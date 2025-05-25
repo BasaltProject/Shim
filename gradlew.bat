@@ -1,3 +1,14 @@
+@rem Gradle wrapper (https://github.com/gradle/gradle).
+@rem Original work Copyright Gradle contributors.
+@rem Original work licensed under Apache-2.0; see docs/licenses/Gradle-LICENSE.txt:
+@rem https://github.com/BasaltProject/Shim/blob/main/docs/licenses/Gradle-LICENSE.txt
+@rem
+@rem Modifications Copyright (c) 2026 BasaltMC.
+@rem Modifications licensed under MIT; see LICENSE:
+@rem https://github.com/BasaltProject/Shim/blob/main/LICENSE
+@rem
+@rem SPDX-License-Identifier: Apache-2.0 AND MIT
+
 @if "%DEBUG%" == "" @echo off
 @rem ##########################################################################
 @rem

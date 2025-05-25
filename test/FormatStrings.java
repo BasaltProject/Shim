@@ -1,3 +1,16 @@
+/*
+ * Based on Avian (https://github.com/ReadyTalk/avian).
+ * Original work Copyright (c) 2008-2015, Avian Contributors.
+ * Original work licensed under ISC; see LICENSE.txt:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
+ *
+ * Modifications Copyright (c) 2026 BasaltMC.
+ * Modifications licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: ISC AND MIT
+ */
+
 /* Copyright (c) 2008-2015, Avian Contributors
 
    Permission to use, copy, modify, and/or distribute this software
@@ -67,7 +80,7 @@ public class FormatStrings {
   public void testNewline() {
     final String newline = System.getProperty("line.separator");
     _testFormat(
-        "<<<" + newline + "    test newlines" + newline + ">>>", 
+        "<<<" + newline + "    test newlines" + newline + ">>>",
         "<<<%n    test newlines%n>>>"
     );
   }
@@ -144,7 +157,7 @@ public class FormatStrings {
     _testFormat("Short C8", "Short %2$X", new Short((short)100), new Short((short)200));
     _testFormat("Byte 64", "Byte %x", new Byte((byte)100));
     _testFormat("Byte c8", "Byte %2$x", new Byte((byte)100), new Byte((byte)200));
- 
+
     _testFormat("Decimal `1`", "Decimal `%d`", new Integer((int)1));
     _testFormat("Decimal `0`", "Decimal `%d`", new Integer((int)0));
     _testFormat("Decimal `100`", "Decimal `%d`", new Integer((int)100));

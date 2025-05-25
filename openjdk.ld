@@ -1,3 +1,13 @@
+# Original work Copyright 2002-2008 Sun Microsystems, Inc.
+# Original work licensed under GPL-2.0-only; see docs/licenses/GPL-2.0.txt:
+# https://github.com/BasaltProject/Shim/blob/main/docs/licenses/GPL-2.0.txt
+#
+# Modifications Copyright (c) 2026 BasaltMC.
+# Modifications licensed under MIT; see LICENSE:
+# https://github.com/BasaltProject/Shim/blob/main/LICENSE
+#
+# SPDX-License-Identifier: GPL-2.0-only AND MIT
+
 #
 # @(#)mapfile-vers-product	1.19 08/02/12 10:56:37
 #
