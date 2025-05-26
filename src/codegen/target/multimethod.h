@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_TARGET_MULTIMETHOD_H
-#define AVIAN_CODEGEN_TARGET_MULTIMETHOD_H
+#ifndef SHIM_CODEGEN_TARGET_MULTIMETHOD_H
+#define SHIM_CODEGEN_TARGET_MULTIMETHOD_H
 
-namespace avian {
+namespace shim {
 namespace codegen {
 
 class Multimethod {
@@ -37,6 +37,6 @@ class Multimethod {
 };
 
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_TARGET_MULTIMETHOD_H
+#endif  // SHIM_CODEGEN_TARGET_MULTIMETHOD_H

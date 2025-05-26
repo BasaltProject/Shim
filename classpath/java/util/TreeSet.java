@@ -23,8 +23,8 @@
 
 package java.util;
 
-import avian.PersistentSet;
-import avian.Cell;
+import shim.PersistentSet;
+import shim.Cell;
 
 public class TreeSet<T> extends AbstractSet<T> implements Collection<T> {
   private PersistentSet<Cell<T>> set;
@@ -74,7 +74,7 @@ public class TreeSet<T> extends AbstractSet<T> implements Collection<T> {
   }
 
   public String toString() {
-    return avian.Data.toString(this);
+    return shim.Data.toString(this);
   }
 
   public boolean add(T value) {

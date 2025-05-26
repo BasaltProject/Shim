@@ -184,7 +184,7 @@ sourceSets {
 }
 
 javadoc {
-  title = "Avian v${version} Class Library API"
+  title = "Basalt Shim v${version} Class Library API"
 }
 
 task javadocJar(type: Jar) {
@@ -196,7 +196,7 @@ task javadocJar(type: Jar) {
 }
 
 jar {
-  baseName "classpath-avian"
+  baseName "classpath-shim"
 }
 
 task downloadLzma(type: Exec) {
@@ -234,11 +234,11 @@ publishing {
         extension "pro"
       }
 
-      module "classpath-avian"
+      module "classpath-shim"
     }
 
-    create("tools-avian-${currentPlatformArch}", IvyPublication) {
-      module "tools-avian-${currentPlatformArch}"
+    create("tools-shim-${currentPlatformArch}", IvyPublication) {
+      module "tools-shim-${currentPlatformArch}"
 
       def publishBinSuffix = currentPlatform == "windows" ? "exe" : "bin"
       def binSuffix = currentPlatform == "windows" ? ".exe" : ""
@@ -262,23 +262,23 @@ publishing {
             binSuffix = ".${publishBinSuffix}"
           }
 
-          module "runtime-avian${buildOption}-${platform.name}"
+          module "runtime-shim${buildOption}-${platform.name}"
 
-          artifact("${nativeBuildDir}/avian${binSuffix}") {
-            name "avian"
+          artifact("${nativeBuildDir}/shim${binSuffix}") {
+            name "shim"
             type publishBinSuffix
             extension publishBinSuffix
           }
 
-          artifact("${nativeBuildDir}/libavian.a") {
-            name "libavian"
+          artifact("${nativeBuildDir}/libshim.a") {
+            name "libshim"
             type "a"
             extension "a"
           }
 
           if (buildOption == "-lzma") {
-            artifact("${nativeBuildDir}/libavian-lzma.a") {
-              name "libavian-lzma"
+            artifact("${nativeBuildDir}/libshim-lzma.a") {
+              name "libshim-lzma"
               type "a"
               extension "a"
             }

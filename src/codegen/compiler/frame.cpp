@@ -21,14 +21,14 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
+#include "shim/target.h"
 
 #include "codegen/compiler/context.h"
 #include "codegen/compiler/frame.h"
 
-#include <avian/codegen/architecture.h>
+#include <shim/codegen/architecture.h>
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -142,4 +142,4 @@ Stack* stack(Context* c, Value* value, Stack* next)
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

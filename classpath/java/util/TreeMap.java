@@ -55,7 +55,7 @@ public class TreeMap<K,V> implements NavigableMap<K,V> {
   }
 
   public String toString() {
-    return avian.Data.toString(this);
+    return shim.Data.toString(this);
   }
 
   @Override
@@ -220,7 +220,7 @@ public class TreeMap<K,V> implements NavigableMap<K,V> {
     }
 
     public <T> T[] toArray(T[] array) {
-      return avian.Data.toArray(this, array);      
+      return shim.Data.toArray(this, array);
     }
 
     public void clear() {
@@ -228,7 +228,7 @@ public class TreeMap<K,V> implements NavigableMap<K,V> {
     }
 
     public Iterator<K> iterator() {
-      return new avian.Data.KeyIterator(set.iterator());
+      return new shim.Data.KeyIterator(set.iterator());
     }
   }
 
@@ -281,7 +281,7 @@ public class TreeMap<K,V> implements NavigableMap<K,V> {
     }
 
     public <T> T[] toArray(T[] array) {
-      return avian.Data.toArray(this, array);      
+      return shim.Data.toArray(this, array);
     }
 
     public void clear() {
@@ -289,7 +289,7 @@ public class TreeMap<K,V> implements NavigableMap<K,V> {
     }
 
     public Iterator<V> iterator() {
-      return new avian.Data.ValueIterator(set.iterator());
+      return new shim.Data.ValueIterator(set.iterator());
     }
   }
 

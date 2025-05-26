@@ -21,7 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/lzma-util.h"
+#include "shim/lzma-util.h"
 #include "C/LzmaDec.h"
 
 using namespace vm;
@@ -40,7 +40,7 @@ int32_t read4(const uint8_t* in)
 namespace vm {
 
 uint8_t* decodeLZMA(System* s,
-                    avian::util::Alloc* a,
+                    shim::util::Alloc* a,
                     uint8_t* in,
                     size_t inSize,
                     size_t* outSize)

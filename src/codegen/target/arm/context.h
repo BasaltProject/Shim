@@ -21,19 +21,19 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_ARM_CONTEXT_H
-#define AVIAN_CODEGEN_ASSEMBLER_ARM_CONTEXT_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_ARM_CONTEXT_H
+#define SHIM_CODEGEN_ASSEMBLER_ARM_CONTEXT_H
 
-#include <avian/codegen/lir.h>
-#include <avian/codegen/assembler.h>
-#include "avian/alloc-vector.h"
+#include <shim/codegen/lir.h>
+#include <shim/codegen/assembler.h>
+#include "shim/alloc-vector.h"
 
 namespace vm {
 class System;
 class Zone;
 }  // namespace vm
 
-namespace avian {
+namespace shim {
 
 namespace util {
 class Aborter;
@@ -109,18 +109,18 @@ class ArchitectureContext {
                                        * lir::Operand::TypeCount];
 };
 
-inline avian::util::Aborter* getAborter(Context* c)
+inline shim::util::Aborter* getAborter(Context* c)
 {
   return c->s;
 }
 
-inline avian::util::Aborter* getAborter(ArchitectureContext* c)
+inline shim::util::Aborter* getAborter(ArchitectureContext* c)
 {
   return c->s;
 }
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_ARM_CONTEXT_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_ARM_CONTEXT_H

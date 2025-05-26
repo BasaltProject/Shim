@@ -23,7 +23,7 @@
 
 /*
  * This file represents a simple cross-platform JNI sockets API
- * It is used from different classes of the default Avian classpath
+ * It is used from different classes of the default Basalt Shim classpath
  */
 
 #ifndef SOCKETS_H_
@@ -31,7 +31,7 @@
 
 #include "jni.h"
 #include "jni-util.h"
-#include "avian/common.h"
+#include "shim/common.h"
 
 #ifdef PLATFORM_WINDOWS
 #include <winsock2.h>
@@ -59,7 +59,7 @@
 
 #endif
 
-namespace avian {
+namespace shim {
 namespace classpath {
 namespace sockets {
 

@@ -281,7 +281,7 @@ public class ArrayDeque<T> extends AbstractDeque<T>
 
   @Override
   public <S> S[] toArray(S[] array) {
-    return avian.Data.toArray(this, array);
+    return shim.Data.toArray(this, array);
   }
 
   public Iterator<T> iterator() {

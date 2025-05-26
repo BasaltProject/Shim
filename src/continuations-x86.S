@@ -66,7 +66,7 @@ LOCAL(vmInvoke_continuationTest):
 #endif
    movq   %r10,(%rsp,%rdi,1)
 
-#ifdef AVIAN_USE_FRAME_POINTER
+#ifdef SHIM_USE_FRAME_POINTER
    // save the current base pointer in the frame and update it
    movq   CONTINUATION_FRAME_POINTER_OFFSET(%rcx),%rdi
    movq   %rbp,(%rsp,%rdi,1)
@@ -105,7 +105,7 @@ LOCAL(vmInvoke_exit):
 #define CONTINUATION_LENGTH 28
 #define CONTINUATION_BODY 32
    
-#ifdef AVIAN_USE_FRAME_POINTER
+#ifdef SHIM_USE_FRAME_POINTER
 #  define CONTINUATION_ALIGNMENT_PADDING 8
 #else
 #  define CONTINUATION_ALIGNMENT_PADDING 12
@@ -160,7 +160,7 @@ LOCAL(vmInvoke_offset):
 #endif
    movl   %esi,(%esp,%edi,1)
    
-#ifdef AVIAN_USE_FRAME_POINTER
+#ifdef SHIM_USE_FRAME_POINTER
    // save the current base pointer in the frame and update it
    movl   CONTINUATION_FRAME_POINTER_OFFSET(%ecx),%edi
    movl   %ebp,(%esp,%edi,1)

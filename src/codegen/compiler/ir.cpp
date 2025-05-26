@@ -24,7 +24,7 @@
 #include "codegen/compiler/context.h"
 #include "codegen/compiler/ir.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -67,4 +67,4 @@ Block* block(Context* c, Event* head)
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

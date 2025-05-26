@@ -24,10 +24,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <avian/common.h>
-#include <avian/util/arg-parser.h>
+#include <shim/common.h>
+#include <shim/util/arg-parser.h>
 
-namespace avian {
+namespace shim {
 namespace util {
 
 Arg::Arg(ArgParser& parser, bool required, const char* name, const char* desc)
@@ -111,4 +111,4 @@ void ArgParser::printUsage(const char* exe)
 }
 
 }  // namespace util
-}  // namespace avian
+}  // namespace shim

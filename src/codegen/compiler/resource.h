@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_RESOURCE_H
-#define AVIAN_CODEGEN_COMPILER_RESOURCE_H
+#ifndef SHIM_CODEGEN_COMPILER_RESOURCE_H
+#define SHIM_CODEGEN_COMPILER_RESOURCE_H
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -85,6 +85,6 @@ void release(Context* c, Resource* resource, Value* value, Site* site);
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_RESOURCE_H
+#endif  // SHIM_CODEGEN_COMPILER_RESOURCE_H

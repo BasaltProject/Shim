@@ -25,7 +25,7 @@
 #include "codegen/compiler/resource.h"
 #include "codegen/compiler/value.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -259,4 +259,4 @@ void release(Context* c,
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

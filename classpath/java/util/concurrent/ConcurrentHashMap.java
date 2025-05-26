@@ -23,9 +23,9 @@
 
 package java.util.concurrent;
 
-import avian.Data;
-import avian.PersistentSet;
-import avian.PersistentSet.Path;
+import shim.Data;
+import shim.PersistentSet;
+import shim.PersistentSet.Path;
 
 import sun.misc.Unsafe;
 import java.util.AbstractMap;

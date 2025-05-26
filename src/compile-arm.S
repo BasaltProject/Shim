@@ -21,8 +21,8 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/types.h"
-#include "avian/target-fields.h"
+#include "shim/types.h"
+#include "shim/target-fields.h"
 
 .text
 
@@ -113,7 +113,7 @@ GLOBAL(vmInvoke_returnAddress):
 .align 2
 GLOBAL(vmInvoke_safeStack):
 
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
    // call the next continuation, if any
    ldr  r5,[r8,#TARGET_THREAD_CONTINUATION]
    cmp  r5,#0
@@ -183,7 +183,7 @@ LOCAL(vmInvoke_exit):
 
   mov   ip, #0
   str   ip, [r8, #TARGET_THREAD_STACK]
-#endif // AVIAN_CONTINUATIONS
+#endif // SHIM_CONTINUATIONS
 
   // restore return type
   ldr   ip, [sp], #4
@@ -197,7 +197,7 @@ LOCAL(vmInvoke_return):
 .globl GLOBAL(vmJumpAndInvoke)
 .align 2
 GLOBAL(vmJumpAndInvoke):
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
    //      r0: thread
    //      r1: address
    //      r2: stack
@@ -260,9 +260,9 @@ LOCAL(vmJumpAndInvoke_getAddress_word):
    .word _GLOBAL_OFFSET_TABLE_-(LOCAL(vmJumpAndInvoke_getAddress)+8)
 #endif // not __APPLE__
 
-#else // not AVIAN_CONTINUATIONS
+#else // not SHIM_CONTINUATIONS
    // vmJumpAndInvoke should only be called when continuations are
    // enabled, so we force a crash if we reach here:
    mov  r1,#0
    ldr  r1,[r1]
-#endif // not AVIAN_CONTINUATIONS
+#endif // not SHIM_CONTINUATIONS

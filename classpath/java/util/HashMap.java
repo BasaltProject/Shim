@@ -23,7 +23,7 @@
 
 package java.util;
 
-import avian.Data;
+import shim.Data;
 
 public class HashMap<K, V> implements Map<K, V> {
   private static final int MinimumCapacity = 16;
@@ -55,7 +55,7 @@ public class HashMap<K, V> implements Map<K, V> {
   }
 
   public String toString() {
-    return avian.Data.toString(this);
+    return shim.Data.toString(this);
   }
 
   public boolean isEmpty() {

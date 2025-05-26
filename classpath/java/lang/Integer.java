@@ -24,7 +24,7 @@
 package java.lang;
 
 public final class Integer extends Number implements Comparable<Integer> {
-  public static final Class TYPE = avian.Classes.forCanonicalName("I");
+  public static final Class TYPE = shim.Classes.forCanonicalName("I");
 
   public static final int MIN_VALUE = 0x80000000;
   public static final int MAX_VALUE = 0x7FFFFFFF;

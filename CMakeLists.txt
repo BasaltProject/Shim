@@ -9,18 +9,18 @@
 #
 # SPDX-License-Identifier: ISC AND MIT
 
-# NOTE that this CMake file doesn't current build all of avian.
+# NOTE that this CMake file doesn't current build all of shim.
 # It only builds what's required for example/kaleidoscope.
 
 cmake_minimum_required (VERSION 2.6)
-project (avian)
+project (shim)
 
 include_directories (include src)
 
 add_definitions (
-  -DAVIAN_TARGET_FORMAT=AVIAN_FORMAT_MACHO
+  -DSHIM_TARGET_FORMAT=SHIM_FORMAT_MACHO
 
-  -DAVIAN_TARGET_ARCH=AVIAN_ARCH_X86_64
+  -DSHIM_TARGET_ARCH=SHIM_ARCH_X86_64
 
   -DTARGET_BYTES_PER_WORD=8
   -D__STDC_LIMIT_MACROS

@@ -174,7 +174,7 @@ public class UnsafeTest {
     System.out.println("method count is "
                        + Unsafe.class.getDeclaredMethods().length);
 
-    Unsafe u = avian.Machine.getUnsafe();
+    Unsafe u = shim.Machine.getUnsafe();
 
     unsafeCatch(u);
     unsafeMemory(u);

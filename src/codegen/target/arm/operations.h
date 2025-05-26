@@ -21,8 +21,8 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_ARM_OPERATIONS_H
-#define AVIAN_CODEGEN_ASSEMBLER_ARM_OPERATIONS_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_ARM_OPERATIONS_H
+#define SHIM_CODEGEN_ASSEMBLER_ARM_OPERATIONS_H
 
 #include "registers.h"
 
@@ -30,7 +30,7 @@ namespace vm {
 class System;
 }
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -442,6 +442,6 @@ void storeLoadBarrier(Context*);
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_ARM_OPERATIONS_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_ARM_OPERATIONS_H

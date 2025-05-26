@@ -27,7 +27,7 @@
 #include "multimethod.h"
 #include "../multimethod.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -152,4 +152,4 @@ void populateTables(ArchitectureContext* con)
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

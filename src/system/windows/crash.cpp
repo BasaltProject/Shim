@@ -21,9 +21,9 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/common.h>
+#include <shim/common.h>
 
-namespace avian {
+namespace shim {
 namespace system {
 
 NO_RETURN void crash()
@@ -38,4 +38,4 @@ NO_RETURN void crash()
 }
 
 }  // namespace system
-}  // namespace avian
+}  // namespace shim

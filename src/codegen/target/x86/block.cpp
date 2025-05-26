@@ -23,9 +23,9 @@
 
 #include "block.h"
 
-#include <avian/codegen/assembler.h>
+#include <shim/codegen/assembler.h>
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -54,4 +54,4 @@ unsigned MyBlock::resolve(unsigned start, Assembler::Block* next)
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

@@ -24,7 +24,7 @@
 #ifndef TEST_HARNESS_H
 #define TEST_HARNESS_H
 
-#include "avian/common.h"
+#include "shim/common.h"
 #include <stdio.h>
 
 class Test {

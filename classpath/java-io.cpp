@@ -74,7 +74,7 @@ typedef wchar_t char_t;
 #if defined(WINAPI_FAMILY)
 #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
 
-#include "avian-interop.h"
+#include "shim-interop.h"
 #define SKIP_OPERATOR_NEW
 
 #endif
@@ -277,7 +277,7 @@ extern "C" JNIEXPORT jstring JNICALL
     std::wstring partialPath = chars;
     releaseChars(e, path, chars);
 
-    std::wstring fullPath = AvianInterop::GetFullPath(partialPath);
+    std::wstring fullPath = ShimInterop::GetFullPath(partialPath);
 
     return e->NewString(reinterpret_cast<const jchar*>(fullPath.c_str()),
                         fullPath.length());

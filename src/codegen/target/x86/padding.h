@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_X86_PADDING_H
-#define AVIAN_CODEGEN_ASSEMBLER_X86_PADDING_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_X86_PADDING_H
+#define SHIM_CODEGEN_ASSEMBLER_X86_PADDING_H
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -48,6 +48,6 @@ unsigned padding(AlignmentPadding* p,
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_X86_PADDING_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_X86_PADDING_H

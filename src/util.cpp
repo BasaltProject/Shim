@@ -21,8 +21,8 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/util.h"
-#include <avian/util/list.h>
+#include "shim/util.h"
+#include <shim/util/list.h>
 
 using namespace vm;
 

@@ -13,10 +13,10 @@
 
 package extra;
 
-import static avian.Continuations.callWithCurrentContinuation;
+import static shim.Continuations.callWithCurrentContinuation;
 
-import avian.Function;
-import avian.Callback;
+import shim.Function;
+import shim.Callback;
 
 public class Continuations {
   private static void expect(boolean v) {

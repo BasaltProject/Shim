@@ -21,11 +21,11 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/util/runtime-array.h>
+#include <shim/util/runtime-array.h>
 
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/architecture.h>
-#include <avian/codegen/registers.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/architecture.h>
+#include <shim/codegen/registers.h>
 
 #include "context.h"
 #include "block.h"
@@ -36,14 +36,14 @@
 #include "registers.h"
 #include "../multimethod.h"
 
-#include "avian/alloc-vector.h"
-#include <avian/util/abort.h>
+#include "shim/alloc-vector.h"
+#include <shim/util/abort.h>
 
 using namespace vm;
-using namespace avian::codegen;
-using namespace avian::util;
+using namespace shim::codegen;
+using namespace shim::util;
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -1188,4 +1188,4 @@ Architecture* makeArchitectureArm(System* system, bool)
 }
 
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

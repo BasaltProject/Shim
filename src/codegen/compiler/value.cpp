@@ -21,12 +21,12 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
+#include "shim/target.h"
 
 #include "codegen/compiler/regalloc.h"
 #include "codegen/compiler/site.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -197,4 +197,4 @@ Value* value(Context* c, ir::Type type, Site* site, Site* target)
 
 }  // namespace regalloc
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

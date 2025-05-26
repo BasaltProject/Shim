@@ -21,21 +21,21 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
-#include "avian/alloc-vector.h"
+#include "shim/target.h"
+#include "shim/alloc-vector.h"
 
-#include <avian/util/abort.h>
-#include <avian/util/math.h>
+#include <shim/util/abort.h>
+#include <shim/util/math.h>
 
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/promise.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/promise.h>
 
 #include "context.h"
 #include "encode.h"
 #include "registers.h"
 #include "fixup.h"
 
-using namespace avian::util;
+using namespace shim::util;
 
 namespace {
 
@@ -54,7 +54,7 @@ int64_t signExtend(unsigned size, int64_t v)
 
 }  // namespace
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -442,4 +442,4 @@ void moveCR2(Context* c,
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

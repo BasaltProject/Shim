@@ -26,7 +26,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <avian/tools/object-writer/tools.h>
+#include <shim/tools/object-writer/tools.h>
 
 namespace {
 
@@ -105,8 +105,8 @@ inline unsigned pad(unsigned n)
   return (n + (4 - 1)) & ~(4 - 1);
 }
 
-using namespace avian::tools;
-using namespace avian::util;
+using namespace shim::tools;
+using namespace shim::util;
 
 template <unsigned BytesPerWord, PlatformInfo::Architecture Architecture>
 class WindowsPlatform : public Platform {

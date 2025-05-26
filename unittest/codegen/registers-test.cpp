@@ -23,11 +23,11 @@
 
 #include <stdio.h>
 
-#include <avian/codegen/registers.h>
+#include <shim/codegen/registers.h>
 
 #include "test-harness.h"
 
-using namespace avian::codegen;
+using namespace shim::codegen;
 using namespace vm;
 
 TEST(RegisterIterator)

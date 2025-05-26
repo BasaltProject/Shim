@@ -31,8 +31,8 @@
 
 namespace {
 
-using namespace avian::codegen;
-using namespace avian::codegen::arm;
+using namespace shim::codegen;
+using namespace shim::codegen::arm;
 
 Register fpr(Register reg)
 {
@@ -503,11 +503,11 @@ uint32_t dmb(int flag)
 
 }  // namespace
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
-using namespace avian::util;
+using namespace shim::util;
 
 void shiftLeftR(Context* c,
                 unsigned size,
@@ -1638,6 +1638,6 @@ void storeLoadBarrier(Context* c)
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
 #endif  // TARGET_BYTES_PER_WORD == 8

@@ -23,8 +23,8 @@
 
 package java.lang.invoke;
 
-import avian.Classes;
-import avian.SystemClassLoader;
+import shim.Classes;
+import shim.SystemClassLoader;
 
 public class MethodHandle {
   static final int REF_invokeVirtual = 5;
@@ -35,10 +35,10 @@ public class MethodHandle {
 
   final int kind;
   private final ClassLoader loader;
-  final avian.VMMethod method;
+  final shim.VMMethod method;
   private volatile MethodType type;
 
-  MethodHandle(int kind, ClassLoader loader, avian.VMMethod method) {
+  MethodHandle(int kind, ClassLoader loader, shim.VMMethod method) {
     this.kind = kind;
     this.loader = loader;
     this.method = method;

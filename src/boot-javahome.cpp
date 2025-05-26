@@ -21,7 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/common.h"
+#include "shim/common.h"
 
 #ifdef BOOT_JAVAHOME
 
@@ -35,7 +35,7 @@ extern "C" {
 extern const uint8_t SYMBOL(start)[];
 extern const uint8_t SYMBOL(end)[];
 
-AVIAN_EXPORT const uint8_t* javahomeJar(size_t* size)
+SHIM_EXPORT const uint8_t* javahomeJar(size_t* size)
 {
   *size = SYMBOL(end) - SYMBOL(start);
   return SYMBOL(start);

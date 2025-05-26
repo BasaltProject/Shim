@@ -21,30 +21,30 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/common.h"
+#include "shim/common.h"
 
-#include <avian/codegen/targets.h>
+#include <shim/codegen/targets.h>
 
-#include "avian/environment.h"
+#include "shim/environment.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 
 Architecture* makeArchitectureNative(vm::System* system,
                                      bool useNativeFeatures UNUSED)
 {
-#ifndef AVIAN_TARGET_ARCH
+#ifndef SHIM_TARGET_ARCH
 #error "Must specify native target!"
 #endif
 
-#if AVIAN_TARGET_ARCH == AVIAN_ARCH_UNKNOWN
+#if SHIM_TARGET_ARCH == SHIM_ARCH_UNKNOWN
   system->abort();
   return 0;
-#elif(AVIAN_TARGET_ARCH == AVIAN_ARCH_X86) \
-    || (AVIAN_TARGET_ARCH == AVIAN_ARCH_X86_64)
+#elif(SHIM_TARGET_ARCH == SHIM_ARCH_X86) \
+    || (SHIM_TARGET_ARCH == SHIM_ARCH_X86_64)
   return makeArchitectureX86(system, useNativeFeatures);
-#elif (AVIAN_TARGET_ARCH == AVIAN_ARCH_ARM) \
-    || (AVIAN_TARGET_ARCH == AVIAN_ARCH_ARM64)
+#elif (SHIM_TARGET_ARCH == SHIM_ARCH_ARM) \
+    || (SHIM_TARGET_ARCH == SHIM_ARCH_ARM64)
   return makeArchitectureArm(system, useNativeFeatures);
 #else
 #error "Unsupported codegen target"
@@ -52,4 +52,4 @@ Architecture* makeArchitectureNative(vm::System* system,
 }
 
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

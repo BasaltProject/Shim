@@ -15,11 +15,11 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
-import avian.testing.annotations.Color;
-import avian.testing.annotations.Test;
-import avian.testing.annotations.TestComplex;
-import avian.testing.annotations.TestEnum;
-import avian.testing.annotations.TestInteger;
+import shim.testing.annotations.Color;
+import shim.testing.annotations.Test;
+import shim.testing.annotations.TestComplex;
+import shim.testing.annotations.TestEnum;
+import shim.testing.annotations.TestInteger;
 
 public class Annotations {
   private static void expect(boolean v) {

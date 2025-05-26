@@ -23,7 +23,7 @@
 
 package java.lang.reflect;
 
-import avian.Classes;
+import shim.Classes;
 
 import java.util.ArrayList;
 import java.util.List;

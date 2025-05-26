@@ -23,7 +23,7 @@
 
 #include "stdlib.h"
 #include "string.h"
-#include "avian/zlib-custom.h"
+#include "shim/zlib-custom.h"
 
 #include "jni.h"
 #include "jni-util.h"

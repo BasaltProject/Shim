@@ -14,7 +14,7 @@
 import java.nio.ByteBuffer;
 import java.nio.BufferUnderflowException;
 import java.nio.BufferOverflowException;
-import static avian.testing.Asserts.*;
+import static shim.testing.Asserts.*;
 
 public class Buffers {
   static {

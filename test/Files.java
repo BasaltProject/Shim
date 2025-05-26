@@ -51,13 +51,13 @@ public class Files {
   private static void setExecutableTestWithPermissions(boolean executable)
     throws Exception
   {
-    File file = File.createTempFile("avian.", null);
+    File file = File.createTempFile("shim.", null);
     try {
       file.setExecutable(executable);
       if (executable) {
         expect(file.canExecute());
       } else {
-        // Commented out because this will fail on Windows - both on Avian and on OpenJDK
+        // Commented out because this will fail on Windows - both on Basalt Shim and on OpenJDK
         // The implementation for Windows considers canExecute() to be the same as canRead()
         // expect(!file.canExecute());
       }

@@ -11,7 +11,7 @@
 
 MAKEFLAGS = -s
 
-name = avian
+name = shim
 version := $(shell grep version gradle.properties | cut -d'=' -f2)
 
 get-java-version = $(shell "$1" -version 2>&1 \
@@ -133,7 +133,7 @@ win64 ?= $(root)/win64
 winrt ?= $(root)/winrt
 wp8 ?= $(root)/wp8
 
-classpath = avian
+classpath = shim
 
 bootimage-classpath = $(classpath-build)
 
@@ -147,7 +147,7 @@ endif
 
 test-executable = $(shell pwd)/$(executable)
 boot-classpath = $(classpath-build)
-embed-prefix = /avian-embedded
+embed-prefix = /shim-embedded
 
 native-path = echo
 
@@ -200,7 +200,7 @@ ifneq ($(openjdk),)
 		include openjdk-src.mk
 		options := $(options)-openjdk-src
 		classpath-objects = $(openjdk-objects) $(openjdk-local-objects)
-		classpath-cflags = -DAVIAN_OPENJDK_SRC -DBOOT_JAVAHOME
+		classpath-cflags = -DSHIM_OPENJDK_SRC -DBOOT_JAVAHOME
 		openjdk-jar-dep = $(build)/openjdk-jar.dep
 		classpath-jar-dep = $(openjdk-jar-dep)
 		javahome = $(embed-prefix)/javahomeJar
@@ -421,7 +421,7 @@ ifneq ($(android),)
 	stub-objects = $(call cpp-objects,$(stub-sources),$(src),$(build))
 endif
 
-ifeq ($(classpath),avian)
+ifeq ($(classpath),shim)
 	jni-sources := $(shell find $(classpath-src) -name '*.cpp')
 	jni-objects = $(call cpp-objects,$(jni-sources),$(classpath-src),$(build))
 	classpath-objects = $(jni-objects)
@@ -488,17 +488,17 @@ target-cflags = -DTARGET_BYTES_PER_WORD=$(pointer-size)
 
 common-cflags = $(warnings) -std=c++0x -fno-rtti -fno-exceptions -I$(classpath-src) \
 	"-I$(JAVA_HOME)/include" -I$(src) -I$(build) -Iinclude $(classpath-cflags) \
-	-D__STDC_LIMIT_MACROS -D_JNI_IMPLEMENTATION_ -DAVIAN_VERSION=\"$(version)\" \
-	-DAVIAN_INFO="\"$(info)\"" \
-	-DUSE_ATOMIC_OPERATIONS -DAVIAN_JAVA_HOME=\"$(javahome)\" \
-	-DAVIAN_EMBED_PREFIX=\"$(embed-prefix)\" $(target-cflags)
+	-D__STDC_LIMIT_MACROS -D_JNI_IMPLEMENTATION_ -DSHIM_VERSION=\"$(version)\" \
+	-DSHIM_INFO="\"$(info)\"" \
+	-DUSE_ATOMIC_OPERATIONS -DSHIM_JAVA_HOME=\"$(javahome)\" \
+	-DSHIM_EMBED_PREFIX=\"$(embed-prefix)\" $(target-cflags)
 
 asmflags = $(target-cflags) -I$(src)
 
 ifneq (,$(filter i386 x86_64,$(arch)))
 	ifeq ($(use-frame-pointer),true)
-		common-cflags += -fno-omit-frame-pointer -DAVIAN_USE_FRAME_POINTER
-		asmflags += -DAVIAN_USE_FRAME_POINTER
+		common-cflags += -fno-omit-frame-pointer -DSHIM_USE_FRAME_POINTER
+		asmflags += -DSHIM_USE_FRAME_POINTER
 	endif
 endif
 
@@ -507,8 +507,8 @@ build-cflags = $(common-cflags) -fPIC -fvisibility=hidden \
 
 converter-cflags = -D__STDC_CONSTANT_MACROS -std=c++0x -Iinclude/ -Isrc/ \
 	-fno-rtti -fno-exceptions \
-	-DAVIAN_TARGET_ARCH=AVIAN_ARCH_UNKNOWN \
-	-DAVIAN_TARGET_FORMAT=AVIAN_FORMAT_UNKNOWN \
+	-DSHIM_TARGET_ARCH=SHIM_ARCH_UNKNOWN \
+	-DSHIM_TARGET_FORMAT=SHIM_FORMAT_UNKNOWN \
 	-Wall -Wextra $(werror) -Wunused-parameter -Winit-self -Wno-non-virtual-dtor
 
 cflags = $(build-cflags)
@@ -566,7 +566,7 @@ else
 	remote-test = true
 endif
 remote-test-user = ${USER}
-remote-test-dir = /tmp/avian-test-${USER}
+remote-test-dir = /tmp/shim-test-${USER}
 
 static = -static
 shared = -shared
@@ -620,11 +620,11 @@ ifneq (,$(filter arm arm64,$(arch)))
 endif
 
 ifeq ($(armv6),true)
-	cflags += -DAVIAN_ASSUME_ARMV6
+	cflags += -DSHIM_ASSUME_ARMV6
 endif
 
 ifeq ($(platform),ios)
-	cflags += -DAVIAN_IOS
+	cflags += -DSHIM_IOS
 	use-lto = false
 endif
 
@@ -908,7 +908,7 @@ ifeq ($(platform),windows)
 	inc = "$(win32)/include"
 	lib = "$(win32)/lib"
 
-	embed-prefix = c:/avian-embedded
+	embed-prefix = c:/shim-embedded
 	system = windows
 
 	so-prefix =
@@ -1013,7 +1013,7 @@ ifeq ($(platform),wp8)
 	target-format = pe
 	ms_cl_compiler = wp8
 	use-lto = false
-	supports_avian_executable = false
+	supports_shim_executable = false
 	aot-only = true
 	ifneq ($(bootimage),true)
 		x := $(error Windows Phone 8 target requires bootimage=true)
@@ -1070,9 +1070,9 @@ ifeq ($(platform),wp8)
 		-AI"$(WP80_KIT)\Windows Metadata" \
 		-I"$(WP80_SDK)\include" -I"$(WP80_KIT)\Include" -I"$(WP80_KIT)\Include\minwin" -I"$(WP80_KIT)\Include\mincore" \
 		-DWINAPI_FAMILY=WINAPI_FAMILY_PHONE_APP -D_USRDLL -D_WINDLL \
-		-DAVIAN_VERSION=\"$(version)\" -D_JNI_IMPLEMENTATION_ \
-		-DUSE_ATOMIC_OPERATIONS -DAVIAN_JAVA_HOME=\"$(javahome)\" \
-		-DAVIAN_EMBED_PREFIX=\"$(embed-prefix)\" \
+		-DSHIM_VERSION=\"$(version)\" -D_JNI_IMPLEMENTATION_ \
+		-DUSE_ATOMIC_OPERATIONS -DSHIM_JAVA_HOME=\"$(javahome)\" \
+		-DSHIM_EMBED_PREFIX=\"$(embed-prefix)\" \
 		-I"$(shell $(windows-path) "$(wp8)/zlib/upstream")" -I"$(shell $(windows-path) "$(wp8)/interop/avian-interop-client")" \
 		-I"$(shell $(windows-path) "$(wp8)/include")" -I$(src) -I$(classpath-src) \
 		-I"$(build)" \
@@ -1179,9 +1179,9 @@ ifdef msvc
 	mt = "mt.exe"
 	ar = "$(msvc)/BIN/lib.exe"
 	manifest-flags = -MANIFEST -MANIFESTFILE:$(@).manifest
-	cflags = -nologo -DAVIAN_VERSION=\"$(version)\" -D_JNI_IMPLEMENTATION_ \
-		-DUSE_ATOMIC_OPERATIONS -DAVIAN_JAVA_HOME=\"$(javahome)\" \
-		-DAVIAN_EMBED_PREFIX=\"$(embed-prefix)\" \
+	cflags = -nologo -DSHIM_VERSION=\"$(version)\" -D_JNI_IMPLEMENTATION_ \
+		-DUSE_ATOMIC_OPERATIONS -DSHIM_JAVA_HOME=\"$(javahome)\" \
+		-DSHIM_EMBED_PREFIX=\"$(embed-prefix)\" \
 		-Fd$(build)/$(name).pdb -I"$(zlib)/include" -I$(src) -I$(classpath-src) \
 		-I"$(build)" -Iinclude \
 		-I"$(windows-java-home)/include" -I"$(windows-java-home)/include/win32" \
@@ -1351,7 +1351,7 @@ ifeq ($(process),compile)
 	vm-asm-sources += $(src)/compile-$(arch).$(asm-format)
 endif
 ifeq ($(aot-only),true)
-	cflags += -DAVIAN_AOT_ONLY
+	cflags += -DSHIM_AOT_ONLY
 endif
 
 vm-cpp-objects = $(call cpp-objects,$(vm-sources),$(src),$(build))
@@ -1368,12 +1368,12 @@ unittest-objects = $(call cpp-objects,$(unittest-sources),$(unittest),$(build)/u
 vm-heapwalk-objects = $(heapwalk-objects)
 
 ifeq ($(tails),true)
-	cflags += -DAVIAN_TAILS
+	cflags += -DSHIM_TAILS
 endif
 
 ifeq ($(continuations),true)
-	cflags += -DAVIAN_CONTINUATIONS
-	asmflags += -DAVIAN_CONTINUATIONS
+	cflags += -DSHIM_CONTINUATIONS
+	asmflags += -DSHIM_CONTINUATIONS
 endif
 
 bootimage-generator-sources = $(src)/tools/bootimage-generator/main.cpp $(src)/util/arg-parser.cpp $(stub-sources)
@@ -1397,11 +1397,11 @@ codeimage-object = $(build)/codeimage-bin.o
 
 ifeq ($(bootimage),true)
 	vm-classpath-objects = $(bootimage-object) $(codeimage-object)
-	cflags += -DBOOT_IMAGE -DAVIAN_CLASSPATH=\"\"
+	cflags += -DBOOT_IMAGE -DSHIM_CLASSPATH=\"\"
 else
 	vm-classpath-objects = $(classpath-object)
 	cflags += -DBOOT_CLASSPATH=\"[classpathJar]\" \
-		-DAVIAN_CLASSPATH=\"[classpathJar]\"
+		-DSHIM_CLASSPATH=\"[classpathJar]\"
 endif
 
 cflags += $(extra-cflags)
@@ -1426,7 +1426,7 @@ generator-sources = \
 	$(src)/util/arg-parser.cpp
 
 ifneq ($(lzma),)
-	common-cflags += -I$(lzma) -DAVIAN_USE_LZMA
+	common-cflags += -I$(lzma) -DSHIM_USE_LZMA
 
 	vm-sources += \
 		$(src)/lzma-decode.cpp
@@ -1467,7 +1467,7 @@ ifneq ($(lzma),)
 
 	lzma-loader = $(build)/lzma/load.o
 
-	lzma-library = $(build)/libavian-lzma.a
+	lzma-library = $(build)/libshim-lzma.a
 endif
 
 generator-cpp-objects = \
@@ -1506,37 +1506,37 @@ executable-dynamic = $(build)/$(name)-dynamic$(exe-suffix)
 
 unittest-executable = $(build)/$(name)-unittest${exe-suffix}
 
-ifneq ($(classpath),avian)
+ifneq ($(classpath),shim)
 # Assembler, ConstantPool, and Stream are not technically needed for a
 # working build, but we include them since our Subroutine test uses
 # them to synthesize a class:
 	classpath-sources := \
-		$(classpath-src)/avian/Addendum.java \
-		$(classpath-src)/avian/AnnotationInvocationHandler.java \
-		$(classpath-src)/avian/Assembler.java \
-		$(classpath-src)/avian/Callback.java \
-		$(classpath-src)/avian/Cell.java \
-		$(classpath-src)/avian/ClassAddendum.java \
-		$(classpath-src)/avian/Classes.java \
-		$(classpath-src)/avian/Code.java \
-		$(classpath-src)/avian/ConstantPool.java \
-		$(classpath-src)/avian/Continuations.java \
-		$(classpath-src)/avian/FieldAddendum.java \
-		$(classpath-src)/avian/Function.java \
-		$(classpath-src)/avian/IncompatibleContinuationException.java \
-		$(classpath-src)/avian/InnerClassReference.java \
-		$(classpath-src)/avian/Machine.java \
-		$(classpath-src)/avian/MethodAddendum.java \
-		$(classpath-src)/avian/Pair.java \
-		$(classpath-src)/avian/Singleton.java \
-		$(classpath-src)/avian/Stream.java \
-		$(classpath-src)/avian/SystemClassLoader.java \
-		$(classpath-src)/avian/Traces.java \
-		$(classpath-src)/avian/VMClass.java \
-		$(classpath-src)/avian/VMField.java \
-		$(classpath-src)/avian/VMMethod.java \
-		$(classpath-src)/avian/avianvmresource/Handler.java \
-		$(classpath-src)/avian/file/Handler.java \
+		$(classpath-src)/shim/Addendum.java \
+		$(classpath-src)/shim/AnnotationInvocationHandler.java \
+		$(classpath-src)/shim/Assembler.java \
+		$(classpath-src)/shim/Callback.java \
+		$(classpath-src)/shim/Cell.java \
+		$(classpath-src)/shim/ClassAddendum.java \
+		$(classpath-src)/shim/Classes.java \
+		$(classpath-src)/shim/Code.java \
+		$(classpath-src)/shim/ConstantPool.java \
+		$(classpath-src)/shim/Continuations.java \
+		$(classpath-src)/shim/FieldAddendum.java \
+		$(classpath-src)/shim/Function.java \
+		$(classpath-src)/shim/IncompatibleContinuationException.java \
+		$(classpath-src)/shim/InnerClassReference.java \
+		$(classpath-src)/shim/Machine.java \
+		$(classpath-src)/shim/MethodAddendum.java \
+		$(classpath-src)/shim/Pair.java \
+		$(classpath-src)/shim/Singleton.java \
+		$(classpath-src)/shim/Stream.java \
+		$(classpath-src)/shim/SystemClassLoader.java \
+		$(classpath-src)/shim/Traces.java \
+		$(classpath-src)/shim/VMClass.java \
+		$(classpath-src)/shim/VMField.java \
+		$(classpath-src)/shim/VMMethod.java \
+		$(classpath-src)/shim/shimvmresource/Handler.java \
+		$(classpath-src)/shim/file/Handler.java \
 		$(classpath-src)/java/lang/invoke/MethodHandle.java \
 		$(classpath-src)/java/lang/invoke/MethodHandles.java \
 		$(classpath-src)/java/lang/invoke/MethodType.java \
@@ -1574,10 +1574,10 @@ classpath-object = $(build)/classpath-jar.o
 classpath-dep = $(classpath-build).dep
 
 vm-classes = \
-	avian/*.class \
-	avian/resource/*.class
+	shim/*.class \
+	shim/resource/*.class
 
-test-support-sources = $(shell find $(test)/avian/ -name '*.java')
+test-support-sources = $(shell find $(test)/shim/ -name '*.java')
 test-sources := $(wildcard $(test)/*.java)
 
 # HACK ALERT!!
@@ -1631,31 +1631,31 @@ ifeq ($(tails),true)
 endif
 
 ifeq ($(target-arch),i386)
-	cflags += -DAVIAN_TARGET_ARCH=AVIAN_ARCH_X86
+	cflags += -DSHIM_TARGET_ARCH=SHIM_ARCH_X86
 endif
 
 ifeq ($(target-arch),x86_64)
-	cflags += -DAVIAN_TARGET_ARCH=AVIAN_ARCH_X86_64
+	cflags += -DSHIM_TARGET_ARCH=SHIM_ARCH_X86_64
 endif
 
 ifeq ($(target-arch),arm)
-	cflags += -DAVIAN_TARGET_ARCH=AVIAN_ARCH_ARM
+	cflags += -DSHIM_TARGET_ARCH=SHIM_ARCH_ARM
 endif
 
 ifeq ($(target-arch),arm64)
-	cflags += -DAVIAN_TARGET_ARCH=AVIAN_ARCH_ARM64
+	cflags += -DSHIM_TARGET_ARCH=SHIM_ARCH_ARM64
 endif
 
 ifeq ($(target-format),elf)
-	cflags += -DAVIAN_TARGET_FORMAT=AVIAN_FORMAT_ELF
+	cflags += -DSHIM_TARGET_FORMAT=SHIM_FORMAT_ELF
 endif
 
 ifeq ($(target-format),pe)
-	cflags += -DAVIAN_TARGET_FORMAT=AVIAN_FORMAT_PE
+	cflags += -DSHIM_TARGET_FORMAT=SHIM_FORMAT_PE
 endif
 
 ifeq ($(target-format),macho)
-	cflags += -DAVIAN_TARGET_FORMAT=AVIAN_FORMAT_MACHO
+	cflags += -DSHIM_TARGET_FORMAT=SHIM_FORMAT_MACHO
 endif
 
 class-name = $(patsubst $(1)/%.class,%,$(2))
@@ -1669,12 +1669,12 @@ test-args = $(test-flags) $(input)
 ifneq ($(filter linux windows macosx,$(platform)),)
 eclipse-exec-env = eclipse-ee
 eclipse-jdk-dir = $(build)/eclipse/jdk
-eclipse-ee-file = $(eclipse-jdk-dir)/avian.ee
+eclipse-ee-file = $(eclipse-jdk-dir)/shim.ee
 eclipse-bin-dir = $(eclipse-jdk-dir)/bin
 eclipse-lib-dir = $(eclipse-jdk-dir)/jre/lib
 eclipse-src-dir = $(eclipse-jdk-dir)/src
 define eclipse-ee-descriptor
-# An Eclipse execution environment for the Avian JVM\
+# An Eclipse execution environment for the Basalt Shim JVM\
 \n-Dee.executable=bin/java${exe-suffix}\
 \n-Dee.bootclasspath=jre/lib/rt.jar\
 \n-Dee.language.level=1.7\
@@ -1688,7 +1688,7 @@ eclipse-exec-env =
 endif
 
 .PHONY: build
-ifneq ($(supports_avian_executable),false)
+ifneq ($(supports_shim_executable),false)
 build: $(static-library) $(executable) $(dynamic-library) $(lzma-library) \
 	$(lzma-encoder) $(executable-dynamic) $(classpath-dep) $(test-dep) \
 	$(test-extra-dep) $(embed) $(build)/classpath.jar $(eclipse-exec-env)
@@ -1736,11 +1736,11 @@ jdk-test: $(test-dep) $(build)/classpath.jar $(build)/jdk-run-tests.sh $(build)/
 
 .PHONY: tarball
 tarball:
-	@echo "creating build/avian-$(version).tar.bz2"
+	@echo "creating build/shim-$(version).tar.bz2"
 	@mkdir -p build
 	(cd .. && tar --exclude=build --exclude=cmake-build --exclude=distrib \
 		--exclude=lib --exclude='.*' --exclude='*~' \
-		-cjf avian/build/avian-$(version).tar.bz2 avian)
+		-cjf shim/build/shim-$(version).tar.bz2 shim)
 
 .PHONY: clean-current
 clean-current:
@@ -2051,16 +2051,16 @@ $(lzma-encoder): $(lzma-encoder-objects) $(lzma-encoder-lzma-objects)
 
 $(lzma-library): $(lzma-loader) $(lzma-decode-objects)
 	@echo "creating $(@)"
-	@rm -rf $(build)/libavian-lzma
-	@mkdir -p $(build)/libavian-lzma
+	@rm -rf $(build)/libshim-lzma
+	@mkdir -p $(build)/libshim-lzma
 	rm -rf $(@)
 	for x in $(^); \
-		do cp $${x} $(build)/libavian-lzma/$$(echo $${x} | sed s:/:_:g); \
+		do cp $${x} $(build)/libshim-lzma/$$(echo $${x} | sed s:/:_:g); \
 	done
 ifdef ms_cl_compiler
-	$(ar) $(arflags) $(build)/libavian-lzma/*.o -out:$(@)
+	$(ar) $(arflags) $(build)/libshim-lzma/*.o -out:$(@)
 else
-	$(ar) cru $(@) $(build)/libavian-lzma/*.o
+	$(ar) cru $(@) $(build)/libshim-lzma/*.o
 	$(ranlib) $(@)
 endif
 
@@ -2112,16 +2112,16 @@ $(jni-objects): $(build)/%.o: $(classpath-src)/%.cpp $(vm-depends)
 $(static-library): $(vm-objects) $(classpath-objects) $(vm-heapwalk-objects) \
 		$(javahome-object) $(boot-javahome-object) $(lzma-decode-objects)
 	@echo "creating $(@)"
-	@rm -rf $(build)/libavian
-	@mkdir -p $(build)/libavian
+	@rm -rf $(build)/libshim
+	@mkdir -p $(build)/libshim
 	rm -rf $(@)
 	for x in $(^); \
-		do cp $${x} $(build)/libavian/$$(echo $${x} | sed s:/:_:g); \
+		do cp $${x} $(build)/libshim/$$(echo $${x} | sed s:/:_:g); \
 	done
 ifdef ms_cl_compiler
-	$(ar) $(arflags) $(build)/libavian/*.o -out:$(@)
+	$(ar) $(arflags) $(build)/libshim/*.o -out:$(@)
 else
-	$(ar) cru $(@) $(build)/libavian/*.o
+	$(ar) cru $(@) $(build)/libshim/*.o
 	$(ranlib) $(@)
 endif
 

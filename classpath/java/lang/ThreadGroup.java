@@ -23,7 +23,7 @@
 
 package java.lang;
 
-import avian.Cell;
+import shim.Cell;
 
 public class ThreadGroup implements Thread.UncaughtExceptionHandler {
   private final ThreadGroup parent;

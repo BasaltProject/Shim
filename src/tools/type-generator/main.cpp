@@ -34,28 +34,28 @@
 #include <sstream>
 #include <algorithm>
 
-#include "avian/constants.h"
-#include "avian/finder.h"
+#include "shim/constants.h"
+#include "shim/finder.h"
 
-#include <avian/util/arg-parser.h>
-#include <avian/util/stream.h>
-#include <avian/util/math.h>
+#include <shim/util/arg-parser.h>
+#include <shim/util/stream.h>
+#include <shim/util/math.h>
 
 #include "io.h"
 #include "sexpr.h"
 
 #include "assert.h"
 
-using namespace avian::util;
+using namespace shim::util;
 
 #define UNREACHABLE abort()
 
 #define UNUSED __attribute__((unused))
 
 using namespace vm;
-using namespace avian::tools::typegenerator;
+using namespace shim::tools::typegenerator;
 
-namespace avian {
+namespace shim {
 namespace tools {
 namespace typegenerator {
 
@@ -487,7 +487,7 @@ class ClassParser {
 
           renamed->name = f.aliasName;
 
-          // TODO: this currently works around how avian uses an object (either
+          // TODO: this currently works around how shim uses an object (either
           // a char[] or byte[]) for String.data
           renamed->typeName = f.field->typeName;
           renamed->javaSpec = f.field->javaSpec;
@@ -1124,14 +1124,14 @@ void writeClassAccessors(Output* out, Module& module, Class* cl)
   }
   if (cl->arrayField) {
     Field* f = cl->arrayField;
-    out->write("  avian::util::Slice<");
+    out->write("  shim::util::Slice<");
     if (isFieldGcVisible(module, f)) {
       out->write("const ");
     }
     out->write(cppFieldType(module, f));
     out->write("> ");
     out->write(obfuscate(f->name));
-    out->write("() { return avian::util::Slice<");
+    out->write("() { return shim::util::Slice<");
     if (isFieldGcVisible(module, f)) {
       out->write("const ");
     }
@@ -1652,7 +1652,7 @@ int main(int ac, char** av)
 
   System* system = makeSystem();
 
-  class MyAllocator : public avian::util::Alloc {
+  class MyAllocator : public shim::util::Alloc {
    public:
     MyAllocator(System* s) : s(s)
     {

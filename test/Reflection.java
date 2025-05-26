@@ -276,7 +276,7 @@ public class Reflection {
     expect((Foo.class.getMethod("toString").getModifiers()
             & Modifier.PUBLIC) != 0);
 
-    expect(avian.TestReflection.get(Baz.class.getField("foo"), new Baz())
+    expect(shim.TestReflection.get(Baz.class.getField("foo"), new Baz())
            .equals(42));
     expect((Baz.class.getModifiers() & Modifier.PUBLIC) == 0);
 
@@ -288,8 +288,8 @@ public class Reflection {
       }
     }.run();
 
-    expect(avian.testing.annotations.Test.class.getPackage().getName().equals
-           ("avian.testing.annotations"));
+    expect(shim.testing.annotations.Test.class.getPackage().getName().equals
+           ("shim.testing.annotations"));
 
     expect(Baz.class.getField("foo").getAnnotation(Ann.class) == null);
     expect(Baz.class.getField("foo").getAnnotations().length == 0);

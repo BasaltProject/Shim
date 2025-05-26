@@ -23,7 +23,7 @@
 
 #include <stdlib.h>
 
-#include "avian/common.h"
+#include "shim/common.h"
 
 // since we aren't linking against libstdc++, we must implement this
 // ourselves:
@@ -46,7 +46,7 @@ extern "C" {
 extern const uint8_t BOOTIMAGE_SYMBOL(start)[];
 extern const uint8_t BOOTIMAGE_SYMBOL(end)[];
 
-AVIAN_EXPORT const uint8_t* bootimageBin(size_t* size)
+SHIM_EXPORT const uint8_t* bootimageBin(size_t* size)
 {
   *size = BOOTIMAGE_SYMBOL(end) - BOOTIMAGE_SYMBOL(start);
   return BOOTIMAGE_SYMBOL(start);
@@ -55,7 +55,7 @@ AVIAN_EXPORT const uint8_t* bootimageBin(size_t* size)
 extern const uint8_t CODEIMAGE_SYMBOL(start)[];
 extern const uint8_t CODEIMAGE_SYMBOL(end)[];
 
-AVIAN_EXPORT const uint8_t* codeimageBin(size_t* size)
+SHIM_EXPORT const uint8_t* codeimageBin(size_t* size)
 {
   *size = CODEIMAGE_SYMBOL(end) - CODEIMAGE_SYMBOL(start);
   return CODEIMAGE_SYMBOL(start);
@@ -78,7 +78,7 @@ extern "C" {
 extern const uint8_t SYMBOL(start)[];
 extern const uint8_t SYMBOL(end)[];
 
-AVIAN_EXPORT const uint8_t* classpathJar(size_t* size)
+SHIM_EXPORT const uint8_t* classpathJar(size_t* size)
 {
   *size = SYMBOL(end) - SYMBOL(start);
   return SYMBOL(start);

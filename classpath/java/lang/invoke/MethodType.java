@@ -23,12 +23,12 @@
 
 package java.lang.invoke;
 
-import static avian.Assembler.*;
+import static shim.Assembler.*;
 
-import avian.Assembler;
-import avian.Classes;
-import avian.SystemClassLoader;
-import avian.VMClass;
+import shim.Assembler;
+import shim.Classes;
+import shim.SystemClassLoader;
+import shim.VMClass;
 
 import java.util.List;
 import java.util.ArrayList;

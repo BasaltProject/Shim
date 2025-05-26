@@ -21,8 +21,8 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/machine.h"
-#include "avian/heapwalk.h"
+#include "shim/machine.h"
+#include "shim/heapwalk.h"
 
 using namespace vm;
 

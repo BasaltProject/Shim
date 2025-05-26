@@ -24,7 +24,7 @@
 #include "context.h"
 #include "block.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -59,4 +59,4 @@ unsigned MyBlock::resolve(unsigned start, Assembler::Block* next)
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

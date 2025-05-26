@@ -23,7 +23,7 @@
 
 package java.io;
 
-import avian.Utf8;
+import shim.Utf8;
 
 public class InputStreamReader extends Reader {
   private static final int MultibytePadding = 4;

@@ -11,7 +11,7 @@
 
 (type jobject java/lang/Object)
 
-(type class avian/VMClass
+(type class shim/VMClass
   (array void* vtable))
 
 (type jclass java/lang/Class
@@ -43,26 +43,26 @@
 
 (type lookup java/lang/invoke/MethodHandles$Lookup)
 
-(type singleton avian/Singleton
+(type singleton shim/Singleton
   (array maybe_object body))
 
 (type classLoader java/lang/ClassLoader
   (object map))
 
-(type systemClassLoader avian/SystemClassLoader
+(type systemClassLoader shim/SystemClassLoader
   (void* finder))
 
-(type field avian/VMField)
+(type field shim/VMField)
 
-(type method avian/VMMethod)
+(type method shim/VMMethod)
 
-(type addendum avian/Addendum)
+(type addendum shim/Addendum)
 
-(type classAddendum avian/ClassAddendum)
+(type classAddendum shim/ClassAddendum)
 
-(type methodAddendum avian/MethodAddendum)
+(type methodAddendum shim/MethodAddendum)
 
-(type fieldAddendum avian/FieldAddendum)
+(type fieldAddendum shim/FieldAddendum)
 
 (type classRuntimeData
   (object arrayClass)
@@ -152,7 +152,7 @@
 (type weakHashMap
   (extends hashMap))
 
-(type pair avian/Pair
+(type pair shim/Pair
   (object first)
   (object second))
 
@@ -168,7 +168,7 @@
   (void* value)
   (object next))
 
-(type innerClassReference avian/InnerClassReference)
+(type innerClassReference shim/InnerClassReference)
 
 (type continuationContext
   (continuationContext next)
@@ -177,7 +177,7 @@
   (object continuation)
   (method method))
 
-(type continuation avian/Continuations$Continuation
+(type continuation shim/Continuations$Continuation
   (continuation next)
   (continuationContext context)
   (method method)
@@ -186,7 +186,7 @@
   (uintptr_t framePointerOffset)
   (array uintptr_t body))
 
-(type unwindResult avian/Continuations$UnwindResult)
+(type unwindResult shim/Continuations$UnwindResult)
 
 (type string java/lang/String
   (alias data object value)
@@ -276,7 +276,7 @@
 (type fileNotFoundException java/io/FileNotFoundException)
 
 (type incompatibleContinuationException
-  avian/IncompatibleContinuationException)
+  shim/IncompatibleContinuationException)
 
 (type number java/lang/Number)
 
@@ -351,7 +351,7 @@
   (extends jobject)
   (array int32_t body))
 
-(type code avian/Code
+(type code shim/Code
   (singleton pool)
   (intArray stackMap)
   (object exceptionHandlerTable)

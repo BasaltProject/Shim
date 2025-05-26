@@ -21,13 +21,13 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
+#include "shim/target.h"
 
 #include "codegen/compiler/context.h"
 #include "codegen/compiler/promise.h"
 #include "codegen/compiler/ir.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -143,4 +143,4 @@ Promise* poolPromise(Context* c, int key)
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

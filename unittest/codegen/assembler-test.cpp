@@ -23,19 +23,19 @@
 
 #include <stdio.h>
 
-#include "avian/common.h"
-#include <avian/heap/heap.h>
-#include <avian/system/system.h>
-#include "avian/target.h"
+#include "shim/common.h"
+#include <shim/heap/heap.h>
+#include <shim/system/system.h>
+#include "shim/target.h"
 
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/architecture.h>
-#include <avian/codegen/targets.h>
-#include <avian/codegen/lir.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/architecture.h>
+#include <shim/codegen/targets.h>
+#include <shim/codegen/lir.h>
 
 #include "test-harness.h"
 
-using namespace avian::codegen;
+using namespace shim::codegen;
 using namespace vm;
 
 class BasicEnv {

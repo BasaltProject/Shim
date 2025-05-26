@@ -21,9 +21,9 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/process.h"
+#include "shim/process.h"
 
-#include <avian/util/runtime-array.h>
+#include <shim/util/runtime-array.h>
 
 using namespace vm;
 
@@ -233,7 +233,7 @@ void* resolveNativeMethod(Thread* t,
 
 GcNative* resolveNativeMethod(Thread* t, GcMethod* method)
 {
-  void* p = resolveNativeMethod(t, method, "Avian_", 6, 3);
+  void* p = resolveNativeMethod(t, method, "Shim_", sizeof("Shim_") - 1, 3);
   if (p) {
     return makeNative(t, p, true);
   }

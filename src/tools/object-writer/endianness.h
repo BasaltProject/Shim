@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_ENDIANNESS_H
-#define AVIAN_ENDIANNESS_H
+#ifndef SHIM_ENDIANNESS_H
+#define SHIM_ENDIANNESS_H
 
-namespace avian {
+namespace shim {
 
 namespace endian {
 
@@ -98,6 +98,6 @@ class Endianness {
 
 }  // namespace endian
 
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_ENDIANNESS_H
+#endif  // SHIM_ENDIANNESS_H

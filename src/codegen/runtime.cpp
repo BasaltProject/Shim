@@ -21,9 +21,9 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/common.h>
+#include <shim/common.h>
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace runtime {
 
@@ -292,4 +292,4 @@ uint64_t longToFloat(int64_t a)
 
 }  // namespace runtime
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

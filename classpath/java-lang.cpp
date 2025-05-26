@@ -91,7 +91,7 @@
 #else
 #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
 
-#include "avian-interop.h"
+#include "shim-interop.h"
 
 #endif
 #endif  // WINAPI_FAMILY
@@ -667,7 +667,7 @@ Locale getLocale()
 
   return Locale(lang, reg);
 #else
-  std::wstring culture = AvianInterop::GetCurrentUICulture();
+  std::wstring culture = ShimInterop::GetCurrentUICulture();
   char* cultureName
       = strdup(std::string(culture.begin(), culture.end()).c_str());
   char* delimiter = strchr(cultureName, '-');
@@ -928,7 +928,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
       array,
       index++,
       L"java.io.tmpdir=%ls",
-      AvianInterop::GetTemporaryFolder().c_str());
+      ShimInterop::GetTemporaryFolder().c_str());
 
 #endif
 
@@ -944,7 +944,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
       array,
       index++,
       L"user.dir=%ls",
-      AvianInterop::GetInstalledLocation().c_str());
+      ShimInterop::GetInstalledLocation().c_str());
 
 #endif
 
@@ -967,7 +967,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
       array,
       index++,
       L"user.home=%ls",
-      AvianInterop::GetDocumentsLibraryLocation().c_str());
+      ShimInterop::GetDocumentsLibraryLocation().c_str());
 
 #endif
 
@@ -1019,7 +1019,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 // System.getEnvironment() implementation
 // TODO: For Win32, replace usage of deprecated _environ and add Unicode
 // support (neither of which is likely to be of great importance).
-#ifdef AVIAN_IOS
+#ifdef SHIM_IOS
 namespace {
 const char* environ[] = {0};
 }

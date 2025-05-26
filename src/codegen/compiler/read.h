@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_READ_H
-#define AVIAN_CODEGEN_COMPILER_READ_H
+#ifndef SHIM_CODEGEN_COMPILER_READ_H
+#define SHIM_CODEGEN_COMPILER_READ_H
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -135,6 +135,6 @@ SingleRead* read(Context* c, const SiteMask& mask, Value* successor = 0);
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_READ_H
+#endif  // SHIM_CODEGEN_COMPILER_READ_H

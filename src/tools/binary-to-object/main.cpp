@@ -36,7 +36,7 @@
 #endif
 #include <fcntl.h>
 
-#include <avian/tools/object-writer/tools.h>
+#include <shim/tools/object-writer/tools.h>
 
 extern "C" void __cxa_pure_virtual()
 {
@@ -55,8 +55,8 @@ void operator delete(void*) throw()
 
 namespace {
 
-using namespace avian::tools;
-using namespace avian::util;
+using namespace shim::tools;
+using namespace shim::util;
 
 bool writeObject(uint8_t* data,
                  size_t size,

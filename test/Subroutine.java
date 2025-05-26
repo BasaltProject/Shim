@@ -11,12 +11,12 @@
  * SPDX-License-Identifier: ISC AND MIT
  */
 
-import avian.Stream;
-import avian.ConstantPool;
-import avian.ConstantPool.PoolEntry;
-import avian.Assembler;
-import avian.Assembler.FieldData;
-import avian.Assembler.MethodData;
+import shim.Stream;
+import shim.ConstantPool;
+import shim.ConstantPool.PoolEntry;
+import shim.Assembler;
+import shim.Assembler.FieldData;
+import shim.Assembler.MethodData;
 
 import java.util.ArrayList;
 import java.util.List;

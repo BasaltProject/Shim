@@ -9,7 +9,7 @@
 #
 # SPDX-License-Identifier: ISC AND MIT
 
-add_library (avian_codegen
+add_library (shim_codegen
   compiler.cpp
   runtime.cpp
   targets.cpp

@@ -24,9 +24,9 @@
 #include "codegen/compiler/context.h"
 #include "codegen/compiler/resource.h"
 
-#include <avian/codegen/architecture.h>
+#include <shim/codegen/architecture.h>
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -80,4 +80,4 @@ Context::Context(vm::System* system,
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

@@ -21,13 +21,13 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/alloc-vector.h"
+#include "shim/alloc-vector.h"
 
 #include "context.h"
 #include "padding.h"
 #include "block.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -81,4 +81,4 @@ unsigned padding(AlignmentPadding* p,
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

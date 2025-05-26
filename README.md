@@ -25,7 +25,8 @@ SPDX-License-Identifier: MIT
 
 Basalt Shim is a fork of [Avian](https://github.com/ReadyTalk/avian) focused on
 modernizing its lightweight Java virtual machine for modern Java LTS releases.
-The initial target is **Java 25 LTS**.
+The initial target is **Java 25 LTS**. Avian's original technical documentation
+is preserved in [the upstream reference](docs/upstream/avian.md).
 
 Shim is an independent runtime project within the Basalt ecosystem. Its scope
 is the VM and the Java class library support needed to execute Java bytecode:

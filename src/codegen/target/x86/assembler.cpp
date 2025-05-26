@@ -24,24 +24,24 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "avian/environment.h"
-#include "avian/target.h"
-#include "avian/alloc-vector.h"
-#include "avian/common.h"
-#include "avian/util/allocator.h"
-#include "avian/zone.h"
+#include "shim/environment.h"
+#include "shim/target.h"
+#include "shim/alloc-vector.h"
+#include "shim/common.h"
+#include "shim/util/allocator.h"
+#include "shim/zone.h"
 
-#include <avian/util/runtime-array.h>
-#include <avian/util/abort.h>
-#include <avian/util/math.h>
+#include <shim/util/runtime-array.h>
+#include <shim/util/abort.h>
+#include <shim/util/math.h>
 
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/architecture.h>
-#include <avian/codegen/registers.h>
-#include <avian/codegen/lir.h>
-#include <avian/codegen/promise.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/architecture.h>
+#include <shim/codegen/registers.h>
+#include <shim/codegen/lir.h>
+#include <shim/codegen/promise.h>
 
-#include <avian/system/system.h>
+#include <shim/system/system.h>
 
 #include "context.h"
 #include "block.h"
@@ -58,9 +58,9 @@
 #define CAST_BRANCH(x) reinterpret_cast<BranchOperationType>(x)
 
 using namespace vm;
-using namespace avian::util;
+using namespace shim::util;
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -263,7 +263,7 @@ class MyArchitecture : public Architecture {
 
   virtual unsigned frameFootprint(unsigned footprint)
   {
-#if AVIAN_TARGET_FORMAT == AVIAN_FORMAT_PE
+#if SHIM_TARGET_FORMAT == SHIM_FORMAT_PE
     return max(footprint, StackAlignmentInWords);
 #else
     return max(footprint > argumentRegisterCount()
@@ -290,7 +290,7 @@ class MyArchitecture : public Architecture {
 
   virtual unsigned argumentRegisterCount()
   {
-#if AVIAN_TARGET_FORMAT == AVIAN_FORMAT_PE
+#if SHIM_TARGET_FORMAT == SHIM_FORMAT_PE
     if (TargetBytesPerWord == 8)
       return 4;
     else
@@ -306,7 +306,7 @@ class MyArchitecture : public Architecture {
   {
     assertT(&c, TargetBytesPerWord == 8);
     switch (index) {
-#if AVIAN_TARGET_FORMAT == AVIAN_FORMAT_PE
+#if SHIM_TARGET_FORMAT == SHIM_FORMAT_PE
     case 0:
       return rcx;
     case 1:
@@ -1273,4 +1273,4 @@ Architecture* makeArchitectureX86(System* system, bool useNativeFeatures)
 }
 
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

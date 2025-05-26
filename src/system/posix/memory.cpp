@@ -21,13 +21,13 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/system/memory.h>
+#include <shim/system/memory.h>
 
-#include <avian/util/assert.h>
+#include <shim/util/assert.h>
 
 #include "sys/mman.h"
 
-namespace avian {
+namespace shim {
 namespace system {
 
 const size_t Memory::PageSize = 1 << 12;
@@ -73,4 +73,4 @@ void Memory::free(util::Slice<uint8_t> pages)
 }
 
 }  // namespace system
-}  // namespace avian
+}  // namespace shim

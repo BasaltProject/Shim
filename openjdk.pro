@@ -40,7 +40,7 @@
    protected ClassLoader(java.lang.ClassLoader);
  }
 
--keep class avian.SystemClassLoader {
+-keep class shim.SystemClassLoader {
    protected java.net.URL findResource(java.lang.String);
  }
 
@@ -60,7 +60,7 @@
    public java.lang.Object remove(java.lang.Object);
  }
 
--keep class avian.OpenJDK {
+-keep class shim.OpenJDK {
    <methods>;
  }
 
@@ -246,10 +246,10 @@
 -keep class sun.nio.cs.UTF_8
 
 # loaded reflectively to handle embedded resources:
--keep class avian.avianvmresource.Handler
+-keep class shim.shimvmresource.Handler
 
 # loaded reflectively by sun.misc.Launcher:
--keep class avian.file.Handler
+-keep class shim.file.Handler
 
 # refered to symbolically in MethodAccessorGenerator:
 -keep class sun.reflect.MethodAccessorImpl {

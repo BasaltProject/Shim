@@ -21,8 +21,8 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_X86_CONTEXT_H
-#define AVIAN_CODEGEN_ASSEMBLER_X86_CONTEXT_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_X86_CONTEXT_H
+#define SHIM_CODEGEN_ASSEMBLER_X86_CONTEXT_H
 
 #define CAST1(x) reinterpret_cast<UnaryOperationType>(x)
 #define CAST2(x) reinterpret_cast<BinaryOperationType>(x)
@@ -30,12 +30,12 @@
 
 #include <stdint.h>
 
-#include "avian/alloc-vector.h"
+#include "shim/alloc-vector.h"
 
-#include <avian/codegen/lir.h>
-#include <avian/codegen/assembler.h>
+#include <shim/codegen/lir.h>
+#include <shim/codegen/assembler.h>
 
-#include <avian/system/system.h>
+#include <shim/system/system.h>
 
 namespace vm {
 class System;
@@ -43,7 +43,7 @@ class Alloc;
 class Zone;
 }  // namespace vm
 
-namespace avian {
+namespace shim {
 
 namespace util {
 class Aborter;
@@ -108,18 +108,18 @@ class Context {
   ArchitectureContext* ac;
 };
 
-inline avian::util::Aborter* getAborter(Context* c)
+inline shim::util::Aborter* getAborter(Context* c)
 {
   return c->s;
 }
 
-inline avian::util::Aborter* getAborter(ArchitectureContext* c)
+inline shim::util::Aborter* getAborter(ArchitectureContext* c)
 {
   return c->s;
 }
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_X86_CONTEXT_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_X86_CONTEXT_H
