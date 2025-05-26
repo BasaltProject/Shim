@@ -9,91 +9,36 @@
 #
 # SPDX-License-Identifier: ISC AND MIT
 
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
+# Build output
+/build/
+/build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/Makefile
+/cmake_install.cmake
+/install_manifest.txt
+/compile_commands.json
+/Testing/
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-*.so.*
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
 *.a
 *.lib
-
-# Executables
+*.so
+*.so.*
+*.dylib
+*.dll
 *.exe
-*.out
-*.app
+*.pdb
+*.dwo
+*.d
 
-# Build directories
-build/
-Build/
-build-*/
-
-# CMake generated files
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-install_manifest.txt
-compile_commands.json
-
-# Temporary files
+# Editor and temporary files
+.idea/
+.vscode/
+.cache/
+.gdb_history
+*~
 *.tmp
 *.log
 *.bak
 *.swp
-
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
-.cache/
-
-# Upstream build and editor files
-.gdb_history
-/build
-*~
-.classpath
-.project
-.settings
-bin
-/lib
-/distrib
-*.pdb
-*.swp
-/.gradle
-/*.sublime-*
-workspace/
-src/.cproject
-/cmake-build
-/cmake-build
-.idea/*

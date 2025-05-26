@@ -37,6 +37,29 @@ without requiring an external JVM installation or process. Shim provides the
 runtime foundation for that goal. Translating Bukkit APIs into Basalt APIs and
 integrating plugins with Basalt will belong to a separate project.
 
+## Project layout
+
+| Directory | Responsibility |
+|---|---|
+| `shim-runtime/` | VM execution, class loading, JNI entry points and embedding |
+| `shim-codegen/` | Compiler, intermediate representation and architecture backends |
+| `shim-classpath/` | Java class library, native library methods and OpenJDK adapters |
+| `shim-system/` | Operating system services, memory and signal handling |
+| `shim-heap/` | Heap and garbage collection support |
+| `shim-util/` | Shared native utilities |
+| `shim-tools/` | Type generation, object writing and binary embedding tools |
+| `shim-tests/` | Native unit tests and Java compatibility tests |
+| `cmake/` | Build configuration and GNU Make rules |
+| `tools/` | Test runner and debugging support |
+| `docs/` | Documentation, upstream reference and license notices |
+
+Native modules keep headers in `include/shim/` and implementations in `src/`.
+The class library lives in `shim-classpath/java/`; its native methods live in
+`shim-classpath/src/`.
+
+CMake builds the native support libraries, tools and unit tests. GNU Make builds
+the complete VM through the root `GNUmakefile` and `cmake/LegacyMake.mk`.
+
 ## Related repositories
 
 | Repository | What it is |
