@@ -4764,7 +4764,7 @@ GcClass* parseClass(Thread* t,
 
     virtual void NO_RETURN handleError()
     {
-      abort(t);
+      throwNew(t, GcClassFormatError::Type, "Truncated class file");
     }
 
    private:
@@ -4774,9 +4774,23 @@ GcClass* parseClass(Thread* t,
   Stream s(&client, data, size);
 
   uint32_t magic = s.read4();
-  expect(t, magic == 0xCAFEBABE);
+  if (magic != 0xCAFEBABE) {
+    throwNew(t, GcClassFormatError::Type, "Invalid class file magic");
+  }
   unsigned minorVer = s.read2();  // minor version
   unsigned majorVer = s.read2();  // major version
+
+  // JVMS 25 section 4.1: Java 25 supports majors 45 through 69.
+  if (majorVer < 45 or majorVer > 69) {
+    throwNew(t, GcUnsupportedClassVersionError::Type,
+             "Unsupported class file version %u.%u (maximum 69.0)", majorVer, minorVer);
+  }
+  if (majorVer >= 56 and minorVer != 0) {
+    throwNew(t, GcUnsupportedClassVersionError::Type,
+             minorVer == 65535 ? "Preview class files are not enabled (%u.%u)"
+                              : "Unsupported class file minor version %u.%u",
+             majorVer, minorVer);
+  }
   if (DebugClassReader) {
     fprintf(stderr, "read class (minor %d major %d)\n", minorVer, majorVer);
   }

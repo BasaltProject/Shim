@@ -257,6 +257,10 @@
 
 (type linkageError java/lang/LinkageError)
 
+(type classFormatError java/lang/ClassFormatError)
+
+(type unsupportedClassVersionError java/lang/UnsupportedClassVersionError)
+
 (type incompatibleClassChangeError java/lang/IncompatibleClassChangeError)
 
 (type abstractMethodError java/lang/AbstractMethodError)
