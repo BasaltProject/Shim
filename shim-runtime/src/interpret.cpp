@@ -1420,7 +1420,7 @@ loop:
   }
     goto loop;
 
-  case fadd: {
+  case vm::fadd: {
     float b = popFloat(t);
     float a = popFloat(t);
 
@@ -1528,7 +1528,7 @@ loop:
   }
     goto loop;
 
-  case fdiv: {
+  case vm::fdiv: {
     float b = popFloat(t);
     float a = popFloat(t);
 
@@ -1536,7 +1536,7 @@ loop:
   }
     goto loop;
 
-  case fmul: {
+  case vm::fmul: {
     float b = popFloat(t);
     float a = popFloat(t);
 
@@ -1559,7 +1559,7 @@ loop:
   }
     goto loop;
 
-  case fsub: {
+  case vm::fsub: {
     float b = popFloat(t);
     float a = popFloat(t);
 
@@ -2092,7 +2092,8 @@ loop:
       PROTECT(t, m);
       PROTECT(t, class_);
 
-      method = findVirtualMethod(t, m, class_);
+      // Since Java 11, nestmates can invoke private methods with invokevirtual.
+      method = methodVirtual(t, m) ? findVirtualMethod(t, m, class_) : m;
       goto invoke;
     } else {
       exception = makeThrowable(t, GcNullPointerException::Type);

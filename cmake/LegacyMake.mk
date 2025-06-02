@@ -14,12 +14,14 @@ MAKEFLAGS = -s
 name = shim
 version = 1.3.0-SNAPSHOT
 
-get-java-version = $(shell "$1" -version 2>&1 \
-		| grep -E 'version "1|version "9' \
-		| sed -e 's/.*version "1.\([^.]*\).*/\1/' \
-					-e 's/.*version "9.*/9/')
-
+JAVA_HOME ?= $(shell java -XshowSettings:properties -version 2>&1 | sed -n 's/^[[:space:]]*java.home = //p')
+get-java-version = $(shell "$1" -XshowSettings:properties -version 2>&1 \
+    | sed -n 's/^[[:space:]]*java.specification.version = //p' | sed 's/^1\.//')
 java-version := $(call get-java-version,$(JAVA_HOME)/bin/java)
+
+# Bootstrap classes define java.lang themselves, so they use the Java 8 bootclasspath compiler mode.
+bootstrap-release ?= 8
+bootstrap-javac-flags = -source $(bootstrap-release) -target $(bootstrap-release) -Xlint:-options
 
 build-arch := $(shell uname -m \
 	| sed 's/^i.86$$/i386/' \
@@ -1821,7 +1823,7 @@ $(generated-code): %.cpp: $(runtime-src)/types.def $(generator) $(classpath-dep)
 $(classpath-dep): $(classpath-sources) $(classpath-jar-dep)
 	@echo "compiling classpath classes"
 	@mkdir -p $(classpath-build)
-	$(javac) -source 1.$(java-version) -target 1.$(java-version) \
+	$(javac) $(bootstrap-javac-flags) \
 		-d $(classpath-build) -bootclasspath $(boot-classpath) \
 		$(classpath-sources)
 	@touch $(@)
@@ -1897,11 +1899,9 @@ $(test-dep): $(test-sources) $(test-library)
 	@mkdir -p $(test-build)
 	files="$(shell $(MAKE) -s --no-print-directory build=$(build) $(test-classes))"; \
 	if test -n "$${files}"; then \
-		$(javac) -source 1.$(java-version) -target 1.$(java-version) \
+		$(javac) $(bootstrap-javac-flags) \
 			-classpath $(test-build) -d $(test-build) -bootclasspath $(boot-classpath) $${files}; \
 	fi
-	$(javac) -source 1.2 -target 1.1 -XDjsrlimit=0 -d $(test-build) \
-		-bootclasspath $(boot-classpath) test/Subroutine.java
 	@touch $(@)
 
 $(test-extra-dep): $(test-extra-sources)
@@ -1909,7 +1909,7 @@ $(test-extra-dep): $(test-extra-sources)
 	@mkdir -p $(test-build)
 	files="$(shell $(MAKE) -s --no-print-directory build=$(build) $(test-extra-classes))"; \
 	if test -n "$${files}"; then \
-		$(javac) -source 1.$(java-version) -target 1.$(java-version) \
+		$(javac) $(bootstrap-javac-flags) \
 			-d $(test-build) -bootclasspath $(boot-classpath) $${files}; \
 	fi
 	@touch $(@)
