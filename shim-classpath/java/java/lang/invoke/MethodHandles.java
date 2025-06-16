@@ -24,6 +24,14 @@
 package java.lang.invoke;
 
 public class MethodHandles {
+  public static Lookup lookup() {
+    return new Lookup(java.lang.reflect.Method.getCaller().class_, 0x5f);
+  }
+
+  public static Lookup publicLookup() {
+    return new Lookup(shim.Classes.toVMClass(Object.class), 0x20);
+  }
+
   public static class Lookup {
     final shim.VMClass class_;
     private final int modes;
@@ -31,6 +39,18 @@ public class MethodHandles {
     private Lookup(shim.VMClass class_, int modes) {
       this.class_ = class_;
       this.modes = modes;
+    }
+
+    public Class<?> lookupClass() {
+      return shim.SystemClassLoader.getClass(class_);
+    }
+
+    public int lookupModes() {
+      return modes;
+    }
+
+    public boolean hasFullPrivilegeAccess() {
+      return (modes & 0x12) == 0x12;
     }
 
     public String toString() {

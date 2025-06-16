@@ -107,7 +107,17 @@ public final class MethodType implements java.io.Serializable {
 
     result = new Result(spec, rtype, type(spec).return_);
 
-    this.spec = sb.toString().getBytes();
+    String descriptor = sb.toString();
+    this.spec = new byte[descriptor.length() + 1];
+    descriptor.getBytes(0, descriptor.length(), this.spec, 0);
+  }
+
+  public static MethodType methodType(Class rtype) {
+    return new MethodType(rtype, new Class[0]);
+  }
+
+  public static MethodType methodType(Class rtype, Class ptype) {
+    return new MethodType(rtype, new Class[] {ptype});
   }
 
   public static MethodType methodType(Class rtype,

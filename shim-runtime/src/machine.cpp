@@ -886,15 +886,38 @@ GcByteArray* internByteArray(Thread* t, GcByteArray* array)
   }
 }
 
+void requireConstantTag(Thread* t, GcByteArray* tags, unsigned index,
+                        unsigned expected, unsigned alternative = 0)
+{
+  if (index >= tags->length() / 2
+      or (tags->body()[index] != expected
+          and (alternative == 0 or tags->body()[index] != alternative))) {
+    throwNew(t, GcClassFormatError::Type, "Invalid constant pool reference %u", index + 1);
+  }
+}
+
 unsigned parsePoolEntry(Thread* t,
                         Stream& s,
                         uint32_t* index,
                         GcSingleton* pool,
                         GcList* invocations,
+                        GcByteArray* tags,
                         unsigned i)
 {
   PROTECT(t, pool);
   PROTECT(t, invocations);
+  PROTECT(t, tags);
+  unsigned count = tags->length() / 2;
+  if (i >= count or tags->body()[i] == 0) {
+    throwNew(t, GcClassFormatError::Type, "Invalid constant pool index %u", i + 1);
+  }
+  if (tags->body()[count + i] == 1) {
+    throwNew(t, GcClassFormatError::Type, "Cyclic constant pool entry %u", i + 1);
+  }
+  if (tags->body()[count + i] == 2) {
+    return tags->body()[i] == CONSTANT_Long or tags->body()[i] == CONSTANT_Double ? 2 : 1;
+  }
+  tags->body()[count + i] = 1;
 
   s.setPosition(index[i]);
 
@@ -908,6 +931,7 @@ unsigned parsePoolEntry(Thread* t,
       fprintf(stderr, "    consts[%d] = int/float 0x%x\n", i, v);
     }
   }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_Long:
@@ -919,6 +943,7 @@ unsigned parsePoolEntry(Thread* t,
       fprintf(stderr, "    consts[%d] = long/double <todo>\n", i);
     }
   }
+    tags->body()[count + i] = 2;
     return 2;
 
   case CONSTANT_Utf8: {
@@ -931,12 +956,14 @@ unsigned parsePoolEntry(Thread* t,
       }
     }
   }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_Class: {
     if (singletonObject(t, pool, i) == 0) {
       unsigned si = s.read2() - 1;
-      parsePoolEntry(t, s, index, pool, invocations, si);
+      requireConstantTag(t, tags, si, CONSTANT_Utf8);
+      parsePoolEntry(t, s, index, pool, invocations, tags, si);
 
       GcReference* value = makeReference(
           t, 0, 0, cast<GcByteArray>(t, singletonObject(t, pool, si)), 0);
@@ -947,12 +974,14 @@ unsigned parsePoolEntry(Thread* t,
       }
     }
   }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_String: {
     if (singletonObject(t, pool, i) == 0) {
       unsigned si = s.read2() - 1;
-      parsePoolEntry(t, s, index, pool, invocations, si);
+      requireConstantTag(t, tags, si, CONSTANT_Utf8);
+      parsePoolEntry(t, s, index, pool, invocations, tags, si);
 
       object value
           = parseUtf8(t, cast<GcByteArray>(t, singletonObject(t, pool, si)));
@@ -966,15 +995,18 @@ unsigned parsePoolEntry(Thread* t,
       }
     }
   }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_NameAndType: {
     if (singletonObject(t, pool, i) == 0) {
       unsigned ni = s.read2() - 1;
       unsigned ti = s.read2() - 1;
+      requireConstantTag(t, tags, ni, CONSTANT_Utf8);
+      requireConstantTag(t, tags, ti, CONSTANT_Utf8);
 
-      parsePoolEntry(t, s, index, pool, invocations, ni);
-      parsePoolEntry(t, s, index, pool, invocations, ti);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ni);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ti);
 
       GcByteArray* name = cast<GcByteArray>(t, singletonObject(t, pool, ni));
       GcByteArray* type = cast<GcByteArray>(t, singletonObject(t, pool, ti));
@@ -990,6 +1022,7 @@ unsigned parsePoolEntry(Thread* t,
       }
     }
   }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_Fieldref:
@@ -998,9 +1031,11 @@ unsigned parsePoolEntry(Thread* t,
     if (singletonObject(t, pool, i) == 0) {
       unsigned ci = s.read2() - 1;
       unsigned nti = s.read2() - 1;
+      requireConstantTag(t, tags, ci, CONSTANT_Class);
+      requireConstantTag(t, tags, nti, CONSTANT_NameAndType);
 
-      parsePoolEntry(t, s, index, pool, invocations, ci);
-      parsePoolEntry(t, s, index, pool, invocations, nti);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ci);
+      parsePoolEntry(t, s, index, pool, invocations, tags, nti);
 
       GcByteArray* className
           = cast<GcReference>(t, singletonObject(t, pool, ci))->name();
@@ -1023,14 +1058,26 @@ unsigned parsePoolEntry(Thread* t,
       }
     }
   }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_MethodHandle:
     if (singletonObject(t, pool, i) == 0) {
       unsigned kind = s.read1();
       unsigned ri = s.read2() - 1;
+      if (kind >= REF_getField and kind <= REF_putStatic) {
+        requireConstantTag(t, tags, ri, CONSTANT_Fieldref);
+      } else if (kind == REF_invokeVirtual or kind == REF_newInvokeSpecial) {
+        requireConstantTag(t, tags, ri, CONSTANT_Methodref);
+      } else if (kind == REF_invokeStatic or kind == REF_invokeSpecial) {
+        requireConstantTag(t, tags, ri, CONSTANT_Methodref, CONSTANT_InterfaceMethodref);
+      } else if (kind == REF_invokeInterface) {
+        requireConstantTag(t, tags, ri, CONSTANT_InterfaceMethodref);
+      } else {
+        throwNew(t, GcClassFormatError::Type, "Invalid method handle reference kind %u", kind);
+      }
 
-      parsePoolEntry(t, s, index, pool, invocations, ri);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ri);
 
       GcReference* value = cast<GcReference>(t, singletonObject(t, pool, ri));
 
@@ -1049,25 +1096,29 @@ unsigned parsePoolEntry(Thread* t,
 
       pool->setBodyElement(t, i, reinterpret_cast<uintptr_t>(value));
     }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_MethodType:
     if (singletonObject(t, pool, i) == 0) {
       unsigned ni = s.read2() - 1;
+      requireConstantTag(t, tags, ni, CONSTANT_Utf8);
 
-      parsePoolEntry(t, s, index, pool, invocations, ni);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ni);
 
       pool->setBodyElement(
           t, i, reinterpret_cast<uintptr_t>(singletonObject(t, pool, ni)));
     }
+    tags->body()[count + i] = 2;
     return 1;
 
   case CONSTANT_InvokeDynamic:
     if (singletonObject(t, pool, i) == 0) {
       unsigned bootstrap = s.read2();
       unsigned nti = s.read2() - 1;
+      requireConstantTag(t, tags, nti, CONSTANT_NameAndType);
 
-      parsePoolEntry(t, s, index, pool, invocations, nti);
+      parsePoolEntry(t, s, index, pool, invocations, tags, nti);
 
       GcPair* nameAndType = cast<GcPair>(t, singletonObject(t, pool, nti));
 
@@ -1101,17 +1152,18 @@ unsigned parsePoolEntry(Thread* t,
                        0);
 
       object value = reinterpret_cast<object>(
-          makeInvocation(t, bootstrap, -1, 0, pool, template_, 0, 0));
+          makeInvocation(t, bootstrap, -1, 0, pool, tags, template_, 0, 0));
       PROTECT(t, value);
 
       pool->setBodyElement(t, i, reinterpret_cast<uintptr_t>(value));
 
       listAppend(t, invocations, value);
     }
+    tags->body()[count + i] = 2;
     return 1;
 
   default:
-    abort(t);
+    throwNew(t, GcClassFormatError::Type, "Invalid constant pool tag");
   }
 }
 
@@ -1119,9 +1171,17 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations)
 {
   PROTECT(t, invocations);
 
-  unsigned count = s.read2() - 1;
+  unsigned entries = s.read2();
+  if (entries == 0) {
+    throwNew(t, GcClassFormatError::Type, "Invalid constant pool size");
+  }
+  unsigned count = entries - 1;
   GcSingleton* pool = makeSingletonOfSize(t, count + poolMaskSize(count));
   PROTECT(t, pool);
+  // Keep original tags for bootstrap boxing; the second half tracks parse state.
+  GcByteArray* tags = makeByteArray(t, count * 2);
+  PROTECT(t, tags);
+  memset(tags->body().begin(), 0, tags->length());
 
   if (DebugClassReader) {
     fprintf(stderr, "  const pool entries %d\n", count);
@@ -1140,7 +1200,9 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations)
     for (unsigned i = 0; i < count; ++i) {
       index[i] = s.position();
 
-      switch (s.read1()) {
+      unsigned tag = s.read1();
+      tags->body()[i] = tag;
+      switch (tag) {
       case CONSTANT_Class:
       case CONSTANT_String:
         singletonMarkObject(t, pool, i);
@@ -1165,11 +1227,17 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations)
         break;
 
       case CONSTANT_Long:
+        if (i + 1 >= count) {
+          throwNew(t, GcClassFormatError::Type, "Invalid two-slot constant pool entry");
+        }
         s.skip(8);
         ++i;
         break;
 
       case CONSTANT_Double:
+        if (i + 1 >= count) {
+          throwNew(t, GcClassFormatError::Type, "Invalid two-slot constant pool entry");
+        }
         singletonSetBit(t, pool, count, i);
         singletonSetBit(t, pool, count, i + 1);
         s.skip(8);
@@ -1197,14 +1265,14 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations)
         break;
 
       default:
-        abort(t);
+        throwNew(t, GcClassFormatError::Type, "Invalid constant pool tag %u", tag);
       }
     }
 
     unsigned end = s.position();
 
     for (unsigned i = 0; i < count;) {
-      i += parsePoolEntry(t, s, index, pool, invocations, i);
+      i += parsePoolEntry(t, s, index, pool, invocations, tags, i);
     }
 
     s.setPosition(end);
@@ -2836,7 +2904,7 @@ void parseAttributeTable(Thread* t,
     } else if (vm::strcmp(reinterpret_cast<const int8_t*>("BootstrapMethods"),
                           name->body().begin()) == 0) {
       unsigned count = s.read2();
-      GcArray* array = makeArray(t, count * 2);
+      GcArray* array = makeArray(t, count);
       PROTECT(t, array);
 
       for (unsigned i = 0; i < count; ++i) {
@@ -6098,217 +6166,6 @@ GcJclass* getDeclaringClass(Thread* t, GcClass* c)
   }
 
   return 0;
-}
-
-// Called when interpreting invokedynamic. `invocation` points to
-// static data in the bootstrap method table, which in turn points to
-// a bootstrap method and stores additional data to be passed to
-// it. `resolveDynamic` will then call this bootstrap method after
-// resolving the arguments as required. The called method is assumed
-// to be a lambda `metafactory` or `altMetafactory`.
-//
-// Note that capture/bridging etc happens within the bootstrap method,
-// this is just the code that dispatches to it.
-//
-// Returns the CallSite returned by the bootstrap method.
-GcCallSite* resolveDynamic(Thread* t, GcInvocation* invocation)
-{
-  PROTECT(t, invocation);
-
-  // Use the invocation's Class to get the bootstrap method table and get a classloader.
-  GcClass* c = invocation->class_();
-  PROTECT(t, c);
-
-  // First element points to the bootstrap method. The rest are static data passed to the BSM.
-  GcCharArray* bootstrapArray = cast<GcCharArray>(
-      t, cast<GcArray>(t, invocation->bootstrapMethodTable())
-             ->body()[invocation->bootstrap()]);
-
-  PROTECT(t, bootstrapArray);
-
-  // Resolve the bootstrap method itself.
-  GcMethod* bootstrap = cast<GcMethodHandle>(t,
-                                       resolve(t,
-                                               c->loader(),
-                                               invocation->pool(),
-                                               bootstrapArray->body()[0],
-                                               findMethodInClass,
-                                               GcNoSuchMethodError::Type))->method();
-  PROTECT(t, bootstrap);
-
-  // Caller context info to be passed to the bootstrap method.
-  GcLookup* lookup
-      = makeLookup(t, c, ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED | ACC_STATIC);
-  PROTECT(t, lookup);
-
-  // The name of the linked-to method.
-  GcByteArray* nameBytes = invocation->template_()->name();
-  GcString* name
-      = t->m->classpath->makeString(t, nameBytes, 0, nameBytes->length() - 1);
-  PROTECT(t, name);
-
-  // This is the type of the linked-to method (e.g. lambda).
-  GcMethodType* type = makeMethodType(
-      t, c->loader(), invocation->template_()->spec(), 0, 0, 0);
-  PROTECT(t, type);
-
-  // `array` stores either
-  // 1. All the arguments to be passed to the bootstrap method in the case of `metafactory`
-  // 2. The vararg object array to be passed to `altMetafactory`
-  GcArray* array = makeArray(t, bootstrap->parameterCount());
-  PROTECT(t, array);
-
-  // These are common arguments to metafactory and altMetafactory
-  unsigned argument = 0;
-  array->setBodyElement(t, argument++, lookup);
-  array->setBodyElement(t, argument++, name);
-  array->setBodyElement(t, argument++, type);
-
-  THREAD_RUNTIME_ARRAY(t, char, specBuffer, bootstrap->spec()->length());
-
-  const char* spec;
-  // `argArray` stores the final arguments to be passed to the bootstrap method.
-  // Later in this function we iterate through the method signature +
-  // bootstrap array and resolve the arguments as required into `array`.
-  //
-  // In the case of a `metafactory` call:
-  //   `argArray = [caller, invokedName, invokedType, methodType, methodImplementation, instantiatedType]`
-  //   `array = argArray`
-  //
-  // In the case of an `altMetafactory` call:
-  //   `argArray = [caller, invokedName, invokedType, array]`
-  //   `array = [methodType, methodImplementation, instantiatedType, flags, ...]`
-  GcArray* argArray = array;
-  PROTECT(t, argArray);
-
-  // Check if the bootstrap method's signature matches that of an altMetafactory
-  if (::strcmp(reinterpret_cast<char*>(bootstrap->spec()->body().begin()),
-               "(Ljava/lang/invoke/MethodHandles$Lookup;"
-               "Ljava/lang/String;"
-               "Ljava/lang/invoke/MethodType;"
-               "[Ljava/lang/Object;)"
-               "Ljava/lang/invoke/CallSite;") == 0) {
-    // If so, create a new array to store the varargs in, and hardcode the BSM signature.
-    array = makeArray(t, bootstrapArray->length() - 1);
-    spec = "(Ljava/lang/invoke/MethodHandles$Lookup;"
-      "Ljava/lang/String;"
-      "Ljava/lang/invoke/MethodType;"
-      "Ljava/lang/invoke/MethodType;"
-      "Ljava/lang/invoke/MethodHandle;"
-      "Ljava/lang/invoke/MethodType;"
-      "I"
-      "I"
-      "[Ljava/lang/Class;"
-      "I"
-      "[Ljava/lang/invoke/MethodType;"
-      ")Ljava/lang/invoke/CallSite;";
-  } else if (bootstrap->parameterCount() == 2 + bootstrapArray->length()) {
-    // We're calling the simpler `metafactory`. 2 + bootstrapArray->length() is the
-    // arguments to the bootstrap method (bootstrapArray->length() - 1), plus the 3 static
-    // arguments (lookup, name, type).
-    memcpy(RUNTIME_ARRAY_BODY(specBuffer),
-           bootstrap->spec()->body().begin(),
-           bootstrap->spec()->length());
-    spec = RUNTIME_ARRAY_BODY(specBuffer);
-  } else {
-    abort(t);
-  }
-
-  MethodSpecIterator it(t, spec);
-
-  // Skip over the already handled 3 arguments.
-  for (unsigned i = 0; i < argument; ++i)
-    it.next();
-
-  // If we're calling altMetafactory then we reset the argument
-  // offset, because we are filling the vararg array instead of the
-  // final argument array.
-  if (argArray != array) {
-    argument = 0;
-  }
-
-  // `i` iterates through the bootstrap arguments (the +1 is because we skip
-  // the bootstrap method's name), `it` iterates through the corresponding types
-  // in the method signature
-  unsigned i = 0;
-  while (i + 1 < bootstrapArray->length() && it.hasNext()) {
-    const char* p = it.next();
-
-    switch (*p) {
-    case 'L': {
-      const char* const methodType = "Ljava/lang/invoke/MethodType;";
-      const char* const methodHandle = "Ljava/lang/invoke/MethodHandle;";
-      if (strncmp(p, methodType, strlen(methodType)) == 0) {
-        GcMethodType* type = makeMethodType(
-            t,
-            c->loader(),
-            cast<GcByteArray>(
-                t,
-                singletonObject(
-                    t, invocation->pool(), bootstrapArray->body()[i + 1])),
-            0,
-            0,
-            0);
-
-        array->setBodyElement(t, i + argument, type);
-      } else if (strncmp(p, methodHandle, strlen(methodHandle)) == 0) {
-        GcMethodHandle* handle = cast<GcMethodHandle>(t,
-                                          resolve(t,
-                                                  c->loader(),
-                                                  invocation->pool(),
-                                                  bootstrapArray->body()[i + 1],
-                                                  findMethodInClass,
-                                                  GcNoSuchMethodError::Type));
-
-        array->setBodyElement(t, i + argument, handle);
-      } else {
-        abort(t);
-      }
-    } break;
-
-    case 'I':
-    case 'F': {
-      GcInt* box = makeInt(
-          t,
-          singletonValue(t, invocation->pool(), bootstrapArray->body()[i + 1]));
-
-      array->setBodyElement(t, i + argument, box);
-    } break;
-
-    case 'J':
-    case 'D': {
-      uint64_t v;
-      memcpy(
-          &v,
-          &singletonValue(t, invocation->pool(), bootstrapArray->body()[i + 1]),
-          8);
-
-      GcLong* box = makeLong(t, v);
-
-      array->setBodyElement(t, i + argument, box);
-    } break;
-
-    default:
-      fprintf(stderr, "todo: unsupported bootstrap argument type: %s", p);
-      abort(t);
-    }
-
-    ++i;
-  }
-
-  GcMethodHandle* handle
-      = (bootstrap->flags() & ACC_STATIC)
-            ? 0
-            : makeMethodHandle(t, REF_invokeSpecial, c->loader(), bootstrap, 0);
-
-  // If we're calling altMetafactory we set the fourth argument to the vararg array.
-  if (argArray != array) {
-    argArray->setBodyElement(t, 3, array);
-  }
-
-  // Finally we make the bootstrap call.
-  return cast<GcCallSite>(
-      t, t->m->processor->invokeArray(t, bootstrap, handle, argArray));
 }
 
 void noop()

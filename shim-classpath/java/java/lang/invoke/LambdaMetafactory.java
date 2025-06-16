@@ -508,7 +508,7 @@ public class LambdaMetafactory {
 
   private static CallSite makeCallSite(MethodType invokedType, byte[] classData) throws AssertionError {
     try {
-      return new CallSite
+      return new ConstantCallSite
               (new MethodHandle
                       (MethodHandle.REF_invokeStatic, invokedType.loader, Classes.toVMMethod
                               (shim.SystemClassLoader.getClass
