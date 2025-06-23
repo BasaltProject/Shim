@@ -28,6 +28,25 @@ public abstract class AbstractList<T> extends AbstractCollection<T>
 {
   protected int modCount;
 
+  public boolean equals(Object other) {
+    if (this == other) return true;
+    if (!(other instanceof List)) return false;
+    Iterator<T> left = iterator();
+    Iterator<?> right = ((List<?>) other).iterator();
+    while (left.hasNext() && right.hasNext()) {
+      T a = left.next();
+      Object b = right.next();
+      if (a == null ? b != null : !a.equals(b)) return false;
+    }
+    return !left.hasNext() && !right.hasNext();
+  }
+
+  public int hashCode() {
+    int hash = 1;
+    for (T element : this) hash = 31 * hash + (element == null ? 0 : element.hashCode());
+    return hash;
+  }
+
   public boolean add(T o) {
     add(size(), o);
     return true;

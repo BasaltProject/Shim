@@ -32,6 +32,7 @@ import shim.VMClass;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
 
 public final class MethodType implements java.io.Serializable {
   private static final char[] Primitives = new char[] {
@@ -78,6 +79,16 @@ public final class MethodType implements java.io.Serializable {
   private MethodType(Class rtype,
                      Class ... ptypes)
   {
+    if (rtype == null || ptypes == null) {
+      throw new NullPointerException();
+    }
+    int slots = 0;
+    for (Class ptype : ptypes) {
+      if (ptype == null) throw new NullPointerException();
+      if (ptype == void.class) throw new IllegalArgumentException("void parameter");
+      slots += ptype == long.class || ptype == double.class ? 2 : 1;
+      if (slots > 255) throw new IllegalArgumentException("too many parameter slots");
+    }
     loader = rtype.getClassLoader();
 
     StringBuilder sb = new StringBuilder();
@@ -137,7 +148,188 @@ public final class MethodType implements java.io.Serializable {
   }
 
   public String toString() {
-    return Classes.makeString(spec, 0, spec.length - 1);
+    StringBuilder text = new StringBuilder("(");
+    Class[] types = parameterArray();
+    for (int i = 0; i < types.length; ++i) {
+      if (i != 0) text.append(',');
+      text.append(types[i].getSimpleName());
+    }
+    return text.append(')').append(returnType().getSimpleName()).toString();
+  }
+
+  public boolean equals(Object other) {
+    if (this == other) return true;
+    if (!(other instanceof MethodType)) return false;
+    MethodType that = (MethodType) other;
+    if (returnType() != that.returnType() || parameterCount() != that.parameterCount()) return false;
+    for (int i = 0; i < parameterCount(); ++i) {
+      if (parameterType(i) != that.parameterType(i)) return false;
+    }
+    return true;
+  }
+
+  public int hashCode() {
+    int hash = 31 + returnType().hashCode();
+    for (Class parameter : parameterArray()) hash = 31 * hash + parameter.hashCode();
+    return hash;
+  }
+
+  public int parameterCount() {
+    parameters();
+    return parameters.size();
+  }
+
+  public Class parameterType(int index) {
+    parameters();
+    if (index < 0 || index >= parameters.size()) throw new IndexOutOfBoundsException();
+    return parameters.get(index).type;
+  }
+
+  public Class lastParameterType() {
+    int count = parameterCount();
+    return count == 0 ? void.class : parameterType(count - 1);
+  }
+
+  public List<Class<?>> parameterList() {
+    List<Class<?>> list = new ArrayList<Class<?>>();
+    for (Class parameter : parameterArray()) list.add(parameter);
+    return Collections.unmodifiableList(list);
+  }
+
+  public String descriptorString() {
+    return toMethodDescriptorString();
+  }
+
+  public static MethodType methodType(Class rtype, MethodType ptypes) {
+    return methodType(rtype, ptypes.parameterArray());
+  }
+
+  public static MethodType methodType(Class rtype, List<Class<?>> ptypes) {
+    return methodType(rtype, ptypes.toArray(new Class[ptypes.size()]));
+  }
+
+  public static MethodType genericMethodType(int count) {
+    return genericMethodType(count, false);
+  }
+
+  public static MethodType genericMethodType(int count, boolean finalArray) {
+    if (count < 0 || count > (finalArray ? 254 : 255)) throw new IllegalArgumentException();
+    Class[] parameters = new Class[count + (finalArray ? 1 : 0)];
+    for (int i = 0; i < count; ++i) parameters[i] = Object.class;
+    if (finalArray) parameters[count] = Object[].class;
+    return methodType(Object.class, parameters);
+  }
+
+  public MethodType changeReturnType(Class rtype) {
+    return methodType(rtype, parameterArray());
+  }
+
+  public MethodType changeParameterType(int index, Class ptype) {
+    parameterType(index); // Check bounds before modifying the copy.
+    Class[] parameters = parameterArray();
+    parameters[index] = ptype;
+    return methodType(returnType(), parameters);
+  }
+
+  public MethodType insertParameterTypes(int position, Class... added) {
+    int count = parameterCount();
+    if (position < 0 || position > count) throw new IndexOutOfBoundsException();
+    if (added.length > 255 - count) throw new IllegalArgumentException();
+    Class[] parameters = new Class[count + added.length];
+    Class[] original = parameterArray();
+    System.arraycopy(original, 0, parameters, 0, position);
+    System.arraycopy(added, 0, parameters, position, added.length);
+    System.arraycopy(original, position, parameters, position + added.length, count - position);
+    return methodType(returnType(), parameters);
+  }
+
+  public MethodType insertParameterTypes(int position, List<Class<?>> added) {
+    return insertParameterTypes(position, added.toArray(new Class[added.size()]));
+  }
+
+  public MethodType appendParameterTypes(Class... added) {
+    return insertParameterTypes(parameterCount(), added);
+  }
+
+  public MethodType appendParameterTypes(List<Class<?>> added) {
+    return insertParameterTypes(parameterCount(), added);
+  }
+
+  public MethodType dropParameterTypes(int start, int end) {
+    int count = parameterCount();
+    if (start < 0 || end < start || end > count) throw new IndexOutOfBoundsException();
+    Class[] parameters = new Class[count - (end - start)];
+    Class[] original = parameterArray();
+    System.arraycopy(original, 0, parameters, 0, start);
+    System.arraycopy(original, end, parameters, start, count - end);
+    return methodType(returnType(), parameters);
+  }
+
+  public boolean hasPrimitives() {
+    if (returnType().isPrimitive()) return true;
+    for (Class parameter : parameterArray()) if (parameter.isPrimitive()) return true;
+    return false;
+  }
+
+  public boolean hasWrappers() {
+    if (primitive(returnType()) != returnType()) return true;
+    for (Class parameter : parameterArray()) {
+      if (parameter != Void.class && primitive(parameter) != parameter) return true;
+    }
+    return false;
+  }
+
+  public MethodType erase() {
+    Class[] parameters = parameterArray();
+    for (int i = 0; i < parameters.length; ++i) {
+      if (!parameters[i].isPrimitive()) parameters[i] = Object.class;
+    }
+    Class result = returnType();
+    return methodType(result.isPrimitive() ? result : Object.class, parameters);
+  }
+
+  public MethodType generic() {
+    return genericMethodType(parameterCount());
+  }
+
+  public MethodType wrap() {
+    Class[] parameters = parameterArray();
+    for (int i = 0; i < parameters.length; ++i) parameters[i] = wrapper(parameters[i]);
+    return methodType(wrapper(returnType()), parameters);
+  }
+
+  public MethodType unwrap() {
+    Class[] parameters = parameterArray();
+    for (int i = 0; i < parameters.length; ++i) {
+      if (parameters[i] != Void.class) parameters[i] = primitive(parameters[i]);
+    }
+    return methodType(primitive(returnType()), parameters);
+  }
+
+  private static Class wrapper(Class type) {
+    if (type == void.class) return Void.class;
+    if (type == boolean.class) return Boolean.class;
+    if (type == byte.class) return Byte.class;
+    if (type == char.class) return Character.class;
+    if (type == short.class) return Short.class;
+    if (type == int.class) return Integer.class;
+    if (type == float.class) return Float.class;
+    if (type == long.class) return Long.class;
+    if (type == double.class) return Double.class;
+    return type;
+  }
+
+  private static Class primitive(Class type) {
+    if (type == Void.class) return void.class;
+    if (type == Boolean.class) return boolean.class;
+    if (type == Byte.class) return byte.class;
+    if (type == Character.class) return char.class;
+    if (type == Short.class) return short.class;
+    if (type == Integer.class) return int.class;
+    if (type == Float.class) return float.class;
+    if (type == Long.class) return long.class;
+    if (type == Double.class) return double.class;
+    return type;
   }
 
   public int footprint() {
