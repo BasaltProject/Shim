@@ -42,9 +42,10 @@ int64_t search(Thread* t,
     PROTECT(t, loader);
     PROTECT(t, name);
 
-    GcByteArray* n = makeByteArray(t, name->length(t) + 1);
+    unsigned length = stringUTFLength(t, name);
+    GcByteArray* n = makeByteArray(t, length + 1);
     char* s = reinterpret_cast<char*>(n->body().begin());
-    stringChars(t, name, s);
+    stringUTFChars(t, name, s, length);
 
     if (replaceDots) {
       replace('.', '/', s);
@@ -224,6 +225,17 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_ClassLoader_reallyFindLoadedClass(Thread* t,
+                                                    object,
+                                                    uintptr_t* arguments)
+{
+  GcClassLoader* loader = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
+  GcString* name = cast<GcString>(t, reinterpret_cast<object>(arguments[1]));
+  GcClass* class_ = reinterpret_cast<GcClass*>(search(t, loader, name, findLoadedClass, true));
+  return class_ ? reinterpret_cast<int64_t>(getJClass(t, class_)) : 0;
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_shim_SystemClassLoader_findVMClass(Thread* t,
                                               object,
                                               uintptr_t* arguments)
@@ -245,8 +257,9 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   GcString* name = cast<GcString>(t, reinterpret_cast<object>(arguments[1]));
 
   if (LIKELY(name)) {
-    THREAD_RUNTIME_ARRAY(t, char, n, name->length(t) + 1);
-    stringChars(t, name, RUNTIME_ARRAY_BODY(n));
+    unsigned length = stringUTFLength(t, name);
+    THREAD_RUNTIME_ARRAY(t, char, n, length + 1);
+    stringUTFChars(t, name, RUNTIME_ARRAY_BODY(n), length);
 
     const char* name
         = static_cast<Finder*>(loader->as<GcSystemClassLoader>(t)->finder())
@@ -271,8 +284,9 @@ extern "C" SHIM_EXPORT int64_t JNICALL
       = cast<GcLongArray>(t, reinterpret_cast<object>(arguments[3]));
 
   if (LIKELY(name) && LIKELY(finderElementPtrPtr)) {
-    THREAD_RUNTIME_ARRAY(t, char, n, name->length(t) + 1);
-    stringChars(t, name, RUNTIME_ARRAY_BODY(n));
+    unsigned length = stringUTFLength(t, name);
+    THREAD_RUNTIME_ARRAY(t, char, n, length + 1);
+    stringUTFChars(t, name, RUNTIME_ARRAY_BODY(n), length);
 
     void*& finderElementPtr
         = reinterpret_cast<void*&>(finderElementPtrPtr->body()[0]);

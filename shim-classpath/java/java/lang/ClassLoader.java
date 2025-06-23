@@ -40,7 +40,7 @@ public abstract class ClassLoader {
 
   protected ClassLoader(ClassLoader parent) {
     if (parent == null) {
-      this.parent = getSystemClassLoader();
+      this.parent = Class.class.getClassLoader();
     } else {
       this.parent = parent;
     }
@@ -112,7 +112,7 @@ public abstract class ClassLoader {
     }
 
   public static ClassLoader getSystemClassLoader() {
-    return ClassLoader.class.getClassLoader();
+    return shim.SystemClassLoader.appLoader();
   }
 
   protected Class defineClass(String name, byte[] b, int offset, int length) {
@@ -138,9 +138,7 @@ public abstract class ClassLoader {
     throw new ClassNotFoundException();
   }
 
-  protected Class reallyFindLoadedClass(String name) {
-    return null;
-  }
+  protected native Class reallyFindLoadedClass(String name);
 
   protected final Class findLoadedClass(String name) {
     return reallyFindLoadedClass(name);

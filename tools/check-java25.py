@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(command):
-    return subprocess.run(command, capture_output=True, text=True, timeout=30)
+    return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
 
 def constant_pool_offsets(data):

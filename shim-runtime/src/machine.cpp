@@ -4557,7 +4557,11 @@ int stringUTFLength(Thread* t,
   if (length) {
     object data = string->data();
     if (objectClass(t, data) == type(t, GcByteArray::Type)) {
-      result = length;
+      GcByteArray* a = cast<GcByteArray>(t, data);
+      for (unsigned i = 0; i < length; ++i) {
+        unsigned c = static_cast<uint8_t>(a->body()[string->offset(t) + start + i]);
+        result += c < 0x80 ? 1 : 2;
+      }
     } else {
       GcCharArray* a = cast<GcCharArray>(t, data);
       for (unsigned i = 0; i < length; ++i) {
@@ -4635,8 +4639,17 @@ void stringUTFChars(Thread* t,
   object data = string->data();
   if (objectClass(t, data) == type(t, GcByteArray::Type)) {
     GcByteArray* b = cast<GcByteArray>(t, data);
-    memcpy(chars, &b->body()[string->offset(t) + start], length);
-    chars[length] = 0;
+    unsigned j = 0;
+    for (unsigned i = 0; i < length; ++i) {
+      unsigned c = static_cast<uint8_t>(b->body()[string->offset(t) + start + i]);
+      if (c < 0x80) {
+        chars[j++] = static_cast<char>(c);
+      } else {
+        chars[j++] = static_cast<char>(0xc0 | (c >> 6));
+        chars[j++] = static_cast<char>(0x80 | (c & 0x3f));
+      }
+    }
+    chars[j] = 0;
   } else {
     GcCharArray* cs = cast<GcCharArray>(t, data);
     int j = 0;

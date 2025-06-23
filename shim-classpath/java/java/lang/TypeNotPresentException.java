@@ -23,12 +23,16 @@
 
 package java.lang;
 
-public class TypeNotPresentException extends Exception {
-  public TypeNotPresentException(String message) {
-    super(message);
+public class TypeNotPresentException extends RuntimeException {
+  private static final long serialVersionUID = -5101214195716534496L;
+  private final String typeName;
+
+  public TypeNotPresentException(String typeName, Throwable cause) {
+    super("Type " + typeName + " not present", cause);
+    this.typeName = typeName;
   }
 
-  public TypeNotPresentException() {
-    this(null);
+  public String typeName() {
+    return typeName;
   }
 }
