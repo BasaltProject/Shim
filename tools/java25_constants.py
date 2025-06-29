@@ -103,6 +103,16 @@ def generate(directory, major):
     body = struct.pack(">HHI", 1, 0, len(code)) + code + u2(0) + u2(0)
     methods.append(struct.pack(">HHHHHI", 0x0009, concurrent_name, capture_descriptor, 1,
                                code_name, len(body)) + body)
+    def invocation_method(name, code, stack):
+        body = struct.pack(">HHI", stack, 0, len(code)) + code + u2(0) + u2(0)
+        methods.append(struct.pack(">HHHHHI", 0x0009, utf(name), capture_descriptor, 1,
+                                   code_name, len(body)) + body)
+
+    shared_code = b"\x10\x07\xba" + u2(capture) + b"\x00\x00"
+    invocation_method("sharedFirstCall", shared_code + b"\xb0", 1)
+    invocation_method("sharedSecondCall", shared_code + b"\xb0", 1)
+    invocation_method("twoSharedCalls", shared_code + b"\x57" + shared_code + b"\xb0", 1)
+    invocation_method("mismatchAliasCall", b"\x09\xba" + u2(mismatch) + b"\x00\x00\xb0", 2)
     failures = []
     for bootstrap_index, name in enumerate(("failRuntime", "failError", "failNull", "failConcurrent", "failChecked"), 2):
         failure_bootstrap = handle(6, "LoadableConstants", name,

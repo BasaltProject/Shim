@@ -361,6 +361,7 @@
 
 (type code shim/Code
   (singleton pool)
+  (list dynamicSites)
   (intArray stackMap)
   (object exceptionHandlerTable)
   (lineNumberTable lineNumberTable)

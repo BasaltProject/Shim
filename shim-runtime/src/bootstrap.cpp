@@ -24,6 +24,7 @@
 #include "shim/machine.h"
 #include "shim/constants.h"
 #include "shim/processor.h"
+#include "shim/util.h"
 
 namespace vm {
 namespace {
@@ -63,6 +64,38 @@ object bootstrapConstant(Thread* t, GcInvocation* invocation, unsigned index)
 }
 
 } // namespace
+
+GcInvocation* dynamicInvocation(Thread* t, GcMethod* method, GcCode* code,
+                                unsigned poolIndex, unsigned offset)
+{
+    PROTECT(t, method);
+    PROTECT(t, code);
+    ACQUIRE(t, t->m->classLock);
+    GcList* sites = code->dynamicSites();
+    if (!sites) {
+        sites = makeList(t, 0, 0, 0);
+        code->setDynamicSites(t, sites);
+    }
+    PROTECT(t, sites);
+    for (GcPair* node = cast<GcPair>(t, sites->front()); node;
+         node = cast<GcPair>(t, node->second())) {
+        GcPair* entry = cast<GcPair>(t, node->first());
+        if (cast<GcInt>(t, entry->first())->value() == static_cast<int>(offset)) {
+            return cast<GcInvocation>(t, entry->second());
+        }
+    }
+    GcInvocation* prototype = cast<GcInvocation>(t, singletonObject(t, code->pool(), poolIndex));
+    PROTECT(t, prototype);
+    GcInvocation* invocation = makeInvocation(t, prototype->bootstrap(), -1,
+        method->class_(), prototype->pool(), prototype->poolTags(), prototype->template_(),
+        prototype->bootstrapMethodTable(), 0, 0);
+    PROTECT(t, invocation);
+    GcInt* position = makeInt(t, offset);
+    PROTECT(t, position);
+    GcPair* entry = makePair(t, position, invocation);
+    listAppend(t, sites, entry);
+    return invocation;
+}
 
 object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* pool, unsigned index)
 {
