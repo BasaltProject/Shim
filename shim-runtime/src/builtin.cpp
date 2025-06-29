@@ -159,6 +159,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 {
   GcClassLoader* loader
       = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
+  if (loader == 0) loader = roots(t)->bootLoader();
   GcByteArray* spec
       = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[1]));
 
@@ -171,6 +172,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 {
   GcClassLoader* loader
       = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
+  if (loader == 0) loader = roots(t)->bootLoader();
   GcByteArray* b = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[1]));
   int offset = arguments[2];
   int length = arguments[3];
@@ -195,6 +197,12 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 
   return reinterpret_cast<int64_t>(
       t->m->classpath->makeString(t, array, offset, length));
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_SystemClassLoader_bootLoader(Thread* t, object, uintptr_t*)
+{
+  return reinterpret_cast<int64_t>(roots(t)->bootLoader());
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL

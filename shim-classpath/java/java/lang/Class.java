@@ -454,7 +454,7 @@ public final class Class <T>
               && Arrays.equals(vmClass.name, reference.outer))
           {
             try {
-              result[--count] = getClassLoader().loadClass
+              result[--count] = vmClass.loader.loadClass
                 (new String(reference.inner, 0, reference.inner.length - 1));
             } catch (ClassNotFoundException e) {
               throw new Error(e);
@@ -478,7 +478,7 @@ public final class Class <T>
           if (Arrays.equals(vmClass.name, reference.inner)) {
             if (reference.outer != null) {
               try {
-                return getClassLoader().loadClass
+                return vmClass.loader.loadClass
                   (new String(reference.outer, 0, reference.outer.length - 1));
               } catch (ClassNotFoundException e) {
                 throw new Error(e);
@@ -494,7 +494,7 @@ public final class Class <T>
   }
 
   public ClassLoader getClassLoader() {
-    return vmClass.loader;
+    return vmClass.loader == shim.SystemClassLoader.bootLoader() ? null : vmClass.loader;
   }
 
   public int getModifiers() {
@@ -603,7 +603,7 @@ public final class Class <T>
         path = name.substring(0, index) + "/" + path;
       }
     }
-    return getClassLoader().getResource(path);
+    return vmClass.loader.getResource(path);
   }
 
   public InputStream getResourceAsStream(String path) {
@@ -638,7 +638,7 @@ public final class Class <T>
       String name = getCanonicalName();
       int index = name.lastIndexOf('.');
       if (index >= 0) {
-        return getClassLoader().getPackage(name.substring(0, index));
+        return vmClass.loader.getPackage(name.substring(0, index));
       } else {
         return null;
       }
