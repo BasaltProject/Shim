@@ -96,8 +96,29 @@ def generate(directory, major):
     body = struct.pack(">HHI", 1, 0, len(code)) + code + u2(0) + u2(0)
     methods.append(struct.pack(">HHHHHI", 0x0009, return_name, utf("()Ljava/lang/Object;"), 1,
                                code_name, len(body)) + body)
-    bootstrap_body = u2(2) + u2(bootstrap) + u2(2) + u2(recipe) + u2(type_index)
+    concurrent_name = utf("concurrentCall")
+    concurrent_signature = add(12, u2(concurrent_name) + u2(utf("(I)Ljava/lang/String;")))
+    concurrent = add(18, u2(1) + u2(concurrent_signature))
+    code = b"\x10\x07\xba" + u2(concurrent) + b"\x00\x00\xb0"
+    body = struct.pack(">HHI", 1, 0, len(code)) + code + u2(0) + u2(0)
+    methods.append(struct.pack(">HHHHHI", 0x0009, concurrent_name, capture_descriptor, 1,
+                               code_name, len(body)) + body)
+    failures = []
+    for bootstrap_index, name in enumerate(("failRuntime", "failError", "failNull", "failConcurrent", "failChecked"), 2):
+        failure_bootstrap = handle(6, "LoadableConstants", name,
+            "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;)"
+            "Ljava/lang/invoke/CallSite;")
+        failure_name = utf(name + "Call")
+        failure_signature = add(12, u2(failure_name) + u2(capture_descriptor))
+        failure_constant = add(18, u2(bootstrap_index) + u2(failure_signature))
+        code = b"\xba" + u2(failure_constant) + b"\x00\x00\xb0"
+        body = struct.pack(">HHI", 1, 0, len(code)) + code + u2(0) + u2(0)
+        methods.append(struct.pack(">HHHHHI", 0x0009, failure_name, capture_descriptor, 1,
+                                   code_name, len(body)) + body)
+        failures.append(u2(failure_bootstrap) + u2(0))
+    bootstrap_body = u2(7) + u2(bootstrap) + u2(2) + u2(recipe) + u2(type_index)
     bootstrap_body += u2(capture_bootstrap) + u2(2) + u2(lazy_type_index) + u2(static_handle_index)
+    bootstrap_body += b"".join(failures)
     bootstrap_attribute = u2(bootstrap_name) + struct.pack(">I", len(bootstrap_body)) + bootstrap_body
     data = struct.pack(">IHHH", 0xcafebabe, 0, major, len(entries) + 1)
     data += b"".join(entries)

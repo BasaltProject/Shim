@@ -2013,10 +2013,6 @@ loop:
       site = resolveDynamic(t, invocation);
       PROTECT(t, site);
 
-      storeStoreMemoryBarrier();
-
-      invocation->setSite(t, site);
-      site->setInvocation(t, invocation);
     }
 
     method = site->target()->method();

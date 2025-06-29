@@ -102,7 +102,8 @@
   (byteArray poolTags)
   (method template)
   (field array bootstrapMethodTable)
-  (callSite site))
+  (callSite site)
+  (throwable failure))
 
 (type triple
   (object first)

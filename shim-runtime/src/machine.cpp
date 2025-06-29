@@ -1152,7 +1152,7 @@ unsigned parsePoolEntry(Thread* t,
                        0);
 
       object value = reinterpret_cast<object>(
-          makeInvocation(t, bootstrap, -1, 0, pool, tags, template_, 0, 0));
+          makeInvocation(t, bootstrap, -1, 0, pool, tags, template_, 0, 0, 0));
       PROTECT(t, value);
 
       pool->setBodyElement(t, i, reinterpret_cast<uintptr_t>(value));

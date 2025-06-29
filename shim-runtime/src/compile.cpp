@@ -7556,38 +7556,27 @@ void* linkDynamicMethod2(MyThread* t, unsigned index)
 {
   GcInvocation* invocation
       = cast<GcInvocation>(t, roots(t)->invocations()->body()[index]);
+  PROTECT(t, invocation);
 
   GcCallSite* site = invocation->site();
 
   loadMemoryBarrier();
 
+  t->trace->targetMethod = invocation->template_();
+  THREAD_RESOURCE0(t, static_cast<MyThread*>(t)->trace->targetMethod = 0;);
+
   if (site == 0) {
-    t->trace->targetMethod = invocation->template_();
-
-    THREAD_RESOURCE0(t, static_cast<MyThread*>(t)->trace->targetMethod = 0;);
-
-    PROTECT(t, invocation);
-
     site = resolveDynamic(t, invocation);
-    PROTECT(t, site);
+  }
+  PROTECT(t, site);
 
-    compile(t, codeAllocator(t), 0, site->target()->method());
+  compile(t, codeAllocator(t), 0, site->target()->method());
 
+  {
     ACQUIRE(t, t->m->classLock);
-
-    if (invocation->site() == 0) {
-      void* address
-          = reinterpret_cast<void*>(methodAddress(t, site->target()->method()));
-
-      if ((site->target()->method()->flags() & ACC_NATIVE) == 0) {
-        t->dynamicTable[index] = address;
-      }
+    if ((site->target()->method()->flags() & ACC_NATIVE) == 0) {
+      t->dynamicTable[index] = reinterpret_cast<void*>(methodAddress(t, site->target()->method()));
     }
-
-    storeStoreMemoryBarrier();
-
-    invocation->setSite(t, site);
-    site->setInvocation(t, invocation);
   }
 
   GcMethod* target = invocation->site()->target()->method();
