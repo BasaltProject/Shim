@@ -51,8 +51,10 @@ def generate(directory, major):
     type_index = method_type("(I[Ljava/lang/String;)J")
     method("type", "MethodType", type_index)
     method("wideType", "MethodType", type_index, True)
-    method("lazyType", "MethodType", method_type("(L" + lazy + ";)L" + lazy + ";"))
-    method("staticHandle", "MethodHandle", handle(6, "java/lang/String", "valueOf", "(I)Ljava/lang/String;"))
+    lazy_type_index = method_type("(L" + lazy + ";)L" + lazy + ";")
+    method("lazyType", "MethodType", lazy_type_index)
+    static_handle_index = handle(6, "java/lang/String", "valueOf", "(I)Ljava/lang/String;")
+    method("staticHandle", "MethodHandle", static_handle_index)
     method("virtualHandle", "MethodHandle", handle(5, "java/lang/String", "length", "()I"))
     method("constructorHandle", "MethodHandle", handle(8, "java/lang/String", "<init>", "()V"))
     method("lazyHandle", "MethodHandle", handle(6, lazy, "target", "()I"), True)
@@ -69,7 +71,33 @@ def generate(directory, major):
     body = struct.pack(">HHI", 1, 0, len(code)) + code + u2(0) + u2(0)
     methods.append(struct.pack(">HHHHHI", 0x0009, concat_name, concat_descriptor, 1,
                                code_name, len(body)) + body)
-    bootstrap_body = u2(1) + u2(bootstrap) + u2(2) + u2(recipe) + u2(type_index)
+    capture_bootstrap = handle(6, "LoadableConstants", "capture",
+        "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;"
+        "Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;)Ljava/lang/invoke/CallSite;")
+    capture_name = utf("captureCall")
+    capture_descriptor = utf("()Ljava/lang/String;")
+    capture_signature = add(12, u2(capture_name) + u2(utf("(I)Ljava/lang/String;")))
+    capture = add(18, u2(1) + u2(capture_signature))
+    code = b"\x10\x07\xba" + u2(capture) + b"\x00\x00\xb0"
+    body = struct.pack(">HHI", 1, 0, len(code)) + code + u2(0) + u2(0)
+    methods.append(struct.pack(">HHHHHI", 0x0009, capture_name, capture_descriptor, 1,
+                               code_name, len(body)) + body)
+    mismatch_name = utf("mismatchCall")
+    mismatch_signature = add(12, u2(mismatch_name) + u2(utf("(J)Ljava/lang/String;")))
+    mismatch = add(18, u2(1) + u2(mismatch_signature))
+    code = b"\x09\xba" + u2(mismatch) + b"\x00\x00\xb0"
+    body = struct.pack(">HHI", 2, 0, len(code)) + code + u2(0) + u2(0)
+    methods.append(struct.pack(">HHHHHI", 0x0009, mismatch_name, capture_descriptor, 1,
+                               code_name, len(body)) + body)
+    return_name = utf("mismatchReturnCall")
+    return_signature = add(12, u2(return_name) + u2(utf("(I)Ljava/lang/Object;")))
+    return_constant = add(18, u2(1) + u2(return_signature))
+    code = b"\x10\x07\xba" + u2(return_constant) + b"\x00\x00\xb0"
+    body = struct.pack(">HHI", 1, 0, len(code)) + code + u2(0) + u2(0)
+    methods.append(struct.pack(">HHHHHI", 0x0009, return_name, utf("()Ljava/lang/Object;"), 1,
+                               code_name, len(body)) + body)
+    bootstrap_body = u2(2) + u2(bootstrap) + u2(2) + u2(recipe) + u2(type_index)
+    bootstrap_body += u2(capture_bootstrap) + u2(2) + u2(lazy_type_index) + u2(static_handle_index)
     bootstrap_attribute = u2(bootstrap_name) + struct.pack(">I", len(bootstrap_body)) + bootstrap_body
     data = struct.pack(">IHHH", 0xcafebabe, 0, major, len(entries) + 1)
     data += b"".join(entries)
