@@ -64,9 +64,12 @@ object bootstrapConstant(Thread* t, GcInvocation* invocation, unsigned index)
         }
         return t->m->classpath->makeJclass(t, class_);
     }
-    case CONSTANT_MethodType:
-        return makeMethodType(t, invocation->class_()->loader(),
-                              cast<GcByteArray>(t, singletonObject(t, pool, index)), 0, 0, 0);
+    case CONSTANT_MethodType: {
+        object value = singletonObject(t, pool, index);
+        return objectClass(t, value) == type(t, GcMethodType::Type) ? value
+            : reinterpret_cast<object>(makeMethodType(t, invocation->class_()->loader(),
+                 cast<GcByteArray>(t, value), 0, 0, 0));
+    }
     case CONSTANT_MethodHandle:
         return resolve(t, invocation->class_()->loader(), pool, index,
                        findMethodInClass, GcNoSuchMethodError::Type);
@@ -76,6 +79,36 @@ object bootstrapConstant(Thread* t, GcInvocation* invocation, unsigned index)
 }
 
 } // namespace
+
+object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* pool, unsigned index)
+{
+    PROTECT(t, pool);
+    PROTECT(t, loader);
+    object value = singletonObject(t, pool, index);
+    loadMemoryBarrier();
+    PROTECT(t, value);
+    if (objectClass(t, value) == type(t, GcReference::Type)) {
+        if (cast<GcReference>(t, value)->kind() != 0) {
+            return resolve(t, loader, pool, index, findMethodInClass, GcNoSuchMethodError::Type);
+        }
+        GcClass* class_ = resolveClass(t, loader, cast<GcReference>(t, value)->name());
+        storeStoreMemoryBarrier();
+        pool->setBodyElement(t, index, reinterpret_cast<uintptr_t>(class_));
+        return getJClass(t, class_);
+    }
+    if (objectClass(t, value) == type(t, GcClass::Type)) {
+        return getJClass(t, cast<GcClass>(t, value));
+    }
+    if (objectClass(t, value) == type(t, GcByteArray::Type)) {
+        value = makeMethodType(t, loader, cast<GcByteArray>(t, value), 0, 0, 0);
+        GcMethod* validate = resolveMethod(t, roots(t)->bootLoader(),
+            "java/lang/invoke/MethodType", "parameterCount", "()I");
+        t->m->processor->invokeArray(t, validate, value, static_cast<GcArray*>(0));
+        storeStoreMemoryBarrier();
+        pool->setBodyElement(t, index, reinterpret_cast<uintptr_t>(value));
+    }
+    return value;
+}
 
 GcCallSite* resolveDynamic(Thread* t, GcInvocation* invocation)
 {

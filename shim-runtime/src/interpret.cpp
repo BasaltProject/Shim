@@ -2331,18 +2331,7 @@ loop:
     GcSingleton* pool = code->pool();
 
     if (singletonIsObject(t, pool, index - 1)) {
-      object v = singletonObject(t, pool, index - 1);
-      if (objectClass(t, v) == type(t, GcReference::Type)) {
-        GcClass* class_
-            = resolveClassInPool(t, frameMethod(t, frame), index - 1);
-
-        pushObject(t, reinterpret_cast<object>(getJClass(t, class_)));
-      } else if (objectClass(t, v) == type(t, GcClass::Type)) {
-        pushObject(t,
-                   reinterpret_cast<object>(getJClass(t, cast<GcClass>(t, v))));
-      } else {
-        pushObject(t, v);
-      }
+      pushObject(t, resolveLoadableConstant(t, frameMethod(t, frame)->class_()->loader(), pool, index - 1));
     } else {
       pushInt(t, singletonValue(t, pool, index - 1));
     }

@@ -74,7 +74,14 @@ public class MethodHandle {
 
   public MethodType type() {
     if (type == null) {
-      type = new MethodType(loader, method.spec);
+      MethodType resolved = new MethodType(loader, method.spec);
+      if (kind != REF_invokeStatic) {
+        Class owner = SystemClassLoader.getClass(method.class_);
+        resolved = kind == REF_newInvokeSpecial
+            ? resolved.changeReturnType(owner)
+            : resolved.insertParameterTypes(0, owner);
+      }
+      type = resolved;
     }
     return type;
   }

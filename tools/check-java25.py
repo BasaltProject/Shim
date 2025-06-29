@@ -15,6 +15,9 @@ import struct
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True
+from java25_constants import generate as generate_constants
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -147,6 +150,8 @@ def main():
             major = struct.unpack(">H", (output / (source.stem + ".class")).read_bytes()[6:8])[0]
             if major != release + 44:
                 raise RuntimeError("Unexpected class-file version")
+            if source.stem == "LoadableConstants":
+                generate_constants(output, major)
             reference = run([java, "-cp", str(output), source.stem])
             if reference.returncode:
                 print(reference.stderr, file=sys.stderr)

@@ -2388,6 +2388,8 @@ GcJclass* getDeclaringClass(Thread* t, GcClass* c);
 
 GcCallSite* resolveDynamic(Thread* t, GcInvocation* invocation);
 
+object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* pool, unsigned index);
+
 inline bool emptyMethod(Thread* t UNUSED, GcMethod* method)
 {
   return ((method->flags() & ACC_NATIVE) == 0)
