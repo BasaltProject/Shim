@@ -2396,6 +2396,8 @@ object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* po
 object resolveDynamicConstant(Thread* t, GcDynamicConstant* constant, GcClass* owner);
 uint64_t dynamicConstantBits(Thread* t, GcDynamicConstant* constant, object value);
 
+void verifyCode(Thread* t, GcCode* code, GcByteArray* tags);
+
 inline bool emptyMethod(Thread* t UNUSED, GcMethod* method)
 {
   return ((method->flags() & ACC_NATIVE) == 0)

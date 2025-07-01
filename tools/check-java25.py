@@ -18,6 +18,7 @@ import sys
 sys.dont_write_bytecode = True
 from java25_constants import generate as generate_constants
 from java25_dynamic import generate as generate_dynamic
+from java25_verify import generate as generate_verification
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -187,6 +188,8 @@ def main():
                 generate_constants(output, major)
             elif source.stem == "DynamicConstants":
                 generate_dynamic(output, major)
+            elif source.stem == "BytecodeValidation":
+                generate_verification(output, major)
             reference = run([java, "-cp", str(output), source.stem])
             if reference.returncode:
                 print(reference.stderr, file=sys.stderr)

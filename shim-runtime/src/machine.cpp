@@ -1192,7 +1192,7 @@ unsigned parsePoolEntry(Thread* t,
   }
 }
 
-GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations, unsigned major)
+GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations, unsigned major, GcByteArray*& poolTags)
 {
   PROTECT(t, invocations);
 
@@ -1206,6 +1206,7 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations, unsigned major
   // Keep original tags for bootstrap boxing; the second half tracks parse state.
   GcByteArray* tags = makeByteArray(t, count * 2);
   PROTECT(t, tags);
+  poolTags = tags;
   memset(tags->body().begin(), 0, tags->length());
 
   if (DebugClassReader) {
@@ -2394,13 +2395,15 @@ void disassembleCode(const char* prefix, uint8_t* code, unsigned length)
   }
 }
 
-GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool)
+GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags)
 {
   PROTECT(t, pool);
+  PROTECT(t, tags);
 
   unsigned maxStack = s.read2();
   unsigned maxLocals = s.read2();
   unsigned length = s.read4();
+  if (length == 0 || length > 65535) throwNew(t, GcClassFormatError::Type, "Invalid Code length");
 
   if (DebugClassReader) {
     fprintf(stderr,
@@ -2413,6 +2416,7 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool)
   GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
   s.read(code->body().begin(), length);
   PROTECT(t, code);
+  verifyCode(t, code, tags);
 
   if (DebugClassReader) {
     disassembleCode("      ", code->body().begin(), length);
@@ -2522,10 +2526,11 @@ GcList* addInterfaceMethods(Thread* t,
   return 0;
 }
 
-void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool)
+void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, GcByteArray* tags)
 {
   PROTECT(t, class_);
   PROTECT(t, pool);
+  PROTECT(t, tags);
 
   GcHashMap* virtualMap = makeHashMap(t, 0, 0);
   PROTECT(t, virtualMap);
@@ -2599,7 +2604,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool)
 
         if (vm::strcmp(reinterpret_cast<const int8_t*>("Code"),
                        attributeName->body().begin()) == 0) {
-          code = parseCode(t, s, pool);
+          code = parseCode(t, s, pool, tags);
         } else if (vm::strcmp(reinterpret_cast<const int8_t*>("Exceptions"),
                               attributeName->body().begin()) == 0) {
           if (addendum == 0) {
@@ -4907,7 +4912,9 @@ GcClass* parseClass(Thread* t,
   GcList* invocations = makeList(t, 0, 0, 0);
   PROTECT(t, invocations);
 
-  GcSingleton* pool = parsePool(t, s, invocations, majorVer);
+  GcByteArray* poolTags = 0;
+  PROTECT(t, poolTags);
+  GcSingleton* pool = parsePool(t, s, invocations, majorVer, poolTags);
   PROTECT(t, pool);
 
   unsigned flags = s.read2();
@@ -4960,7 +4967,7 @@ GcClass* parseClass(Thread* t,
 
   parseFieldTable(t, s, class_, pool);
 
-  parseMethodTable(t, s, class_, pool);
+  parseMethodTable(t, s, class_, pool, poolTags);
 
   parseAttributeTable(t, s, class_, pool, invocations);
 
