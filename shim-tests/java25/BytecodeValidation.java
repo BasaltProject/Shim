@@ -17,7 +17,7 @@ public class BytecodeValidation {
 
     public static void main(String[] args) throws Exception {
         String[] controls = {"ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong",
-                "ValidTable", "ValidLookup", "ValidLocals", "ValidHandler", "ValidHandlerEnd"};
+                "ValidTable", "ValidLookup", "ValidLocals", "ValidHandler", "ValidHandlerEnd", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface"};
         for (String name : controls) {
             Class.forName("Verify" + name);
             System.out.println("valid " + name);
@@ -25,7 +25,7 @@ public class BytecodeValidation {
         String[] invalid = {"LdcLong", "LdcWideDouble", "Ldc2Int", "Ldc2String", "LdcUtf", "LdcZero", "LdcOutside", "LdcReserved",
                 "DynamicNarrowLong", "DynamicWideInt", "TruncatedLdc", "TruncatedWide", "IllegalWide", "ReservedOpcode",
                 "BranchOperand", "BranchOutside", "TruncatedSwitch", "NegativePairs", "InvalidRange", "UnsortedKeys",
-                "DynamicReserved", "WrongFieldRef", "WrongClassRef", "BadArrayType", "ZeroDimensions", "InterfaceReserved", "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride"};
+                "DynamicReserved", "WrongFieldRef", "WrongClassRef", "BadArrayType", "ZeroDimensions", "InterfaceReserved", "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "InterfaceCount", "WideInterfaceCount"};
         for (String name : invalid) {
             try { Class.forName("Verify" + name); throw new AssertionError(name); }
             catch (VerifyError expected) { System.out.println("verify " + name); }
