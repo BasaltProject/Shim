@@ -2416,12 +2416,6 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags)
   GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
   s.read(code->body().begin(), length);
   PROTECT(t, code);
-  verifyCode(t, code, tags);
-
-  if (DebugClassReader) {
-    disassembleCode("      ", code->body().begin(), length);
-  }
-
   unsigned ehtLength = s.read2();
   if (ehtLength) {
     GcExceptionHandlerTable* eht = makeExceptionHandlerTable(t, ehtLength);
@@ -2430,10 +2424,20 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags)
       unsigned end = s.read2();
       unsigned ip = s.read2();
       unsigned catchType = s.read2();
+      if (start >= end || end > length || ip >= length) {
+        throwNew(t, GcClassFormatError::Type, "Invalid exception handler range");
+      }
+      if (catchType && (catchType > tags->length() / 2 || tags->body()[catchType - 1] != CONSTANT_Class)) {
+        throwNew(t, GcClassFormatError::Type, "Invalid exception handler catch type");
+      }
       eht->body()[i] = exceptionHandler(start, end, ip, catchType);
     }
 
     code->setExceptionHandlerTable(t, eht);
+  }
+  verifyCode(t, code, tags);
+  if (DebugClassReader) {
+    disassembleCode("      ", code->body().begin(), length);
   }
 
   unsigned attributeCount = s.read2();
