@@ -168,7 +168,16 @@ unsigned instruction(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, co
         if (opcode == 186) require(t, bytes[pc + 3] == 0 && bytes[pc + 4] == 0, "Invalid invokedynamic operands");
     } else if (opcode == 187 || opcode == 189 || opcode == 192 || opcode == 193 || opcode == 197) {
         require(t, constantTag(t, tags, word16(bytes + pc + 1)) == CONSTANT_Class, "Invalid class reference in bytecode");
-        if (opcode == 197) require(t, bytes[pc + 3] != 0, "Invalid multianewarray dimensions");
+        if (opcode == 187 || opcode == 189 || opcode == 197) {
+            GcReference* reference = cast<GcReference>(t, singletonObject(t, code->pool(), word16(bytes + pc + 1) - 1));
+            GcByteArray* name = reference->name();
+            unsigned dimensions = 0;
+            while (dimensions + 1 < name->length() && name->body()[dimensions] == '[') ++dimensions;
+            if (opcode == 187) require(t, dimensions == 0, "new cannot allocate an array class");
+            if (opcode == 189) require(t, dimensions < 255, "anewarray exceeds the array dimension limit");
+            if (opcode == 197) require(t, bytes[pc + 3] != 0 && bytes[pc + 3] <= dimensions,
+                                      "Invalid multianewarray dimensions");
+        }
     } else if (opcode == 188) {
         require(t, bytes[pc + 1] >= 4 && bytes[pc + 1] <= 11, "Invalid newarray primitive type");
     }
