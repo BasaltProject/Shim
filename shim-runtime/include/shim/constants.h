@@ -253,6 +253,7 @@ enum Constant {
   CONSTANT_Integer = 3,
   CONSTANT_InterfaceMethodref = 11,
   CONSTANT_InvokeDynamic = 18,
+  CONSTANT_Dynamic = 17,
   CONSTANT_Long = 5,
   CONSTANT_MethodHandle = 15,
   CONSTANT_MethodType = 16,

@@ -921,7 +921,8 @@ unsigned parsePoolEntry(Thread* t,
 
   s.setPosition(index[i]);
 
-  switch (s.read1()) {
+  unsigned tag = s.read1();
+  switch (tag) {
   case CONSTANT_Integer:
   case CONSTANT_Float: {
     uint32_t v = s.read4();
@@ -1112,6 +1113,7 @@ unsigned parsePoolEntry(Thread* t,
     tags->body()[count + i] = 2;
     return 1;
 
+  case CONSTANT_Dynamic:
   case CONSTANT_InvokeDynamic:
     if (singletonObject(t, pool, i) == 0) {
       unsigned bootstrap = s.read2();
@@ -1122,8 +1124,29 @@ unsigned parsePoolEntry(Thread* t,
 
       GcPair* nameAndType = cast<GcPair>(t, singletonObject(t, pool, nti));
 
-      const char* specString = reinterpret_cast<const char*>(
-          cast<GcByteArray>(t, nameAndType->second())->body().begin());
+      PROTECT(t, nameAndType);
+      GcByteArray* spec = cast<GcByteArray>(t, nameAndType->second());
+      PROTECT(t, spec);
+      if (tag == CONSTANT_Dynamic) {
+        const char* field = reinterpret_cast<const char*>(spec->body().begin());
+        unsigned end = spec->length() - 1;
+        unsigned position = 0;
+        while (position < end && field[position] == '[') ++position;
+        bool valid = position <= 255 && position < end;
+        if (valid && field[position] == 'L') {
+          unsigned start = ++position;
+          while (position < end && field[position] != ';') {
+            if (field[position] == '.' || field[position] == '[') valid = false;
+            ++position;
+          }
+          valid = valid && position > start && position + 1 == end;
+        } else {
+          valid = valid && field[position] != 0 && strchr("ZBCSIFJD", field[position]) && position + 1 == end;
+        }
+        if (!valid) throwNew(t, GcClassFormatError::Type, "Invalid dynamic constant descriptor");
+        spec = makeByteArray(t, "()%s", field);
+      }
+      const char* specString = reinterpret_cast<const char*>(spec->body().begin());
 
       unsigned parameterCount;
       unsigned parameterFootprint;
@@ -1146,13 +1169,15 @@ unsigned parsePoolEntry(Thread* t,
                        0,
                        0,
                        cast<GcByteArray>(t, nameAndType->first()),
-                       cast<GcByteArray>(t, nameAndType->second()),
+                       spec,
                        0,
                        0,
                        0);
+      PROTECT(t, template_);
 
-      object value = reinterpret_cast<object>(
-          makeInvocation(t, bootstrap, -1, 0, pool, tags, template_, 0, 0, 0));
+      object value = tag == CONSTANT_Dynamic
+          ? reinterpret_cast<object>(makeDynamicConstant(t, bootstrap, -1, 0, pool, tags, template_, 0, 0, 0, 0, 0))
+          : reinterpret_cast<object>(makeInvocation(t, bootstrap, -1, 0, pool, tags, template_, 0, 0, 0));
       PROTECT(t, value);
 
       pool->setBodyElement(t, i, reinterpret_cast<uintptr_t>(value));
@@ -1167,7 +1192,7 @@ unsigned parsePoolEntry(Thread* t,
   }
 }
 
-GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations)
+GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations, unsigned major)
 {
   PROTECT(t, invocations);
 
@@ -1259,6 +1284,9 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations)
         s.skip(2);
         break;
 
+      case CONSTANT_Dynamic:
+        if (major < 55) throwNew(t, GcClassFormatError::Type, "Dynamic constant requires Java 11 or later");
+        // fall through
       case CONSTANT_InvokeDynamic:
         singletonMarkObject(t, pool, i);
         s.skip(4);
@@ -4879,7 +4907,7 @@ GcClass* parseClass(Thread* t,
   GcList* invocations = makeList(t, 0, 0, 0);
   PROTECT(t, invocations);
 
-  GcSingleton* pool = parsePool(t, s, invocations);
+  GcSingleton* pool = parsePool(t, s, invocations, majorVer);
   PROTECT(t, pool);
 
   unsigned flags = s.read2();

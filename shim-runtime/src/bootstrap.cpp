@@ -54,6 +54,8 @@ object bootstrapConstant(Thread* t, GcInvocation* invocation, unsigned index)
     }
     case CONSTANT_String:
         return singletonObject(t, pool, index);
+    case CONSTANT_Dynamic:
+        return resolveDynamicConstant(t, cast<GcDynamicConstant>(t, singletonObject(t, pool, index)), invocation->class_());
     case CONSTANT_Class:
     case CONSTANT_MethodType:
     case CONSTANT_MethodHandle:
@@ -127,9 +129,10 @@ object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* po
     return value;
 }
 
-static GcCallSite* linkDynamic(Thread* t, GcInvocation* invocation)
+static object invokeBootstrap(Thread* t, GcInvocation* invocation, object typeArgument)
 {
     PROTECT(t, invocation);
+    PROTECT(t, typeArgument);
     GcClass* caller = invocation->class_();
     PROTECT(t, caller);
     GcArray* table = cast<GcArray>(t, invocation->bootstrapMethodTable());
@@ -161,8 +164,7 @@ static GcCallSite* linkDynamic(Thread* t, GcInvocation* invocation)
     GcByteArray* name = invocation->template_()->name();
     GcString* string = t->m->classpath->makeString(t, name, 0, name->length() - 1);
     arguments->setBodyElement(t, 1, string);
-    GcMethodType* methodType = makeMethodType(t, caller->loader(), invocation->template_()->spec(), 0, 0, 0);
-    arguments->setBodyElement(t, 2, methodType);
+    arguments->setBodyElement(t, 2, typeArgument);
     for (unsigned i = 3; i < fixed; ++i) {
         object value = bootstrapConstant(t, invocation, constants->body()[i - 2]);
         arguments->setBodyElement(t, i, value);
@@ -178,6 +180,26 @@ static GcCallSite* linkDynamic(Thread* t, GcInvocation* invocation)
     }
     initClass(t, bootstrap->class_());
     object result = t->m->processor->invokeArray(t, bootstrap, 0, arguments);
+    if (result) {
+        switch (bootstrap->returnCode()) {
+        case BooleanField: return makeBoolean(t, cast<GcInt>(t, result)->value());
+        case ByteField: return makeByte(t, cast<GcInt>(t, result)->value());
+        case CharField: return makeChar(t, cast<GcInt>(t, result)->value());
+        case ShortField: return makeShort(t, cast<GcInt>(t, result)->value());
+        case FloatField: return makeFloat(t, cast<GcInt>(t, result)->value());
+        case DoubleField: return makeDouble(t, cast<GcLong>(t, result)->value());
+        default: break;
+        }
+    }
+    return result;
+}
+
+static GcCallSite* linkDynamic(Thread* t, GcInvocation* invocation)
+{
+    PROTECT(t, invocation);
+    GcMethodType* methodType = makeMethodType(t, invocation->class_()->loader(), invocation->template_()->spec(), 0, 0, 0);
+    PROTECT(t, methodType);
+    object result = invokeBootstrap(t, invocation, methodType);
     if (result == 0 or !instanceOf(t, type(t, GcCallSite::Type), result)) {
         throwNew(t, GcBootstrapMethodError::Type, "Bootstrap method did not return a CallSite");
     }
@@ -195,12 +217,133 @@ static GcCallSite* linkDynamic(Thread* t, GcInvocation* invocation)
     PROTECT(t, equalsMethod);
     GcArray* comparison = makeArray(t, 1);
     PROTECT(t, comparison);
-    comparison->setBodyElement(t, 0, arguments->body()[2]);
+    comparison->setBodyElement(t, 0, methodType);
     object matches = t->m->processor->invokeArray(t, equalsMethod, targetType, comparison);
     if (!cast<GcInt>(t, matches)->value()) {
         throwNew(t, GcBootstrapMethodError::Type, "CallSite target type does not match invocation type");
     }
     return site;
+}
+
+namespace {
+
+object convertConstant(Thread* t, GcDynamicConstant* constant, object value, GcClass* expected)
+{
+    PROTECT(t, value);
+    unsigned code = constant->template_()->returnCode();
+    if (code == ObjectField) {
+        if (value && !instanceOf(t, expected, value)) {
+            throwNew(t, GcClassCastException::Type, "Dynamic constant has incompatible reference type");
+        }
+        return value;
+    }
+    if (!value) throwNew(t, GcNullPointerException::Type, "Null dynamic primitive constant");
+    GcClass* actual = objectClass(t, value);
+    if (code == BooleanField && actual == type(t, GcBoolean::Type)) return value;
+    if (code == CharField && actual == type(t, GcChar::Type)) return value;
+    int rank = 0;
+    int64_t integral = 0;
+    double real = 0;
+    if (actual == type(t, GcByte::Type)) {
+        rank = 1; integral = static_cast<int8_t>(cast<GcByte>(t, value)->value());
+    } else if (actual == type(t, GcShort::Type)) {
+        rank = 2; integral = static_cast<int16_t>(cast<GcShort>(t, value)->value());
+    } else if (actual == type(t, GcChar::Type)) {
+        rank = 2; integral = cast<GcChar>(t, value)->value();
+    } else if (actual == type(t, GcInt::Type)) {
+        rank = 3; integral = cast<GcInt>(t, value)->value();
+    } else if (actual == type(t, GcLong::Type)) {
+        rank = 4; integral = static_cast<int64_t>(cast<GcLong>(t, value)->value());
+    } else if (actual == type(t, GcFloat::Type)) {
+        rank = 5; real = bitsToFloat(cast<GcFloat>(t, value)->value());
+    } else if (actual == type(t, GcDouble::Type)) {
+        rank = 6; real = bitsToDouble(cast<GcDouble>(t, value)->value());
+    }
+    if (rank) {
+        switch (code) {
+        case ByteField:
+            if (rank == 1) return value;
+            break;
+        case ShortField:
+            if (rank <= 2 && actual != type(t, GcChar::Type)) return makeShort(t, integral);
+            break;
+        case IntField:
+            if (rank <= 3) return makeInt(t, integral);
+            break;
+        case LongField:
+            if (rank <= 4) return makeLong(t, integral);
+            break;
+        case FloatField:
+            if (rank <= 5) return makeFloat(t, floatToBits(rank <= 4 ? static_cast<float>(integral) : static_cast<float>(real)));
+            break;
+        case DoubleField:
+            return makeDouble(t, doubleToBits(rank <= 4 ? static_cast<double>(integral) : real));
+        default: break;
+        }
+    }
+    throwNew(t, GcClassCastException::Type, "Dynamic constant has incompatible primitive type");
+}
+
+uint64_t runConstantBootstrap(Thread* t, uintptr_t* arguments)
+{
+    GcDynamicConstant* constant = reinterpret_cast<GcDynamicConstant*>(arguments[0]);
+    PROTECT(t, constant);
+    GcMethodType* methodType = makeMethodType(t, constant->class_()->loader(), constant->template_()->spec(), 0, 0, 0);
+    PROTECT(t, methodType);
+    GcMethod* returnType = resolveMethod(t, roots(t)->bootLoader(),
+        "java/lang/invoke/MethodType", "returnType", "()Ljava/lang/Class;");
+    GcJclass* expected = cast<GcJclass>(t, t->m->processor->invokeArray(t, returnType, methodType, static_cast<GcArray*>(0)));
+    PROTECT(t, expected);
+    object value = invokeBootstrap(t, cast<GcInvocation>(t, constant), expected);
+    return reinterpret_cast<uintptr_t>(convertConstant(t, constant, value, expected->vmClass()));
+}
+
+} // namespace
+
+object resolveDynamicConstant(Thread* t, GcDynamicConstant* constant, GcClass* owner)
+{
+    PROTECT(t, constant);
+    PROTECT(t, owner);
+    {
+        ACQUIRE(t, t->m->classLock);
+        if (constant->resolved()) return constant->value();
+        if (constant->failure()) throw_(t, constant->failure());
+        constant->setClass(t, owner);
+    }
+    uintptr_t arguments[] = {reinterpret_cast<uintptr_t>(constant)};
+    object value = reinterpret_cast<object>(runRaw(t, runConstantBootstrap, arguments));
+    PROTECT(t, value);
+    GcThrowable* failure = t->exception;
+    t->exception = 0;
+    PROTECT(t, failure);
+    if (failure && !instanceOf(t, type(t, GcError::Type), failure)) {
+        failure = makeThrowable(t, GcBootstrapMethodError::Type, 0, 0, failure);
+    }
+    ACQUIRE(t, t->m->classLock);
+    if (constant->resolved()) return constant->value();
+    if (constant->failure()) throw_(t, constant->failure());
+    if (failure) {
+        constant->setFailure(t, failure);
+        throw_(t, failure);
+    }
+    constant->setValue(t, value);
+    constant->resolved() = 1;
+    return value;
+}
+
+uint64_t dynamicConstantBits(Thread* t, GcDynamicConstant* constant, object value)
+{
+    switch (constant->template_()->returnCode()) {
+    case BooleanField: return cast<GcBoolean>(t, value)->value();
+    case ByteField: return static_cast<int32_t>(static_cast<int8_t>(cast<GcByte>(t, value)->value()));
+    case CharField: return cast<GcChar>(t, value)->value();
+    case ShortField: return static_cast<int32_t>(static_cast<int16_t>(cast<GcShort>(t, value)->value()));
+    case IntField: return cast<GcInt>(t, value)->value();
+    case FloatField: return cast<GcFloat>(t, value)->value();
+    case LongField: return cast<GcLong>(t, value)->value();
+    case DoubleField: return cast<GcDouble>(t, value)->value();
+    default: abort(t);
+    }
 }
 
 namespace {

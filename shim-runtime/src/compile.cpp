@@ -2573,6 +2573,38 @@ int64_t getLoadableConstant(MyThread* t, GcPair* pair)
       cast<GcInt>(t, location->second())->value()));
 }
 
+object dynamicConstantValue(MyThread* t, GcPair* pair)
+{
+  return resolveDynamicConstant(t, cast<GcDynamicConstant>(t, pair->first()), cast<GcClass>(t, pair->second()));
+}
+
+int64_t getDynamicConstantObject(MyThread* t, GcPair* pair)
+{
+  return reinterpret_cast<intptr_t>(dynamicConstantValue(t, pair));
+}
+
+uint64_t getDynamicConstantLong(MyThread* t, GcPair* pair)
+{
+  PROTECT(t, pair);
+  object value = dynamicConstantValue(t, pair);
+  return dynamicConstantBits(t, cast<GcDynamicConstant>(t, pair->first()), value);
+}
+
+int32_t getDynamicConstantInt(MyThread* t, GcPair* pair)
+{
+  return static_cast<int32_t>(getDynamicConstantLong(t, pair));
+}
+
+float getDynamicConstantFloat(MyThread* t, GcPair* pair)
+{
+  return bitsToFloat(getDynamicConstantLong(t, pair));
+}
+
+double getDynamicConstantDouble(MyThread* t, GcPair* pair)
+{
+  return bitsToDouble(getDynamicConstantLong(t, pair));
+}
+
 unsigned traceSize(Thread* t)
 {
   class Counter : public Processor::StackVisitor {
@@ -3222,6 +3254,28 @@ ir::Value* popField(MyThread* t, Frame* frame, int code)
   default:
     abort(t);
   }
+}
+
+void compileDynamicConstant(MyThread* t, Frame* frame, GcDynamicConstant* constant)
+{
+  PROTECT(t, constant);
+  Compiler* c = frame->c;
+  unsigned code = constant->template_()->returnCode();
+  Thunk thunk = getDynamicConstantIntThunk;
+  ir::Type resultType = ir::Type::i4();
+  switch (code) {
+  case ObjectField: thunk = getDynamicConstantObjectThunk; resultType = ir::Type::object(); break;
+  case LongField: thunk = getDynamicConstantLongThunk; resultType = ir::Type::i8(); break;
+  case FloatField: thunk = getDynamicConstantFloatThunk; resultType = ir::Type::f4(); break;
+  case DoubleField: thunk = getDynamicConstantDoubleThunk; resultType = ir::Type::f8(); break;
+  default: break;
+  }
+  GcPair* context = makePair(t, constant, frame->context->method->class_());
+  PROTECT(t, context);
+  ir::Value* result = c->nativeCall(c->constant(getThunk(t, thunk), ir::Type::iptr()),
+      0, frame->trace(0, 0), resultType, args(c->threadRegister(), frame->append(context)));
+  if (code == LongField || code == DoubleField) frame->pushLarge(resultType, result);
+  else frame->push(resultType, result);
 }
 
 void compileSafePoint(MyThread* t, Compiler* c, Frame* frame)
@@ -5701,6 +5755,10 @@ loop:
         object v = singletonObject(t, pool, index - 1);
 
         loadMemoryBarrier();
+        if (objectClass(t, v) == type(t, GcDynamicConstant::Type)) {
+          compileDynamicConstant(t, frame, cast<GcDynamicConstant>(t, v));
+          break;
+        }
 
         if (objectClass(t, v) == type(t, GcByteArray::Type)
             or (objectClass(t, v) == type(t, GcReference::Type)
@@ -5764,6 +5822,10 @@ loop:
       uint16_t index = codeReadInt16(t, code, ip);
 
       GcSingleton* pool = code->pool();
+      if (singletonIsObject(t, pool, index - 1)) {
+        compileDynamicConstant(t, frame, cast<GcDynamicConstant>(t, singletonObject(t, pool, index - 1)));
+        break;
+      }
 
       uint64_t v;
       memcpy(&v, &singletonValue(t, pool, index - 1), 8);
