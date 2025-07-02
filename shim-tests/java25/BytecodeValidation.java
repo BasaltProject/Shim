@@ -42,7 +42,7 @@ public class BytecodeValidation {
         for (String name : new String[] {"DescriptorEmpty", "DescriptorVoidParameter", "DescriptorVoidArray", "DescriptorUnknown",
                 "DescriptorNoReturn", "DescriptorReturn", "DescriptorTrailing", "DescriptorDotted", "DescriptorDimensions",
                 "DescriptorSlots", "DescriptorMethodType", "DescriptorReference", "ArgumentsStatic", "ArgumentsWide",
-                "ArgumentsReceiver", "ArgumentsInstance", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode"}) {
+                "ArgumentsReceiver", "ArgumentsInstance", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero"}) {
             try { Class.forName("Verify" + name); throw new AssertionError(name); }
             catch (ClassFormatError expected) { System.out.println("descriptor " + name); }
         }
