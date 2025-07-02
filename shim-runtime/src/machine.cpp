@@ -2580,7 +2580,8 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
       unsigned spec = s.read2();
       requireConstantTag(t, tags, name - 1, CONSTANT_Utf8);
       requireConstantTag(t, tags, spec - 1, CONSTANT_Utf8);
-      validateMethodDescriptor(t, cast<GcByteArray>(t, singletonObject(t, pool, spec - 1)), !(flags & ACC_STATIC));
+      unsigned argumentSlots = validateMethodDescriptor(
+          t, cast<GcByteArray>(t, singletonObject(t, pool, spec - 1)), !(flags & ACC_STATIC));
 
       if (DebugClassReader) {
         fprintf(stderr,
@@ -2608,6 +2609,9 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
         if (vm::strcmp(reinterpret_cast<const int8_t*>("Code"),
                        attributeName->body().begin()) == 0) {
           code = parseCode(t, s, pool, tags);
+          if (code->maxLocals() < argumentSlots) {
+            throwNew(t, GcClassFormatError::Type, "Method arguments exceed max_locals");
+          }
         } else if (vm::strcmp(reinterpret_cast<const int8_t*>("Exceptions"),
                               attributeName->body().begin()) == 0) {
           if (addendum == 0) {
