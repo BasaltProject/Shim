@@ -51,33 +51,6 @@ void loadConstant(Thread* t, GcCode* code, GcByteArray* tags, unsigned index, bo
     require(t, valid, "Incompatible constant for ldc instruction");
 }
 
-unsigned interfaceSlots(Thread* t, GcByteArray* descriptor)
-{
-    const int8_t* bytes = descriptor->body().begin();
-    unsigned length = descriptor->length() - 1;
-    require(t, length >= 3 && bytes[0] == '(', "Invalid interface method descriptor");
-    unsigned position = 1;
-    unsigned slots = 1; // The receiver occupies one slot.
-    while (position < length && bytes[position] != ')') {
-        unsigned start = position;
-        while (position < length && bytes[position] == '[') ++position;
-        bool array = position != start;
-        require(t, position < length, "Truncated interface parameter descriptor");
-        unsigned kind = bytes[position++];
-        if (kind == 'L') {
-            unsigned name = position;
-            while (position < length && bytes[position] != ';') ++position;
-            require(t, position < length && position > name, "Invalid interface reference descriptor");
-            ++position;
-        } else {
-            require(t, kind != 0 && strchr("ZBCSIFJD", kind), "Invalid interface parameter descriptor");
-        }
-        slots += !array && (kind == 'J' || kind == 'D') ? 2 : 1;
-    }
-    require(t, position < length && bytes[position] == ')', "Missing interface return descriptor");
-    return slots;
-}
-
 void branch(Thread* t, const uint8_t* starts, unsigned length, unsigned pc, int32_t displacement)
 {
     if (!starts) return;
@@ -163,7 +136,7 @@ unsigned instruction(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, co
         if (opcode == 185) {
             require(t, bytes[pc + 3] != 0 && bytes[pc + 4] == 0, "Invalid invokeinterface operands");
             GcReference* reference = cast<GcReference>(t, singletonObject(t, code->pool(), word16(bytes + pc + 1) - 1));
-            require(t, bytes[pc + 3] == interfaceSlots(t, reference->spec()), "Wrong invokeinterface argument count");
+            require(t, bytes[pc + 3] == 1 + validateMethodDescriptor(t, reference->spec(), false), "Wrong invokeinterface argument count");
         }
         if (opcode == 186) require(t, bytes[pc + 3] == 0 && bytes[pc + 4] == 0, "Invalid invokedynamic operands");
     } else if (opcode == 187 || opcode == 189 || opcode == 192 || opcode == 193 || opcode == 197) {
@@ -190,6 +163,60 @@ unsigned instruction(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, co
 }
 
 } // namespace
+
+namespace {
+
+unsigned descriptorType(Thread* t, GcByteArray* descriptor, unsigned position, bool allowVoid)
+{
+    const int8_t* bytes = descriptor->body().begin();
+    unsigned length = descriptor->length() - 1;
+    unsigned start = position;
+    while (position < length && bytes[position] == '[') ++position;
+    bool valid = position - start <= 255 && position < length;
+    if (valid && bytes[position] == 'L') {
+        unsigned name = ++position;
+        while (position < length && bytes[position] != ';') {
+            if (bytes[position] == '.' || bytes[position] == '[' || bytes[position] == 0) valid = false;
+            ++position;
+        }
+        valid = valid && position < length && position > name;
+        ++position;
+    } else if (valid) {
+        unsigned kind = bytes[position++];
+        valid = (kind != 0 && strchr("ZBCSIFJD", kind)) || (kind == 'V' && allowVoid && position == start + 1);
+    }
+    if (!valid) throwNew(t, GcClassFormatError::Type, "Invalid type descriptor");
+    return position;
+}
+
+} // namespace
+
+void validateFieldDescriptor(Thread* t, GcByteArray* descriptor)
+{
+    if (descriptorType(t, descriptor, 0, false) != descriptor->length() - 1) {
+        throwNew(t, GcClassFormatError::Type, "Trailing field descriptor data");
+    }
+}
+
+unsigned validateMethodDescriptor(Thread* t, GcByteArray* descriptor, bool instance)
+{
+    unsigned length = descriptor->length() - 1;
+    if (length < 3 || descriptor->body()[0] != '(') {
+        throwNew(t, GcClassFormatError::Type, "Invalid method descriptor");
+    }
+    unsigned position = 1;
+    unsigned slots = instance ? 1 : 0;
+    while (position < length && descriptor->body()[position] != ')') {
+        unsigned kind = descriptor->body()[position];
+        position = descriptorType(t, descriptor, position, false);
+        slots += kind == 'J' || kind == 'D' ? 2 : 1;
+        if (slots > 255) throwNew(t, GcClassFormatError::Type, "Too many method parameter slots");
+    }
+    if (position >= length || descriptorType(t, descriptor, position + 1, true) != length) {
+        throwNew(t, GcClassFormatError::Type, "Invalid method return descriptor");
+    }
+    return slots;
+}
 
 void verifyCode(Thread* t, GcCode* code, GcByteArray* tags)
 {
