@@ -44,6 +44,14 @@ def generate(directory, major):
         }
         if case in argument_cases: bad_descriptors[case] = argument_cases[case][0]
         code_name, method_name, method_descriptor = utf("Code"), utf("test"), utf(bad_descriptors.get(case, "()V"))
+        handle_names = {
+            "HandleNewMethod": (8, "run", 10), "HandleStaticInit": (6, "<init>", 10),
+            "HandleVirtualInit": (5, "<init>", 10), "HandleSpecialInit": (7, "<init>", 10),
+            "HandleStaticClinit": (6, "<clinit>", 10),
+        }
+        if case in handle_names:
+            kind, target, tag = handle_names[case]
+            add(15, bytes([kind]) + u2(ref("java/lang/Object", target, "()V", tag)))
         integer = add(3, i4(7))
         long_ = add(5, struct.pack(">q", 42))
         double = add(6, struct.pack(">d", 3.5))
@@ -146,7 +154,7 @@ def generate(directory, major):
                 code = b"\x10\x00\x57\xb1"
             handlers = struct.pack(">HHHH", *handler_cases[case])
         else:
-            code = b"\xb1" if case in code_cases or case in bad_descriptors or case in ("DescriptorMethodType", "DescriptorReference") else variants[case]
+            code = b"\xb1" if case in handle_names or case in code_cases or case in bad_descriptors or case in ("DescriptorMethodType", "DescriptorReference") else variants[case]
         attributes = b""
         if case in ("ValidTable", "ValidLookup", "UnsortedKeys"):
             position = 24 if case == "ValidTable" else 28
@@ -189,5 +197,7 @@ def generate(directory, major):
     arguments = ("ValidStaticArguments", "ValidInstanceArguments", "ArgumentsStatic", "ArgumentsWide",
                  "ArgumentsReceiver", "ArgumentsInstance")
     code_attributes = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
-    for case in controls + invalid + handlers + descriptors + arguments + code_attributes:
+    handle_names = ("HandleNewMethod", "HandleStaticInit", "HandleVirtualInit", "HandleSpecialInit",
+                    "HandleStaticClinit")
+    for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names:
         build("Verify" + case, case)

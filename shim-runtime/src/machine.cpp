@@ -1085,6 +1085,15 @@ unsigned parsePoolEntry(Thread* t,
       parsePoolEntry(t, s, index, pool, invocations, tags, ri);
 
       GcReference* value = cast<GcReference>(t, singletonObject(t, pool, ri));
+      if (kind >= REF_invokeVirtual) {
+        const int8_t* methodName = value->name()->body().begin();
+        bool constructor = vm::strcmp(methodName, reinterpret_cast<const int8_t*>("<init>")) == 0;
+        bool initializer = vm::strcmp(methodName, reinterpret_cast<const int8_t*>("<clinit>")) == 0;
+        if ((kind == REF_newInvokeSpecial && !constructor)
+            || (kind != REF_newInvokeSpecial && (constructor || initializer))) {
+          throwNew(t, GcClassFormatError::Type, "Invalid method handle target name");
+        }
+      }
 
       if (DebugClassReader) {
         fprintf(stderr,
