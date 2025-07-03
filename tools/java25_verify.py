@@ -39,6 +39,19 @@ def generate(directory, major):
             data += b"".join(entries) + struct.pack(">HHHHHH", 0x0021, this, super_, 0, 0, 1) + method + u2(0)
             (directory / (name + ".class")).write_bytes(data)
             return
+        if case in ("InvokeStatic51", "InvokeSpecial51", "InvokeStatic52", "InvokeSpecial52"):
+            special = "Special" in case
+            interface = class_("java/lang/Runnable")
+            target = ref("java/lang/Runnable", "run", "()V", 11)
+            code_name, method_name, descriptor = utf("Code"), utf("test"), utf("()V")
+            code = (b"\x2a\xb7" if special else b"\xb8") + u2(target) + b"\xb1"
+            body = struct.pack(">HHI", int(special), int(special), len(code)) + code + u2(0) + u2(0)
+            method = struct.pack(">HHHHHI", 1 if special else 9, method_name, descriptor, 1, code_name, len(body)) + body
+            version = 51 if case.endswith("51") else 52
+            data = struct.pack(">IHHH", 0xcafebabe, 0, version, len(entries) + 1) + b"".join(entries)
+            data += struct.pack(">HHHH", 0x0421, this, super_, 1) + u2(interface) + u2(0) + u2(1) + method + u2(0)
+            (directory / (name + ".class")).write_bytes(data)
+            return
         code_cases = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
         bad_descriptors = {
             "DescriptorEmpty": "", "DescriptorVoidParameter": "(V)V", "DescriptorVoidArray": "([V)V",
@@ -211,5 +224,6 @@ def generate(directory, major):
     code_attributes = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
     handle_names = ("HandleNewMethod", "HandleStaticInit", "HandleVirtualInit", "HandleSpecialInit",
                     "HandleStaticClinit")
-    for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names + ("HandleStatic51", "HandleSpecial51", "HandleStatic52", "HandleSpecial52"):
+    for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names + ("HandleStatic51", "HandleSpecial51", "HandleStatic52", "HandleSpecial52",
+            "InvokeStatic51", "InvokeSpecial51", "InvokeStatic52", "InvokeSpecial52"):
         build("Verify" + case, case)

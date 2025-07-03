@@ -65,7 +65,7 @@ void local(Thread* t, GcCode* code, unsigned opcode, unsigned index)
             "Local variable index exceeds max_locals");
 }
 
-unsigned instruction(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, const uint8_t* starts)
+unsigned instruction(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, const uint8_t* starts, unsigned major)
 {
     const uint8_t* bytes = code->body().begin();
     unsigned length = code->length();
@@ -129,7 +129,7 @@ unsigned instruction(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, co
         bool valid;
         if (opcode <= 181) valid = tag == CONSTANT_Fieldref;
         else if (opcode == 182) valid = tag == CONSTANT_Methodref;
-        else if (opcode == 183 || opcode == 184) valid = tag == CONSTANT_Methodref || tag == CONSTANT_InterfaceMethodref;
+        else if (opcode == 183 || opcode == 184) valid = tag == CONSTANT_Methodref || (major >= 52 && tag == CONSTANT_InterfaceMethodref);
         else if (opcode == 185) valid = tag == CONSTANT_InterfaceMethodref;
         else valid = tag == CONSTANT_InvokeDynamic;
         require(t, valid, "Incompatible member reference for bytecode instruction");
@@ -230,10 +230,10 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major)
         require(t, major < 51 || (opcode != 168 && opcode != 169 && opcode != 201
             && !(opcode == 196 && pc + 1 < code->length() && code->body()[pc + 1] == 169)),
             "Subroutine instruction requires class file version below 51");
-        pc = instruction(t, code, tags, pc, 0);
+        pc = instruction(t, code, tags, pc, 0, major);
     }
     for (unsigned pc = 0; pc < code->length();) {
-        pc = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts));
+        pc = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts), major);
     }
     GcExceptionHandlerTable* handlers = cast<GcExceptionHandlerTable>(t, code->exceptionHandlerTable());
     if (handlers) {
