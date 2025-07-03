@@ -1220,6 +1220,10 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations, unsigned major
 
       unsigned tag = s.read1();
       tags->body()[i] = tag;
+      if (major < 51 && (tag == CONSTANT_MethodHandle || tag == CONSTANT_MethodType
+                         || tag == CONSTANT_InvokeDynamic)) {
+        throwNew(t, GcClassFormatError::Type, "Constant pool entry requires Java 7 or later");
+      }
       switch (tag) {
       case CONSTANT_Class:
       case CONSTANT_String:

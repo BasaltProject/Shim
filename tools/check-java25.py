@@ -55,6 +55,9 @@ def constant_pool_offsets(data):
 def check_versions(java, runtimes, directory):
     original = (directory / "ClassFileValidation.class").read_bytes()
     variants = [
+        ("old-method-handle", 50, 0, "ClassFormatError"),
+        ("old-method-type", 50, 0, "ClassFormatError"),
+        ("old-invokedynamic", 50, 0, "ClassFormatError"),
         ("future", 70, 0, "UnsupportedClassVersionError"),
         ("too-old", 44, 0, "UnsupportedClassVersionError"),
         ("preview", 69, 65535, "UnsupportedClassVersionError"),
@@ -76,7 +79,26 @@ def check_versions(java, runtimes, directory):
         output.mkdir()
         data = bytearray(original)
         struct.pack_into(">HH", data, 4, minor, major)
-        if name == "bad-magic":
+        if name in ("old-method-handle", "old-method-type", "old-invokedynamic"):
+            entries = constant_pool_offsets(data)
+            # Append an otherwise unused entry to isolate tag-version validation.
+            last_tag, last = entries[max(entries)]
+            end = last + (3 + struct.unpack_from(">H", data, last + 1)[0] if last_tag == 1 else
+                          (9 if last_tag in (5, 6) else (5 if last_tag in (3, 4, 9, 10, 11, 12, 17, 18) else
+                           (4 if last_tag == 15 else 3))))
+            method = next(index for index, (tag, _) in entries.items() if tag == 10)
+            if name == "old-method-handle": entry = b"\x0f\x08" + struct.pack(">H", method)
+            elif name == "old-method-type":
+                descriptor = next(index for index, (tag, offset) in entries.items()
+                    if tag == 1 and data[offset + 3:offset + 6] == b"()V")
+                entry = b"\x10" + struct.pack(">H", descriptor)
+            else:
+                signature = next(index for index, (tag, _) in entries.items() if tag == 12)
+                entry = b"\x12" + struct.pack(">HH", 0, signature)
+            count = struct.unpack_from(">H", data, 8)[0]
+            data[end:end] = entry
+            struct.pack_into(">H", data, 8, count + 1)
+        elif name == "bad-magic":
             data[0] = 0
         elif name == "truncated":
             data = data[:7]
