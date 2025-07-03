@@ -27,6 +27,18 @@ def generate(directory, major):
             signature = add(12, u2(utf(method)) + u2(utf(descriptor)))
             return add(tag, u2(owner_index) + u2(signature))
         this, super_ = class_(name), class_("java/lang/Object")
+        if case in ("HandleStatic51", "HandleSpecial51", "HandleStatic52", "HandleSpecial52"):
+            kind = 6 if "Static" in case else 7
+            target = ref("java/lang/Runnable", "run", "()V", 11)
+            add(15, bytes([kind]) + u2(target))
+            code_name, method_name, descriptor = utf("Code"), utf("test"), utf("()V")
+            body = struct.pack(">HHI", 0, 0, 1) + b"\xb1" + u2(0) + u2(0)
+            method = struct.pack(">HHHHHI", 9, method_name, descriptor, 1, code_name, len(body)) + body
+            version = 51 if case.endswith("51") else 52
+            data = struct.pack(">IHHH", 0xcafebabe, 0, version, len(entries) + 1)
+            data += b"".join(entries) + struct.pack(">HHHHHH", 0x0021, this, super_, 0, 0, 1) + method + u2(0)
+            (directory / (name + ".class")).write_bytes(data)
+            return
         code_cases = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
         bad_descriptors = {
             "DescriptorEmpty": "", "DescriptorVoidParameter": "(V)V", "DescriptorVoidArray": "([V)V",
@@ -199,5 +211,5 @@ def generate(directory, major):
     code_attributes = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
     handle_names = ("HandleNewMethod", "HandleStaticInit", "HandleVirtualInit", "HandleSpecialInit",
                     "HandleStaticClinit")
-    for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names:
+    for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names + ("HandleStatic51", "HandleSpecial51", "HandleStatic52", "HandleSpecial52"):
         build("Verify" + case, case)

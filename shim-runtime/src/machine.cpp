@@ -902,7 +902,7 @@ unsigned parsePoolEntry(Thread* t,
                         GcSingleton* pool,
                         GcList* invocations,
                         GcByteArray* tags,
-                        unsigned i)
+                        unsigned i, unsigned major)
 {
   PROTECT(t, pool);
   PROTECT(t, invocations);
@@ -964,7 +964,7 @@ unsigned parsePoolEntry(Thread* t,
     if (singletonObject(t, pool, i) == 0) {
       unsigned si = s.read2() - 1;
       requireConstantTag(t, tags, si, CONSTANT_Utf8);
-      parsePoolEntry(t, s, index, pool, invocations, tags, si);
+      parsePoolEntry(t, s, index, pool, invocations, tags, si, major);
 
       GcReference* value = makeReference(
           t, 0, 0, cast<GcByteArray>(t, singletonObject(t, pool, si)), 0);
@@ -982,7 +982,7 @@ unsigned parsePoolEntry(Thread* t,
     if (singletonObject(t, pool, i) == 0) {
       unsigned si = s.read2() - 1;
       requireConstantTag(t, tags, si, CONSTANT_Utf8);
-      parsePoolEntry(t, s, index, pool, invocations, tags, si);
+      parsePoolEntry(t, s, index, pool, invocations, tags, si, major);
 
       object value
           = parseUtf8(t, cast<GcByteArray>(t, singletonObject(t, pool, si)));
@@ -1006,8 +1006,8 @@ unsigned parsePoolEntry(Thread* t,
       requireConstantTag(t, tags, ni, CONSTANT_Utf8);
       requireConstantTag(t, tags, ti, CONSTANT_Utf8);
 
-      parsePoolEntry(t, s, index, pool, invocations, tags, ni);
-      parsePoolEntry(t, s, index, pool, invocations, tags, ti);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ni, major);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ti, major);
 
       GcByteArray* name = cast<GcByteArray>(t, singletonObject(t, pool, ni));
       GcByteArray* type = cast<GcByteArray>(t, singletonObject(t, pool, ti));
@@ -1035,8 +1035,8 @@ unsigned parsePoolEntry(Thread* t,
       requireConstantTag(t, tags, ci, CONSTANT_Class);
       requireConstantTag(t, tags, nti, CONSTANT_NameAndType);
 
-      parsePoolEntry(t, s, index, pool, invocations, tags, ci);
-      parsePoolEntry(t, s, index, pool, invocations, tags, nti);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ci, major);
+      parsePoolEntry(t, s, index, pool, invocations, tags, nti, major);
 
       GcByteArray* className
           = cast<GcReference>(t, singletonObject(t, pool, ci))->name();
@@ -1075,14 +1075,15 @@ unsigned parsePoolEntry(Thread* t,
       } else if (kind == REF_invokeVirtual or kind == REF_newInvokeSpecial) {
         requireConstantTag(t, tags, ri, CONSTANT_Methodref);
       } else if (kind == REF_invokeStatic or kind == REF_invokeSpecial) {
-        requireConstantTag(t, tags, ri, CONSTANT_Methodref, CONSTANT_InterfaceMethodref);
+        if (major < 52) requireConstantTag(t, tags, ri, CONSTANT_Methodref);
+        else requireConstantTag(t, tags, ri, CONSTANT_Methodref, CONSTANT_InterfaceMethodref);
       } else if (kind == REF_invokeInterface) {
         requireConstantTag(t, tags, ri, CONSTANT_InterfaceMethodref);
       } else {
         throwNew(t, GcClassFormatError::Type, "Invalid method handle reference kind %u", kind);
       }
 
-      parsePoolEntry(t, s, index, pool, invocations, tags, ri);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ri, major);
 
       GcReference* value = cast<GcReference>(t, singletonObject(t, pool, ri));
       if (kind >= REF_invokeVirtual) {
@@ -1118,7 +1119,7 @@ unsigned parsePoolEntry(Thread* t,
       unsigned ni = s.read2() - 1;
       requireConstantTag(t, tags, ni, CONSTANT_Utf8);
 
-      parsePoolEntry(t, s, index, pool, invocations, tags, ni);
+      parsePoolEntry(t, s, index, pool, invocations, tags, ni, major);
 
       validateMethodDescriptor(t, cast<GcByteArray>(t, singletonObject(t, pool, ni)), false);
       pool->setBodyElement(
@@ -1134,7 +1135,7 @@ unsigned parsePoolEntry(Thread* t,
       unsigned nti = s.read2() - 1;
       requireConstantTag(t, tags, nti, CONSTANT_NameAndType);
 
-      parsePoolEntry(t, s, index, pool, invocations, tags, nti);
+      parsePoolEntry(t, s, index, pool, invocations, tags, nti, major);
 
       GcPair* nameAndType = cast<GcPair>(t, singletonObject(t, pool, nti));
 
@@ -1306,7 +1307,7 @@ GcSingleton* parsePool(Thread* t, Stream& s, GcList* invocations, unsigned major
     unsigned end = s.position();
 
     for (unsigned i = 0; i < count;) {
-      i += parsePoolEntry(t, s, index, pool, invocations, tags, i);
+      i += parsePoolEntry(t, s, index, pool, invocations, tags, i, major);
     }
 
     s.setPosition(end);
