@@ -52,6 +52,23 @@ def generate(directory, major):
             data += struct.pack(">HHHH", 0x0421, this, super_, 1) + u2(interface) + u2(0) + u2(1) + method + u2(0)
             (directory / (name + ".class")).write_bytes(data)
             return
+        if case.startswith("Return"):
+            results = {"Int": ("I", b"\x03\xac"), "Long": ("J", b"\x09\xad"),
+                       "Float": ("F", b"\x0b\xae"), "Double": ("D", b"\x0e\xaf"),
+                       "Reference": ("Ljava/lang/Object;", b"\x01\xb0"), "Array": ("[I", b"\x01\xb0"),
+                       "Void": ("V", b"\xb1"), "Boolean": ("Z", b"\x03\xac"),
+                       "Byte": ("B", b"\x03\xac"), "Char": ("C", b"\x03\xac"), "Short": ("S", b"\x03\xac")}
+            invalid = case.endswith("Wrong")
+            kind = case[6:-5] if invalid else case[6:]
+            result, code = results[kind]
+            if invalid: code = b"\x03\xac" if kind == "Void" else b"\xb1"
+            code_name, method_name, descriptor = utf("Code"), utf("test"), utf("()" + result)
+            body = struct.pack(">HHI", 2, 0, len(code)) + code + u2(0) + u2(0)
+            method = struct.pack(">HHHHHI", 9, method_name, descriptor, 1, code_name, len(body)) + body
+            data = struct.pack(">IHHH", 0xcafebabe, 0, major, len(entries) + 1) + b"".join(entries)
+            data += struct.pack(">HHHHHH", 0x0021, this, super_, 0, 0, 1) + method + u2(0)
+            (directory / (name + ".class")).write_bytes(data)
+            return
         code_cases = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
         bad_descriptors = {
             "DescriptorEmpty": "", "DescriptorVoidParameter": "(V)V", "DescriptorVoidArray": "([V)V",
@@ -227,3 +244,8 @@ def generate(directory, major):
     for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names + ("HandleStatic51", "HandleSpecial51", "HandleStatic52", "HandleSpecial52",
             "InvokeStatic51", "InvokeSpecial51", "InvokeStatic52", "InvokeSpecial52"):
         build("Verify" + case, case)
+
+    for kind in ("Int", "Long", "Float", "Double", "Reference", "Array", "Void", "Boolean", "Byte", "Char", "Short"):
+        for suffix in ("", "Wrong"):
+            case = "Return" + kind + suffix
+            build("Verify" + case, case)

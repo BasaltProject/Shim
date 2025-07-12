@@ -47,6 +47,11 @@ public class BytecodeValidation {
             try { Class.forName("Verify" + name); throw new AssertionError(name); }
             catch (ClassFormatError expected) { System.out.println("descriptor " + name); }
         }
+        for (String kind : new String[] {"Int", "Long", "Float", "Double", "Reference", "Array", "Void", "Boolean", "Byte", "Char", "Short"}) {
+            Class.forName("VerifyReturn" + kind);
+            try { Class.forName("VerifyReturn" + kind + "Wrong"); throw new AssertionError(kind); }
+            catch (VerifyError expected) { System.out.println("return " + kind); }
+        }
         System.out.println(bootstraps);
     }
 }
