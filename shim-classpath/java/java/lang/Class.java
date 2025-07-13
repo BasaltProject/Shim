@@ -57,7 +57,7 @@ import java.security.Permissions;
 import java.security.AllPermission;
 
 public final class Class <T>
-  implements Type, AnnotatedElement, GenericDeclaration
+  implements Type, AnnotatedElement, GenericDeclaration, java.lang.invoke.TypeDescriptor.OfField<Class<?>>
 {
   private static final int PrimitiveFlag = 1 <<  5;
   private static final int EnumFlag      = 1 << 14;
@@ -89,6 +89,33 @@ public final class Class <T>
 
   public String getName() {
     return getName(vmClass);
+  }
+
+  public String descriptorString() {
+    if (this == void.class) return "V";
+    if (this == boolean.class) return "Z";
+    if (this == byte.class) return "B";
+    if (this == char.class) return "C";
+    if (this == short.class) return "S";
+    if (this == int.class) return "I";
+    if (this == long.class) return "J";
+    if (this == float.class) return "F";
+    if (this == double.class) return "D";
+    String name = getName().replace('.', '/');
+    return isArray() ? name : "L" + name + ";";
+  }
+
+  public Class componentType() {
+    return getComponentType();
+  }
+
+  public Class arrayType() {
+    if (this == void.class) throw new UnsupportedOperationException("Void has no array type");
+    String name = getName();
+    int dimensions = 0;
+    while (dimensions < name.length() && name.charAt(dimensions) == '[') ++dimensions;
+    if (dimensions == 255) throw new UnsupportedOperationException("Array dimension limit exceeded");
+    return java.lang.reflect.Array.newInstance(this, 0).getClass();
   }
 
   public static String getName(VMClass c) {
