@@ -91,6 +91,18 @@ public final class Class <T>
     return getName(vmClass);
   }
 
+  public String getTypeName() {
+    Class component = this;
+    int dimensions = 0;
+    while (component.isArray()) {
+      ++dimensions;
+      component = component.getComponentType();
+    }
+    StringBuilder name = new StringBuilder(component.getName());
+    for (int i = 0; i < dimensions; ++i) name.append("[]");
+    return name.toString();
+  }
+
   public String descriptorString() {
     if (this == void.class) return "V";
     if (this == boolean.class) return "Z";
@@ -147,8 +159,7 @@ public final class Class <T>
       }
     }
 
-    return Classes.makeString
-      (replace('/', '.', c.name, 0, c.name.length - 1), 0, c.name.length - 1);
+    return new String(shim.Utf8.decode16(c.name, 0, c.name.length - 1)).replace('/', '.');
   }
 
   public String getCanonicalName() {
