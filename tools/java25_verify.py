@@ -121,6 +121,11 @@ def generate(directory, major):
             "ModernJsrWide": b"\xc9\x00\x00\x00\x06\xb1\x4b\xa9\x00",
             "ModernRet": b"\xa9\x00",
             "ModernWideRet": b"\xc4\xa9\x00\x00",
+            "FalloffNop": b"\x00",
+            "FalloffValue": b"\x03",
+            "FalloffConditional": b"\x03\x99\xff\xff",
+            "ValidThrowEnd": b"\x01\xbf",
+            "ValidLoopEnd": b"\xa7\x00\x00",
             "ValidInt": b"\x12" + bytes([integer]) + b"\x57\xb1",
             "ValidLong": b"\x14" + u2(long_) + b"\x58\xb1",
             "ValidType": b"\x12" + bytes([method_type]) + b"\x57\xb1",
@@ -202,6 +207,9 @@ def generate(directory, major):
             position = 24 if case == "ValidTable" else 28
             payload = u2(1) + bytes([position])
             attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
+        if case == "ValidLoopEnd":
+            payload = u2(1) + b"\x00"
+            attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
         if handlers:
             payload = u2(1) + b"\x42\x07" + u2(class_("java/lang/Throwable"))
             attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
@@ -224,12 +232,12 @@ def generate(directory, major):
         data += u2(1) + u2(bootstrap_name) + struct.pack(">I", len(bootstrap_body)) + bootstrap_body
         (directory / (name + ".class")).write_bytes(data)
 
-    controls = ("ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong", "ValidTable", "ValidLookup", "ValidLocals", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface", "ValidMultiFull", "ValidMultiPartial", "ValidArrayLimit", "ValidNewObject")
+    controls = ("ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong", "ValidTable", "ValidLookup", "ValidLocals", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface", "ValidMultiFull", "ValidMultiPartial", "ValidArrayLimit", "ValidNewObject", "ValidThrowEnd", "ValidLoopEnd")
     invalid = ("LdcLong", "LdcWideDouble", "Ldc2Int", "Ldc2String", "LdcUtf", "LdcZero", "LdcOutside", "LdcReserved",
                "DynamicNarrowLong", "DynamicWideInt", "TruncatedLdc", "TruncatedWide", "IllegalWide", "ReservedOpcode",
                "BranchOperand", "BranchOutside", "TruncatedSwitch", "NegativePairs", "InvalidRange", "UnsortedKeys",
                "DynamicReserved", "WrongFieldRef", "WrongClassRef", "BadArrayType", "ZeroDimensions", "InterfaceReserved",
-               "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "InterfaceCount", "WideInterfaceCount", "MultiExcess", "MultiScalar", "NewArrayClass", "ArrayDimensionLimit", "EmptyCode", "OversizeCode", "ModernJsr", "ModernJsrWide", "ModernRet", "ModernWideRet")
+               "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "InterfaceCount", "WideInterfaceCount", "MultiExcess", "MultiScalar", "NewArrayClass", "ArrayDimensionLimit", "EmptyCode", "OversizeCode", "ModernJsr", "ModernJsrWide", "ModernRet", "ModernWideRet", "FalloffNop", "FalloffValue", "FalloffConditional")
     handlers = ("ValidHandler", "ValidHandlerEnd", "HandlerEmpty", "HandlerReverse", "HandlerEndOutside",
                 "HandlerTargetOutside", "HandlerCatchOutside", "HandlerCatchTag", "HandlerStartOperand",
                 "HandlerEndOperand", "HandlerTargetOperand")
