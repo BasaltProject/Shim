@@ -669,6 +669,15 @@ public final class Class <T>
     return (T) o;
   }
 
+  public String getPackageName() {
+    Class element = this;
+    while (element.isArray()) element = element.getComponentType();
+    if (element.isPrimitive()) return "java.lang";
+    String name = element.getName();
+    int separator = name.lastIndexOf('.');
+    return separator < 0 ? "" : name.substring(0, separator);
+  }
+
   public Package getPackage() {
     if ((vmClass.vmFlags & PrimitiveFlag) != 0 || isArray()) {
       return null;

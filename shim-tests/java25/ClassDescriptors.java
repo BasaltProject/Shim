@@ -21,6 +21,7 @@ public class ClassDescriptors {
                     || field.isArray() != type.isArray() || field.isPrimitive() != type.isPrimitive())
                 throw new AssertionError(type);
             System.out.println(field.descriptorString());
+            System.out.println("package " + type.getPackageName());
             if (type.componentType() != type.getComponentType()) throw new AssertionError(type);
             if (type == void.class) {
                 try { type.arrayType(); throw new AssertionError(); }
@@ -31,6 +32,9 @@ public class ClassDescriptors {
                 System.out.println(array.descriptorString());
             }
         }
+        System.out.println(java.util.Map.Entry.class.getPackageName());
+        System.out.println(java.util.Map.Entry[][].class.getPackageName());
+        System.out.println(new Object() {}.getClass().getPackageName());
         Class<?> deep = int.class;
         for (int i = 0; i < 255; ++i) deep = deep.arrayType();
         System.out.println(deep.descriptorString().length());
