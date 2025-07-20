@@ -69,6 +69,7 @@ public final class Class <T>
   }
 
   public String toString() {
+    if (isPrimitive()) return getName();
     String res;
     if (isInterface()) res = "interface ";
     else if (isAnnotation()) res = "annotation ";
@@ -198,6 +199,20 @@ public final class Class <T>
     } catch (InvocationTargetException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static Class<?> forPrimitiveName(String name) {
+    if (name == null) throw new NullPointerException();
+    if (name.equals("void")) return void.class;
+    if (name.equals("boolean")) return boolean.class;
+    if (name.equals("byte")) return byte.class;
+    if (name.equals("char")) return char.class;
+    if (name.equals("short")) return short.class;
+    if (name.equals("int")) return int.class;
+    if (name.equals("long")) return long.class;
+    if (name.equals("float")) return float.class;
+    if (name.equals("double")) return double.class;
+    return null;
   }
 
   public static Class forName(String name) throws ClassNotFoundException {
