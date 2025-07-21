@@ -66,8 +66,12 @@ public final class Float extends Number {
   }
 
   public static String toString(float v) {
-    return Double.toString(v);
+    byte[] buffer = new byte[24];
+    int length = fillBufferWithFloat(v, buffer);
+    return new String(buffer, 0, length, false);
   }
+
+  private static native int fillBufferWithFloat(float value, byte[] buffer);
 
   public byte byteValue() {
     return (byte) value;

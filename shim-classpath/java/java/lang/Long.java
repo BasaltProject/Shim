@@ -103,16 +103,27 @@ public final class Long extends Number implements Comparable<Long> {
     return toString(v, 10);
   }
 
+  private static String unsignedString(long value, int shift) {
+    char[] digits = new char[64];
+    int position = digits.length;
+    int mask = (1 << shift) - 1;
+    do {
+      digits[--position] = "0123456789abcdef".charAt((int) value & mask);
+      value >>>= shift;
+    } while (value != 0);
+    return new String(digits, position, digits.length - position);
+  }
+
   public static String toHexString(long v) {
-    return toString(v, 16);
+    return unsignedString(v, 4);
   }
 
   public static String toOctalString(long v) {
-    return toString(v, 8);
+    return unsignedString(v, 3);
   }
 
   public static String toBinaryString(long v) {
-    return toString(v, 2);
+    return unsignedString(v, 1);
   }
 
   public byte byteValue() {
