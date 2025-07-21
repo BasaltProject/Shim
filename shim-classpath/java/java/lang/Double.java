@@ -23,15 +23,22 @@
 
 package java.lang;
 
-public final class Double extends Number {
+public final class Double extends Number implements Comparable<Double> {
   public static final Class TYPE = shim.Classes.forCanonicalName("D");
 
   public static final double NEGATIVE_INFINITY = -1.0 / 0.0;
   public static final double POSITIVE_INFINITY =  1.0 / 0.0;
   public static final double NaN =  0.0 / 0.0;
 
-  public static final double MIN_VALUE = 2.22507385850720138309e-308;
+  public static final double MIN_VALUE = 0x0.0000000000001p-1022;
   public static final double MAX_VALUE = 1.79769313486231570815e+308;
+
+  public static final double MIN_NORMAL = 0x1.0p-1022;
+  public static final int MIN_EXPONENT = -1022;
+  public static final int MAX_EXPONENT = 1023;
+  public static final int SIZE = 64;
+  public static final int BYTES = 8;
+  public static final int PRECISION = 53;
 
   private final double value;
 
@@ -52,12 +59,27 @@ public final class Double extends Number {
   }
 
   public boolean equals(Object o) {
-    return o instanceof Double && ((Double) o).value == value;
+    return o instanceof Double && doubleToLongBits(((Double) o).value) == doubleToLongBits(value);
   }
 
-  public int hashCode() {
-    long v = doubleToRawLongBits(value);
-    return (int) ((v >> 32) ^ (v & 0xFF));
+  public int hashCode() { return hashCode(value); }
+
+  public static int hashCode(double value) {
+    long bits = doubleToLongBits(value);
+    return (int) (bits ^ (bits >>> 32));
+  }
+
+  public int compareTo(Double other) { return compare(value, other.value); }
+
+  public static int compare(double first, double second) {
+    if (first < second) return -1;
+    if (first > second) return 1;
+    long a = doubleToLongBits(first), b = doubleToLongBits(second);
+    return a == b ? 0 : (a < b ? -1 : 1);
+  }
+
+  public static boolean isFinite(double value) {
+    return !isNaN(value) && !isInfinite(value);
   }
 
   public String toString() {
