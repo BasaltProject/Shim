@@ -80,6 +80,12 @@ public final class Float extends Number implements Comparable<Float> {
     return a == b ? 0 : (a < b ? -1 : 1);
   }
 
+  public static float sum(float first, float second) { return first + second; }
+
+  public static float min(float first, float second) { return Math.min(first, second); }
+
+  public static float max(float first, float second) { return Math.max(first, second); }
+
   public static boolean isFinite(float value) {
     return !isNaN(value) && !isInfinite(value);
   }

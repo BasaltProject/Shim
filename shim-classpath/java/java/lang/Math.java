@@ -36,19 +36,51 @@ public final class Math {
   private Math() { }
 
   public static double max(double a, double b) {
-    return (a < b ? b : a);
+    if (Double.isNaN(a)) return a;
+    if (Double.isNaN(b)) return b;
+    return Double.compare(a, b) >= 0 ? a : b;
   }
 
   public static double min(double a, double b) {
-    return (a > b ? b : a);
+    if (Double.isNaN(a)) return a;
+    if (Double.isNaN(b)) return b;
+    return Double.compare(a, b) <= 0 ? a : b;
   }
 
   public static float max(float a, float b) {
-    return (a < b ? b : a);
+    if (Float.isNaN(a)) return a;
+    if (Float.isNaN(b)) return b;
+    return Float.compare(a, b) >= 0 ? a : b;
   }
 
   public static float min(float a, float b) {
-    return (a > b ? b : a);
+    if (Float.isNaN(a)) return a;
+    if (Float.isNaN(b)) return b;
+    return Float.compare(a, b) <= 0 ? a : b;
+  }
+
+  public static int clamp(long value, int minimum, int maximum) {
+    if (minimum > maximum) throw new IllegalArgumentException("Invalid clamp range");
+    return (int) max((long) minimum, min(value, (long) maximum));
+  }
+
+  public static long clamp(long value, long minimum, long maximum) {
+    if (minimum > maximum) throw new IllegalArgumentException("Invalid clamp range");
+    return max(minimum, min(value, maximum));
+  }
+
+  public static float clamp(float value, float minimum, float maximum) {
+    if (Float.isNaN(minimum) || Float.isNaN(maximum) || Float.compare(minimum, maximum) > 0) {
+      throw new IllegalArgumentException("Invalid clamp range");
+    }
+    return max(minimum, min(value, maximum));
+  }
+
+  public static double clamp(double value, double minimum, double maximum) {
+    if (Double.isNaN(minimum) || Double.isNaN(maximum) || Double.compare(minimum, maximum) > 0) {
+      throw new IllegalArgumentException("Invalid clamp range");
+    }
+    return max(minimum, min(value, maximum));
   }
 
   public static long max(long a, long b) {
