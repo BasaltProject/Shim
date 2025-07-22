@@ -115,12 +115,28 @@ public final class Math {
     return Double.longBitsToDouble(Double.doubleToRawLongBits(v) & 0x7fffffffffffffffL);
   }
 
-  public static long round(double v) {
-    return (long) Math.floor(v + 0.5);
+  public static long round(double value) {
+    int exponent = getExponent(value);
+    if (exponent >= 52) return (long) value;
+    if (exponent < -1) return 0;
+    long bits = Double.doubleToRawLongBits(value);
+    return roundSignificand((bits & 0x000fffffffffffffL) | 0x0010000000000000L, 52 - exponent, bits < 0);
   }
 
-  public static int round(float v) {
-    return (int) Math.floor(v + 0.5);
+  public static int round(float value) {
+    int exponent = getExponent(value);
+    if (exponent >= 23) return (int) value;
+    if (exponent < -1) return 0;
+    int bits = Float.floatToRawIntBits(value);
+    return (int) roundSignificand((bits & 0x007fffff) | 0x00800000, 23 - exponent, bits < 0);
+  }
+
+  private static long roundSignificand(long significand, int shift, boolean negative) {
+    long integral = significand >>> shift;
+    long remainder = significand & ((1L << shift) - 1);
+    long half = 1L << (shift - 1);
+    if (negative) return -integral - (remainder > half ? 1 : 0);
+    return integral + (remainder >= half ? 1 : 0);
   }
 
   public static double signum(double d) {
