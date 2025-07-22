@@ -108,11 +108,11 @@ public final class Math {
   }
 
   public static float abs(float v) {
-    return (v < 0 ? -v : v);
+    return Float.intBitsToFloat(Float.floatToRawIntBits(v) & 0x7fffffff);
   }
 
   public static double abs(double v) {
-    return (v < 0 ? -v : v);
+    return Double.longBitsToDouble(Double.doubleToRawLongBits(v) & 0x7fffffffffffffffL);
   }
 
   public static long round(double v) {
@@ -124,11 +124,31 @@ public final class Math {
   }
 
   public static double signum(double d) {
-    return d > 0 ? +1.0 : d < 0 ? -1.0 : 0;
+    return d == 0 || Double.isNaN(d) ? d : copySign(1.0, d);
   }
 
   public static float signum(float f) {
-    return f > 0 ? +1.0f : f < 0 ? -1.0f : 0;
+    return f == 0 || Float.isNaN(f) ? f : copySign(1.0f, f);
+  }
+
+  public static double copySign(double magnitude, double sign) {
+    long bits = (Double.doubleToRawLongBits(magnitude) & 0x7fffffffffffffffL)
+        | (Double.doubleToRawLongBits(sign) & 0x8000000000000000L);
+    return Double.longBitsToDouble(bits);
+  }
+
+  public static float copySign(float magnitude, float sign) {
+    int bits = (Float.floatToRawIntBits(magnitude) & 0x7fffffff)
+        | (Float.floatToRawIntBits(sign) & 0x80000000);
+    return Float.intBitsToFloat(bits);
+  }
+
+  public static int getExponent(double value) {
+    return (int) ((Double.doubleToRawLongBits(value) >>> 52) & 0x7ff) - 1023;
+  }
+
+  public static int getExponent(float value) {
+    return ((Float.floatToRawIntBits(value) >>> 23) & 0xff) - 127;
   }
 
   public static double random() {
