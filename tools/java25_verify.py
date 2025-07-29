@@ -52,6 +52,33 @@ def generate(directory, major):
             data += struct.pack(">HHHH", 0x0421, this, super_, 1) + u2(interface) + u2(0) + u2(1) + method + u2(0)
             (directory / (name + ".class")).write_bytes(data)
             return
+        nest_cases = {
+            "NestHostLength": [(3, b"\x00\x00\x00", "NestHost")],
+            "NestHostTag": [(2, u2(utf("raw")), "NestHost")],
+            "NestHostMultiple": [(2, u2(super_), "NestHost"), (2, u2(super_), "NestHost")],
+            "NestConflict": [(2, u2(super_), "NestHost"), (4, struct.pack(">HH", 1, super_), "NestMembers")],
+            "NestMembersLength": [(3, b"\x00\x01\x00", "NestMembers")],
+            "NestMembersTag": [(4, struct.pack(">HH", 1, utf("raw")), "NestMembers")],
+            "NestMembersMultiple": [(4, struct.pack(">HH", 1, super_), "NestMembers"), (4, struct.pack(">HH", 1, super_), "NestMembers")],
+            "PermittedLength": [(3, b"\x00\x01\x00", "PermittedSubclasses")],
+            "PermittedTag": [(4, struct.pack(">HH", 1, utf("raw")), "PermittedSubclasses")],
+            "PermittedMultiple": [(4, struct.pack(">HH", 1, super_), "PermittedSubclasses"), (4, struct.pack(">HH", 1, super_), "PermittedSubclasses")],
+            "RecordLength": [(1, b"\x00", "Record")],
+            "RecordMultiple": [(8, struct.pack(">HHHH", 1, utf("x"), utf("I"), 0), "Record"), (8, struct.pack(">HHHH", 1, utf("x"), utf("I"), 0), "Record")],
+        }
+        if case in nest_cases:
+            code_name, method_name, descriptor = utf("Code"), utf("test"), utf("()V")
+            body = struct.pack(">HHI", 0, 0, 1) + b"\xb1" + u2(0) + u2(0)
+            method = struct.pack(">HHHHHI", 9, method_name, descriptor, 1, code_name, len(body)) + body
+            attrs = []
+            for length, payload, aname in nest_cases[case]:
+                attrs.append(u2(utf(aname)) + i4(length) + payload)
+            data = struct.pack(">IHHH", 0xcafebabe, 0, major, len(entries) + 1)
+            data += b"".join(entry for entry in entries if entry is not None)
+            data += struct.pack(">HHHHHH", 0x0021, this, super_, 0, 0, 1) + method
+            data += u2(len(attrs)) + b"".join(attrs)
+            (directory / (name + ".class")).write_bytes(data)
+            return
         if case.startswith("Return"):
             results = {"Int": ("I", b"\x03\xac"), "Long": ("J", b"\x09\xad"),
                        "Float": ("F", b"\x0b\xae"), "Double": ("D", b"\x0e\xaf"),
@@ -249,7 +276,11 @@ def generate(directory, major):
     code_attributes = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
     handle_names = ("HandleNewMethod", "HandleStaticInit", "HandleVirtualInit", "HandleSpecialInit",
                     "HandleStaticClinit")
-    for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names + ("HandleStatic51", "HandleSpecial51", "HandleStatic52", "HandleSpecial52",
+    nest_attributes = ("NestHostLength", "NestHostTag", "NestHostMultiple", "NestConflict",
+                       "NestMembersLength", "NestMembersTag", "NestMembersMultiple",
+                       "PermittedLength", "PermittedTag", "PermittedMultiple",
+                       "RecordLength", "RecordMultiple")
+    for case in controls + invalid + handlers + descriptors + arguments + code_attributes + handle_names + nest_attributes + ("HandleStatic51", "HandleSpecial51", "HandleStatic52", "HandleSpecial52",
             "InvokeStatic51", "InvokeSpecial51", "InvokeStatic52", "InvokeSpecial52"):
         build("Verify" + case, case)
 

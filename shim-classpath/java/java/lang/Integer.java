@@ -52,11 +52,19 @@ public final class Integer extends Number implements Comparable<Integer> {
   }
 
   public int hashCode() {
+    return hashCode(value);
+  }
+
+  public static int hashCode(int value) {
     return value;
   }
 
   public int compareTo(Integer other) {
-    return value - other.value;
+    return compare(value, other.value);
+  }
+
+  public static int compare(int x, int y) {
+    return (x < y) ? -1 : ((x == y) ? 0 : 1);
   }
 
   public String toString() {

@@ -26,7 +26,7 @@ package java.lang.reflect;
 import java.lang.annotation.Annotation;
 
 public class Constructor<T> extends AccessibleObject implements Member {
-  private Method<T> method;
+  public final Method<T> method;
 
   public Constructor(Method<T> method) {
     this.method = method;

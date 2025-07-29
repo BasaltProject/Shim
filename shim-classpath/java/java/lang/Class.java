@@ -41,6 +41,7 @@ import java.lang.reflect.Proxy;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.RecordComponent;
 import java.lang.reflect.SignatureParser;
 import java.lang.annotation.Annotation;
 import java.io.InputStream;
@@ -861,6 +862,146 @@ public final class Class <T>
     }
 
     return SignatureParser.parse(vmClass.loader, typeSigns[0], this);
+  }
+
+  public Class<?> getNestHost() {
+    if (isPrimitive() || isArray()) {
+      return this;
+    }
+    ClassAddendum addendum = vmClass.addendum;
+    if (addendum != null && addendum.nestHost != null) {
+      try {
+        String hostName = Classes.toString(addendum.nestHost).replace('/', '.');
+        Class<?> host = Class.forName(hostName, false, getClassLoader());
+        if (host != this && host.getPackageName().equals(this.getPackageName()) && host.hasNestMember(vmClass.name)) {
+          return host;
+        }
+      } catch (Throwable ignored) {
+      }
+    }
+    return this;
+  }
+
+  private boolean hasNestMember(byte[] memberName) {
+    ClassAddendum addendum = vmClass.addendum;
+    if (addendum == null || addendum.nestMembers == null) {
+      return false;
+    }
+    for (Object m : addendum.nestMembers) {
+      if (m instanceof byte[] && Arrays.equals((byte[]) m, memberName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public boolean isNestmateOf(Class<?> c) {
+    if (c == null) {
+      throw new NullPointerException();
+    }
+    if (this == c) {
+      return true;
+    }
+    return getNestHost() == c.getNestHost();
+  }
+
+  public Class<?>[] getNestMembers() {
+    if (isPrimitive() || isArray()) {
+      return new Class<?>[] { this };
+    }
+    Class<?> host = getNestHost();
+    if (host != this) {
+      return host.getNestMembers();
+    }
+    ClassAddendum addendum = vmClass.addendum;
+    if (addendum == null || addendum.nestMembers == null || addendum.nestMembers.length == 0) {
+      return new Class<?>[] { this };
+    }
+    List<Class<?>> list = new ArrayList<Class<?>>();
+    list.add(this);
+    for (Object nameObj : addendum.nestMembers) {
+      if (nameObj instanceof byte[]) {
+        try {
+          String memberName = Classes.toString((byte[]) nameObj).replace('/', '.');
+          Class<?> member = Class.forName(memberName, false, getClassLoader());
+          if (member.getNestHost() == this && !list.contains(member)) {
+            list.add(member);
+          }
+        } catch (Throwable ignored) {
+        }
+      }
+    }
+    return list.toArray(new Class<?>[list.size()]);
+  }
+
+  public boolean isRecord() {
+    return getSuperclass() == Record.class
+        && ((vmClass.flags & 0x1000) != 0 || (vmClass.addendum != null && vmClass.addendum.recordComponents != null));
+  }
+
+  public RecordComponent[] getRecordComponents() {
+    if (!isRecord()) {
+      return null;
+    }
+    ClassAddendum addendum = vmClass.addendum;
+    if (addendum == null || addendum.recordComponents == null || addendum.recordComponents.length == 0) {
+      return new RecordComponent[0];
+    }
+    Object[] raw = addendum.recordComponents;
+    RecordComponent[] components = new RecordComponent[raw.length];
+    for (int i = 0; i < raw.length; ++i) {
+      Object nameObj = raw[i];
+      String name = (nameObj instanceof byte[]) ? Classes.toString((byte[]) nameObj) : String.valueOf(nameObj);
+      Method accessor = null;
+      try {
+        accessor = getDeclaredMethod(name);
+      } catch (Throwable ignored) {
+      }
+      Class<?> type = accessor != null ? accessor.getReturnType() : Object.class;
+      if (accessor == null) {
+        try {
+          Field f = getDeclaredField(name);
+          type = f.getType();
+        } catch (Throwable ignored) {
+        }
+      }
+      components[i] = new RecordComponent(this, name, type, accessor);
+    }
+    return components;
+  }
+
+  public boolean isSealed() {
+    return getPermittedSubclasses() != null;
+  }
+
+  public Class<?>[] getPermittedSubclasses() {
+    ClassAddendum addendum = vmClass.addendum;
+    if (addendum == null || addendum.permittedSubclasses == null) {
+      return null;
+    }
+    List<Class<?>> list = new ArrayList<Class<?>>();
+    for (Object nameObj : addendum.permittedSubclasses) {
+      if (nameObj instanceof byte[]) {
+        try {
+          String subName = Classes.toString((byte[]) nameObj).replace('/', '.');
+          Class<?> sub = Class.forName(subName, false, getClassLoader());
+          list.add(sub);
+        } catch (Throwable ignored) {
+        }
+      }
+    }
+    return list.toArray(new Class<?>[list.size()]);
+  }
+
+  public Module getModule() {
+    if (isArray()) {
+      return getComponentType().getModule();
+    }
+    ClassLoader loader = getClassLoader();
+    if (loader == null) {
+      return Module.JAVA_BASE;
+    }
+    return loader.getUnnamedModule();
   }
 
 }
