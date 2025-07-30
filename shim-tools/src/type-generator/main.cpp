@@ -637,7 +637,157 @@ const char* fieldType(const char* spec)
   }
 }
 
-void parseJavaClass(Module& module, ClassParser& clparser, Stream* s)
+void collectInterfaceMethods(Finder* finder,
+                             std::set<Method>& methods,
+                             const std::string& iname,
+                             std::set<std::string>& visited)
+{
+  if (visited.find(iname) != visited.end()) {
+    return;
+  }
+  visited.insert(iname);
+
+  class Client : public Stream::Client {
+   public:
+    virtual void NO_RETURN handleError()
+    {
+      abort();
+    }
+  } client;
+
+  System::Region* region = finder->find(append(iname.c_str(), ".class"));
+  if (region == 0) {
+    return;
+  }
+  Stream s(&client, region->start(), region->length());
+
+  uint32_t magic = s.read4();
+  assert(magic == 0xCAFEBABE);
+  (void)magic;
+  s.read2();  // minor version
+  s.read2();  // major version
+
+  unsigned poolCount = s.read2() - 1;
+  std::vector<uintptr_t> pool(poolCount, -1);
+  std::vector<void*> allocatedUtf8;
+  for (unsigned i = 0; i < poolCount; ++i) {
+    unsigned c = s.read1();
+
+    switch (c) {
+    case CONSTANT_Integer:
+    case CONSTANT_Float:
+      pool[i] = s.read4();
+      break;
+
+    case CONSTANT_Long:
+    case CONSTANT_Double:
+      pool[i++] = s.read4();
+      pool[i] = s.read4();
+      break;
+
+    case CONSTANT_Utf8: {
+      unsigned length = s.read2();
+      uint8_t* p = static_cast<uint8_t*>(malloc(length + 1));
+      s.read(p, length);
+      p[length] = 0;
+      pool[i] = reinterpret_cast<uintptr_t>(p);
+      allocatedUtf8.push_back(p);
+    } break;
+
+    case CONSTANT_Class:
+    case CONSTANT_String:
+    case 16:  // CONSTANT_MethodType
+    case 19:  // CONSTANT_Module
+    case 20:  // CONSTANT_Package
+      pool[i] = s.read2();
+      break;
+
+    case 15:  // CONSTANT_MethodHandle
+      s.read1();
+      pool[i] = s.read2();
+      break;
+
+    case CONSTANT_NameAndType:
+    case CONSTANT_Fieldref:
+    case CONSTANT_Methodref:
+    case CONSTANT_InterfaceMethodref:
+    case 17:  // CONSTANT_Dynamic
+    case 18:  // CONSTANT_InvokeDynamic
+      pool[i] = s.read4();
+      break;
+
+    default:
+      for (size_t k = 0; k < allocatedUtf8.size(); ++k) {
+        free(allocatedUtf8[k]);
+      }
+      region->dispose();
+      return;
+    }
+  }
+
+  s.read2();  // flags
+  s.read2();  // name
+  s.read2();  // super
+
+  unsigned interfaceCount = s.read2();
+  std::vector<std::string> superInterfaces;
+  for (unsigned i = 0; i < interfaceCount; ++i) {
+    unsigned idx = s.read2();
+    if (idx && idx - 1 < pool.size()) {
+      unsigned nameIdx = pool[idx - 1];
+      if (nameIdx && nameIdx - 1 < pool.size()) {
+        const char* name = reinterpret_cast<const char*>(pool[nameIdx - 1]);
+        if (name) {
+          superInterfaces.push_back(name);
+        }
+      }
+    }
+  }
+
+  for (size_t i = 0; i < superInterfaces.size(); ++i) {
+    collectInterfaceMethods(finder, methods, superInterfaces[i], visited);
+  }
+
+  unsigned fieldCount = s.read2();
+  for (unsigned i = 0; i < fieldCount; ++i) {
+    s.read2();
+    s.read2();
+    s.read2();
+
+    unsigned attributeCount = s.read2();
+    for (unsigned j = 0; j < attributeCount; ++j) {
+      s.read2();
+      s.skip(s.read4());
+    }
+  }
+
+  unsigned methodCount = s.read2();
+  for (unsigned i = 0; i < methodCount; ++i) {
+    unsigned flags = s.read2();
+    unsigned nameIndex = s.read2();
+    unsigned specIndex = s.read2();
+
+    unsigned attributeCount = s.read2();
+    for (unsigned j = 0; j < attributeCount; ++j) {
+      s.read2();
+      s.skip(s.read4());
+    }
+
+    const char* name = reinterpret_cast<const char*>(pool[nameIndex - 1]);
+    const char* spec = reinterpret_cast<const char*>(pool[specIndex - 1]);
+
+    if ((flags & (ACC_STATIC | ACC_PRIVATE)) == 0 and *name != '<') {
+      methods.insert(Method(name, spec));
+    }
+  }
+
+  for (size_t k = 0; k < allocatedUtf8.size(); ++k) {
+    free(allocatedUtf8[k]);
+  }
+  region->dispose();
+}
+
+void parseJavaClass(Finder* finder, Module& module, ClassParser& clparser, Stream* s)
 {
   uint32_t magic = s->read4();
   assert(magic == 0xCAFEBABE);
@@ -672,16 +822,23 @@ void parseJavaClass(Module& module, ClassParser& clparser, Stream* s)
 
     case CONSTANT_Class:
     case CONSTANT_String:
+    case 16:  // CONSTANT_MethodType
+    case 19:  // CONSTANT_Module
+    case 20:  // CONSTANT_Package
+      pool[i] = s->read2();
+      break;
+
+    case 15:  // CONSTANT_MethodHandle
+      s->read1();
       pool[i] = s->read2();
       break;
 
     case CONSTANT_NameAndType:
-      pool[i] = s->read4();
-      break;
-
     case CONSTANT_Fieldref:
     case CONSTANT_Methodref:
     case CONSTANT_InterfaceMethodref:
+    case 17:  // CONSTANT_Dynamic
+    case 18:  // CONSTANT_InvokeDynamic
       pool[i] = s->read4();
       break;
 
@@ -702,11 +859,19 @@ void parseJavaClass(Module& module, ClassParser& clparser, Stream* s)
   }
 
   unsigned interfaceCount = s->read2();
-  s->skip(interfaceCount * 2);
-  //   for (unsigned i = 0; i < interfaceCount; ++i) {
-  //     const char* name = reinterpret_cast<const char*>
-  //       (pool[pool[s->read2() - 1] - 1]);
-  //   }
+  std::vector<std::string> interfaceNames;
+  for (unsigned i = 0; i < interfaceCount; ++i) {
+    unsigned idx = s->read2();
+    if (idx && idx - 1 < pool.size()) {
+      unsigned nameIdx = pool[idx - 1];
+      if (nameIdx && nameIdx - 1 < pool.size()) {
+        const char* name = reinterpret_cast<const char*>(pool[nameIdx - 1]);
+        if (name) {
+          interfaceNames.push_back(name);
+        }
+      }
+    }
+  }
 
   unsigned fieldCount = s->read2();
   for (unsigned i = 0; i < fieldCount; ++i) {
@@ -760,6 +925,11 @@ void parseJavaClass(Module& module, ClassParser& clparser, Stream* s)
       clparser.cl->overridesMethods = true;
     }
   }
+
+  std::set<std::string> visitedInterfaces;
+  for (size_t i = 0; i < interfaceNames.size(); ++i) {
+    collectInterfaceMethods(finder, clparser.cl->methods, interfaceNames[i], visitedInterfaces);
+  }
 }
 
 void parseType(Finder* finder, Module& module, Object* p)
@@ -792,7 +962,7 @@ void parseType(Finder* finder, Module& module, Object* p)
       return;
     }
     Stream s(&client, region->start(), region->length());
-    parseJavaClass(module, clparser, &s);
+    parseJavaClass(finder, module, clparser, &s);
     region->dispose();
   }
 

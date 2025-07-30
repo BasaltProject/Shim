@@ -2507,7 +2507,7 @@ GcList* addInterfaceMethods(Thread* t,
               = hashMapFindNode(t, virtualMap, method, methodHash, methodEqual);
           if (n == 0) {
             method = makeMethod(t,
-                                method->vmFlags(),
+                                method->vmFlags() | InterfaceMethodFlag,
                                 method->returnCode(),
                                 method->parameterCount(),
                                 method->parameterFootprint(),
@@ -2528,6 +2528,12 @@ GcList* addInterfaceMethods(Thread* t,
                 list = vm::makeList(t, 0, 0, 0);
               }
               listAppend(t, list, method);
+            }
+          } else if (method->code() != 0) {
+            GcMethod* existing = cast<GcMethod>(t, n->second());
+            if (existing->code() == 0 and (existing->vmFlags() & InterfaceMethodFlag)) {
+              existing->setCode(t, method->code());
+              existing->flags() = method->flags();
             }
           }
         }
@@ -3190,6 +3196,8 @@ void updateBootstrapClass(Thread* t, GcClass* bootstrapClass, GcClass* class_)
   expect(t, bootstrapClass->super() == class_->super());
 
   expect(t, bootstrapClass->fixedSize() >= class_->fixedSize());
+
+  expect(t, bootstrapClass->length() >= class_->length());
 
   expect(t, (class_->vmFlags() & HasFinalizerFlag) == 0);
 
@@ -5707,7 +5715,7 @@ object findInHierarchyOrNull(
       o = find(t, class_, name, spec);
     }
 
-    if (o == 0 and find == findFieldInClass) {
+    if (o == 0) {
       o = findInInterfaces(t, originalClass, name, spec, find);
     }
   }

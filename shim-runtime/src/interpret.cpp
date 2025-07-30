@@ -2089,7 +2089,9 @@ loop:
       PROTECT(t, class_);
 
       // Since Java 11, nestmates can invoke private methods with invokevirtual.
-      method = methodVirtual(t, m) ? findVirtualMethod(t, m, class_) : m;
+      method = methodVirtual(t, m) ?
+          (((m->class_()->flags() & ACC_INTERFACE) != 0) ? findInterfaceMethod(t, m, class_) : findVirtualMethod(t, m, class_))
+          : m;
       goto invoke;
     } else {
       exception = makeThrowable(t, GcNullPointerException::Type);
@@ -3003,6 +3005,16 @@ back_branch:
 invoke : {
   if (method->flags() & ACC_NATIVE) {
     invokeNative(t, method);
+  } else if (method->code() == 0) {
+    throwNew(t,
+             GcAbstractMethodError::Type,
+             "%s.%s%s",
+             method->class_()->name()->body().begin(),
+             method->name()->body().begin(),
+             method->spec()->body().begin());
+    exception = t->exception;
+    t->exception = 0;
+    goto throw_;
   } else {
     checkStack(t, method);
     pushFrame(t, method);
