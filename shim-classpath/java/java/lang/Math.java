@@ -264,4 +264,264 @@ public final class Math {
   public static native double sqrt(double v);
 
   public static native double pow(double v, double e);
+
+  public static int addExact(int x, int y) {
+    int r = x + y;
+    if (((x ^ r) & (y ^ r)) < 0) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return r;
+  }
+
+  public static long addExact(long x, long y) {
+    long r = x + y;
+    if (((x ^ r) & (y ^ r)) < 0) {
+      throw new ArithmeticException("long overflow");
+    }
+    return r;
+  }
+
+  public static int subtractExact(int x, int y) {
+    int r = x - y;
+    if (((x ^ y) & (x ^ r)) < 0) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return r;
+  }
+
+  public static long subtractExact(long x, long y) {
+    long r = x - y;
+    if (((x ^ y) & (x ^ r)) < 0) {
+      throw new ArithmeticException("long overflow");
+    }
+    return r;
+  }
+
+  public static int multiplyExact(int x, int y) {
+    long r = (long) x * (long) y;
+    if ((int) r != r) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return (int) r;
+  }
+
+  public static long multiplyExact(long x, int y) {
+    return multiplyExact(x, (long) y);
+  }
+
+  public static long multiplyExact(long x, long y) {
+    long r = x * y;
+    long ax = Math.abs(x);
+    long ay = Math.abs(y);
+    if (((ax | ay) >>> 31 != 0)) {
+      if (((y != 0) && (r / y != x)) ||
+          (x == Long.MIN_VALUE && y == -1)) {
+        throw new ArithmeticException("long overflow");
+      }
+    }
+    return r;
+  }
+
+  public static int incrementExact(int a) {
+    if (a == Integer.MAX_VALUE) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return a + 1;
+  }
+
+  public static long incrementExact(long a) {
+    if (a == Long.MAX_VALUE) {
+      throw new ArithmeticException("long overflow");
+    }
+    return a + 1;
+  }
+
+  public static int decrementExact(int a) {
+    if (a == Integer.MIN_VALUE) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return a - 1;
+  }
+
+  public static long decrementExact(long a) {
+    if (a == Long.MIN_VALUE) {
+      throw new ArithmeticException("long overflow");
+    }
+    return a - 1;
+  }
+
+  public static int negateExact(int a) {
+    if (a == Integer.MIN_VALUE) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return -a;
+  }
+
+  public static long negateExact(long a) {
+    if (a == Long.MIN_VALUE) {
+      throw new ArithmeticException("long overflow");
+    }
+    return -a;
+  }
+
+  public static int toIntExact(long value) {
+    if ((int) value != value) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return (int) value;
+  }
+
+  public static long multiplyHigh(long x, long y) {
+    long x1 = x >> 32;
+    long x2 = x & 0xFFFFFFFFL;
+    long y1 = y >> 32;
+    long y2 = y & 0xFFFFFFFFL;
+
+    long z2 = x2 * y2;
+    long t = x1 * y2 + (z2 >>> 32);
+    long z1 = t & 0xFFFFFFFFL;
+    long z0 = t >> 32;
+    z1 += x2 * y1;
+
+    return x1 * y1 + z0 + (z1 >> 32);
+  }
+
+  public static long unsignedMultiplyHigh(long x, long y) {
+    long x1 = x >>> 32;
+    long x2 = x & 0xFFFFFFFFL;
+    long y1 = y >>> 32;
+    long y2 = y & 0xFFFFFFFFL;
+
+    long z2 = x2 * y2;
+    long t = x1 * y2 + (z2 >>> 32);
+    long z1 = t & 0xFFFFFFFFL;
+    long z0 = t >>> 32;
+    z1 += x2 * y1;
+
+    return x1 * y1 + z0 + (z1 >>> 32);
+  }
+
+  public static int floorDiv(int x, int y) {
+    int r = x / y;
+    if ((x ^ y) < 0 && (r * y != x)) {
+      r--;
+    }
+    return r;
+  }
+
+  public static int floorDivExact(int x, int y) {
+    if ((x == Integer.MIN_VALUE) && (y == -1)) {
+      throw new ArithmeticException("integer overflow");
+    }
+    int r = x / y;
+    if ((x ^ y) < 0 && (r * y != x)) {
+      r--;
+    }
+    return r;
+  }
+
+  public static int ceilDiv(int x, int y) {
+    int r = x / y;
+    if ((x ^ y) >= 0 && (r * y != x)) {
+      r++;
+    }
+    return r;
+  }
+
+  public static int ceilDivExact(int x, int y) {
+    if ((x == Integer.MIN_VALUE) && (y == -1)) {
+      throw new ArithmeticException("integer overflow");
+    }
+    int r = x / y;
+    if ((x ^ y) >= 0 && (r * y != x)) {
+      r++;
+    }
+    return r;
+  }
+
+  public static int floorMod(int x, int y) {
+    int r = x % y;
+    if ((x ^ y) < 0 && r != 0) {
+      r += y;
+    }
+    return r;
+  }
+
+  public static int ceilMod(int x, int y) {
+    int r = x % y;
+    if ((x ^ y) >= 0 && r != 0) {
+      r -= y;
+    }
+    return r;
+  }
+
+  public static long floorDiv(long x, int y) {
+    return floorDiv(x, (long) y);
+  }
+
+  public static long floorDiv(long x, long y) {
+    long r = x / y;
+    if ((x ^ y) < 0 && (r * y != x)) {
+      r--;
+    }
+    return r;
+  }
+
+  public static long floorDivExact(long x, long y) {
+    if ((x == Long.MIN_VALUE) && (y == -1)) {
+      throw new ArithmeticException("long overflow");
+    }
+    long r = x / y;
+    if ((x ^ y) < 0 && (r * y != x)) {
+      r--;
+    }
+    return r;
+  }
+
+  public static int floorMod(long x, int y) {
+    return (int) floorMod(x, (long) y);
+  }
+
+  public static long floorMod(long x, long y) {
+    long r = x % y;
+    if ((x ^ y) < 0 && r != 0) {
+      r += y;
+    }
+    return r;
+  }
+
+  public static long ceilDiv(long x, int y) {
+    return ceilDiv(x, (long) y);
+  }
+
+  public static long ceilDiv(long x, long y) {
+    long r = x / y;
+    if ((x ^ y) >= 0 && (r * y != x)) {
+      r++;
+    }
+    return r;
+  }
+
+  public static long ceilDivExact(long x, long y) {
+    if ((x == Long.MIN_VALUE) && (y == -1)) {
+      throw new ArithmeticException("long overflow");
+    }
+    long r = x / y;
+    if ((x ^ y) >= 0 && (r * y != x)) {
+      r++;
+    }
+    return r;
+  }
+
+  public static int ceilMod(long x, int y) {
+    return (int) ceilMod(x, (long) y);
+  }
+
+  public static long ceilMod(long x, long y) {
+    long r = x % y;
+    if ((x ^ y) >= 0 && r != 0) {
+      r -= y;
+    }
+    return r;
+  }
 }

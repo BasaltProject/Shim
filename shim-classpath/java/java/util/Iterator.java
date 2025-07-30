@@ -23,10 +23,21 @@
 
 package java.util;
 
+import java.util.function.Consumer;
+
 public interface Iterator<T> {
   public T next();
 
   public boolean hasNext();
 
-  public void remove();
+  default void remove() {
+    throw new UnsupportedOperationException("remove");
+  }
+
+  default void forEachRemaining(Consumer<? super T> action) {
+    Objects.requireNonNull(action);
+    while (hasNext()) {
+      action.accept(next());
+    }
+  }
 }

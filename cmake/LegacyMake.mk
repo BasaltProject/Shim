@@ -1418,7 +1418,9 @@ else
 endif
 
 cflags += $(extra-cflags)
+build-cflags += $(extra-cflags)
 lflags += $(extra-lflags)
+build-lflags += $(extra-lflags)
 
 openjdk-cflags += $(extra-cflags)
 

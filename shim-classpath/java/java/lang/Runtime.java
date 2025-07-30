@@ -455,6 +455,10 @@ public class Runtime {
   
   public native long maxMemory();
 
+  public int availableProcessors() {
+    return 4;
+  }
+
   private static class MyProcess extends Process {
     private long pid;
     private long tid;

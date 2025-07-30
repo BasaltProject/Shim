@@ -109,4 +109,8 @@ public final class OptionalInt {
   public String toString() {
     return isPresent ? ("OptionalInt[" + value + "]") : "OptionalInt.empty";
   }
+
+  public java.util.stream.IntStream stream() {
+    return isPresent ? java.util.stream.IntStream.of(value) : java.util.stream.IntStream.empty();
+  }
 }

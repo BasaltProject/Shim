@@ -31,4 +31,76 @@ public interface CharSequence {
   CharSequence subSequence(int start, int end);
         
   String toString();
+
+  default boolean isEmpty() {
+    return length() == 0;
+  }
+
+  public static int compare(CharSequence cs1, CharSequence cs2) {
+    if (cs1 == cs2) {
+      return 0;
+    }
+    java.util.Objects.requireNonNull(cs1);
+    java.util.Objects.requireNonNull(cs2);
+    for (int i = 0, len = Math.min(cs1.length(), cs2.length()); i < len; i++) {
+      char a = cs1.charAt(i);
+      char b = cs2.charAt(i);
+      if (a != b) {
+        return a - b;
+      }
+    }
+    return cs1.length() - cs2.length();
+  }
+
+  default java.util.stream.IntStream chars() {
+    class CharIterator implements java.util.PrimitiveIterator.OfInt {
+      int cur = 0;
+
+      @Override
+      public boolean hasNext() {
+        return cur < length();
+      }
+
+      @Override
+      public int nextInt() {
+        if (!hasNext()) {
+          throw new java.util.NoSuchElementException();
+        }
+        return charAt(cur++);
+      }
+    }
+    return java.util.stream.StreamSupport.intStream(
+        java.util.Spliterators.spliterator(new CharIterator(), (long) length(), java.util.Spliterator.ORDERED),
+        false);
+  }
+
+  default java.util.stream.IntStream codePoints() {
+    class CodePointIterator implements java.util.PrimitiveIterator.OfInt {
+      int cur = 0;
+
+      @Override
+      public boolean hasNext() {
+        return cur < length();
+      }
+
+      @Override
+      public int nextInt() {
+        if (!hasNext()) {
+          throw new java.util.NoSuchElementException();
+        }
+        char c1 = charAt(cur++);
+        if (Character.isHighSurrogate(c1) && cur < length()) {
+          char c2 = charAt(cur);
+          if (Character.isLowSurrogate(c2)) {
+            cur++;
+            return Character.toCodePoint(c1, c2);
+          }
+        }
+        return c1;
+      }
+    }
+    return java.util.stream.StreamSupport.intStream(
+        java.util.Spliterators.spliteratorUnknownSize(new CodePointIterator(), java.util.Spliterator.ORDERED),
+        false);
+  }
 }

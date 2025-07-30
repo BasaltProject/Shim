@@ -41,6 +41,17 @@ public abstract class AbstractCollection<T> implements Collection<T> {
     return result;
   }
 
+  public boolean retainAll(Collection<?> c) {
+    boolean changed = false;
+    for (Iterator<T> iter = iterator(); iter.hasNext();) {
+      if (!c.contains(iter.next())) {
+        iter.remove();
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   public void clear() {
     throw new UnsupportedOperationException("clear() in "
                                             + this.getClass().getName());

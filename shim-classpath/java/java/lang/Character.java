@@ -59,6 +59,14 @@ public final class Character implements Comparable<Character> {
     return new String(new char[] { v });
   }
 
+  public static String toString(int codePoint) {
+    return new String(toChars(codePoint));
+  }
+
+  public static int compare(char x, char y) {
+    return x - y;
+  }
+
   public char charValue() {
     return value;
   }
@@ -163,12 +171,18 @@ public final class Character implements Comparable<Character> {
     return canCastToChar(c) && isUpperCase((char) c);
   }
 
-  public static boolean isWhitespace(int c) {
-    return canCastToChar(c) && isWhitespace((char) c);
+  public static boolean isWhitespace(char c) {
+    return isWhitespace((int) c);
   }
 
-  public static boolean isWhitespace(char c) {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+  public static boolean isWhitespace(int c) {
+    if (c >= 0x0009 && c <= 0x000D) return true;
+    if (c >= 0x001C && c <= 0x0020) return true;
+    if (c == 0x1680) return true;
+    if (c >= 0x2000 && c <= 0x2006) return true;
+    if (c >= 0x2008 && c <= 0x200A) return true;
+    if (c == 0x2028 || c == 0x2029 || c == 0x205F || c == 0x3000) return true;
+    return false;
   }
 
   public static boolean isSpaceChar(char c) {
@@ -210,6 +224,18 @@ public final class Character implements Comparable<Character> {
     return (((high & 0x3FF) << 10) | (low & 0x3FF)) + 0x10000;
   }
 
+  public static boolean isValidCodePoint(int codePoint) {
+    return codePoint >= 0 && codePoint <= 0x10FFFF;
+  }
+
+  public static boolean isBmpCodePoint(int codePoint) {
+    return codePoint >= 0 && codePoint <= 0xFFFF;
+  }
+
+  public static int charCount(int codePoint) {
+    return codePoint >= 0x10000 ? 2 : 1;
+  }
+
   public static boolean isSupplementaryCodePoint(int codePoint) {
     return codePoint >= 0x10000 && codePoint <= 0x10FFFF;
   }
@@ -219,6 +245,9 @@ public final class Character implements Comparable<Character> {
   }
 
   public static char[] toChars(int codePoint) {
+    if (!isValidCodePoint(codePoint)) {
+      throw new IllegalArgumentException();
+    }
     if (isSupplementaryCodePoint(codePoint)) {
       int cpPrime = codePoint - 0x10000;
       int high = 0xD800 | ((cpPrime >> 10) & 0x3FF);
@@ -250,9 +279,24 @@ public final class Character implements Comparable<Character> {
     return toCodePoint(high, low);
   }
 
+  public static int codePointBefore(CharSequence sequence, int index) {
+    int length = sequence.length();
+    if (index < 1 || index > length) {
+      throw new IndexOutOfBoundsException();
+    }
+    char low = sequence.charAt(index - 1);
+    if (isLowSurrogate(low) && index > 1) {
+      char high = sequence.charAt(index - 2);
+      if (isHighSurrogate(high)) {
+        return toCodePoint(high, low);
+      }
+    }
+    return low;
+  }
+
   public static int codePointCount(CharSequence sequence, int start, int end) {
     int length = sequence.length();
-    if (start < 0 || start > end || end >= length) {
+    if (start < 0 || start > end || end > length) {
       throw new IndexOutOfBoundsException();
     }
 

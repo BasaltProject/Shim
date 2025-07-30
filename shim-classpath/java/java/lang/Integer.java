@@ -170,4 +170,70 @@ public final class Integer extends Number implements Comparable<Integer> {
     i |= i >> 16;
     return bitCount(~i);
   }
+
+  public static int compareUnsigned(int x, int y) {
+    return compare(x + MIN_VALUE, y + MIN_VALUE);
+  }
+
+  public static long toUnsignedLong(int x) {
+    return ((long) x) & 0xFFFFFFFFL;
+  }
+
+  public static int divideUnsigned(int dividend, int divisor) {
+    return (int) (toUnsignedLong(dividend) / toUnsignedLong(divisor));
+  }
+
+  public static int remainderUnsigned(int dividend, int divisor) {
+    return (int) (toUnsignedLong(dividend) % toUnsignedLong(divisor));
+  }
+
+  public static String toUnsignedString(int i, int radix) {
+    return Long.toUnsignedString(toUnsignedLong(i), radix);
+  }
+
+  public static String toUnsignedString(int i) {
+    return toUnsignedString(i, 10);
+  }
+
+  public static int parseUnsignedInt(String s, int radix) {
+    if (s == null) {
+      throw new NumberFormatException("null");
+    }
+    int len = s.length();
+    if (len > 0) {
+      char firstChar = s.charAt(0);
+      if (firstChar == '-') {
+        throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s));
+      } else {
+        if (len <= 5 || (radix == 10 && len <= 9)) {
+          return parseInt(s, radix);
+        } else {
+          long ell = Long.parseLong(s, radix);
+          if ((ell & 0xFFFFFFFF00000000L) == 0) {
+            return (int) ell;
+          } else {
+            throw new NumberFormatException(String.format("String value %s exceeds range of unsigned integer.", s));
+          }
+        }
+      }
+    } else {
+      throw new NumberFormatException("For input string: \"\"");
+    }
+  }
+
+  public static int parseUnsignedInt(String s) {
+    return parseUnsignedInt(s, 10);
+  }
+
+  public static int min(int a, int b) {
+    return Math.min(a, b);
+  }
+
+  public static int max(int a, int b) {
+    return Math.max(a, b);
+  }
+
+  public static int sum(int a, int b) {
+    return a + b;
+  }
 }

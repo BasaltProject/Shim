@@ -167,6 +167,10 @@ public class Arrays {
   private final static int SORT_SIZE_THRESHOLD = 16;
 
   public static <T> void sort(T[] array, Comparator<? super T> comparator) {
+    if (comparator == null) {
+      sort(array);
+      return;
+    }
     introSort(array, comparator, 0, array.length, array.length);
     insertionSort(array, comparator);
   }
@@ -725,4 +729,67 @@ public class Arrays {
     return -left - 1;
   }
 
+  public static <T> Spliterator<T> spliterator(T[] array) {
+    return Spliterators.spliterator(array, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static <T> Spliterator<T> spliterator(T[] array, int startInclusive, int endExclusive) {
+    return Spliterators.spliterator(array, startInclusive, endExclusive, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static Spliterator.OfInt spliterator(int[] array) {
+    return Spliterators.spliterator(array, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static Spliterator.OfInt spliterator(int[] array, int startInclusive, int endExclusive) {
+    return Spliterators.spliterator(array, startInclusive, endExclusive, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static Spliterator.OfLong spliterator(long[] array) {
+    return Spliterators.spliterator(array, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static Spliterator.OfLong spliterator(long[] array, int startInclusive, int endExclusive) {
+    return Spliterators.spliterator(array, startInclusive, endExclusive, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static Spliterator.OfDouble spliterator(double[] array) {
+    return Spliterators.spliterator(array, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static Spliterator.OfDouble spliterator(double[] array, int startInclusive, int endExclusive) {
+    return Spliterators.spliterator(array, startInclusive, endExclusive, Spliterator.ORDERED | Spliterator.IMMUTABLE);
+  }
+
+  public static <T> java.util.stream.Stream<T> stream(T[] array) {
+    return stream(array, 0, array.length);
+  }
+
+  public static <T> java.util.stream.Stream<T> stream(T[] array, int startInclusive, int endExclusive) {
+    return java.util.stream.StreamSupport.stream(spliterator(array, startInclusive, endExclusive), false);
+  }
+
+  public static java.util.stream.IntStream stream(int[] array) {
+    return stream(array, 0, array.length);
+  }
+
+  public static java.util.stream.IntStream stream(int[] array, int startInclusive, int endExclusive) {
+    return java.util.stream.StreamSupport.intStream(spliterator(array, startInclusive, endExclusive), false);
+  }
+
+  public static java.util.stream.LongStream stream(long[] array) {
+    return stream(array, 0, array.length);
+  }
+
+  public static java.util.stream.LongStream stream(long[] array, int startInclusive, int endExclusive) {
+    return java.util.stream.StreamSupport.longStream(spliterator(array, startInclusive, endExclusive), false);
+  }
+
+  public static java.util.stream.DoubleStream stream(double[] array) {
+    return stream(array, 0, array.length);
+  }
+
+  public static java.util.stream.DoubleStream stream(double[] array, int startInclusive, int endExclusive) {
+    return java.util.stream.StreamSupport.doubleStream(spliterator(array, startInclusive, endExclusive), false);
+  }
 }

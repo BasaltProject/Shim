@@ -25,5 +25,26 @@ package java.util;
 
 public interface ListIterator<E> extends Iterator<E> {
   public boolean hasPrevious();
+
   public E previous();
+
+  default int nextIndex() {
+    throw new UnsupportedOperationException();
+  }
+
+  default int previousIndex() {
+    throw new UnsupportedOperationException();
+  }
+
+  default void remove() {
+    throw new UnsupportedOperationException();
+  }
+
+  default void set(E e) {
+    throw new UnsupportedOperationException();
+  }
+
+  default void add(E e) {
+    throw new UnsupportedOperationException();
+  }
 }

@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public class StringBuilder implements CharSequence, Appendable {
+public class StringBuilder implements CharSequence, Appendable, Comparable<StringBuilder> {
   private static final int BufferSize = 32;
 
   private Cell chain;
@@ -72,10 +72,17 @@ public class StringBuilder implements CharSequence, Appendable {
   }
 
   public StringBuilder append(CharSequence sequence) {
-    return append(sequence.toString());
+    if (sequence == null) {
+      return append("null");
+    } else {
+      return append(sequence.toString());
+    }
   }
 
   public StringBuilder append(CharSequence sequence, int start, int end) {
+    if (sequence == null) {
+      sequence = "null";
+    }
     return append(sequence.subSequence(start, end));
   }
 
@@ -393,5 +400,21 @@ public class StringBuilder implements CharSequence, Appendable {
 
   public void ensureCapacity(int capacity) {
     // ignore
+  }
+
+  public int compareTo(StringBuilder another) {
+    return CharSequence.compare(this, another);
+  }
+
+  public int codePointAt(int index) {
+    return Character.codePointAt(this, index);
+  }
+
+  public int codePointBefore(int index) {
+    return Character.codePointBefore(this, index);
+  }
+
+  public int codePointCount(int start, int end) {
+    return Character.codePointCount(this, start, end);
   }
 }

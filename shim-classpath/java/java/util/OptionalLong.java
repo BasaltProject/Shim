@@ -109,4 +109,8 @@ public final class OptionalLong {
   public String toString() {
     return isPresent ? ("OptionalLong[" + value + "]") : "OptionalLong.empty";
   }
+
+  public java.util.stream.LongStream stream() {
+    return isPresent ? java.util.stream.LongStream.of(value) : java.util.stream.LongStream.empty();
+  }
 }
