@@ -45,6 +45,19 @@ public abstract class CharBuffer
     return new ArrayCharBuffer(array, offset, length, false);
   }
 
+  public static CharBuffer wrap(CharSequence csq) {
+    return wrap(csq, 0, csq.length());
+  }
+
+  public static CharBuffer wrap(CharSequence csq, int start, int end) {
+    if (csq == null) throw new NullPointerException();
+    char[] array = new char[end - start];
+    for (int i = start; i < end; ++i) {
+      array[i - start] = csq.charAt(i);
+    }
+    return new ArrayCharBuffer(array, 0, array.length, true);
+  }
+
   public abstract CharBuffer asReadOnlyBuffer();
 
   public abstract CharBuffer slice();

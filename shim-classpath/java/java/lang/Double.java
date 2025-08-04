@@ -23,7 +23,8 @@
 
 package java.lang;
 
-public final class Double extends Number implements Comparable<Double> {
+public final class Double extends Number implements Comparable<Double>,
+    java.lang.constant.Constable, java.lang.constant.ConstantDesc {
   public static final Class TYPE = shim.Classes.forCanonicalName("D");
 
   public static final double NEGATIVE_INFINITY = -1.0 / 0.0;
@@ -157,4 +158,14 @@ public final class Double extends Number implements Comparable<Double> {
   public static native boolean isNaN(double value);
 
   public static native double doubleFromString(String s, int[] numRead);
+
+  @Override
+  public java.util.Optional<Double> describeConstable() {
+    return java.util.Optional.of(this);
+  }
+
+  @Override
+  public Double resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
+    return this;
+  }
 }

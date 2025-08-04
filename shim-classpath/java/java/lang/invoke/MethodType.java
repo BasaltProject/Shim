@@ -35,7 +35,8 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
 
-public final class MethodType implements java.io.Serializable, TypeDescriptor.OfMethod<Class<?>, MethodType> {
+public final class MethodType implements java.io.Serializable, TypeDescriptor.OfMethod<Class<?>, MethodType>,
+    java.lang.constant.Constable {
   private static final char[] Primitives = new char[] {
     'V', 'Z', 'B', 'C', 'S', 'I', 'F', 'J', 'D'
   };
@@ -197,6 +198,10 @@ public final class MethodType implements java.io.Serializable, TypeDescriptor.Of
 
   public String descriptorString() {
     return toMethodDescriptorString();
+  }
+
+  public java.util.Optional<java.lang.constant.MethodTypeDesc> describeConstable() {
+    return java.util.Optional.of(java.lang.constant.MethodTypeDesc.ofDescriptor(descriptorString()));
   }
 
   public static MethodType methodType(Class rtype, MethodType ptypes) {

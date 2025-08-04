@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public class NoSuchMethodException extends Exception {
+public class NoSuchMethodException extends ReflectiveOperationException {
   public NoSuchMethodException(String message) {
     super(message);
   }

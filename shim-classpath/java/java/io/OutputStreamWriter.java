@@ -31,6 +31,14 @@ public class OutputStreamWriter extends Writer {
   public OutputStreamWriter(OutputStream out) {
     this.out = out;
   }
+
+  public OutputStreamWriter(OutputStream out, String charsetName) throws UnsupportedEncodingException {
+    this(out);
+  }
+
+  public OutputStreamWriter(OutputStream out, java.nio.charset.Charset cs) {
+    this(out);
+  }
   
   public void write(char[] b, int offset, int length) throws IOException {
     out.write(Utf8.encode(b, offset, length));

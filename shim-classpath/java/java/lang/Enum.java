@@ -25,7 +25,7 @@ package java.lang;
 
 import java.lang.reflect.Method;
 
-public abstract class Enum<E extends Enum<E>> implements Comparable<E> {
+public abstract class Enum<E extends Enum<E>> implements Comparable<E>, java.lang.constant.Constable {
   private final String name;
   protected final int ordinal;
 
@@ -81,5 +81,42 @@ public abstract class Enum<E extends Enum<E>> implements Comparable<E> {
       c = c.getSuperclass();
     }
     return c;
+  }
+
+  @Override
+  public final java.util.Optional<EnumDesc<E>> describeConstable() {
+    return getDeclaringClass().describeConstable()
+        .map(c -> EnumDesc.of(c, name));
+  }
+
+  public static final class EnumDesc<E extends Enum<E>> extends java.lang.constant.DynamicConstantDesc<E> {
+    private final java.lang.constant.ClassDesc enumDesc;
+    private final String constantName;
+
+    private EnumDesc(java.lang.constant.ClassDesc enumDesc, String constantName) {
+      super(java.lang.constant.ConstantDescs.BSM_ENUM_CONSTANT,
+            constantName,
+            enumDesc,
+            new java.lang.constant.ConstantDesc[0]);
+      this.enumDesc = enumDesc;
+      this.constantName = constantName;
+    }
+
+    public static <E extends Enum<E>> EnumDesc<E> of(java.lang.constant.ClassDesc enumClass, String constantName) {
+      java.util.Objects.requireNonNull(enumClass, "enumClass");
+      java.util.Objects.requireNonNull(constantName, "constantName");
+      return new EnumDesc<E>(enumClass, constantName);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public E resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) throws ReflectiveOperationException {
+      return (E) Enum.valueOf((Class) enumDesc.resolveConstantDesc(lookup), constantName);
+    }
+
+    @Override
+    public String toString() {
+      return "EnumDesc[" + enumDesc.displayName() + "." + constantName + "]";
+    }
   }
 }

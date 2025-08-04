@@ -43,6 +43,10 @@ public class InputStreamReader extends Reader {
       throw new UnsupportedEncodingException(encoding);
     }    
   }
+
+  public InputStreamReader(InputStream in, java.nio.charset.Charset cs) {
+    this(in);
+  }
   
   public int read(char[] b, int offset, int length) throws IOException {
     if (length == 0) {

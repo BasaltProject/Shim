@@ -292,6 +292,13 @@ public class MethodHandles {
       return VarHandle.makeFieldHandle(f, (f.getModifiers() & Modifier.STATIC) != 0);
     }
 
+    public Class<?> findClass(String targetName) throws ClassNotFoundException, IllegalAccessException {
+      Objects.requireNonNull(targetName, "targetName");
+      Class<?> decl = shim.SystemClassLoader.getClass(class_);
+      ClassLoader loader = (decl != null) ? decl.getClassLoader() : ClassLoader.getSystemClassLoader();
+      return Class.forName(targetName, false, loader);
+    }
+
     public String toString() {
       return "lookup[" + shim.SystemClassLoader.getClass(class_) + ", "
         + modes + "]";

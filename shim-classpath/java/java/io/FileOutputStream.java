@@ -47,6 +47,10 @@ public class FileOutputStream extends OutputStream {
     this(file.getPath());
   }
 
+  public FileOutputStream(File file, boolean append) throws IOException {
+    this(file.getPath(), append);
+  }
+
   private static native int open(String path, boolean append) throws IOException;
 
   private static native void write(int fd, int c) throws IOException;

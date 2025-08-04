@@ -34,8 +34,10 @@ class loading, verification, execution, memory management and native interfaces.
 
 The organization's long-term motivation is to run legacy Bukkit `.jar` plugins
 without requiring an external JVM installation or process. Shim provides the
-runtime foundation for that goal. Translating Bukkit APIs into Basalt APIs and
-integrating plugins with Basalt will belong to a separate project.
+runtime foundation for that goal. Bukkit APIs and plugin lifecycle integration
+will belong to a dedicated module of Server. BungeeCord and Velocity adapters will belong to modules of Proxy.
+Those modules will be developed once Shim is complete. Shim itself only provides
+Java bytecode execution, not Minecraft plugin API compatibility.
 
 ## Project layout
 
