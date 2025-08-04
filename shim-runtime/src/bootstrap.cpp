@@ -107,7 +107,26 @@ object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* po
     loadMemoryBarrier();
     PROTECT(t, value);
     if (objectClass(t, value) == type(t, GcReference::Type)) {
-        if (cast<GcReference>(t, value)->kind() != 0) {
+        unsigned kind = cast<GcReference>(t, value)->kind();
+        if (kind != 0) {
+            if (kind >= REF_getField and kind <= REF_putStatic) {
+                GcReference* ref = cast<GcReference>(t, value);
+                PROTECT(t, ref);
+                GcClass* class_ = resolveClass(t, loader, ref->class_());
+                PROTECT(t, class_);
+                GcField* field = cast<GcField>(t, findInHierarchy(t, class_, ref->name(), ref->spec(), findFieldInClass, GcNoSuchFieldError::Type));
+                PROTECT(t, field);
+                GcMethod* makeFieldHandle = resolveMethod(t, roots(t)->bootLoader(),
+                    "java/lang/invoke/MethodHandle", "makeFieldHandle", "(ILshim/VMField;)Ljava/lang/invoke/MethodHandle;");
+                GcArray* args = makeArray(t, 2);
+                PROTECT(t, args);
+                args->setBodyElement(t, 0, makeInt(t, kind));
+                args->setBodyElement(t, 1, field);
+                object handle = t->m->processor->invokeArray(t, makeFieldHandle, 0, args);
+                storeStoreMemoryBarrier();
+                pool->setBodyElement(t, index, reinterpret_cast<uintptr_t>(handle));
+                return handle;
+            }
             return resolve(t, loader, pool, index, findMethodInClass, GcNoSuchMethodError::Type);
         }
         GcClass* class_ = resolveClass(t, loader, cast<GcReference>(t, value)->name());
@@ -170,11 +189,12 @@ static object invokeBootstrap(Thread* t, GcInvocation* invocation, object typeAr
         arguments->setBodyElement(t, i, value);
     }
     if (varargs) {
-        GcArray* trailing = makeArray(t, staticArguments - (fixed - 3));
+        object trailing = makeObjectArray(t, staticArguments - (fixed - 3));
         PROTECT(t, trailing);
-        for (unsigned i = 0; i < trailing->length(); ++i) {
+        unsigned trailingLength = objectArrayLength(t, trailing);
+        for (unsigned i = 0; i < trailingLength; ++i) {
             object value = bootstrapConstant(t, invocation, constants->body()[fixed - 2 + i]);
-            trailing->setBodyElement(t, i, value);
+            reinterpret_cast<GcArray*>(trailing)->setBodyElement(t, i, value);
         }
         arguments->setBodyElement(t, parameters - 1, trailing);
     }
