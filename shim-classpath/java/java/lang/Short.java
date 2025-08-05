@@ -102,4 +102,8 @@ public final class Short extends Number implements Comparable<Short> {
   public static int compare(short x, short y) {
     return x - y;
   }
+
+  public static short reverseBytes(short i) {
+    return (short) (((i & 0xFF00) >> 8) | (i << 8));
+  }
 }
