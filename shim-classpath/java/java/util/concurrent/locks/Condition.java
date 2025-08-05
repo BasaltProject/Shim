@@ -27,11 +27,11 @@ import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 public interface Condition {
-  public void await();
-  public boolean await(long time, TimeUnit unit);
-  public long awaitNanos(long nanosTimeout);
+  public void await() throws InterruptedException;
+  public boolean await(long time, TimeUnit unit) throws InterruptedException;
+  public long awaitNanos(long nanosTimeout) throws InterruptedException;
   public void awaitUninterruptibly();
-  public boolean awaitUntil(Date deadline);
+  public boolean awaitUntil(Date deadline) throws InterruptedException;
   public void signal();
   public void signalAll();
 }

@@ -24,6 +24,8 @@
 package java.util.concurrent.atomic;
 
 import java.lang.reflect.Field;
+import java.util.function.IntBinaryOperator;
+import java.util.function.IntUnaryOperator;
 
 import sun.misc.Unsafe;
 
@@ -117,6 +119,111 @@ public class AtomicInteger extends Number implements java.io.Serializable {
     return addAndGet(-1);
   }
   
+  public final int getAndUpdate(IntUnaryOperator updateFunction) {
+    while (true) {
+      int prev = get();
+      int next = updateFunction.applyAsInt(prev);
+      if (compareAndSet(prev, next)) {
+        return prev;
+      }
+    }
+  }
+
+  public final int updateAndGet(IntUnaryOperator updateFunction) {
+    while (true) {
+      int prev = get();
+      int next = updateFunction.applyAsInt(prev);
+      if (compareAndSet(prev, next)) {
+        return next;
+      }
+    }
+  }
+
+  public final int getAndAccumulate(int x, IntBinaryOperator accumulatorFunction) {
+    while (true) {
+      int prev = get();
+      int next = accumulatorFunction.applyAsInt(prev, x);
+      if (compareAndSet(prev, next)) {
+        return prev;
+      }
+    }
+  }
+
+  public final int accumulateAndGet(int x, IntBinaryOperator accumulatorFunction) {
+    while (true) {
+      int prev = get();
+      int next = accumulatorFunction.applyAsInt(prev, x);
+      if (compareAndSet(prev, next)) {
+        return next;
+      }
+    }
+  }
+
+  public int getPlain() {
+    return value;
+  }
+
+  public void setPlain(int newValue) {
+    value = newValue;
+  }
+
+  public int getOpaque() {
+    return value;
+  }
+
+  public void setOpaque(int newValue) {
+    value = newValue;
+  }
+
+  public int getAcquire() {
+    return value;
+  }
+
+  public void setRelease(int newValue) {
+    lazySet(newValue);
+  }
+
+  public final int compareAndExchange(int expectedValue, int newValue) {
+    while (true) {
+      int cur = get();
+      if (cur != expectedValue) {
+        return cur;
+      }
+      if (compareAndSet(cur, newValue)) {
+        return expectedValue;
+      }
+    }
+  }
+
+  public final int compareAndExchangeAcquire(int expectedValue, int newValue) {
+    return compareAndExchange(expectedValue, newValue);
+  }
+
+  public final int compareAndExchangeRelease(int expectedValue, int newValue) {
+    return compareAndExchange(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetVolatile(int expectedValue, int newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetAcquire(int expectedValue, int newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetRelease(int expectedValue, int newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetPlain(int expectedValue, int newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  @Override
+  public String toString() {
+    return Integer.toString(get());
+  }
+
   @Override
   public byte byteValue() {
     return (byte)value;

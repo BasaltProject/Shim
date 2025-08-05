@@ -99,14 +99,7 @@ public class Executors {
   }
 
   public static ExecutorService newVirtualThreadPerTaskExecutor() {
-    return new ThreadPerTaskExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable r) {
-        Thread t = new Thread(r);
-        t.setDaemon(true);
-        return t;
-      }
-    });
+    return newThreadPerTaskExecutor(Thread.ofVirtual().factory());
   }
 
   public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {

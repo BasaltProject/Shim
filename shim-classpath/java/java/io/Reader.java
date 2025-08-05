@@ -68,4 +68,49 @@ public abstract class Reader implements Closeable, Readable {
   }
 
   public abstract void close() throws IOException;
+
+  public long transferTo(Writer out) throws IOException {
+    java.util.Objects.requireNonNull(out, "out");
+    long transferred = 0;
+    char[] buffer = new char[8192];
+    int count;
+    while ((count = this.read(buffer, 0, buffer.length)) >= 0) {
+      out.write(buffer, 0, count);
+      transferred += count;
+    }
+    return transferred;
+  }
+
+  public static Reader nullReader() {
+    return new Reader() {
+      private volatile boolean closed;
+
+      private void ensureOpen() throws IOException {
+        if (closed) {
+          throw new IOException("Stream closed");
+        }
+      }
+
+      @Override
+      public int read() throws IOException {
+        ensureOpen();
+        return -1;
+      }
+
+      @Override
+      public int read(char[] cbuf, int off, int len) throws IOException {
+        java.util.Objects.checkFromIndexSize(off, len, cbuf.length);
+        ensureOpen();
+        if (len == 0) {
+          return 0;
+        }
+        return -1;
+      }
+
+      @Override
+      public void close() {
+        closed = true;
+      }
+    };
+  }
 }

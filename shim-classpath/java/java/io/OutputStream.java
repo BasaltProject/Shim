@@ -39,4 +39,37 @@ public abstract class OutputStream implements Closeable, Flushable {
   public void flush() throws IOException { }
 
   public void close() throws IOException { }
+
+  public static OutputStream nullOutputStream() {
+    return new OutputStream() {
+      private volatile boolean closed;
+
+      private void ensureOpen() throws IOException {
+        if (closed) {
+          throw new IOException("Stream closed");
+        }
+      }
+
+      @Override
+      public void write(int b) throws IOException {
+        ensureOpen();
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        java.util.Objects.checkFromIndexSize(off, len, b.length);
+        ensureOpen();
+      }
+
+      @Override
+      public void flush() throws IOException {
+        ensureOpen();
+      }
+
+      @Override
+      public void close() {
+        closed = true;
+      }
+    };
+  }
 }

@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 public class ConcurrentHashMap<K,V>
   extends AbstractMap<K,V>
@@ -310,6 +311,19 @@ public class ConcurrentHashMap<K,V>
     return new Data.KeySet(new MyEntryMap());
   }
 
+  public KeySetView<K,V> keySet(V mappedValue) {
+    Objects.requireNonNull(mappedValue);
+    return new KeySetView<K,V>(this, mappedValue);
+  }
+
+  public static <K> KeySetView<K,Boolean> newKeySet() {
+    return new KeySetView<K,Boolean>(new ConcurrentHashMap<K,Boolean>(), Boolean.TRUE);
+  }
+
+  public static <K> KeySetView<K,Boolean> newKeySet(int initialCapacity) {
+    return new KeySetView<K,Boolean>(new ConcurrentHashMap<K,Boolean>(initialCapacity), Boolean.TRUE);
+  }
+
   public Collection<V> values() {
     return new Data.Values(new MyEntryMap());
   }
@@ -446,6 +460,106 @@ public class ConcurrentHashMap<K,V>
       } else {
         throw new IllegalStateException();
       }
+    }
+  }
+
+  public static class KeySetView<K,V> implements Set<K>, java.io.Serializable {
+    private static final long serialVersionUID = 7249069246863182397L;
+    private final ConcurrentHashMap<K,V> map;
+    private final V value;
+
+    KeySetView(ConcurrentHashMap<K,V> map, V value) {
+      this.map = map;
+      this.value = value;
+    }
+
+    public V getMappedValue() {
+      return value;
+    }
+
+    public ConcurrentHashMap<K,V> getMap() {
+      return map;
+    }
+
+    public void clear() {
+      map.clear();
+    }
+
+    public int size() {
+      return map.size();
+    }
+
+    public boolean isEmpty() {
+      return map.isEmpty();
+    }
+
+    public boolean contains(Object o) {
+      return map.containsKey(o);
+    }
+
+    public boolean remove(Object o) {
+      return map.remove(o) != null;
+    }
+
+    public Iterator<K> iterator() {
+      return map.keySet().iterator();
+    }
+
+    public boolean add(K e) {
+      V v = value;
+      if (v == null) {
+        throw new UnsupportedOperationException();
+      }
+      return map.put(e, v) == null;
+    }
+
+    public boolean addAll(Collection<? extends K> c) {
+      boolean added = false;
+      for (K e : c) {
+        if (add(e)) {
+          added = true;
+        }
+      }
+      return added;
+    }
+
+    public int hashCode() {
+      int h = 0;
+      for (K e : this) {
+        if (e != null) h += e.hashCode();
+      }
+      return h;
+    }
+
+    public boolean equals(Object o) {
+      if (o == this) return true;
+      if (!(o instanceof Set)) return false;
+      Set<?> s = (Set<?>) o;
+      return s.size() == size() && containsAll(s);
+    }
+
+    public boolean containsAll(Collection<?> c) {
+      return map.keySet().containsAll(c);
+    }
+
+    public boolean removeAll(Collection<?> c) {
+      return map.keySet().removeAll(c);
+    }
+
+    public boolean retainAll(Collection<?> c) {
+      return map.keySet().retainAll(c);
+    }
+
+    public Object[] toArray() {
+      return map.keySet().toArray();
+    }
+
+    public <T> T[] toArray(T[] a) {
+      return map.keySet().toArray(a);
+    }
+
+    public String toString() {
+      return map.keySet().toString();
     }
   }
 }

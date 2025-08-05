@@ -704,6 +704,109 @@ public class Arrays {
     return result;
   }
 
+  public static boolean[] copyOfRange(boolean[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    boolean[] result = new boolean[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static byte[] copyOfRange(byte[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    byte[] result = new byte[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static char[] copyOfRange(char[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    char[] result = new char[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static short[] copyOfRange(short[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    short[] result = new short[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static int[] copyOfRange(int[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    int[] result = new int[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static long[] copyOfRange(long[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    long[] result = new long[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static float[] copyOfRange(float[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    float[] result = new float[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static double[] copyOfRange(double[] original, int from, int to) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    double[] result = new double[newLength];
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
+  public static <T> T[] copyOfRange(T[] original, int from, int to) {
+    return copyOfRange(original, from, to, (Class<? extends T[]>) original.getClass());
+  }
+
+  public static <T, U> T[] copyOfRange(U[] original, int from, int to, Class<? extends T[]> newType) {
+    if (from > to) throw new IllegalArgumentException(from + " > " + to);
+    int len = original.length;
+    if (from < 0 || from > len) throw new ArrayIndexOutOfBoundsException(from);
+    int newLength = to - from;
+    T[] result = (T[]) Array.newInstance(newType.getComponentType(), newLength);
+    int copyLength = Math.min(newLength, len - from);
+    System.arraycopy(original, from, result, 0, copyLength);
+    return result;
+  }
+
   public static int binarySearch(int[] a, int key) {
     return binarySearch(a, 0, a.length - 1, key);
   }
