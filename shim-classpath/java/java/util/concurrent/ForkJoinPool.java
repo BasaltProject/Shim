@@ -35,30 +35,73 @@ public class ForkJoinPool extends AbstractExecutorService {
     if (parallelism <= 0) throw new IllegalArgumentException();
     this.parallelism = parallelism;
     for (int i = 0; i < parallelism; ++i) {
-      Thread worker = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          while (!shutdown || !workQueue.isEmpty()) {
-            try {
-              Runnable task = workQueue.poll(100, TimeUnit.MILLISECONDS);
-              if (task != null) {
-                task.run();
-              }
-            } catch (InterruptedException e) {
-              if (shutdown) break;
-            } catch (Throwable ignore) {
-            }
-          }
-        }
-      }, "ForkJoinPool-worker-" + i);
-      worker.setDaemon(true);
+      ForkJoinWorkerThread worker = new ForkJoinWorkerThread(this);
+      worker.setName("ForkJoinPool-worker-" + i);
       workers.add(worker);
       worker.start();
     }
   }
 
+  void runWorker() {
+    while (!shutdown || !workQueue.isEmpty()) {
+      try {
+        Runnable task = workQueue.poll(100, TimeUnit.MILLISECONDS);
+        if (task != null) {
+          task.run();
+        }
+      } catch (InterruptedException e) {
+        if (shutdown) break;
+      } catch (Throwable ignore) {
+      }
+    }
+  }
+
   public int getParallelism() {
     return parallelism;
+  }
+
+  public <T> T invoke(ForkJoinTask<T> task) {
+    if (task == null) throw new NullPointerException();
+    execute(task);
+    return task.join();
+  }
+
+  public void execute(ForkJoinTask<?> task) {
+    if (task == null) throw new NullPointerException();
+    if (shutdown) throw new RejectedExecutionException();
+    workQueue.offer(new Runnable() {
+      @Override
+      public void run() {
+        task.doExec();
+      }
+    });
+  }
+
+  public <T> ForkJoinTask<T> submit(ForkJoinTask<T> task) {
+    if (task == null) throw new NullPointerException();
+    execute(task);
+    return task;
+  }
+
+  @Override
+  public <T> ForkJoinTask<T> submit(Callable<T> task) {
+    ForkJoinTask<T> fjt = ForkJoinTask.adapt(task);
+    execute(fjt);
+    return fjt;
+  }
+
+  @Override
+  public <T> ForkJoinTask<T> submit(Runnable task, T result) {
+    ForkJoinTask<T> fjt = ForkJoinTask.adapt(task, result);
+    execute(fjt);
+    return fjt;
+  }
+
+  @Override
+  public ForkJoinTask<?> submit(Runnable task) {
+    ForkJoinTask<?> fjt = ForkJoinTask.adapt(task);
+    execute(fjt);
+    return fjt;
   }
 
   @Override

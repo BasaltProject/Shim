@@ -43,6 +43,14 @@ public abstract class Reference<T> {
     return target;
   }
 
+  public boolean refersTo(T obj) {
+    return this.target == obj;
+  }
+
+  public static void reachabilityFence(Object ref) {
+    // Acts as a reachability barrier for compiler optimizations
+  }
+
   public void clear() {
     target = null;
   }

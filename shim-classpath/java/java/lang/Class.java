@@ -79,6 +79,30 @@ public final class Class <T>
     return res + getName();
   }
 
+  public String toGenericString() {
+    if (isPrimitive()) {
+      return toString();
+    }
+    StringBuilder sb = new StringBuilder();
+    int mod = getModifiers() & Modifier.classModifiers();
+    if (mod != 0) {
+      sb.append(Modifier.toString(mod)).append(' ');
+    }
+    if (isAnnotation()) {
+      sb.append("@interface ");
+    } else if (isInterface()) {
+      sb.append("interface ");
+    } else if (isEnum()) {
+      sb.append("enum ");
+    } else if (isRecord()) {
+      sb.append("record ");
+    } else {
+      sb.append("class ");
+    }
+    sb.append(getName());
+    return sb.toString();
+  }
+
   private static byte[] replace(int a, int b, byte[] s, int offset,
                                 int length)
   {

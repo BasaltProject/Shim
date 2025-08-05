@@ -45,4 +45,27 @@ public abstract class AccessibleObject implements AnnotatedElement {
   public static void setAccessible(AccessibleObject[] array, boolean v) {
     for (AccessibleObject o: array) o.setAccessible(v);
   }
+
+  public boolean canAccess(Object obj) {
+    if (isAccessible()) {
+      return true;
+    }
+    if (this instanceof Member) {
+      Member m = (Member) this;
+      if (!Modifier.isStatic(m.getModifiers())) {
+        if (obj == null) {
+          throw new IllegalArgumentException("null object for instance member");
+        }
+        if (!m.getDeclaringClass().isInstance(obj)) {
+          throw new IllegalArgumentException("object is not an instance of declaring class");
+        }
+      }
+    }
+    return true;
+  }
+
+  public boolean trySetAccessible() {
+    setAccessible(true);
+    return true;
+  }
 }

@@ -46,8 +46,53 @@ public final class Modifier {
   public static boolean isStatic   (int v) { return (v &    STATIC) != 0; }
   public static boolean isFinal    (int v) { return (v &     FINAL) != 0; }
   public static boolean isTransient(int v) { return (v & TRANSIENT) != 0; }
+  public static boolean isVolatile (int v) { return (v &  VOLATILE) != 0; }
+  public static boolean isSynchronized(int v) { return (v & SYNCHRONIZED) != 0; }
   public static boolean isSuper    (int v) { return (v &     SUPER) != 0; }
   public static boolean isNative   (int v) { return (v &    NATIVE) != 0; }
   public static boolean isAbstract (int v) { return (v &  ABSTRACT) != 0; }
   public static boolean isInterface(int v) { return (v & INTERFACE) != 0; }
+  public static boolean isStrict   (int v) { return (v &    STRICT) != 0; }
+
+  public static String toString(int mod) {
+    StringBuilder sb = new StringBuilder();
+    if ((mod & PUBLIC) != 0) sb.append("public ");
+    if ((mod & PROTECTED) != 0) sb.append("protected ");
+    if ((mod & PRIVATE) != 0) sb.append("private ");
+    if ((mod & ABSTRACT) != 0) sb.append("abstract ");
+    if ((mod & STATIC) != 0) sb.append("static ");
+    if ((mod & FINAL) != 0) sb.append("final ");
+    if ((mod & TRANSIENT) != 0) sb.append("transient ");
+    if ((mod & VOLATILE) != 0) sb.append("volatile ");
+    if ((mod & SYNCHRONIZED) != 0) sb.append("synchronized ");
+    if ((mod & NATIVE) != 0) sb.append("native ");
+    if ((mod & STRICT) != 0) sb.append("strictfp ");
+    if ((mod & INTERFACE) != 0) sb.append("interface ");
+    int len = sb.length();
+    return (len > 0) ? sb.substring(0, len - 1) : "";
+  }
+
+  public static int classModifiers() {
+    return PUBLIC | PROTECTED | PRIVATE | ABSTRACT | STATIC | FINAL | STRICT;
+  }
+
+  public static int interfaceModifiers() {
+    return PUBLIC | PROTECTED | PRIVATE | ABSTRACT | STATIC | STRICT;
+  }
+
+  public static int constructorModifiers() {
+    return PUBLIC | PROTECTED | PRIVATE;
+  }
+
+  public static int methodModifiers() {
+    return PUBLIC | PROTECTED | PRIVATE | ABSTRACT | STATIC | FINAL | SYNCHRONIZED | NATIVE | STRICT;
+  }
+
+  public static int fieldModifiers() {
+    return PUBLIC | PROTECTED | PRIVATE | STATIC | FINAL | TRANSIENT | VOLATILE;
+  }
+
+  public static int parameterModifiers() {
+    return FINAL;
+  }
 }

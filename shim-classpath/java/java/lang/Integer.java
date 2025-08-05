@@ -238,6 +238,18 @@ public final class Integer extends Number implements Comparable<Integer>,
     return a + b;
   }
 
+  public static int rotateLeft(int i, int distance) {
+    return (i << distance) | (i >>> -distance);
+  }
+
+  public static int rotateRight(int i, int distance) {
+    return (i >>> distance) | (i << -distance);
+  }
+
+  public static int numberOfTrailingZeros(int i) {
+    return bitCount((i & -i) - 1);
+  }
+
   @Override
   public java.util.Optional<Integer> describeConstable() {
     return java.util.Optional.of(this);
@@ -248,3 +260,4 @@ public final class Integer extends Number implements Comparable<Integer>,
     return this;
   }
 }
+

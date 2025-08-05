@@ -1301,3 +1301,46 @@ extern "C" JNIEXPORT jint JNICALL
   e->SetByteArrayRegion(buffer, 0, count, reinterpret_cast<const jbyte*>(text));
   return count;
 }
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_java_lang_ProcessHandleImpl_getCurrentPid0(JNIEnv*, jclass)
+{
+#if defined(PLATFORM_WINDOWS)
+  return static_cast<jlong>(GetCurrentProcessId());
+#else
+  return static_cast<jlong>(getpid());
+#endif
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_java_lang_ProcessHandleImpl_isAlive0(JNIEnv*, jclass, jlong pid)
+{
+#if defined(PLATFORM_WINDOWS)
+  HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+  if (h == NULL) return JNI_FALSE;
+  DWORD exitCode;
+  BOOL res = GetExitCodeProcess(h, &exitCode);
+  CloseHandle(h);
+  return (res && exitCode == STILL_ACTIVE) ? JNI_TRUE : JNI_FALSE;
+#else
+  if (pid <= 0) return JNI_FALSE;
+  return (kill(static_cast<pid_t>(pid), 0) == 0 || errno == EPERM) ? JNI_TRUE : JNI_FALSE;
+#endif
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_java_lang_ProcessHandleImpl_destroy0(JNIEnv*, jclass, jlong pid, jboolean forcibly)
+{
+#if defined(PLATFORM_WINDOWS)
+  HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid));
+  if (h == NULL) return JNI_FALSE;
+  BOOL res = TerminateProcess(h, 1);
+  CloseHandle(h);
+  return res ? JNI_TRUE : JNI_FALSE;
+#else
+  if (pid <= 0) return JNI_FALSE;
+  int sig = forcibly ? SIGKILL : SIGTERM;
+  return (kill(static_cast<pid_t>(pid), sig) == 0) ? JNI_TRUE : JNI_FALSE;
+#endif
+}
+

@@ -481,6 +481,32 @@ public class Runtime {
 			}
     }
 
+    @Override
+    public long pid() {
+      return pid;
+    }
+
+    @Override
+    public ProcessHandle toHandle() {
+      return ProcessHandle.of(pid).orElseGet(() -> new ProcessHandleImpl(pid));
+    }
+
+    @Override
+    public boolean isAlive() {
+      return pid != 0;
+    }
+
+    @Override
+    public Process destroyForcibly() {
+      destroy();
+      return this;
+    }
+
+    @Override
+    public boolean supportsNormalTermination() {
+      return true;
+    }
+
     public InputStream getInputStream() {
       return new FileInputStream(new FileDescriptor(in));
     }

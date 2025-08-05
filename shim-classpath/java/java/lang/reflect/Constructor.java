@@ -25,7 +25,7 @@ package java.lang.reflect;
 
 import java.lang.annotation.Annotation;
 
-public class Constructor<T> extends AccessibleObject implements Member {
+public class Constructor<T> extends Executable {
   public final Method<T> method;
 
   public Constructor(Method<T> method) {
@@ -89,6 +89,34 @@ public class Constructor<T> extends AccessibleObject implements Member {
   }
 
   public Class<?>[] getExceptionTypes() {
-    throw new UnsupportedOperationException("not yet implemented");
+    return method.getExceptionTypes();
+  }
+
+  public Annotation[][] getParameterAnnotations() {
+    return method.getParameterAnnotations();
+  }
+
+  public String toGenericString() {
+    StringBuilder sb = new StringBuilder();
+    int mod = getModifiers() & Modifier.constructorModifiers();
+    if (mod != 0) {
+      sb.append(Modifier.toString(mod)).append(' ');
+    }
+    sb.append(getDeclaringClass().getTypeName()).append('(');
+    Class<?>[] params = getParameterTypes();
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) sb.append(',');
+      sb.append(params[i].getTypeName());
+    }
+    sb.append(')');
+    Class<?>[] exceptions = getExceptionTypes();
+    if (exceptions.length > 0) {
+      sb.append(" throws ");
+      for (int i = 0; i < exceptions.length; i++) {
+        if (i > 0) sb.append(',');
+        sb.append(exceptions[i].getTypeName());
+      }
+    }
+    return sb.toString();
   }
 }
