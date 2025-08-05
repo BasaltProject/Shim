@@ -24,6 +24,13 @@
 package java.util.concurrent;
 
 public interface Future<V> {
+  enum State {
+    RUNNING,
+    SUCCESS,
+    FAILED,
+    CANCELLED
+  }
+
   public boolean cancel(boolean mayInterruptIfRunning);
   
   public boolean isCancelled();
@@ -35,4 +42,60 @@ public interface Future<V> {
   public V get(long timeout, TimeUnit unit) throws InterruptedException, 
                                                    ExecutionException, 
                                                    TimeoutException;
+
+  default State state() {
+    if (!isDone()) {
+      return State.RUNNING;
+    }
+    if (isCancelled()) {
+      return State.CANCELLED;
+    }
+    try {
+      get();
+      return State.SUCCESS;
+    } catch (ExecutionException e) {
+      return State.FAILED;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return State.FAILED;
+    }
+  }
+
+  default V resultNow() {
+    if (!isDone()) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    State s = state();
+    switch (s) {
+      case SUCCESS:
+        try {
+          return get();
+        } catch (InterruptedException | ExecutionException e) {
+          throw new IllegalStateException(e);
+        }
+      case FAILED:
+        throw new IllegalStateException("Task completed with exception");
+      case CANCELLED:
+        throw new IllegalStateException("Task was cancelled");
+      default:
+        throw new IllegalStateException("Task has not completed");
+    }
+  }
+
+  default Throwable exceptionNow() {
+    if (!isDone()) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    if (state() != State.FAILED) {
+      throw new IllegalStateException("Task completed with state: " + state());
+    }
+    try {
+      get();
+      throw new IllegalStateException("Task completed normally");
+    } catch (ExecutionException e) {
+      return e.getCause() != null ? e.getCause() : e;
+    } catch (InterruptedException e) {
+      throw new IllegalStateException(e);
+    }
+  }
 }

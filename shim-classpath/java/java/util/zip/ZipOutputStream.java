@@ -83,17 +83,21 @@ public class ZipOutputStream extends DeflaterOutputStream {
   }
   
   public void closeEntry() throws IOException {
+    if (currentEntry == null) {
+      return;
+    }
     // write remainder of buffer if partially full
     if (bufferIndex != 0) {
       write(inputBuffer, 0, bufferIndex);
       bufferIndex = 0;
     }
 
-    finish();
+    finishDeflateEntry();
 
     currentEntry.crc = (int) crc.getValue();
     crc.reset();
     writeDataDescriptor(currentEntry);
+    currentEntry = null;
   }
   
   @Override
@@ -120,7 +124,8 @@ public class ZipOutputStream extends DeflaterOutputStream {
     }
   }
 
-  private void deflate() throws IOException {
+  @Override
+  protected void deflate() throws IOException {
     int len = deflater.deflate(buffer, 0, buffer.length);
     currentEntry.compSize += len;
     bytesWritten += len;
@@ -215,28 +220,39 @@ public class ZipOutputStream extends DeflaterOutputStream {
     bytesWritten += 22;
   }
 
-  @Override
-  public void close() throws IOException {
-    int centralDirOffset = bytesWritten;
-    for (ZipEntry e : entries)
-      writeCentralDirectoryHeader(e);
-    writeEndofCentralDirectory(centralDirOffset);
-    deflater.dispose();
-    out.close();
-  }
+  private boolean finished;
 
-  @Override
-  public void flush() throws IOException {
-    out.write(inputBuffer, 0, inputBuffer.length);
-    inputBuffer = new byte[INPUT_BUFFER_SIZE];
-  }
-
-  private void finish() throws IOException {
+  private void finishDeflateEntry() throws IOException {
     deflater.finish();
     while (!deflater.finished()) {
       deflate();
     }
     deflater.reset();
+  }
+
+  @Override
+  public void finish() throws IOException {
+    if (finished) {
+      return;
+    }
+    if (currentEntry != null) {
+      closeEntry();
+    }
+    int centralDirOffset = bytesWritten;
+    for (ZipEntry e : entries) {
+      writeCentralDirectoryHeader(e);
+    }
+    writeEndofCentralDirectory(centralDirOffset);
+    finished = true;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (!finished) {
+      finish();
+    }
+    deflater.dispose();
+    out.close();
   }
   
   private void addTwoBytes(int bytes, int offset, byte[] buffer) throws IOException {
@@ -244,7 +260,7 @@ public class ZipOutputStream extends DeflaterOutputStream {
     buffer[offset + 1] = (byte) ((bytes >> 8) & 0xff);
   }
   
-  private void addFourBytes(int bytes, int offset, byte[] buffer) throws IOException {
+  private void addFourBytes(long bytes, int offset, byte[] buffer) throws IOException {
     buffer[offset] = (byte) (bytes & 0xff);
     buffer[offset + 1] = (byte) ((bytes >> 8) & 0xff);
     buffer[offset + 2] = (byte) ((bytes >> 16) & 0xff);

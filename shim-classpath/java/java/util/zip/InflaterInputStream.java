@@ -28,15 +28,20 @@ import java.io.IOException;
 import java.io.EOFException;
 
 public class InflaterInputStream extends InputStream {
-  private final InputStream in;
-  private final Inflater inflater;
-  private final byte[] buffer;
+  protected InputStream in;
+  protected Inflater inflater;
+  protected Inflater inf;
+  protected byte[] buffer;
+  protected byte[] buf;
+  protected int len;
 
   public InflaterInputStream(InputStream in, Inflater inflater, int bufferSize)
   {
     this.in = in;
     this.inflater = inflater;
+    this.inf = inflater;
     this.buffer = new byte[bufferSize];
+    this.buf = this.buffer;
   }
 
   public InflaterInputStream(InputStream in, Inflater inflater) {

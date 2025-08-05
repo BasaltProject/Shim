@@ -41,6 +41,8 @@ public class Deflater {
   private boolean finished;
   private final boolean nowrap;
   private boolean finish;
+  private long bytesRead;
+  private long bytesWritten;
 
   public Deflater(int level, boolean nowrap) {
     this.nowrap = nowrap;
@@ -105,6 +107,8 @@ public class Deflater {
     offset = length = 0;
     finish = false;
     needDictionary = finished = false;
+    bytesRead = 0;
+    bytesWritten = 0;
   }
 
   public int deflate(byte[] output) {
@@ -120,13 +124,22 @@ public class Deflater {
       throw new IllegalStateException();      
     }
 
-    if (input == null || output == null) {
+    if (output == null) {
       throw new NullPointerException();
+    }
+
+    byte[] in = this.input;
+    int inOffset = this.offset;
+    int inLength = this.length;
+    if (in == null) {
+      in = new byte[0];
+      inOffset = 0;
+      inLength = 0;
     }
 
     int[] results = new int[3];
     deflate(peer, 
-            input, this.offset, this.length,
+            in, inOffset, inLength,
             output, offset, length, finish, results);
 
     if (results[zlibResult] < 0) {
@@ -145,8 +158,26 @@ public class Deflater {
 
     this.offset += results[inputCount];
     this.length -= results[inputCount];
+    this.bytesRead += results[inputCount];
+    this.bytesWritten += results[outputCount];
     
     return results[outputCount];
+  }
+
+  public long getBytesRead() {
+    return bytesRead;
+  }
+
+  public int getTotalIn() {
+    return (int) bytesRead;
+  }
+
+  public long getBytesWritten() {
+    return bytesWritten;
+  }
+
+  public int getTotalOut() {
+    return (int) bytesWritten;
   }
 
   public void finish() {

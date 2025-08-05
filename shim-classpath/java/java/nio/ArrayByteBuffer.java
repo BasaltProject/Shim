@@ -44,6 +44,11 @@ class ArrayByteBuffer extends ByteBuffer {
     return b;
   }
 
+  @Override
+  public boolean isDirect() {
+    return false;
+  }
+
   public boolean hasArray() {
     return true;
   }

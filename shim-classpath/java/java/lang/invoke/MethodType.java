@@ -142,7 +142,7 @@ public final class MethodType implements java.io.Serializable, TypeDescriptor.Of
   }
 
   public static MethodType methodType(Class rtype,
-                                      Class ... ptypes)
+                                      Class[] ptypes)
   {
     return new MethodType(rtype, ptypes);
   }

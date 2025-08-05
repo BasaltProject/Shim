@@ -76,18 +76,25 @@ public class DeflaterOutputStream extends FilterOutputStream {
     }
   }
 
-  private void deflate() throws IOException {
+  protected void deflate() throws IOException {
     int len = deflater.deflate(buffer, 0, buffer.length);
     if (len > 0) {
       out.write(buffer, 0, len);
     }
   }
 
-  public void close() throws IOException {
-    deflater.finish();
-    while (! deflater.finished()) {
-      deflate();
+  public void finish() throws IOException {
+    if (!deflater.finished()) {
+      deflater.finish();
+      while (!deflater.finished()) {
+        deflate();
+      }
     }
+  }
+
+  @Override
+  public void close() throws IOException {
+    finish();
     out.close();
     deflater.dispose();
   }

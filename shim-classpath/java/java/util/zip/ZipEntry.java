@@ -49,15 +49,20 @@ import java.util.Date;
 
 
 public class ZipEntry {
+  public static final int STORED = 0;
+  public static final int DEFLATED = 8;
+
   String name;
   short reqVersion = -1;
   short compressionMethod = -1;
   int modTimeDate = -1;
   long millisTime = -1;
-  int crc = -1;
+  long crc = -1;
   long compSize = 0;
   long uncompSize = 0;
   int offset = -1;
+  byte[] extra;
+  String comment;
   
   public ZipEntry(String name) {
     this.name = name;
@@ -99,10 +104,16 @@ public class ZipEntry {
   
   //Method to set the compression method for the file
   //Valid methods are "stored" = 0 or "deflated" = 8
-  public void setMethod(short compMethod){
-    if (compMethod == 0 || compMethod == 8){
-      this.compressionMethod = compMethod;
+  public void setMethod(int compMethod){
+    if (compMethod == STORED || compMethod == DEFLATED){
+      this.compressionMethod = (short) compMethod;
+    } else {
+      throw new IllegalArgumentException("invalid compression method");
     }
+  }
+
+  public void setMethod(short compMethod){
+    setMethod((int) compMethod);
   }
 
   public int getMethod(){
@@ -110,15 +121,18 @@ public class ZipEntry {
   }
 
   //Methods to set and get the crc for the entry
-  public void setCrc(int crc){
-    if (crc < 0 || crc > 0xffffffff){
-      return;
+  public void setCrc(long crc){
+    if (crc < 0 || crc > 0xffffffffL){
+      throw new IllegalArgumentException("invalid entry crc-32");
     }
-    else
-      this.crc = crc;
+    this.crc = crc;
   }
 
-  public int getCrc(){
+  public void setCrc(int crc){
+    setCrc((long) crc & 0xffffffffL);
+  }
+
+  public long getCrc(){
     return this.crc;
   }
 
@@ -196,12 +210,15 @@ public class ZipEntry {
   }
 
   //Methods to set and get the uncompressed size of the entry
-  public void setSize(int size){
+  public void setSize(long size){
     if (size < 0){
-      return;
+      throw new IllegalArgumentException("invalid entry size");
     }
-    else
-      uncompSize = size;
+    uncompSize = size;
+  }
+
+  public void setSize(int size){
+    setSize((long) size);
   }
 
   public long getSize() {
@@ -211,7 +228,7 @@ public class ZipEntry {
   //Methods to set and get the compressed size of the entry
   public void setCompressedSize(long size){
     if (size < 0){
-      return;
+      compSize = -1;
     }
     else
       compSize = size;
@@ -219,5 +236,26 @@ public class ZipEntry {
 
   public long getCompressedSize() {
     return compSize;
+  }
+
+  public void setExtra(byte[] extra) {
+    this.extra = extra;
+  }
+
+  public byte[] getExtra() {
+    return extra;
+  }
+
+  public void setComment(String comment) {
+    this.comment = comment;
+  }
+
+  public String getComment() {
+    return comment;
+  }
+
+  @Override
+  public String toString() {
+    return getName();
   }
 }

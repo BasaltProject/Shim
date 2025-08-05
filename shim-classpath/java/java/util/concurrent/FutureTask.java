@@ -26,9 +26,9 @@ package java.util.concurrent;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class FutureTask<T> implements RunnableFuture<T> {
-  private enum State { New, Canceling, Canceled, Running, Done };
+  private enum TaskState { New, Canceling, Canceled, Running, Done };
   
-  private final AtomicReference<State> currentState;
+  private final AtomicReference<TaskState> currentState;
   private final Callable<T> callable;
   private final Object notifyLock;
   private volatile Thread runningThread;
@@ -47,7 +47,7 @@ public class FutureTask<T> implements RunnableFuture<T> {
   }
   
   public FutureTask(Callable<T> callable) {
-    currentState = new AtomicReference<State>(State.New);
+    currentState = new AtomicReference<TaskState>(TaskState.New);
     this.callable = callable;
     notifyLock = new Object();
     runningThread = null;
@@ -57,15 +57,15 @@ public class FutureTask<T> implements RunnableFuture<T> {
 
   @Override
   public void run() {
-    if (currentState.compareAndSet(State.New, State.Running)) {
+    if (currentState.compareAndSet(TaskState.New, TaskState.Running)) {
       runningThread = Thread.currentThread();
       try {
         result = callable.call();
       } catch (Throwable t) {
         failure = t;
       } finally {
-        if (currentState.compareAndSet(State.Running, State.Done) || 
-            currentState.get() == State.Canceled) {
+        if (currentState.compareAndSet(TaskState.Running, TaskState.Done) || 
+            currentState.get() == TaskState.Canceled) {
           /* in either of these conditions we either were not canceled 
            * or we already were interrupted.  The thread may or MAY NOT
            * be in an interrupted status depending on when it was 
@@ -105,12 +105,12 @@ public class FutureTask<T> implements RunnableFuture<T> {
 
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
-    if (currentState.compareAndSet(State.New, State.Canceled)) {
+    if (currentState.compareAndSet(TaskState.New, TaskState.Canceled)) {
       handleDone();
       
       return true;
     } else if (mayInterruptIfRunning && 
-               currentState.compareAndSet(State.Running, State.Canceling)) {
+               currentState.compareAndSet(TaskState.Running, TaskState.Canceling)) {
       // handleDone will be called from running thread
       try {
         Thread runningThread = this.runningThread;
@@ -121,7 +121,7 @@ public class FutureTask<T> implements RunnableFuture<T> {
         }
       } finally {
         // we can not set to canceled until interrupt status has been set
-        currentState.set(State.Canceled);
+        currentState.set(TaskState.Canceled);
       }
     }
     
@@ -130,12 +130,52 @@ public class FutureTask<T> implements RunnableFuture<T> {
 
   @Override
   public boolean isCancelled() {
-    return currentState.get() == State.Canceled;
+    return currentState.get() == TaskState.Canceled;
   }
 
   @Override
   public boolean isDone() {
-    return currentState.get() == State.Done || isCancelled();
+    return currentState.get() == TaskState.Done || isCancelled();
+  }
+
+  @Override
+  public Future.State state() {
+    TaskState s = currentState.get();
+    if (s == TaskState.Canceled || s == TaskState.Canceling) {
+      return Future.State.CANCELLED;
+    }
+    if (s == TaskState.Done) {
+      return failure != null ? Future.State.FAILED : Future.State.SUCCESS;
+    }
+    return Future.State.RUNNING;
+  }
+
+  @Override
+  public T resultNow() {
+    if (!isDone()) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    if (isCancelled()) {
+      throw new IllegalStateException("Task was cancelled");
+    }
+    if (failure != null) {
+      throw new IllegalStateException("Task completed with exception: " + failure);
+    }
+    return result;
+  }
+
+  @Override
+  public Throwable exceptionNow() {
+    if (!isDone()) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    if (isCancelled()) {
+      throw new IllegalStateException("Task was cancelled");
+    }
+    if (failure == null) {
+      throw new IllegalStateException("Task completed normally with a result");
+    }
+    return failure;
   }
 
   @Override
@@ -171,7 +211,7 @@ public class FutureTask<T> implements RunnableFuture<T> {
     
     if (remainingTime <= 0) {
       throw new TimeoutException();
-    } else if (currentState.get() == State.Canceled) {
+    } else if (currentState.get() == TaskState.Canceled) {
       throw new CancellationException();
     } else if (failure != null) {
       throw new ExecutionException(failure);

@@ -79,7 +79,7 @@ public abstract class VarHandle {
   private final Class<?> varType;
   private final List<Class<?>> coordinateTypes;
 
-  VarHandle(Class<?> varType, List<Class<?>> coordinateTypes) {
+  protected VarHandle(Class<?> varType, List<Class<?>> coordinateTypes) {
     this.varType = Objects.requireNonNull(varType);
     this.coordinateTypes = coordinateTypes != null
         ? Collections.unmodifiableList(coordinateTypes)
