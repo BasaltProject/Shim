@@ -28,7 +28,15 @@ public class VirtualMachineError extends Error {
     super(message);
   }
 
+  public VirtualMachineError(String message, Throwable cause) {
+    super(message, cause);
+  }
+
+  public VirtualMachineError(Throwable cause) {
+    super(cause);
+  }
+
   public VirtualMachineError() {
-    this(null);
+    super();
   }
 }

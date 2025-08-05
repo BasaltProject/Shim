@@ -28,7 +28,15 @@ public class InternalError extends VirtualMachineError {
     super(message);
   }
 
+  public InternalError(String message, Throwable cause) {
+    super(message, cause);
+  }
+
+  public InternalError(Throwable cause) {
+    super(cause);
+  }
+
   public InternalError() {
-    this(null);
+    super();
   }
 }
