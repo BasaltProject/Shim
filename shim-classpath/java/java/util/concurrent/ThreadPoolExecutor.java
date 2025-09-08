@@ -9,7 +9,9 @@
 package java.util.concurrent;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ThreadPoolExecutor extends AbstractExecutorService {
@@ -22,6 +24,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
   private volatile RejectedExecutionHandler handler;
   private volatile boolean isShutdown;
   private final List<Thread> workers = new ArrayList<Thread>();
+  private final Set<Thread> idleWorkers = new HashSet<Thread>();
   private final AtomicInteger activeCount = new AtomicInteger();
 
   public static class AbortPolicy implements RejectedExecutionHandler {
@@ -146,11 +149,18 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
           Runnable task = firstTask;
           while (!isShutdown || !workQueue.isEmpty()) {
             if (task == null) {
+              synchronized (idleWorkers) {
+                idleWorkers.add(Thread.currentThread());
+              }
               try {
                 task = workQueue.poll(keepAliveTime > 0 ? keepAliveTime : 100,
                                       unit != null ? unit : TimeUnit.MILLISECONDS);
               } catch (InterruptedException e) {
                 if (isShutdown) break;
+              } finally {
+                synchronized (idleWorkers) {
+                  idleWorkers.remove(Thread.currentThread());
+                }
               }
             }
             if (task != null) {
@@ -168,6 +178,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
           }
           synchronized (workers) {
             workers.remove(Thread.currentThread());
+          }
+          synchronized (idleWorkers) {
+            idleWorkers.remove(Thread.currentThread());
           }
         }
       });
@@ -211,6 +224,11 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
   @Override
   public void shutdown() {
     isShutdown = true;
+    synchronized (idleWorkers) {
+      for (Thread w : idleWorkers) {
+        w.interrupt();
+      }
+    }
   }
 
   @Override
