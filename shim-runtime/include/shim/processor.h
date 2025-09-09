@@ -147,6 +147,11 @@ class Processor {
                              object this_,
                              object arguments) = 0;
 
+  virtual object invokeArrayNonVirtual(Thread* t,
+                                       GcMethod* method,
+                                       object this_,
+                                       object arguments) = 0;
+
   virtual object invokeArray(Thread* t,
                              GcMethod* method,
                              object this_,

@@ -3174,14 +3174,14 @@ void pushArguments(Thread* t, object this_, const char* spec, object a)
   }
 }
 
-object invoke(Thread* t, GcMethod* method)
+object invoke(Thread* t, GcMethod* method, bool nonVirtual = false)
 {
   PROTECT(t, method);
 
   GcClass* class_;
   PROTECT(t, class_);
 
-  if (methodVirtual(t, method)) {
+  if (!nonVirtual && methodVirtual(t, method)) {
     unsigned parameterFootprint = method->parameterFootprint();
     class_ = objectClass(t, peekObject(t, t->sp - parameterFootprint));
 
@@ -3437,6 +3437,30 @@ class MyProcessor : public Processor {
     pushArguments(t, this_, spec, arguments);
 
     return local::invoke(t, method);
+  }
+
+  virtual object invokeArrayNonVirtual(vm::Thread* vmt,
+                                       GcMethod* method,
+                                       object this_,
+                                       object arguments)
+  {
+    Thread* t = static_cast<Thread*>(vmt);
+
+    assertT(
+        t,
+        t->state == Thread::ActiveState or t->state == Thread::ExclusiveState);
+
+    assertT(t, ((method->flags() & ACC_STATIC) == 0) xor (this_ == 0));
+
+    if (UNLIKELY(t->sp + method->parameterFootprint() + 1 > stackSizeInWords(t)
+                                                            / 2)) {
+      throwNew(t, GcStackOverflowError::Type);
+    }
+
+    const char* spec = reinterpret_cast<char*>(method->spec()->body().begin());
+    pushArguments(t, this_, spec, arguments);
+
+    return local::invoke(t, method, true);
   }
 
   virtual object invokeArray(vm::Thread* vmt,

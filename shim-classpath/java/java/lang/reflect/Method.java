@@ -115,6 +115,33 @@ public class Method<T> extends Executable {
                                       Object ... arguments)
     throws InvocationTargetException, IllegalAccessException;
 
+  public Object invokeNonVirtual(Object instance, Object ... arguments)
+    throws InvocationTargetException, IllegalAccessException
+  {
+    if (instance == null) {
+      throw new NullPointerException();
+    }
+    if (!Class.isInstance(vmMethod.class_, instance)) {
+      throw new IllegalArgumentException();
+    }
+    if (arguments == null) {
+      if (vmMethod.parameterCount > 0) {
+        throw new NullPointerException();
+      }
+      arguments = new Object[0];
+    }
+    if (arguments.length == vmMethod.parameterCount) {
+      Classes.initialize(vmMethod.class_);
+      return invokeNonVirtual(vmMethod, instance, arguments);
+    } else {
+      throw new ArrayIndexOutOfBoundsException();
+    }
+  }
+
+  private static native Object invokeNonVirtual(VMMethod method, Object instance,
+                                                Object ... arguments)
+    throws InvocationTargetException, IllegalAccessException;
+
   public Class getReturnType() {
     for (int i = 0; i < vmMethod.spec.length - 1; ++i) {
       if (vmMethod.spec[i] == ')') {
@@ -218,6 +245,32 @@ public class Method<T> extends Executable {
       }
     }
     return new Class<?>[0];
+  }
+
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    int mod = getModifiers() & Modifier.methodModifiers();
+    if (mod != 0) {
+      sb.append(Modifier.toString(mod)).append(' ');
+    }
+    sb.append(getReturnType().getName()).append(' ');
+    sb.append(getDeclaringClass().getName()).append('.');
+    sb.append(getName()).append('(');
+    Class<?>[] params = getParameterTypes();
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) sb.append(',');
+      sb.append(params[i].getName());
+    }
+    sb.append(')');
+    Class<?>[] exceptions = getExceptionTypes();
+    if (exceptions.length > 0) {
+      sb.append(" throws ");
+      for (int i = 0; i < exceptions.length; i++) {
+        if (i > 0) sb.append(',');
+        sb.append(exceptions[i].getName());
+      }
+    }
+    return sb.toString();
   }
 
   public String toGenericString() {

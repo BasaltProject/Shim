@@ -400,6 +400,18 @@ public class Field<T> extends AccessibleObject implements Member {
     return getAnnotations();
   }
 
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    int mod = getModifiers() & Modifier.fieldModifiers();
+    if (mod != 0) {
+      sb.append(Modifier.toString(mod)).append(' ');
+    }
+    sb.append(getType().getName()).append(' ');
+    sb.append(getDeclaringClass().getName()).append('.');
+    sb.append(getName());
+    return sb.toString();
+  }
+
   public String toGenericString() {
     StringBuilder sb = new StringBuilder();
     int mod = getModifiers() & Modifier.fieldModifiers();
