@@ -95,6 +95,15 @@ public class PrintWriter extends Writer {
     } catch (IOException e) { }
   }
 
+  public PrintWriter format(String format, Object... args) {
+    print(String.format(format, args));
+    return this;
+  }
+
+  public PrintWriter printf(String format, Object... args) {
+    return format(format, args);
+  }
+
   public void close() {
     try {
       out.close();

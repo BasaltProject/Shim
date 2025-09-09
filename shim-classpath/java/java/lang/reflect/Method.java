@@ -225,23 +225,10 @@ public class Method<T> extends Executable {
   }
 
   public Class<?>[] getExceptionTypes() {
-    if (vmMethod.addendum != null && vmMethod.addendum.exceptionTable != null) {
-      Object table = vmMethod.addendum.exceptionTable;
-      if (table instanceof Class<?>[]) {
-        return (Class<?>[]) table;
-      }
-      if (table instanceof Object[]) {
-        Object[] arr = (Object[]) table;
-        Class<?>[] classes = new Class<?>[arr.length];
-        for (int i = 0; i < arr.length; i++) {
-          if (arr[i] instanceof Class<?>) {
-            classes[i] = (Class<?>) arr[i];
-          } else if (arr[i] instanceof byte[]) {
-            byte[] bytes = (byte[]) arr[i];
-            classes[i] = Classes.forCanonicalName(vmMethod.class_.loader, Classes.makeString(bytes, 0, bytes.length));
-          }
-        }
-        return classes;
+    if (vmMethod != null) {
+      Class<?>[] types = Classes.getExceptionTypes(vmMethod);
+      if (types != null) {
+        return types;
       }
     }
     return new Class<?>[0];
@@ -297,5 +284,14 @@ public class Method<T> extends Executable {
       }
     }
     return sb.toString();
+  }
+
+  public Type getGenericReturnType() {
+    return getReturnType();
+  }
+
+  @Override
+  public AnnotatedType getAnnotatedReturnType() {
+    return new AnnotatedTypeImpl(getGenericReturnType());
   }
 }

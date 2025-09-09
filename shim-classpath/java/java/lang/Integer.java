@@ -30,6 +30,9 @@ public final class Integer extends Number implements Comparable<Integer>,
   public static final int MIN_VALUE = 0x80000000;
   public static final int MAX_VALUE = 0x7FFFFFFF;
 
+  public static final int SIZE = 32;
+  public static final int BYTES = 4;
+
   private final int value;
 
   public Integer(int value) {
@@ -130,11 +133,10 @@ public final class Integer extends Number implements Comparable<Integer>,
   }
 
   public static int reverseBytes(int v) {
-    int byte3 =  v >>> 24;
-    int byte2 = (v >>> 8) & 0xFF00;
-    int byte1 = (v <<  8) & 0xFF00;
-    int byte0 =  v << 24;
-    return (byte0 | byte1 | byte2 | byte3);
+    return (v >>> 24) |
+           ((v >> 8) & 0x0000FF00) |
+           ((v << 8) & 0x00FF0000) |
+           (v << 24);
   }
 
   public static int parseInt(String s) {
@@ -248,6 +250,26 @@ public final class Integer extends Number implements Comparable<Integer>,
 
   public static int numberOfTrailingZeros(int i) {
     return bitCount((i & -i) - 1);
+  }
+
+  public static int highestOneBit(int i) {
+    i |= (i >> 1);
+    i |= (i >> 2);
+    i |= (i >> 4);
+    i |= (i >> 8);
+    i |= (i >> 16);
+    return i - (i >>> 1);
+  }
+
+  public static int lowestOneBit(int i) {
+    return i & -i;
+  }
+
+  public static int reverse(int i) {
+    i = (i & 0x55555555) << 1 | (i >>> 1) & 0x55555555;
+    i = (i & 0x33333333) << 2 | (i >>> 2) & 0x33333333;
+    i = (i & 0x0f0f0f0f) << 4 | (i >>> 4) & 0x0f0f0f0f;
+    return reverseBytes(i);
   }
 
   @Override

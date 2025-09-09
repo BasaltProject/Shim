@@ -719,3 +719,17 @@ extern "C" SHIM_EXPORT int64_t JNICALL
                  cast<GcJclass>(t, reinterpret_cast<object>(arguments[0])),
                  arguments[1]));
 }
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_getExceptionTypes(Thread* t, object, uintptr_t* arguments)
+{
+  object m = reinterpret_cast<object>(arguments[0]);
+  if (m == 0) {
+    return reinterpret_cast<uintptr_t>(
+        makeObjectArray(t, type(t, GcJclass::Type), 0));
+  }
+  GcMethod* method = cast<GcMethod>(t, m);
+  GcClassLoader* loader = method->class_() ? method->class_()->loader() : roots(t)->bootLoader();
+  return reinterpret_cast<uintptr_t>(
+      resolveExceptionJTypes(t, loader, method->addendum()));
+}

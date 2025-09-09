@@ -125,4 +125,8 @@ public final class Parameter implements AnnotatedElement {
   public Annotation[] getDeclaredAnnotations() {
     return getAnnotations();
   }
+
+  public AnnotatedType getAnnotatedType() {
+    return new AnnotatedTypeImpl(getParameterizedType());
+  }
 }

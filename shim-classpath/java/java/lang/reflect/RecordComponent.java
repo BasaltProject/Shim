@@ -77,4 +77,8 @@ public final class RecordComponent implements AnnotatedElement {
   public String toString() {
     return type.getTypeName() + " " + name;
   }
+
+  public AnnotatedType getAnnotatedType() {
+    return new AnnotatedTypeImpl(type);
+  }
 }

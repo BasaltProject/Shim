@@ -33,8 +33,8 @@ public class URLClassLoader extends ClassLoader {
 
   private final File jarFile;
 
-  public URLClassLoader(URL[] urls, ClassLoader parent) {
-    super(parent);
+  public URLClassLoader(String name, URL[] urls, ClassLoader parent) {
+    super(name, parent);
     if(urls.length != 1) {
       throw new UnsupportedOperationException();
     }
@@ -42,6 +42,22 @@ public class URLClassLoader extends ClassLoader {
       throw new UnsupportedOperationException(urls[0].getProtocol());
     }
     this.jarFile = new File(urls[0].getFile());
+  }
+
+  public URLClassLoader(URL[] urls, ClassLoader parent) {
+    this(null, urls, parent);
+  }
+
+  public URLClassLoader(URL[] urls) {
+    this(urls, getSystemClassLoader());
+  }
+
+  public static URLClassLoader newInstance(final URL[] urls, final ClassLoader parent) {
+    return new URLClassLoader(urls, parent);
+  }
+
+  public static URLClassLoader newInstance(final URL[] urls) {
+    return new URLClassLoader(urls);
   }
 
 

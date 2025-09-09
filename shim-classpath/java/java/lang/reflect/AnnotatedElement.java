@@ -24,13 +24,51 @@
 package java.lang.reflect;
 
 import java.lang.annotation.Annotation;
+import java.util.Objects;
 
 public interface AnnotatedElement {
-  public boolean isAnnotationPresent(Class<? extends Annotation> class_);
+  public default boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+    return getAnnotation(annotationClass) != null;
+  }
 
-  public <T extends Annotation> T getAnnotation(Class<T> class_);
+  public <T extends Annotation> T getAnnotation(Class<T> annotationClass);
 
   public Annotation[] getAnnotations();
 
   public Annotation[] getDeclaredAnnotations();
+
+  @SuppressWarnings("unchecked")
+  public default <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
+    Objects.requireNonNull(annotationClass);
+    for (Annotation ann : getDeclaredAnnotations()) {
+      if (annotationClass.equals(ann.annotationType())) {
+        return (T) ann;
+      }
+    }
+    return null;
+  }
+
+  @SuppressWarnings("unchecked")
+  public default <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+    Objects.requireNonNull(annotationClass);
+    T direct = getAnnotation(annotationClass);
+    if (direct != null) {
+      T[] result = (T[]) Array.newInstance(annotationClass, 1);
+      result[0] = direct;
+      return result;
+    }
+    return (T[]) Array.newInstance(annotationClass, 0);
+  }
+
+  @SuppressWarnings("unchecked")
+  public default <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
+    Objects.requireNonNull(annotationClass);
+    T direct = getDeclaredAnnotation(annotationClass);
+    if (direct != null) {
+      T[] result = (T[]) Array.newInstance(annotationClass, 1);
+      result[0] = direct;
+      return result;
+    }
+    return (T[]) Array.newInstance(annotationClass, 0);
+  }
 }
