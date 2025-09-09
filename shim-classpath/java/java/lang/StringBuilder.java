@@ -417,4 +417,18 @@ public class StringBuilder implements CharSequence, Appendable, Comparable<Strin
   public int codePointCount(int start, int end) {
     return Character.codePointCount(this, start, end);
   }
+
+  public StringBuilder reverse() {
+    String s = toString();
+    char[] c = new char[s.length()];
+    for (int i = 0; i < c.length; i++) {
+      c[i] = s.charAt(c.length - 1 - i);
+    }
+    chain = null;
+    buffer = null;
+    position = 0;
+    length = 0;
+    append(new String(c));
+    return this;
+  }
 }

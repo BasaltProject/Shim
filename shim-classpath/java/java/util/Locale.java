@@ -26,6 +26,7 @@ package java.util;
 public class Locale {
   private static final Locale DEFAULT;
   public static final Locale ENGLISH = new Locale("en", "");
+  public static final Locale US = new Locale("en", "US");
   public static final Locale ROOT = new Locale("", "");
 
   private final String language;

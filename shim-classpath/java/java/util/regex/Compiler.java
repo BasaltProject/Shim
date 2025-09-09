@@ -373,10 +373,16 @@ class Compiler implements PikeVMOpcodes {
     }
   }
 
+  private final int flags;
   private Group0 root;
   private Stack<Group> groups;
 
   public Compiler() {
+    this(0);
+  }
+
+  public Compiler(int flags) {
+    this.flags = flags;
     root = new Group0();
     groups = new Stack<Group>();
     groups.add(root.group);
@@ -398,6 +404,35 @@ class Compiler implements PikeVMOpcodes {
         current.push(DOT);
         continue;
       case '\\':
+        if (index + 1 >= array.length) {
+          throw new PatternSyntaxException("Trailing backslash", regex, index);
+        }
+        switch (array[index + 1]) {
+        case 'b':
+          index++;
+          current.push(WORD_BOUNDARY);
+          continue;
+        case 'B':
+          index++;
+          current.push(NON_WORD_BOUNDARY);
+          continue;
+        case 'Q': {
+          index += 2;
+          while (index < array.length) {
+            if (array[index] == '\\' && index + 1 < array.length && array[index + 1] == 'E') {
+              index++;
+              break;
+            }
+            current.push(array[index]);
+            index++;
+          }
+          continue;
+        }
+        case 'E': {
+          index++;
+          continue;
+        }
+        }
         int unescaped = characterClassParser.parseEscapedCharacter(index + 1);
         if (unescaped >= 0) {
           index = characterClassParser.getEndOffset() - 1;
@@ -410,17 +445,7 @@ class Compiler implements PikeVMOpcodes {
           current.push(new CharacterRange(characterClass));
           continue;
         }
-        switch (array[index + 1]) {
-        case 'b':
-          index++;
-          current.push(WORD_BOUNDARY);
-          continue;
-        case 'B':
-          index++;
-          current.push(NON_WORD_BOUNDARY);
-          continue;
-        }
-        throw new RuntimeException("Parse error @" + index + ": " + regex);
+        throw new PatternSyntaxException("Parse error", regex, index);
       case '?':
       case '*':
       case '+': {
@@ -449,8 +474,7 @@ class Compiler implements PikeVMOpcodes {
           c = index + 1< array.length ? array[index + 1] : 0;
         }
         if (c != '}') {
-          throw new RuntimeException("Invalid quantifier @" + index + ": "
-              + regex);
+          throw new PatternSyntaxException("Invalid quantifier", regex, index);
         }
         ++ index;
         boolean greedy = true;
@@ -466,21 +490,18 @@ class Compiler implements PikeVMOpcodes {
         if (index + 1 < array.length && array[index + 1] == '?') {
           index += 2;
           if (index >= array.length) {
-            throw new RuntimeException("Short pattern @" + index + ": "
-              + regex);
+            throw new PatternSyntaxException("Short pattern", regex, index);
           }
           c = array[index];
           boolean lookAhead = true;
           if (c == '<') {
             if (++ index >= array.length) {
-              throw new RuntimeException("Short pattern @" + index + ": "
-                + regex);
+              throw new PatternSyntaxException("Short pattern", regex, index);
             }
             lookAhead = false;
             c = array[index];
             if (c != '=' && c != '!') {
-              throw new IllegalArgumentException("Named groups not supported @"
-                + index + ": " + regex);
+              throw new PatternSyntaxException("Named groups not supported", regex, index);
             }
           }
           switch (c) {
@@ -496,8 +517,7 @@ class Compiler implements PikeVMOpcodes {
             continue;
           }
           default:
-            throw new UnsupportedOperationException("Not yet supported: "
-              + regex.substring(index));
+            throw new PatternSyntaxException("Not yet supported", regex, index);
           }
         }
         current.push(groups.push(new Group(capturing, null)));
@@ -505,15 +525,14 @@ class Compiler implements PikeVMOpcodes {
       }
       case ')':
         if (groups.size() < 2) {
-          throw new RuntimeException("Invalid group close @" + index + ": "
-            + regex);
+          throw new PatternSyntaxException("Invalid group close", regex, index);
         }
         groups.pop();
         continue;
       case '[': {
         CharacterMatcher matcher = characterClassParser.parseClass(index);
         if (matcher == null) {
-          throw new RuntimeException("Invalid range @" + index + ": " + regex);
+          throw new PatternSyntaxException("Invalid range", regex, index);
         }
         current.push(new CharacterRange(matcher));
         index = characterClassParser.getEndOffset() - 1;
@@ -529,18 +548,17 @@ class Compiler implements PikeVMOpcodes {
         current.push(LINE_END);
         continue;
       default:
-        throw new RuntimeException("Parse error @" + index + ": " + regex);
+        throw new PatternSyntaxException("Parse error", regex, index);
       }
     }
     if (groups.size() != 1) {
-      throw new IllegalArgumentException("Unclosed groups: ("
-        + (groups.size() - 1) + "): " + regex);
+      throw new PatternSyntaxException("Unclosed group", regex, regex.length());
     }
     PikeVM vm = new Output(root).toVM();
     String plain = vm.isPlainString();
     if (plain != null) {
-      return new TrivialPattern(regex, plain, 0);
+      return new TrivialPattern(regex, plain, flags);
     }
-    return new RegexPattern(regex, 0, vm);
+    return new RegexPattern(regex, flags, vm);
   }
 }

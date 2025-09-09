@@ -47,15 +47,19 @@ public class RegexMatcher extends Matcher {
     }
   };
 
+  @Override
   public Matcher reset() {
+    super.reset();
     start = end = -1;
     return this;
   }
 
+  @Override
   public Matcher reset(CharSequence input) {
-    this.input = input;
-    array = input.toString().toCharArray();
-    return reset();
+    super.reset(input);
+    this.array = input != null ? input.toString().toCharArray() : null;
+    start = end = -1;
+    return this;
   }
 
   public boolean matches() {

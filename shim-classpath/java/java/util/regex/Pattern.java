@@ -23,16 +23,16 @@
 
 package java.util.regex;
 
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
-/**
- * This is a work in progress.
- * 
- * @author zsombor and others
- * 
- */
-public abstract class Pattern implements PikeVMOpcodes {
+public abstract class Pattern implements PikeVMOpcodes, Serializable {
+  private static final long serialVersionUID = 5073258162644648461L;
 
   public static final int UNIX_LINES       = 1;
   public static final int CASE_INSENSITIVE = 2;
@@ -56,10 +56,17 @@ public abstract class Pattern implements PikeVMOpcodes {
   }
 
   public static Pattern compile(String regex, int flags) {
-    if (flags != 0) {
-      throw new UnsupportedOperationException("TODO");
+    Objects.requireNonNull(regex, "regex");
+    if ((flags & LITERAL) != 0) {
+      return new TrivialPattern(regex, regex, flags);
     }
-    return new Compiler().compile(regex);
+    try {
+      return new Compiler(flags).compile(regex);
+    } catch (PatternSyntaxException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw new PatternSyntaxException(e.getMessage() != null ? e.getMessage() : "Syntax error", regex, -1);
+    }
   }
 
   public int flags() {
@@ -74,6 +81,37 @@ public abstract class Pattern implements PikeVMOpcodes {
 
   public String pattern() {
     return pattern;
+  }
+
+  public static String quote(String s) {
+    Objects.requireNonNull(s, "s");
+    int slashEIndex = s.indexOf("\\E");
+    if (slashEIndex == -1) {
+      return "\\Q" + s + "\\E";
+    }
+    StringBuilder sb = new StringBuilder(s.length() * 2);
+    sb.append("\\Q");
+    int current = 0;
+    while ((slashEIndex = s.indexOf("\\E", current)) != -1) {
+      sb.append(s, current, slashEIndex);
+      current = slashEIndex + 2;
+      sb.append("\\E\\\\E\\Q");
+    }
+    sb.append(s, current, s.length());
+    sb.append("\\E");
+    return sb.toString();
+  }
+
+  public Predicate<String> asPredicate() {
+    return s -> matcher(s).find();
+  }
+
+  public Predicate<String> asMatchPredicate() {
+    return s -> matcher(s).matches();
+  }
+
+  public Stream<String> splitAsStream(CharSequence input) {
+    return Arrays.stream(split(input));
   }
 
   public String[] split(CharSequence input) {
@@ -98,5 +136,10 @@ public abstract class Pattern implements PikeVMOpcodes {
       result.add(input.subSequence(offset, input.length()).toString());
     }
     return result.toArray(new String[result.size()]);
+  }
+
+  @Override
+  public String toString() {
+    return pattern;
   }
 }

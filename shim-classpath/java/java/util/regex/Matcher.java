@@ -23,15 +23,18 @@
 
 package java.util.regex;
 
-/**
- * This is a work in progress.
- * 
- * @author zsombor and others
- */
-public abstract class Matcher {
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Stream;
+
+public abstract class Matcher implements MatchResult {
   protected CharSequence input;
   protected int start;
   protected int end;
+  private int lastAppendPosition = 0;
 
   public Matcher(CharSequence input) {
     reset(input);
@@ -51,8 +54,9 @@ public abstract class Matcher {
 
   public Matcher reset(CharSequence input) {
     this.input = input;
-    start = 0;
-    end = 0;
+    this.start = 0;
+    this.end = 0;
+    this.lastAppendPosition = 0;
     return this;
   }
 
@@ -62,6 +66,143 @@ public abstract class Matcher {
 
   public String replaceFirst(String replacement) {
     return replace(replacement, 1);
+  }
+
+  public String replaceAll(Function<MatchResult, String> replacer) {
+    Objects.requireNonNull(replacer, "replacer");
+    reset();
+    StringBuilder sb = new StringBuilder();
+    while (find()) {
+      String repl = replacer.apply(this);
+      sb.append(input.subSequence(lastAppendPosition, start));
+      sb.append(repl);
+      lastAppendPosition = end;
+    }
+    appendTail(sb);
+    return sb.toString();
+  }
+
+  public String replaceFirst(Function<MatchResult, String> replacer) {
+    Objects.requireNonNull(replacer, "replacer");
+    reset();
+    if (!find()) {
+      return input.toString();
+    }
+    StringBuilder sb = new StringBuilder();
+    String repl = replacer.apply(this);
+    sb.append(input.subSequence(lastAppendPosition, start));
+    sb.append(repl);
+    lastAppendPosition = end;
+    appendTail(sb);
+    return sb.toString();
+  }
+
+  public Stream<MatchResult> results() {
+    List<MatchResult> list = new ArrayList<>();
+    reset();
+    while (find()) {
+      list.add(toMatchResult());
+    }
+    return list.stream();
+  }
+
+  public MatchResult toMatchResult() {
+    final int s = start();
+    final int e = end();
+    final String g = group();
+    final int gc = groupCount();
+    return new MatchResult() {
+      @Override
+      public int start() {
+        return s;
+      }
+
+      @Override
+      public int start(int group) {
+        return group == 0 ? s : Matcher.this.start(group);
+      }
+
+      @Override
+      public int end() {
+        return e;
+      }
+
+      @Override
+      public int end(int group) {
+        return group == 0 ? e : Matcher.this.end(group);
+      }
+
+      @Override
+      public String group() {
+        return g;
+      }
+
+      @Override
+      public String group(int group) {
+        return group == 0 ? g : Matcher.this.group(group);
+      }
+
+      @Override
+      public int groupCount() {
+        return gc;
+      }
+    };
+  }
+
+  public Matcher appendReplacement(StringBuffer sb, String replacement) {
+    sb.append(input.subSequence(lastAppendPosition, start));
+    appendExpandedReplacement(sb, replacement);
+    lastAppendPosition = end;
+    return this;
+  }
+
+  public Matcher appendReplacement(StringBuilder sb, String replacement) {
+    sb.append(input.subSequence(lastAppendPosition, start));
+    appendExpandedReplacement(sb, replacement);
+    lastAppendPosition = end;
+    return this;
+  }
+
+  public StringBuffer appendTail(StringBuffer sb) {
+    sb.append(input.subSequence(lastAppendPosition, input.length()));
+    return sb;
+  }
+
+  public StringBuilder appendTail(StringBuilder sb) {
+    sb.append(input.subSequence(lastAppendPosition, input.length()));
+    return sb;
+  }
+
+  private void appendExpandedReplacement(Appendable sb, String replacement) {
+    try {
+      int cursor = 0;
+      int len = replacement.length();
+      while (cursor < len) {
+        char c = replacement.charAt(cursor);
+        if (c == '\\') {
+          cursor++;
+          if (cursor < len) {
+            sb.append(replacement.charAt(cursor++));
+          }
+        } else if (c == '$') {
+          cursor++;
+          if (cursor < len && replacement.charAt(cursor) >= '0' && replacement.charAt(cursor) <= '9') {
+            int g = replacement.charAt(cursor++) - '0';
+            String grp = group(g);
+            if (grp != null) {
+              sb.append(grp);
+            }
+          } else {
+            sb.append('$');
+          }
+        } else {
+          sb.append(c);
+          cursor++;
+        }
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   protected String replace(String replacement, int limit) {
@@ -80,12 +221,15 @@ public abstract class Matcher {
         }
         sb.append(replacement);
         index = end;
-        ++ count;
+        ++count;
       } else if (index == 0) {
         return input.toString();
       } else {
         break;
       }
+    }
+    if (sb == null) {
+      return input.toString();
     }
     if (index < input.length()) {
       sb.append(input.subSequence(index, input.length()));
@@ -93,18 +237,22 @@ public abstract class Matcher {
     return sb.toString();
   }
 
+  @Override
   public int start() {
     return start;
   }
 
+  @Override
   public int end() {
     return end;
   }
 
+  @Override
   public String group() {
     return input.subSequence(start, end).toString();
   }
 
+  @Override
   public int start(int group) {
     if (group == 0) {
       return start();
@@ -112,6 +260,7 @@ public abstract class Matcher {
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public int end(int group) {
     if (group == 0) {
       return end();
@@ -119,6 +268,7 @@ public abstract class Matcher {
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public String group(int group) {
     if (group == 0) {
       return group();
@@ -126,6 +276,7 @@ public abstract class Matcher {
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public int groupCount() {
     return 0;
   }

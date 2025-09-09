@@ -41,6 +41,14 @@ public class TimeZone {
     return GMT;
   }
 
+  public static TimeZone getDefault() {
+    return GMT;
+  }
+
+  public String getID() {
+    return name;
+  }
+
   public String getDisplayName() {
     return name;
   }

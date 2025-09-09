@@ -363,27 +363,11 @@ class PikeVM implements PikeVMOpcodes {
         case NON_WORD_BOUNDARY: {
           int i2 = i - step;
           int c2 = i2 < 0 || i2 >= characters.length ? -1 : characters[i2];
-          switch (opcode) {
-          case WORD_BOUNDARY:
-            if ((c2 < 0 || !wordCharacter.matches((char)c2))) {
-              if (wordCharacter.matches(c)) {
-                current.queueImmediately(pc, pc + 1, false);
-              }
-            } else if (i >= 0 && i < characters.length &&
-                !wordCharacter.matches(c)) {
-              current.queueImmediately(pc, pc + 1, false);
-            }
-            break;
-          case NON_WORD_BOUNDARY:
-            if ((c2 < 0 || !wordCharacter.matches((char)c2))) {
-              if (i >= 0 && i < characters.length &&
-                  !wordCharacter.matches(c)) {
-                current.queueImmediately(pc, pc + 1, false);
-              }
-            } else if (wordCharacter.matches(c)) {
-              current.queueImmediately(pc, pc + 1, false);
-            }
-            break;
+          boolean prevIsWord = (c2 >= 0 && wordCharacter.matches((char)c2));
+          boolean currIsWord = (i >= 0 && i < characters.length && wordCharacter.matches(c));
+          boolean isBoundary = prevIsWord ^ currIsWord;
+          if (opcode == WORD_BOUNDARY ? isBoundary : !isBoundary) {
+            current.queueImmediately(pc, pc + 1, false);
           }
           break;
         }

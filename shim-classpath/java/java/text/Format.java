@@ -23,11 +23,35 @@
 
 package java.text;
 
-public abstract class Format {
+import java.io.Serializable;
+
+public abstract class Format implements Serializable, Cloneable {
+  private static final long serialVersionUID = -2866970561809722305L;
+
   public final String format(Object o) {
     return format(o, new StringBuffer(), new FieldPosition(0)).toString();
   }
 
   public abstract StringBuffer format(Object o, StringBuffer target,
                                       FieldPosition p);
+
+  public Object parseObject(String source) throws ParseException {
+    ParsePosition pos = new ParsePosition(0);
+    Object result = parseObject(source, pos);
+    if (pos.getIndex() == 0) {
+      throw new ParseException("Format.parseObject(String) failed", pos.getErrorIndex());
+    }
+    return result;
+  }
+
+  public abstract Object parseObject(String source, ParsePosition pos);
+
+  @Override
+  public Object clone() {
+    try {
+      return super.clone();
+    } catch (CloneNotSupportedException e) {
+      throw new InternalError(e);
+    }
+  }
 }
