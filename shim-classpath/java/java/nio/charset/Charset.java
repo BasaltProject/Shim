@@ -105,6 +105,10 @@ public abstract class Charset implements Comparable<Charset> {
     return true;
   }
 
+  public abstract CharsetDecoder newDecoder();
+
+  public abstract CharsetEncoder newEncoder();
+
   public ByteBuffer encode(String str) {
     byte[] bytes;
     try {

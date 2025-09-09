@@ -61,7 +61,12 @@ public class DirectByteBuffer extends ByteBuffer {
   }
 
   public ByteBuffer slice() {
-    return new DirectByteBuffer(address + position, remaining(), true);
+    return new DirectByteBuffer(address + position, remaining(), isReadOnly());
+  }
+
+  public ByteBuffer slice(int index, int length) {
+    java.util.Objects.checkFromIndexSize(index, length, limit());
+    return new DirectByteBuffer(address + index, length, isReadOnly());
   }
 
   protected void doPut(int position, byte val) {
@@ -110,6 +115,8 @@ public class DirectByteBuffer extends ByteBuffer {
 
     unsafe.copyMemory
       (null, address + position, dst, baseOffset + offset, length);
+
+    position += length;
 
     return this;
   }

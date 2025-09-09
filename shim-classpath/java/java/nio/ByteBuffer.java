@@ -51,7 +51,9 @@ public abstract class ByteBuffer
   public abstract ByteBuffer asReadOnlyBuffer();
 
   public abstract ByteBuffer slice();
-  
+
+  public abstract ByteBuffer slice(int index, int length);
+
   public abstract ByteBuffer duplicate();
 
   public abstract boolean isDirect();
@@ -348,5 +350,122 @@ public abstract class ByteBuffer
 
   public ByteOrder order() {
     return ByteOrder.BIG_ENDIAN;
+  }
+
+  @Override
+  public ByteBuffer position(int newPosition) {
+    super.position(newPosition);
+    return this;
+  }
+
+  @Override
+  public ByteBuffer limit(int newLimit) {
+    super.limit(newLimit);
+    return this;
+  }
+
+  @Override
+  public ByteBuffer mark() {
+    super.mark();
+    return this;
+  }
+
+  @Override
+  public ByteBuffer reset() {
+    super.reset();
+    return this;
+  }
+
+  @Override
+  public ByteBuffer clear() {
+    super.clear();
+    return this;
+  }
+
+  @Override
+  public ByteBuffer flip() {
+    super.flip();
+    return this;
+  }
+
+  @Override
+  public ByteBuffer rewind() {
+    super.rewind();
+    return this;
+  }
+
+  public int mismatch(ByteBuffer that) {
+    int length = Math.min(this.remaining(), that.remaining());
+    int p1 = this.position();
+    int p2 = that.position();
+    for (int i = 0; i < length; ++i) {
+      if (this.get(p1 + i) != that.get(p2 + i)) {
+        return i;
+      }
+    }
+    return this.remaining() != that.remaining() ? length : -1;
+  }
+
+  public ByteBuffer get(int index, byte[] dst, int offset, int length) {
+    java.util.Objects.checkFromIndexSize(index, length, limit());
+    java.util.Objects.checkFromIndexSize(offset, length, dst.length);
+    for (int i = 0; i < length; ++i) {
+      dst[offset + i] = get(index + i);
+    }
+    return this;
+  }
+
+  public ByteBuffer get(int index, byte[] dst) {
+    return get(index, dst, 0, dst.length);
+  }
+
+  public ByteBuffer put(int index, byte[] src, int offset, int length) {
+    if (isReadOnly()) throw new ReadOnlyBufferException();
+    java.util.Objects.checkFromIndexSize(index, length, limit());
+    java.util.Objects.checkFromIndexSize(offset, length, src.length);
+    for (int i = 0; i < length; ++i) {
+      put(index + i, src[offset + i]);
+    }
+    return this;
+  }
+
+  public ByteBuffer put(int index, byte[] src) {
+    return put(index, src, 0, src.length);
+  }
+
+  public ByteBuffer put(int index, ByteBuffer src, int offset, int length) {
+    if (isReadOnly()) throw new ReadOnlyBufferException();
+    java.util.Objects.checkFromIndexSize(index, length, limit());
+    java.util.Objects.checkFromIndexSize(offset, length, src.limit());
+    for (int i = 0; i < length; ++i) {
+      put(index + i, src.get(offset + i));
+    }
+    return this;
+  }
+
+  public char getChar() {
+    return (char) getShort();
+  }
+
+  public char getChar(int index) {
+    return (char) getShort(index);
+  }
+
+  public ByteBuffer putChar(char value) {
+    return putShort((short) value);
+  }
+
+  public ByteBuffer putChar(int index, char value) {
+    return putShort(index, (short) value);
+  }
+
+  public final int alignmentOffset(int index, int unitSize) {
+    if (index < 0) throw new IndexOutOfBoundsException("index < 0: " + index);
+    if (unitSize <= 0 || (unitSize & (unitSize - 1)) != 0) {
+      throw new IllegalArgumentException("unitSize not a power of 2: " + unitSize);
+    }
+    long base = (isDirect() && (this instanceof DirectByteBuffer))
+      ? ((DirectByteBuffer) this).address() : 0;
+    return (int) ((base + index) & (unitSize - 1));
   }
 }
