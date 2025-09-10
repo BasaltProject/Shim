@@ -199,6 +199,36 @@ public class MethodHandles {
     return new MethodHandle.ArrayElementSetterMethodHandle(arrayClass);
   }
 
+  public static MethodHandle collectArguments(MethodHandle target, int pos, MethodHandle filter) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(filter, "filter");
+    return new MethodHandle.CollectArgumentsMethodHandle(target, pos, filter);
+  }
+
+  public static MethodHandle exactInvoker(MethodType type) {
+    Objects.requireNonNull(type, "type");
+    return new MethodHandle.ExactInvokerMethodHandle(type);
+  }
+
+  public static MethodHandle invoker(MethodType type) {
+    return exactInvoker(type);
+  }
+
+  public static MethodHandle spreadInvoker(MethodType type, int leadingArgCount) {
+    Objects.requireNonNull(type, "type");
+    if (leadingArgCount < 0 || leadingArgCount > type.parameterCount()) {
+      throw new IllegalArgumentException("bad argument count");
+    }
+    MethodHandle invoker = exactInvoker(type);
+    int spreadArgCount = type.parameterCount() - leadingArgCount;
+    return invoker.asSpreader(Object[].class, spreadArgCount);
+  }
+
+  public static MethodHandle guardWithTest(SwitchPoint switchPoint, MethodHandle target, MethodHandle fallback) {
+    Objects.requireNonNull(switchPoint, "switchPoint");
+    return switchPoint.guardWithTest(target, fallback);
+  }
+
   public static Lookup privateLookupIn(Class<?> targetClass, Lookup lookup) throws IllegalAccessException {
     Objects.requireNonNull(targetClass);
     Objects.requireNonNull(lookup);

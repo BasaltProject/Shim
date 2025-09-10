@@ -23,18 +23,28 @@
 
 package java.lang.invoke;
 
-public abstract class CallSite {
-  private final MethodHandle target;
+import java.util.Objects;
 
-  protected CallSite(MethodHandle target) {
-    if (target == null) {
-      throw new NullPointerException();
-    }
-    this.target = target;
+public abstract class CallSite {
+  final MethodType type;
+  volatile MethodHandle target;
+
+  CallSite(MethodType type) {
+    this.type = Objects.requireNonNull(type, "type");
+    this.target = null;
+  }
+
+  CallSite(MethodHandle target) {
+    this.target = Objects.requireNonNull(target, "target");
+    this.type = target.type();
   }
 
   protected final MethodHandle target() {
     return target;
+  }
+
+  public MethodType type() {
+    return type != null ? type : (target != null ? target.type() : null);
   }
 
   public abstract MethodHandle getTarget();
@@ -42,4 +52,17 @@ public abstract class CallSite {
   public abstract void setTarget(MethodHandle target);
 
   public abstract MethodHandle dynamicInvoker();
+
+  void checkTargetChange(MethodHandle oldTarget, MethodHandle newTarget) {
+    Objects.requireNonNull(newTarget, "newTarget");
+    MethodType expectedType = type();
+    if (!newTarget.type().equals(expectedType)) {
+      throw new WrongMethodTypeException("target and call site types do not match: "
+          + newTarget.type() + " vs " + expectedType);
+    }
+  }
+
+  MethodHandle makeDynamicInvoker() {
+    return new MethodHandle.DynamicInvokerMethodHandle(this);
+  }
 }
