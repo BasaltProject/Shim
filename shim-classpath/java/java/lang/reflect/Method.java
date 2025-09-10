@@ -287,7 +287,58 @@ public class Method<T> extends Executable {
   }
 
   public Type getGenericReturnType() {
+    if (vmMethod.addendum != null && vmMethod.addendum.signature != null) {
+      String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
+      try {
+        SignatureParser.MethodSignature ms =
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+        return ms.returnType;
+      } catch (Exception ignored) {
+      }
+    }
     return getReturnType();
+  }
+
+  @Override
+  public Type[] getGenericParameterTypes() {
+    if (vmMethod.addendum != null && vmMethod.addendum.signature != null) {
+      String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
+      try {
+        SignatureParser.MethodSignature ms =
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+        return ms.parameterTypes;
+      } catch (Exception ignored) {
+      }
+    }
+    return getParameterTypes();
+  }
+
+  @Override
+  public Type[] getGenericExceptionTypes() {
+    if (vmMethod.addendum != null && vmMethod.addendum.signature != null) {
+      String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
+      try {
+        SignatureParser.MethodSignature ms =
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+        return ms.exceptionTypes;
+      } catch (Exception ignored) {
+      }
+    }
+    return getExceptionTypes();
+  }
+
+  @Override
+  public TypeVariable<?>[] getTypeParameters() {
+    if (vmMethod.addendum != null && vmMethod.addendum.signature != null) {
+      String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
+      try {
+        SignatureParser.MethodSignature ms =
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+        return ms.typeParameters;
+      } catch (Exception ignored) {
+      }
+    }
+    return new TypeVariable<?>[0];
   }
 
   @Override
