@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.stream.Stream;
@@ -75,6 +76,19 @@ public final class Files {
       throw new NoSuchFileException(path.toString());
     }
     return new FileOutputStream(f, append);
+  }
+
+  public static java.nio.channels.SeekableByteChannel newByteChannel(Path path, OpenOption... options)
+      throws IOException
+  {
+    return java.nio.channels.FileChannel.open(path, options);
+  }
+
+  public static java.nio.channels.SeekableByteChannel newByteChannel(
+      Path path, Set<? extends OpenOption> options, java.nio.file.attribute.FileAttribute<?>... attrs)
+      throws IOException
+  {
+    return java.nio.channels.FileChannel.open(path, options, attrs);
   }
 
   public static BufferedReader newBufferedReader(Path path, Charset cs) throws IOException {

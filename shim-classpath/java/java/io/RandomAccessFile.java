@@ -227,8 +227,26 @@ public class RandomAccessFile implements DataInput, Closeable {
   }
 
   public void write(int b) throws IOException {
-    int count = writeBytes(peer, position, new byte[] { (byte)b }, 0, 1);
-    if (count > 0) position += count;
+    write(new byte[] { (byte) b }, 0, 1);
+  }
+
+  public void write(byte[] b) throws IOException {
+    if (b == null) throw new NullPointerException();
+    write(b, 0, b.length);
+  }
+
+  public void write(byte[] b, int off, int len) throws IOException {
+    if (b == null) throw new NullPointerException();
+    if (off < 0 || len < 0 || off + len > b.length) throw new IndexOutOfBoundsException();
+    if (len == 0) return;
+    if (peer == 0) throw new IOException("closed");
+    int count = writeBytes(peer, position, b, off, len);
+    if (count > 0) {
+      position += count;
+      if (position > length) {
+        length = position;
+      }
+    }
   }
 
   private static native int writeBytes(long peer, long position, byte[] buffer,
@@ -243,53 +261,36 @@ public class RandomAccessFile implements DataInput, Closeable {
 
   private static native void close(long peer);
 
+  public boolean isWritable() {
+    return allowWrite;
+  }
+
+  public void setLength(long newLength) throws IOException {
+    if (newLength < 0) throw new IllegalArgumentException("Negative length: " + newLength);
+    if (peer == 0) throw new IOException("closed");
+    setLength(peer, newLength);
+    this.length = newLength;
+    if (this.position > newLength) {
+      this.position = newLength;
+    }
+  }
+
+  private static native void setLength(long peer, long length) throws IOException;
+
+  public void sync() throws IOException {
+    if (peer == 0) throw new IOException("closed");
+    sync(peer);
+  }
+
+  private static native void sync(long peer) throws IOException;
+
+  public FileDescriptor getFD() throws IOException {
+    if (peer == 0) throw new IOException("closed");
+    return new FileDescriptor((int) peer);
+  }
+
   public FileChannel getChannel() {
-    return new FileChannel() {
-      public void close() {
-        if (peer != 0) RandomAccessFile.close(peer);
-      }
-
-      public boolean isOpen() {
-        return peer != 0;
-      }
-
-      public int read(ByteBuffer dst, long position) throws IOException {
-        if (!dst.hasArray()) throw new IOException("Cannot handle " + dst.getClass());
-	// TODO: this needs to be synchronized on the Buffer, no?
-        byte[] array = dst.array();
-        return readBytes(peer, position, array, dst.position(), dst.remaining());
-      }
-
-      public int read(ByteBuffer dst) throws IOException {
-        int count = read(dst, position);
-        if (count > 0) position += count;
-        return count;
-      }
-
-      public int write(ByteBuffer src, long position) throws IOException {
-        if (!src.hasArray()) throw new IOException("Cannot handle " + src.getClass());
-        byte[] array = src.array();
-        return writeBytes(peer, position, array, src.position(), src.remaining());
-      }
-
-      public int write(ByteBuffer src) throws IOException {
-        int count = write(src, position);
-        if (count > 0) position += count;
-        return count;
-      }
-
-      public long position() throws IOException {
-        return getFilePointer();
-      }
-
-      public FileChannel position(long position) throws IOException {
-        seek(position);
-        return this;
-      }
-
-      public long size() throws IOException {
-        return length();
-      }
-    };
+    return new java.nio.channels.FileChannelImpl(this, true, allowWrite, false);
   }
 }
+

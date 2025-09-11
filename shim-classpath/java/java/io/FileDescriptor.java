@@ -37,4 +37,13 @@ public class FileDescriptor {
   public FileDescriptor() {
     this(-1);
   }
+
+  public boolean valid() {
+    return value != -1;
+  }
+
+  public void sync() throws SyncFailedException {
+    // No-op or native sync
+  }
 }
+

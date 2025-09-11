@@ -33,7 +33,8 @@ public class SelectionKey {
   private final Selector selector;
   private int interestOps;
   private int readyOps;
-  private final Object attachment;
+  private Object attachment;
+  private volatile boolean valid = true;
 
   public SelectionKey(SelectableChannel channel, Selector selector,
                       int interestOps, Object attachment)
@@ -52,6 +53,22 @@ public class SelectionKey {
   public SelectionKey interestOps(int v) {
     this.interestOps = v;
     return this;
+  }
+
+  public int interestOpsOr(int ops) {
+    synchronized (this) {
+      int old = interestOps();
+      interestOps(old | ops);
+      return old;
+    }
+  }
+
+  public int interestOpsAnd(int ops) {
+    synchronized (this) {
+      int old = interestOps();
+      interestOps(old & ops);
+      return old;
+    }
   }
 
   public int readyOps() {
@@ -79,7 +96,14 @@ public class SelectionKey {
   }
 
   public boolean isValid() {
-    return channel.isOpen() && selector.isOpen();
+    return valid && channel.isOpen() && selector.isOpen();
+  }
+
+  public void cancel() {
+    if (valid) {
+      valid = false;
+      selector.remove(this);
+    }
   }
 
   public SelectableChannel channel() {
@@ -92,5 +116,11 @@ public class SelectionKey {
 
   public Object attachment() {
     return attachment;
+  }
+
+  public final Object attach(Object ob) {
+    Object old = attachment;
+    attachment = ob;
+    return old;
   }
 }
