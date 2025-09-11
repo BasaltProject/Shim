@@ -1,0 +1,465 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ *
+ * Licensed under the MIT License; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package java.net.http;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Authenticator;
+import java.net.CookieHandler;
+import java.net.HttpURLConnection;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Flow;
+import java.util.concurrent.ForkJoinPool;
+
+public abstract class HttpClient implements AutoCloseable {
+
+  protected HttpClient() {}
+
+  public enum Version {
+    HTTP_1_1, HTTP_2
+  }
+
+  public enum Redirect {
+    NEVER, ALWAYS, NORMAL
+  }
+
+  public interface Builder {
+    Builder cookieHandler(CookieHandler cookieHandler);
+    Builder connectTimeout(Duration duration);
+    Builder followRedirects(Redirect policy);
+    Builder version(Version version);
+    Builder priority(int priority);
+    Builder proxy(ProxySelector proxySelector);
+    Builder authenticator(Authenticator authenticator);
+    Builder executor(Executor executor);
+    HttpClient build();
+  }
+
+  public static HttpClient newHttpClient() {
+    return newBuilder().build();
+  }
+
+  public static Builder newBuilder() {
+    return new BuilderImpl();
+  }
+
+  public abstract Optional<CookieHandler> cookieHandler();
+  public abstract Optional<Duration> connectTimeout();
+  public abstract Redirect followRedirects();
+  public abstract Optional<ProxySelector> proxy();
+  public abstract Optional<Authenticator> authenticator();
+  public abstract Version version();
+  public abstract Optional<Executor> executor();
+
+  public abstract <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler)
+      throws IOException, InterruptedException;
+
+  public abstract <T> CompletableFuture<HttpResponse<T>> sendAsync(
+      HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler);
+
+  public <T> CompletableFuture<HttpResponse<T>> sendAsync(
+      HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler, HttpResponse.PushPromiseHandler<T> pushPromiseHandler)
+  {
+    return sendAsync(request, responseBodyHandler);
+  }
+
+  public WebSocket.Builder newWebSocketBuilder() {
+    throw new UnsupportedOperationException("WebSocket builder not supported");
+  }
+
+  @Override
+  public void close() {
+    shutdown();
+  }
+
+  public void shutdown() {}
+
+  public void shutdownNow() {}
+
+  public boolean awaitTermination(Duration duration) throws InterruptedException {
+    return true;
+  }
+
+  public boolean isTerminated() {
+    return true;
+  }
+
+  private static class BuilderImpl implements Builder {
+    private CookieHandler cookieHandler;
+    private Duration connectTimeout;
+    private Redirect followRedirects = Redirect.NEVER;
+    private Version version = Version.HTTP_2;
+    private int priority;
+    private ProxySelector proxySelector;
+    private Authenticator authenticator;
+    private Executor executor;
+
+    @Override
+    public Builder cookieHandler(CookieHandler cookieHandler) {
+      this.cookieHandler = Objects.requireNonNull(cookieHandler);
+      return this;
+    }
+
+    @Override
+    public Builder connectTimeout(Duration duration) {
+      this.connectTimeout = Objects.requireNonNull(duration);
+      return this;
+    }
+
+    @Override
+    public Builder followRedirects(Redirect policy) {
+      this.followRedirects = Objects.requireNonNull(policy);
+      return this;
+    }
+
+    @Override
+    public Builder version(Version version) {
+      this.version = Objects.requireNonNull(version);
+      return this;
+    }
+
+    @Override
+    public Builder priority(int priority) {
+      if (priority < 1 || priority > 256) throw new IllegalArgumentException();
+      this.priority = priority;
+      return this;
+    }
+
+    @Override
+    public Builder proxy(ProxySelector proxySelector) {
+      this.proxySelector = Objects.requireNonNull(proxySelector);
+      return this;
+    }
+
+    @Override
+    public Builder authenticator(Authenticator authenticator) {
+      this.authenticator = Objects.requireNonNull(authenticator);
+      return this;
+    }
+
+    @Override
+    public Builder executor(Executor executor) {
+      this.executor = Objects.requireNonNull(executor);
+      return this;
+    }
+
+    @Override
+    public HttpClient build() {
+      return new HttpClientImpl(this);
+    }
+  }
+
+  private static class HttpClientImpl extends HttpClient {
+    private final Optional<CookieHandler> cookieHandler;
+    private final Optional<Duration> connectTimeout;
+    private final Redirect followRedirects;
+    private final Version version;
+    private final Optional<ProxySelector> proxy;
+    private final Optional<Authenticator> authenticator;
+    private final Optional<Executor> executor;
+
+    HttpClientImpl(BuilderImpl b) {
+      this.cookieHandler = Optional.ofNullable(b.cookieHandler);
+      this.connectTimeout = Optional.ofNullable(b.connectTimeout);
+      this.followRedirects = b.followRedirects;
+      this.version = b.version;
+      this.proxy = Optional.ofNullable(b.proxySelector);
+      this.authenticator = Optional.ofNullable(b.authenticator);
+      this.executor = Optional.ofNullable(b.executor);
+    }
+
+    @Override
+    public Optional<CookieHandler> cookieHandler() {
+      return cookieHandler;
+    }
+
+    @Override
+    public Optional<Duration> connectTimeout() {
+      return connectTimeout;
+    }
+
+    @Override
+    public Redirect followRedirects() {
+      return followRedirects;
+    }
+
+    @Override
+    public Optional<ProxySelector> proxy() {
+      return proxy;
+    }
+
+    @Override
+    public Optional<Authenticator> authenticator() {
+      return authenticator;
+    }
+
+    @Override
+    public Version version() {
+      return version;
+    }
+
+    @Override
+    public Optional<Executor> executor() {
+      return executor;
+    }
+
+    @Override
+    public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler)
+        throws IOException, InterruptedException
+    {
+      Objects.requireNonNull(request, "request");
+      Objects.requireNonNull(responseBodyHandler, "responseBodyHandler");
+
+      URI uri = request.uri();
+      URL url = uri.toURL();
+      Proxy p = null;
+      if (proxy.isPresent()) {
+        List<Proxy> proxies = proxy.get().select(uri);
+        if (proxies != null && !proxies.isEmpty()) {
+          p = proxies.get(0);
+        }
+      }
+
+      URLConnection connection = (p != null && p != Proxy.NO_PROXY) ? url.openConnection(p) : url.openConnection();
+      if (connectTimeout.isPresent()) {
+        connection.setConnectTimeout((int) connectTimeout.get().toMillis());
+      }
+      if (request.timeout().isPresent()) {
+        connection.setReadTimeout((int) request.timeout().get().toMillis());
+      }
+
+      if (connection instanceof HttpURLConnection) {
+        HttpURLConnection http = (HttpURLConnection) connection;
+        http.setRequestMethod(request.method());
+        if (followRedirects == Redirect.ALWAYS) {
+          http.setInstanceFollowRedirects(true);
+        } else if (followRedirects == Redirect.NEVER) {
+          http.setInstanceFollowRedirects(false);
+        }
+      }
+
+      for (Map.Entry<String, List<String>> e : request.headers().map().entrySet()) {
+        for (String val : e.getValue()) {
+          connection.addRequestProperty(e.getKey(), val);
+        }
+      }
+
+      if (cookieHandler.isPresent()) {
+        Map<String, List<String>> cookies = cookieHandler.get().get(uri, request.headers().map());
+        if (cookies != null) {
+          for (Map.Entry<String, List<String>> e : cookies.entrySet()) {
+            for (String val : e.getValue()) {
+              connection.addRequestProperty(e.getKey(), val);
+            }
+          }
+        }
+      }
+
+      Optional<HttpRequest.BodyPublisher> pub = request.bodyPublisher();
+      if (pub.isPresent() && !request.method().equals("GET") && !request.method().equals("HEAD")) {
+        connection.setDoOutput(true);
+        try (OutputStream out = connection.getOutputStream()) {
+          pub.get().subscribe(new Flow.Subscriber<ByteBuffer>() {
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+              if (subscription != null) {
+                subscription.request(Long.MAX_VALUE);
+              }
+            }
+
+            @Override
+            public void onNext(ByteBuffer item) {
+              try {
+                if (item.hasArray()) {
+                  out.write(item.array(), item.arrayOffset() + item.position(), item.remaining());
+                } else {
+                  byte[] b = new byte[item.remaining()];
+                  item.get(b);
+                  out.write(b);
+                }
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {}
+
+            @Override
+            public void onComplete() {}
+          });
+        }
+      }
+
+      int statusCode = 200;
+      if (connection instanceof HttpURLConnection) {
+        statusCode = ((HttpURLConnection) connection).getResponseCode();
+      }
+
+      Map<String, List<String>> headerFields = connection.getHeaderFields();
+      if (headerFields == null) {
+        headerFields = Collections.emptyMap();
+      }
+      HttpHeaders respHeaders = HttpHeaders.of(headerFields, (k, v) -> true);
+
+      if (cookieHandler.isPresent()) {
+        cookieHandler.get().put(uri, respHeaders.map());
+      }
+
+      final int code = statusCode;
+      HttpResponse.ResponseInfo info = new HttpResponse.ResponseInfo() {
+        @Override
+        public int statusCode() {
+          return code;
+        }
+
+        @Override
+        public HttpHeaders headers() {
+          return respHeaders;
+        }
+
+        @Override
+        public Version version() {
+          return HttpClientImpl.this.version;
+        }
+      };
+
+      HttpResponse.BodySubscriber<T> subscriber = responseBodyHandler.apply(info);
+      subscriber.onSubscribe(null);
+
+      InputStream in = null;
+      try {
+        in = connection.getInputStream();
+      } catch (IOException e) {
+        if (connection instanceof HttpURLConnection) {
+          in = ((HttpURLConnection) connection).getErrorStream();
+        }
+      }
+
+      if (in != null) {
+        try (InputStream is = in) {
+          byte[] buf = new byte[8192];
+          int read;
+          while ((read = is.read(buf)) != -1) {
+            byte[] chunk = new byte[read];
+            System.arraycopy(buf, 0, chunk, 0, read);
+            subscriber.onNext(Collections.singletonList(ByteBuffer.wrap(chunk)));
+          }
+          subscriber.onComplete();
+        }
+      } else {
+        subscriber.onComplete();
+      }
+
+      T body;
+      try {
+        body = subscriber.getBody().toCompletableFuture().get();
+      } catch (Exception e) {
+        Throwable cause = e.getCause() != null ? e.getCause() : e;
+        if (cause instanceof IOException) throw (IOException) cause;
+        throw new IOException(cause);
+      }
+
+      return new HttpResponseImpl<T>(code, request, respHeaders, body, uri, this.version);
+    }
+
+    @Override
+    public <T> CompletableFuture<HttpResponse<T>> sendAsync(
+        HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler)
+    {
+      Executor exec = executor.orElse(ForkJoinPool.commonPool());
+      return CompletableFuture.supplyAsync(() -> {
+        try {
+          return send(request, responseBodyHandler);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, exec);
+    }
+  }
+
+  private static class HttpResponseImpl<T> implements HttpResponse<T> {
+    private final int statusCode;
+    private final HttpRequest request;
+    private final HttpHeaders headers;
+    private final T body;
+    private final URI uri;
+    private final Version version;
+
+    HttpResponseImpl(int statusCode, HttpRequest request, HttpHeaders headers, T body, URI uri, Version version) {
+      this.statusCode = statusCode;
+      this.request = request;
+      this.headers = headers;
+      this.body = body;
+      this.uri = uri;
+      this.version = version;
+    }
+
+    @Override
+    public int statusCode() {
+      return statusCode;
+    }
+
+    @Override
+    public HttpRequest request() {
+      return request;
+    }
+
+    @Override
+    public Optional<HttpResponse<T>> previousResponse() {
+      return Optional.empty();
+    }
+
+    @Override
+    public HttpHeaders headers() {
+      return headers;
+    }
+
+    @Override
+    public T body() {
+      return body;
+    }
+
+    @Override
+    public Optional<Object> sslSession() {
+      return Optional.empty();
+    }
+
+    @Override
+    public URI uri() {
+      return uri;
+    }
+
+    @Override
+    public Version version() {
+      return version;
+    }
+
+    @Override
+    public String toString() {
+      return "(" + request.method() + " " + uri + ") " + statusCode;
+    }
+  }
+}
