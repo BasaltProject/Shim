@@ -26,10 +26,30 @@ package java.util;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Reader;
+import java.io.Writer;
+import java.io.IOException;
 
 public class Properties extends Hashtable {
+  protected Properties defaults;
+
+  public Properties() {
+    this(null, 8);
+  }
+
+  public Properties(int initialCapacity) {
+    this(null, initialCapacity);
+  }
+
+  public Properties(Properties defaults) {
+    this(defaults, 8);
+  }
+
+  public Properties(Properties defaults, int initialCapacity) {
+    this.defaults = defaults;
+  }
+
   public void load(InputStream in) throws IOException {
     new InputStreamParser(in).parse(this);
   }
@@ -40,7 +60,9 @@ public class Properties extends Hashtable {
 
   public void store(OutputStream out, String comment) throws IOException {
     PrintStream os = new PrintStream(out);
-    os.println("# " + comment);
+    if (comment != null) {
+      os.println("#" + comment);
+    }
     for (Iterator it = entrySet().iterator();
          it.hasNext();) {
       Map.Entry entry = (Map.Entry)it.next();
@@ -51,16 +73,29 @@ public class Properties extends Hashtable {
     os.flush();
   }
 
+  public void store(Writer writer, String comments) throws IOException {
+    PrintWriter pw = (writer instanceof PrintWriter) ? (PrintWriter) writer : new PrintWriter(writer);
+    if (comments != null) {
+      pw.println("#" + comments);
+    }
+    for (Iterator it = entrySet().iterator(); it.hasNext();) {
+      Map.Entry entry = (Map.Entry) it.next();
+      pw.print(entry.getKey());
+      pw.print('=');
+      pw.println(entry.getValue());
+    }
+    pw.flush();
+  }
+
   public String getProperty(String key) {
-    return (String)get(key);
+    Object oval = super.get(key);
+    String sval = (oval instanceof String) ? (String) oval : null;
+    return ((sval == null) && (defaults != null)) ? defaults.getProperty(key) : sval;
   }
 
   public String getProperty(String key, String defaultValue) {
-    String value = (String) get(key);
-    if (value == null) {
-      return defaultValue;
-    }
-    return value;
+    String val = getProperty(key);
+    return (val == null) ? defaultValue : val;
   }
 
   public Object setProperty(String key, String value) {
@@ -68,11 +103,39 @@ public class Properties extends Hashtable {
   }
   
   public Enumeration<?> propertyNames() {
-    return keys();
+    Hashtable<Object, Object> h = new Hashtable<Object, Object>();
+    enumerate(h);
+    return h.keys();
+  }
+
+  private void enumerate(Hashtable<Object, Object> h) {
+    if (defaults != null) {
+      defaults.enumerate(h);
+    }
+    for (Iterator it = entrySet().iterator(); it.hasNext();) {
+      Map.Entry entry = (Map.Entry) it.next();
+      h.put(entry.getKey(), entry.getValue());
+    }
   }
 
   public Set<String> stringPropertyNames() {
-    return new HashSet(keySet());
+    Map<String, String> h = new HashMap<String, String>();
+    enumerateStringProperties(h);
+    return h.keySet();
+  }
+
+  private void enumerateStringProperties(Map<String, String> h) {
+    if (defaults != null) {
+      defaults.enumerateStringProperties(h);
+    }
+    for (Iterator it = entrySet().iterator(); it.hasNext();) {
+      Map.Entry entry = (Map.Entry) it.next();
+      Object k = entry.getKey();
+      Object v = entry.getValue();
+      if (k instanceof String && v instanceof String) {
+        h.put((String) k, (String) v);
+      }
+    }
   }
 
   private abstract static class Parser {

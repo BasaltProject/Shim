@@ -166,6 +166,62 @@ public final class Float extends Number implements Comparable<Float>,
 
   public static native float floatFromString(String s, int[] numRead);
 
+  public static short floatToFloat16(float f) {
+    int fBits = floatToRawIntBits(f);
+    int signBit = (fBits & 0x80000000) >>> 16;
+    if (isNaN(f)) {
+      return (short) (signBit | 0x7C00 |
+          ((fBits & 0x007FE000) >> 13) |
+          ((fBits & 0x1FF0) >> 4) |
+          (fBits & 0x0F));
+    }
+    float fAbs = Math.abs(f);
+    if (fAbs >= 65520.0f) {
+      return (short) (signBit | 0x7C00);
+    }
+    if (fAbs <= 2.9802322E-8f) {
+      return (short) signBit;
+    }
+    int exp = Math.getExponent(f);
+    int subnormalShift = 0;
+    int hiddenBit = 0;
+    if (exp < -14) {
+      subnormalShift = -14 - exp;
+      exp = -15;
+      hiddenBit = 0x800000;
+    }
+    int signif = (fBits & 0x7FFFFF) | hiddenBit;
+    int shift = 13 + subnormalShift;
+    int halfSignif = signif >> shift;
+    int lsb = signif & (1 << shift);
+    int roundBit = signif & (1 << (shift - 1));
+    int sticky = signif & ((1 << (shift - 1)) - 1);
+    if (roundBit != 0 && (lsb != 0 || sticky != 0)) {
+      halfSignif++;
+    }
+    return (short) (signBit | (((exp + 15) << 10) + halfSignif));
+  }
+
+  public static float float16ToFloat(short floatBinary16) {
+    int bin16 = floatBinary16 & 0xFFFF;
+    int signBit = bin16 & 0x8000;
+    int exp = bin16 & 0x7C00;
+    int significand = bin16 & 0x03FF;
+    float sign = (signBit != 0) ? -1.0f : 1.0f;
+    int expVal = (exp >> 10) - 15;
+    if (expVal == -15) {
+      return sign * 5.9604645E-8f * significand;
+    }
+    if (expVal == 16) {
+      if (significand == 0) {
+        return sign * Float.POSITIVE_INFINITY;
+      }
+      return intBitsToFloat((signBit << 16) | 0x7FC00000 | (significand << 13));
+    }
+    int fExp = (expVal + 127) << 23;
+    return intBitsToFloat((signBit << 16) | fExp | (significand << 13));
+  }
+
   @Override
   public java.util.Optional<Float> describeConstable() {
     return java.util.Optional.of(this);

@@ -168,44 +168,60 @@ public final class Long extends Number implements Comparable<Long>,
     else            return -1;
   }
 
-  private static long pow(long a, long b) {
-    long c = 1;
-    for (int i = 0; i < b; ++i) c *= a;
-    return c;
+  public static long parseLong(CharSequence s, int beginIndex, int endIndex, int radix) {
+    java.util.Objects.requireNonNull(s);
+    java.util.Objects.checkFromToIndex(beginIndex, endIndex, s.length());
+    if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+      throw new NumberFormatException("radix " + radix + " not in [" + Character.MIN_RADIX + ", " + Character.MAX_RADIX + "]");
+    }
+    int len = endIndex - beginIndex;
+    if (len == 0) {
+      throw new NumberFormatException("For input string: \"\"");
+    }
+    int i = beginIndex;
+    char firstChar = s.charAt(i);
+    boolean negative = false;
+    long limit = -Long.MAX_VALUE;
+    if (firstChar < '0') {
+      if (firstChar == '-') {
+        negative = true;
+        limit = Long.MIN_VALUE;
+      } else if (firstChar != '+') {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      if (len == 1) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      i++;
+    }
+    long multmin = limit / radix;
+    long result = 0;
+    while (i < endIndex) {
+      int digit = Character.digit(s.charAt(i++), radix);
+      if (digit < 0) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      if (result < multmin) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      result *= radix;
+      if (result < limit + digit) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      result -= digit;
+    }
+    return negative ? result : -result;
+  }
+
+  public static long parseLong(String s, int radix) {
+    if (s == null) {
+      throw new NumberFormatException("null");
+    }
+    return parseLong(s, 0, s.length(), radix);
   }
 
   public static long parseLong(String s) {
     return parseLong(s, 10);
-  } 
-
-  public static long parseLong(String s, int radix) {
-    int i = 0;
-    long number = 0;
-    boolean negative = s.startsWith("-");
-    int length = s.length();
-    if (negative) {
-      i = 1;
-      -- length;
-    }
-
-    long factor = pow(radix, length - 1);
-    for (; i < s.length(); ++i) {
-      char c = s.charAt(i);
-      int digit = Character.digit(c, radix);
-      if (digit >= 0) {
-        number += digit * factor;
-        factor /= radix;
-      } else {
-        throw new NumberFormatException("invalid character " + c + " code " +
-                                        (int) c);
-      }
-    }
-
-    if (negative) {
-      number = -number;
-    }
-
-    return number;
   }
 
   public static int compareUnsigned(long x, long y) {
@@ -261,33 +277,44 @@ public final class Long extends Number implements Comparable<Long>,
     return toUnsignedString(i, 10);
   }
 
+  public static long parseUnsignedLong(CharSequence s, int beginIndex, int endIndex, int radix) {
+    java.util.Objects.requireNonNull(s);
+    java.util.Objects.checkFromToIndex(beginIndex, endIndex, s.length());
+    int len = endIndex - beginIndex;
+    if (len == 0) {
+      throw new NumberFormatException("For input string: \"\"");
+    }
+    char firstChar = s.charAt(beginIndex);
+    if (firstChar == '-') {
+      throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s.subSequence(beginIndex, endIndex)));
+    }
+    if (firstChar == '+') {
+      beginIndex++;
+      len--;
+      if (len == 0) {
+        throw new NumberFormatException("For input string: \"+\"");
+      }
+    }
+    if (len <= 12 || (radix == 10 && len <= 18)) {
+      return parseLong(s, beginIndex, endIndex, radix);
+    }
+    long first = parseUnsignedLong(s, beginIndex, endIndex - 1, radix);
+    int second = Character.digit(s.charAt(endIndex - 1), radix);
+    if (second < 0) {
+      throw new NumberFormatException("Bad digit at end of " + s.subSequence(beginIndex, endIndex));
+    }
+    long result = first * radix + second;
+    if (compareUnsigned(result, first) < 0 || divideUnsigned(result - second, radix) != first) {
+      throw new NumberFormatException(String.format("String value %s exceeds range of unsigned long.", s.subSequence(beginIndex, endIndex)));
+    }
+    return result;
+  }
+
   public static long parseUnsignedLong(String s, int radix) {
     if (s == null) {
       throw new NumberFormatException("null");
     }
-    int len = s.length();
-    if (len > 0) {
-      char firstChar = s.charAt(0);
-      if (firstChar == '-') {
-        throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s));
-      } else {
-        if (len <= 12 || (radix == 10 && len <= 18)) {
-          return parseLong(s, radix);
-        }
-        long first = parseUnsignedLong(s.substring(0, len - 1), radix);
-        int second = Character.digit(s.charAt(len - 1), radix);
-        if (second < 0) {
-          throw new NumberFormatException("Bad digit at end of " + s);
-        }
-        long result = first * radix + second;
-        if (compareUnsigned(result, first) < 0 || divideUnsigned(result - second, radix) != first) {
-          throw new NumberFormatException(String.format("String value %s exceeds range of unsigned long.", s));
-        }
-        return result;
-      }
-    } else {
-      throw new NumberFormatException("For input string: \"\"");
-    }
+    return parseUnsignedLong(s, 0, s.length(), radix);
   }
 
   public static long parseUnsignedLong(String s) {
@@ -359,6 +386,35 @@ public final class Long extends Number implements Comparable<Long>,
     i = (i & 0x3333333333333333L) << 2 | (i >>> 2) & 0x3333333333333333L;
     i = (i & 0x0f0f0f0f0f0f0f0fL) << 4 | (i >>> 4) & 0x0f0f0f0f0f0f0f0fL;
     return reverseBytes(i);
+  }
+
+  public static long compress(long i, long mask) {
+    i &= mask;
+    long res = 0;
+    int outBit = 0;
+    while (mask != 0) {
+      long bit = mask & -mask;
+      if ((i & bit) != 0) {
+        res |= (1L << outBit);
+      }
+      outBit++;
+      mask &= mask - 1;
+    }
+    return res;
+  }
+
+  public static long expand(long i, long mask) {
+    long res = 0;
+    int inBit = 0;
+    while (mask != 0) {
+      long bit = mask & -mask;
+      if (((i >>> inBit) & 1L) != 0) {
+        res |= bit;
+      }
+      inBit++;
+      mask &= mask - 1;
+    }
+    return res;
   }
 
   @Override

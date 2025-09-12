@@ -28,6 +28,7 @@ import java.util.Random;
 public final class Math {
   public static final double E = 2.718281828459045;
   public static final double PI = 3.141592653589793;
+  public static final double TAU = 2.0 * PI;
 
   private static class Static {
     public static final Random random = new Random();
@@ -523,5 +524,59 @@ public final class Math {
       r -= y;
     }
     return r;
+  }
+
+  public static int divideExact(int x, int y) {
+    if (x == Integer.MIN_VALUE && y == -1) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return x / y;
+  }
+
+  public static long divideExact(long x, long y) {
+    if (x == Long.MIN_VALUE && y == -1L) {
+      throw new ArithmeticException("long overflow");
+    }
+    return x / y;
+  }
+
+  public static double fma(double a, double b, double c) {
+    if (Double.isNaN(a) || Double.isNaN(b) || Double.isNaN(c)) {
+      return Double.NaN;
+    }
+    boolean aInf = Double.isInfinite(a);
+    boolean bInf = Double.isInfinite(b);
+    boolean cInf = Double.isInfinite(c);
+    if (aInf || bInf || cInf) {
+      if ((aInf && b == 0.0) || (bInf && a == 0.0)) {
+        return Double.NaN;
+      }
+      double prod = a * b;
+      if (Double.isInfinite(prod) && !aInf && !bInf) {
+        return c;
+      }
+      return prod + c;
+    }
+    java.math.BigDecimal bda = new java.math.BigDecimal(a);
+    java.math.BigDecimal bdb = new java.math.BigDecimal(b);
+    java.math.BigDecimal prod = bda.multiply(bdb);
+    if (c == 0.0) {
+      if (a == 0.0 || b == 0.0) {
+        return a * b + c;
+      }
+      return prod.doubleValue();
+    }
+    return prod.add(new java.math.BigDecimal(c)).doubleValue();
+  }
+
+  public static float fma(float a, float b, float c) {
+    if (Float.isFinite(a) && Float.isFinite(b) && Float.isFinite(c)) {
+      if ((double) a == 0.0 || (double) b == 0.0) {
+        return a * b + c;
+      }
+      java.math.BigDecimal prod = new java.math.BigDecimal((double) a * (double) b);
+      return prod.add(new java.math.BigDecimal((double) c)).floatValue();
+    }
+    return (float) fma((double) a, (double) b, (double) c);
   }
 }

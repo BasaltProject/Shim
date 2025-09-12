@@ -84,8 +84,8 @@ public class BigDecimal extends Number implements Comparable<BigDecimal>, Serial
     int sign = (bits < 0) ? -1 : 1;
     int exp = (int) ((bits >> 52) & 0x7ffL);
     long mantissa = (exp == 0)
-        ? (bits & 0xffffffffffffL) << 1
-        : (bits & 0xffffffffffffL) | 0x10000000000000L;
+        ? (bits & 0x000fffffffffffffL) << 1
+        : (bits & 0x000fffffffffffffL) | 0x0010000000000000L;
     if (mantissa == 0) {
       this.intVal = BigInteger.ZERO;
       this.scale = 0;
