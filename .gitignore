@@ -42,3 +42,6 @@
 *.log
 *.bak
 *.swp
+
+# Local tooling
+/tools/
