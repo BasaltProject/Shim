@@ -23,10 +23,48 @@
 
 package java.util.jar;
 
+import java.io.IOException;
+import java.security.CodeSigner;
+import java.security.cert.Certificate;
 import java.util.zip.ZipEntry;
 
-public abstract class JarEntry extends ZipEntry {
-    public JarEntry(){
-        super(null);
-    }
+public class JarEntry extends ZipEntry {
+  Attributes attr;
+  Certificate[] certs;
+  CodeSigner[] signers;
+
+  public JarEntry() {
+    super((String) null);
+  }
+
+  public JarEntry(String name) {
+    super(name);
+  }
+
+  public JarEntry(ZipEntry ze) {
+    super(ze);
+  }
+
+  public JarEntry(JarEntry je) {
+    super((ZipEntry) je);
+    this.attr = je.attr;
+    this.certs = je.certs != null ? je.certs.clone() : null;
+    this.signers = je.signers != null ? je.signers.clone() : null;
+  }
+
+  public Attributes getAttributes() throws IOException {
+    return attr;
+  }
+
+  public Certificate[] getCertificates() {
+    return certs == null ? null : certs.clone();
+  }
+
+  public CodeSigner[] getCodeSigners() {
+    return signers == null ? null : signers.clone();
+  }
+
+  public String getRealName() {
+    return super.getName();
+  }
 }

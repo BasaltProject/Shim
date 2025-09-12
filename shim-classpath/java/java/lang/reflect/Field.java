@@ -64,6 +64,11 @@ public class Field<T> extends AccessibleObject implements Member {
   public int getModifiers() {
     return vmField.flags;
   }
+
+  @Override
+  public java.util.Set<AccessFlag> accessFlags() {
+    return AccessFlag.maskToAccessFlags(getModifiers(), AccessFlag.Location.FIELD);
+  }
   
   public boolean isSynthetic() {
     return (vmField.flags & ACC_SYNTHETIC) != 0;

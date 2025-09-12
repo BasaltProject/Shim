@@ -34,4 +34,8 @@ public interface Member {
   public String getName();
 
   public boolean isSynthetic();
+
+  default java.util.Set<AccessFlag> accessFlags() {
+    return AccessFlag.maskToAccessFlags(getModifiers(), AccessFlag.Location.METHOD);
+  }
 }

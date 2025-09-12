@@ -23,6 +23,12 @@
 
 package java.io;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
 public class File implements Serializable {
   private static final String FileSeparator
     = System.getProperty("file.separator");
@@ -257,6 +263,30 @@ public class File implements Serializable {
       return true;
     } catch (IOException e) {
       return false;
+    }
+  }
+
+  private static final Set<String> deleteOnExitHook = new LinkedHashSet<String>();
+  private static boolean deleteOnExitHookRegistered;
+
+  public void deleteOnExit() {
+    synchronized (deleteOnExitHook) {
+      if (!deleteOnExitHookRegistered) {
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+          public void run() {
+            List<String> files;
+            synchronized (deleteOnExitHook) {
+              files = new ArrayList<String>(deleteOnExitHook);
+            }
+            Collections.reverse(files);
+            for (String f : files) {
+              new File(f).delete();
+            }
+          }
+        }, "File-DeleteOnExit"));
+        deleteOnExitHookRegistered = true;
+      }
+      deleteOnExitHook.add(path);
     }
   }
 

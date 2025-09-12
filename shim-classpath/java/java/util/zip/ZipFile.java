@@ -23,16 +23,25 @@
 
 package java.util.zip;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.io.InputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-public class ZipFile {
+public class ZipFile implements Closeable {
+  public static final int OPEN_READ = 1;
+  public static final int OPEN_DELETE = 4;
+
   private final RandomAccessFile file;
   private final Window window;
   private final Map<String,Integer> index = new HashMap();
@@ -72,6 +81,25 @@ public class ZipFile {
     this(file.getAbsolutePath());
   }
 
+  public ZipFile(File file, int mode) throws IOException {
+    this(file.getAbsolutePath());
+    if ((mode & ~(OPEN_READ | OPEN_DELETE)) != 0) {
+      throw new IllegalArgumentException("Illegal mode: 0x" + Integer.toHexString(mode));
+    }
+  }
+
+  public ZipFile(File file, int mode, Charset charset) throws IOException {
+    this(file, mode);
+  }
+
+  public ZipFile(String name, Charset charset) throws IOException {
+    this(name);
+  }
+
+  public ZipFile(File file, Charset charset) throws IOException {
+    this(file);
+  }
+
   public int size() {
     return index.size();
   }
@@ -84,6 +112,19 @@ public class ZipFile {
 
   public Enumeration<? extends ZipEntry> entries() {
     return makeEnumeration(ZipEntryFactory.Instance);
+  }
+
+  public Stream<? extends ZipEntry> stream() {
+    return StreamSupport.stream(
+        Spliterators.spliterator(
+            new Iterator<ZipEntry>() {
+              private final Enumeration<? extends ZipEntry> e = entries();
+              public boolean hasNext() { return e.hasMoreElements(); }
+              public ZipEntry next() { return e.nextElement(); }
+            },
+            size(),
+            Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.IMMUTABLE | Spliterator.NONNULL),
+        false);
   }
 
   protected ZipEntry getEntry(EntryFactory factory, String name) {
@@ -296,7 +337,7 @@ public class ZipFile {
     public final int pointer;
 
     public MyZipEntry(Window window, int pointer) {
-      super(null);
+      super((String) null);
       this.window = window;
       this.pointer = pointer;
     }

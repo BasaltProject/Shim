@@ -33,6 +33,10 @@ public final class Parameter implements AnnotatedElement {
     return modifiers;
   }
 
+  public java.util.Set<AccessFlag> accessFlags() {
+    return AccessFlag.maskToAccessFlags(getModifiers(), AccessFlag.Location.METHOD_PARAMETER);
+  }
+
   public Executable getDeclaringExecutable() {
     return executable;
   }

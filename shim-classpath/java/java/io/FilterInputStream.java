@@ -35,7 +35,7 @@ public class FilterInputStream extends InputStream {
   }
 
   public int read(byte[] b) throws IOException {
-    return in.read(b);
+    return read(b, 0, b.length);
   }
 
   public int read(byte[] b, int off, int len) throws IOException {
@@ -44,5 +44,25 @@ public class FilterInputStream extends InputStream {
 
   public int read() throws IOException {
     return in.read();
+  }
+
+  public int available() throws IOException {
+    return in.available();
+  }
+
+  public long skip(long n) throws IOException {
+    return in.skip(n);
+  }
+
+  public boolean markSupported() {
+    return in.markSupported();
+  }
+
+  public synchronized void mark(int readlimit) {
+    in.mark(readlimit);
+  }
+
+  public synchronized void reset() throws IOException {
+    in.reset();
   }
 }
