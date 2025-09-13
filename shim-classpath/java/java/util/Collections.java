@@ -23,6 +23,7 @@
 
 package java.util;
 
+import java.io.Serializable;
 import shim.Data;
 
 public class Collections {
@@ -819,6 +820,45 @@ public class Collections {
     public K lastKey() {
       return sm.lastKey();
     }
+
+    public Map.Entry<K, V> firstEntry() {
+      Map.Entry<K, V> e = sm.firstEntry();
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+
+    public Map.Entry<K, V> lastEntry() {
+      Map.Entry<K, V> e = sm.lastEntry();
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+
+    public Map.Entry<K, V> pollFirstEntry() {
+      throw new UnsupportedOperationException();
+    }
+
+    public Map.Entry<K, V> pollLastEntry() {
+      throw new UnsupportedOperationException();
+    }
+
+    public V putFirst(K key, V value) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V putLast(K key, V value) {
+      throw new UnsupportedOperationException();
+    }
+
+    public SequencedSet<K> sequencedKeySet() {
+      return unmodifiableSequencedSet(sm.sequencedKeySet());
+    }
+
+    public SequencedCollection<V> sequencedValues() {
+      return unmodifiableSequencedCollection(sm.sequencedValues());
+    }
+
+    @Override
+    public SortedMap<K, V> reversed() {
+      return new UnmodifiableSortedMap<K, V>(sm.reversed());
+    }
   }
   
   static class UnmodifiableIterator<T> implements Iterator<T> {
@@ -993,5 +1033,606 @@ public class Collections {
     Map<K, V> map = new HashMap<K, V>(1);
     map.put(key, value);
     return unmodifiableMap(map);
+  }
+
+  public static <T> SortedSet<T> unmodifiableSortedSet(SortedSet<T> s) {
+    return new UnmodifiableSortedSet<T>(s);
+  }
+
+  static class UnmodifiableSortedSet<T> extends UnmodifiableSet<T>
+      implements SortedSet<T>, Serializable {
+    private final SortedSet<T> ss;
+
+    UnmodifiableSortedSet(SortedSet<T> s) {
+      super(s);
+      this.ss = Objects.requireNonNull(s);
+    }
+
+    public Comparator<? super T> comparator() { return ss.comparator(); }
+    public SortedSet<T> subSet(T fromElement, T toElement) {
+      return new UnmodifiableSortedSet<T>(ss.subSet(fromElement, toElement));
+    }
+    public SortedSet<T> headSet(T toElement) {
+      return new UnmodifiableSortedSet<T>(ss.headSet(toElement));
+    }
+    public SortedSet<T> tailSet(T fromElement) {
+      return new UnmodifiableSortedSet<T>(ss.tailSet(fromElement));
+    }
+    public T first() { return ss.first(); }
+    public T last() { return ss.last(); }
+    @Override
+    public SortedSet<T> reversed() {
+      return new UnmodifiableSortedSet<T>(ss.reversed());
+    }
+  }
+
+  public static <T> NavigableSet<T> unmodifiableNavigableSet(NavigableSet<T> s) {
+    return new UnmodifiableNavigableSet<T>(s);
+  }
+
+  static class UnmodifiableNavigableSet<T> extends UnmodifiableSortedSet<T>
+      implements NavigableSet<T>, Serializable {
+    private final NavigableSet<T> ns;
+
+    UnmodifiableNavigableSet(NavigableSet<T> s) {
+      super(s);
+      this.ns = Objects.requireNonNull(s);
+    }
+
+    public T lower(T e) { return ns.lower(e); }
+    public T floor(T e) { return ns.floor(e); }
+    public T ceiling(T e) { return ns.ceiling(e); }
+    public T higher(T e) { return ns.higher(e); }
+    public T pollFirst() { throw new UnsupportedOperationException(); }
+    public T pollLast() { throw new UnsupportedOperationException(); }
+    public NavigableSet<T> descendingSet() {
+      return new UnmodifiableNavigableSet<T>(ns.descendingSet());
+    }
+    public Iterator<T> descendingIterator() {
+      return new UnmodifiableIterator<T>(ns.descendingIterator());
+    }
+    public NavigableSet<T> subSet(T fromElement, boolean fromInclusive, T toElement, boolean toInclusive) {
+      return new UnmodifiableNavigableSet<T>(ns.subSet(fromElement, fromInclusive, toElement, toInclusive));
+    }
+    public NavigableSet<T> headSet(T toElement, boolean inclusive) {
+      return new UnmodifiableNavigableSet<T>(ns.headSet(toElement, inclusive));
+    }
+    public NavigableSet<T> tailSet(T fromElement, boolean inclusive) {
+      return new UnmodifiableNavigableSet<T>(ns.tailSet(fromElement, inclusive));
+    }
+    @Override
+    public NavigableSet<T> reversed() {
+      return descendingSet();
+    }
+  }
+
+  public static <K, V> NavigableMap<K, V> unmodifiableNavigableMap(NavigableMap<K, ? extends V> m) {
+    return new UnmodifiableNavigableMap<K, V>(m);
+  }
+
+  static class UnmodifiableNavigableMap<K, V> extends UnmodifiableSortedMap<K, V>
+      implements NavigableMap<K, V>, Serializable {
+    private final NavigableMap<K, ? extends V> nm;
+
+    @SuppressWarnings("unchecked")
+    UnmodifiableNavigableMap(NavigableMap<K, ? extends V> m) {
+      super((SortedMap<K, V>) m);
+      this.nm = Objects.requireNonNull(m);
+    }
+
+    public Entry<K, V> lowerEntry(K key) {
+      Entry<K, ? extends V> e = nm.lowerEntry(key);
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+    public K lowerKey(K key) { return nm.lowerKey(key); }
+    public Entry<K, V> floorEntry(K key) {
+      Entry<K, ? extends V> e = nm.floorEntry(key);
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+    public K floorKey(K key) { return nm.floorKey(key); }
+    public Entry<K, V> ceilingEntry(K key) {
+      Entry<K, ? extends V> e = nm.ceilingEntry(key);
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+    public K ceilingKey(K key) { return nm.ceilingKey(key); }
+    public Entry<K, V> higherEntry(K key) {
+      Entry<K, ? extends V> e = nm.higherEntry(key);
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+    public K higherKey(K key) { return nm.higherKey(key); }
+    @Override
+    public Entry<K, V> firstEntry() {
+      Entry<K, ? extends V> e = nm.firstEntry();
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+    @Override
+    public Entry<K, V> lastEntry() {
+      Entry<K, ? extends V> e = nm.lastEntry();
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+    @Override
+    public Entry<K, V> pollFirstEntry() { throw new UnsupportedOperationException(); }
+    @Override
+    public Entry<K, V> pollLastEntry() { throw new UnsupportedOperationException(); }
+    public NavigableMap<K, V> descendingMap() {
+      return new UnmodifiableNavigableMap<K, V>(nm.descendingMap());
+    }
+    public NavigableSet<K> navigableKeySet() {
+      return unmodifiableNavigableSet(nm.navigableKeySet());
+    }
+    public NavigableSet<K> descendingKeySet() {
+      return unmodifiableNavigableSet(nm.descendingKeySet());
+    }
+    public NavigableMap<K, V> subMap(K fromKey, boolean fromInclusive, K toKey, boolean toInclusive) {
+      return new UnmodifiableNavigableMap<K, V>(nm.subMap(fromKey, fromInclusive, toKey, toInclusive));
+    }
+    public NavigableMap<K, V> headMap(K toKey, boolean inclusive) {
+      return new UnmodifiableNavigableMap<K, V>(nm.headMap(toKey, inclusive));
+    }
+    public NavigableMap<K, V> tailMap(K fromKey, boolean inclusive) {
+      return new UnmodifiableNavigableMap<K, V>(nm.tailMap(fromKey, inclusive));
+    }
+    @Override
+    public NavigableMap<K, V> reversed() {
+      return descendingMap();
+    }
+  }
+
+  public static <T> SequencedCollection<T> unmodifiableSequencedCollection(SequencedCollection<? extends T> c) {
+    return new UnmodifiableSequencedCollection<T>(c);
+  }
+
+  static class UnmodifiableSequencedCollection<T> extends UnmodifiableCollection<T>
+      implements SequencedCollection<T>, Serializable {
+    private final SequencedCollection<? extends T> sc;
+
+    @SuppressWarnings("unchecked")
+    UnmodifiableSequencedCollection(SequencedCollection<? extends T> sc) {
+      super((Collection<T>) sc);
+      this.sc = Objects.requireNonNull(sc);
+    }
+
+    @Override
+    public SequencedCollection<T> reversed() {
+      return new UnmodifiableSequencedCollection<T>(sc.reversed());
+    }
+
+    @Override
+    public void addFirst(T element) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void addLast(T element) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public T getFirst() {
+      return sc.getFirst();
+    }
+
+    @Override
+    public T getLast() {
+      return sc.getLast();
+    }
+
+    @Override
+    public T removeFirst() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public T removeLast() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  public static <T> SequencedSet<T> unmodifiableSequencedSet(SequencedSet<? extends T> s) {
+    return new UnmodifiableSequencedSet<T>(s);
+  }
+
+  static class UnmodifiableSequencedSet<T> extends UnmodifiableSequencedCollection<T>
+      implements SequencedSet<T>, Serializable {
+    private final SequencedSet<? extends T> ss;
+
+    UnmodifiableSequencedSet(SequencedSet<? extends T> ss) {
+      super(ss);
+      this.ss = Objects.requireNonNull(ss);
+    }
+
+    @Override
+    public SequencedSet<T> reversed() {
+      return new UnmodifiableSequencedSet<T>(ss.reversed());
+    }
+  }
+
+  public static <K, V> SequencedMap<K, V> unmodifiableSequencedMap(SequencedMap<? extends K, ? extends V> m) {
+    return new UnmodifiableSequencedMap<K, V>(m);
+  }
+
+  static class UnmodifiableSequencedMap<K, V> extends UnmodifiableMap<K, V>
+      implements SequencedMap<K, V>, Serializable {
+    private final SequencedMap<? extends K, ? extends V> sm;
+
+    @SuppressWarnings("unchecked")
+    UnmodifiableSequencedMap(SequencedMap<? extends K, ? extends V> sm) {
+      super((Map<K, V>) sm);
+      this.sm = Objects.requireNonNull(sm);
+    }
+
+    @Override
+    public SequencedMap<K, V> reversed() {
+      return new UnmodifiableSequencedMap<K, V>(sm.reversed());
+    }
+
+    @Override
+    public Map.Entry<K, V> firstEntry() {
+      Map.Entry<? extends K, ? extends V> e = sm.firstEntry();
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+
+    @Override
+    public Map.Entry<K, V> lastEntry() {
+      Map.Entry<? extends K, ? extends V> e = sm.lastEntry();
+      return e == null ? null : Map.entry(e.getKey(), e.getValue());
+    }
+
+    @Override
+    public Map.Entry<K, V> pollFirstEntry() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Map.Entry<K, V> pollLastEntry() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public V putFirst(K key, V value) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public V putLast(K key, V value) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SequencedSet<K> sequencedKeySet() {
+      return unmodifiableSequencedSet(sm.sequencedKeySet());
+    }
+
+    @Override
+    public SequencedCollection<V> sequencedValues() {
+      return unmodifiableSequencedCollection(sm.sequencedValues());
+    }
+  }
+
+  public static <E> Set<E> newSetFromMap(Map<E, Boolean> map) {
+    return new SetFromMap<E>(map);
+  }
+
+  static class SetFromMap<E> extends AbstractSet<E> implements Set<E>, Serializable {
+    private final Map<E, Boolean> m;
+    private transient Set<E> s;
+
+    SetFromMap(Map<E, Boolean> map) {
+      if (!map.isEmpty()) {
+        throw new IllegalArgumentException("Map is not empty");
+      }
+      this.m = Objects.requireNonNull(map);
+      this.s = map.keySet();
+    }
+
+    @Override
+    public void clear() { m.clear(); }
+    @Override
+    public int size() { return m.size(); }
+    @Override
+    public boolean isEmpty() { return m.isEmpty(); }
+    @Override
+    public boolean contains(Object o) { return m.containsKey(o); }
+    @Override
+    public boolean remove(Object o) { return m.remove(o) != null; }
+    @Override
+    public boolean add(E e) { return m.put(e, Boolean.TRUE) == null; }
+    @Override
+    public Iterator<E> iterator() { return s.iterator(); }
+    @Override
+    public Object[] toArray() { return s.toArray(); }
+    @Override
+    public <T> T[] toArray(T[] a) { return s.toArray(a); }
+    @Override
+    public String toString() { return s.toString(); }
+    @Override
+    public int hashCode() { return s.hashCode(); }
+    @Override
+    public boolean equals(Object o) { return o == this || s.equals(o); }
+    @Override
+    public boolean containsAll(Collection<?> c) { return s.containsAll(c); }
+    @Override
+    public boolean removeAll(Collection<?> c) { return s.removeAll(c); }
+    @Override
+    public boolean retainAll(Collection<?> c) { return s.retainAll(c); }
+  }
+
+  public static <E> SequencedSet<E> newSequencedSetFromMap(SequencedMap<E, Boolean> map) {
+    return new SetFromSequencedMap<E>(map);
+  }
+
+  static class SetFromSequencedMap<E> extends AbstractSet<E>
+      implements SequencedSet<E>, Serializable {
+    private final SequencedMap<E, Boolean> m;
+    private transient SequencedSet<E> s;
+
+    SetFromSequencedMap(SequencedMap<E, Boolean> map) {
+      this(map, true);
+    }
+
+    SetFromSequencedMap(SequencedMap<E, Boolean> map, boolean checkEmpty) {
+      if (checkEmpty && !map.isEmpty()) {
+        throw new IllegalArgumentException("Map is not empty");
+      }
+      this.m = Objects.requireNonNull(map);
+      this.s = map.sequencedKeySet();
+    }
+
+    @Override
+    public void clear() { m.clear(); }
+    @Override
+    public int size() { return m.size(); }
+    @Override
+    public boolean isEmpty() { return m.isEmpty(); }
+    @Override
+    public boolean contains(Object o) { return m.containsKey(o); }
+    @Override
+    public boolean remove(Object o) { return m.remove(o) != null; }
+    @Override
+    public boolean add(E e) { return m.put(e, Boolean.TRUE) == null; }
+    @Override
+    public Iterator<E> iterator() { return s.iterator(); }
+    @Override
+    public Object[] toArray() { return s.toArray(); }
+    @Override
+    public <T> T[] toArray(T[] a) { return s.toArray(a); }
+    @Override
+    public String toString() { return s.toString(); }
+    @Override
+    public int hashCode() { return s.hashCode(); }
+    @Override
+    public boolean equals(Object o) { return o == this || s.equals(o); }
+    @Override
+    public boolean containsAll(Collection<?> c) { return s.containsAll(c); }
+    @Override
+    public boolean removeAll(Collection<?> c) { return s.removeAll(c); }
+    @Override
+    public boolean retainAll(Collection<?> c) { return s.retainAll(c); }
+
+    @Override
+    public SequencedSet<E> reversed() {
+      return new SetFromSequencedMap<E>(m.reversed(), false);
+    }
+
+    @Override
+    public void addFirst(E e) {
+      m.putFirst(e, Boolean.TRUE);
+    }
+
+    @Override
+    public void addLast(E e) {
+      m.putLast(e, Boolean.TRUE);
+    }
+
+    @Override
+    public E getFirst() {
+      return s.getFirst();
+    }
+
+    @Override
+    public E getLast() {
+      return s.getLast();
+    }
+
+    @Override
+    public E removeFirst() {
+      Map.Entry<E, Boolean> e = m.pollFirstEntry();
+      if (e == null) {
+        throw new NoSuchElementException();
+      }
+      return e.getKey();
+    }
+
+    @Override
+    public E removeLast() {
+      Map.Entry<E, Boolean> e = m.pollLastEntry();
+      if (e == null) {
+        throw new NoSuchElementException();
+      }
+      return e.getKey();
+    }
+  }
+
+  public static <T> Queue<T> asLifoQueue(Deque<T> deque) {
+    return new AsLifoQueue<T>(deque);
+  }
+
+  static class AsLifoQueue<T> extends AbstractQueue<T> implements Queue<T>, Serializable {
+    private final Deque<T> q;
+
+    AsLifoQueue(Deque<T> deque) {
+      this.q = Objects.requireNonNull(deque);
+    }
+
+    @Override
+    public boolean add(T e) { q.addFirst(e); return true; }
+    @Override
+    public boolean offer(T e) { return q.offerFirst(e); }
+    @Override
+    public T poll() { return q.pollFirst(); }
+    @Override
+    public T remove() { return q.removeFirst(); }
+    @Override
+    public T peek() { return q.peekFirst(); }
+    @Override
+    public T element() { return q.getFirst(); }
+    @Override
+    public void clear() { q.clear(); }
+    @Override
+    public int size() { return q.size(); }
+    @Override
+    public boolean isEmpty() { return q.isEmpty(); }
+    @Override
+    public boolean contains(Object o) { return q.contains(o); }
+    @Override
+    public boolean remove(Object o) { return q.remove(o); }
+    @Override
+    public Iterator<T> iterator() { return q.iterator(); }
+    @Override
+    public Object[] toArray() { return q.toArray(); }
+    @Override
+    public <E> E[] toArray(E[] a) { return q.toArray(a); }
+    @Override
+    public String toString() { return q.toString(); }
+  }
+
+  private static final EmptyNavigableSet<?> EMPTY_NAVIGABLE_SET = new EmptyNavigableSet<Object>();
+
+  @SuppressWarnings("unchecked")
+  public static <E> SortedSet<E> emptySortedSet() {
+    return (SortedSet<E>) EMPTY_NAVIGABLE_SET;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <E> NavigableSet<E> emptyNavigableSet() {
+    return (NavigableSet<E>) EMPTY_NAVIGABLE_SET;
+  }
+
+  static class EmptyNavigableSet<E> extends AbstractSet<E> implements NavigableSet<E>, Serializable {
+    @Override
+    public Iterator<E> iterator() { return emptyIterator(); }
+    @Override
+    public int size() { return 0; }
+    @Override
+    public boolean isEmpty() { return true; }
+    @Override
+    public boolean contains(Object o) { return false; }
+    @Override
+    public Comparator<? super E> comparator() { return null; }
+    @Override
+    public SortedSet<E> subSet(E fromElement, E toElement) { return this; }
+    @Override
+    public SortedSet<E> headSet(E toElement) { return this; }
+    @Override
+    public SortedSet<E> tailSet(E fromElement) { return this; }
+    @Override
+    public E first() { throw new NoSuchElementException(); }
+    @Override
+    public E last() { throw new NoSuchElementException(); }
+    @Override
+    public E lower(E e) { return null; }
+    @Override
+    public E floor(E e) { return null; }
+    @Override
+    public E ceiling(E e) { return null; }
+    @Override
+    public E higher(E e) { return null; }
+    @Override
+    public E pollFirst() { return null; }
+    @Override
+    public E pollLast() { return null; }
+    @Override
+    public NavigableSet<E> descendingSet() { return this; }
+    @Override
+    public Iterator<E> descendingIterator() { return emptyIterator(); }
+    @Override
+    public NavigableSet<E> subSet(E fromElement, boolean fromInclusive, E toElement, boolean toInclusive) { return this; }
+    @Override
+    public NavigableSet<E> headSet(E toElement, boolean inclusive) { return this; }
+    @Override
+    public NavigableSet<E> tailSet(E fromElement, boolean inclusive) { return this; }
+    @Override
+    public NavigableSet<E> reversed() { return this; }
+  }
+
+  private static final EmptyNavigableMap<?, ?> EMPTY_NAVIGABLE_MAP = new EmptyNavigableMap<Object, Object>();
+
+  @SuppressWarnings("unchecked")
+  public static <K, V> SortedMap<K, V> emptySortedMap() {
+    return (SortedMap<K, V>) EMPTY_NAVIGABLE_MAP;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <K, V> NavigableMap<K, V> emptyNavigableMap() {
+    return (NavigableMap<K, V>) EMPTY_NAVIGABLE_MAP;
+  }
+
+  static class EmptyNavigableMap<K, V> extends AbstractMap<K, V> implements NavigableMap<K, V>, Serializable {
+    @Override
+    public int size() { return 0; }
+    @Override
+    public boolean isEmpty() { return true; }
+    @Override
+    public boolean containsKey(Object key) { return false; }
+    @Override
+    public boolean containsValue(Object value) { return false; }
+    @Override
+    public V get(Object key) { return null; }
+    @Override
+    public Set<Entry<K, V>> entrySet() { return emptySet(); }
+    @Override
+    public NavigableSet<K> keySet() { return emptyNavigableSet(); }
+    @Override
+    public Collection<V> values() { return emptySet(); }
+    @Override
+    public Comparator<? super K> comparator() { return null; }
+    @Override
+    public SortedMap<K, V> subMap(K fromKey, K toKey) { return this; }
+    @Override
+    public SortedMap<K, V> headMap(K toKey) { return this; }
+    @Override
+    public SortedMap<K, V> tailMap(K fromKey) { return this; }
+    @Override
+    public K firstKey() { throw new NoSuchElementException(); }
+    @Override
+    public K lastKey() { throw new NoSuchElementException(); }
+    @Override
+    public Entry<K, V> lowerEntry(K key) { return null; }
+    @Override
+    public K lowerKey(K key) { return null; }
+    @Override
+    public Entry<K, V> floorEntry(K key) { return null; }
+    @Override
+    public K floorKey(K key) { return null; }
+    @Override
+    public Entry<K, V> ceilingEntry(K key) { return null; }
+    @Override
+    public K ceilingKey(K key) { return null; }
+    @Override
+    public Entry<K, V> higherEntry(K key) { return null; }
+    @Override
+    public K higherKey(K key) { return null; }
+    @Override
+    public Entry<K, V> firstEntry() { return null; }
+    @Override
+    public Entry<K, V> lastEntry() { return null; }
+    @Override
+    public Entry<K, V> pollFirstEntry() { return null; }
+    @Override
+    public Entry<K, V> pollLastEntry() { return null; }
+    @Override
+    public NavigableMap<K, V> descendingMap() { return this; }
+    @Override
+    public NavigableSet<K> navigableKeySet() { return emptyNavigableSet(); }
+    @Override
+    public NavigableSet<K> descendingKeySet() { return emptyNavigableSet(); }
+    @Override
+    public NavigableMap<K, V> subMap(K fromKey, boolean fromInclusive, K toKey, boolean toInclusive) { return this; }
+    @Override
+    public NavigableMap<K, V> headMap(K toKey, boolean inclusive) { return this; }
+    @Override
+    public NavigableMap<K, V> tailMap(K fromKey, boolean inclusive) { return this; }
+    @Override
+    public NavigableMap<K, V> reversed() { return this; }
   }
 }

@@ -338,6 +338,9 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements SequencedMap<K
 
   @Override
   public V putLast(K key, V value) {
+    if (containsKey(key)) {
+      remove(key);
+    }
     return put(key, value);
   }
 

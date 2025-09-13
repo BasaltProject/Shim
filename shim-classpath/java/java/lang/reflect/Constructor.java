@@ -26,9 +26,9 @@ package java.lang.reflect;
 import java.lang.annotation.Annotation;
 
 public class Constructor<T> extends Executable {
-  public final Method<T> method;
+  public final Method method;
 
-  public Constructor(Method<T> method) {
+  public Constructor(Method method) {
     this.method = method;
   }
 
@@ -45,8 +45,9 @@ public class Constructor<T> extends Executable {
     method.setAccessible(v);
   }
 
+  @SuppressWarnings("unchecked")
   public Class<T> getDeclaringClass() {
-    return method.getDeclaringClass();
+    return (Class<T>) method.getDeclaringClass();
   }
 
   public Class[] getParameterTypes() {
