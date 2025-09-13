@@ -23,6 +23,9 @@
 
 package java.io;
 
+import java.nio.charset.Charset;
+import java.util.Objects;
+
 public class PrintStream extends OutputStream {
   private final OutputStream out;
   private final boolean autoFlush;
@@ -48,8 +51,54 @@ public class PrintStream extends OutputStream {
     }
   }
 
+  private static OutputStream openFile(String fileName) throws FileNotFoundException {
+    try {
+      return new FileOutputStream(fileName);
+    } catch (FileNotFoundException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new FileNotFoundException(e.getMessage());
+    }
+  }
+
+  private static OutputStream openFile(File file) throws FileNotFoundException {
+    return openFile(file.getPath());
+  }
+
+  public PrintStream(OutputStream out, boolean autoFlush, Charset charset) {
+    this.out = out;
+    this.autoFlush = autoFlush;
+    Objects.requireNonNull(charset);
+  }
+
   public PrintStream(OutputStream out) {
     this(out, false);
+  }
+
+  public PrintStream(String fileName) throws FileNotFoundException {
+    this(openFile(fileName), false);
+  }
+
+  public PrintStream(String fileName, String csn)
+      throws FileNotFoundException, UnsupportedEncodingException {
+    this(openFile(fileName), false, csn);
+  }
+
+  public PrintStream(String fileName, Charset charset) throws IOException {
+    this(openFile(fileName), false, charset);
+  }
+
+  public PrintStream(File file) throws FileNotFoundException {
+    this(openFile(file), false);
+  }
+
+  public PrintStream(File file, String csn)
+      throws FileNotFoundException, UnsupportedEncodingException {
+    this(openFile(file), false, csn);
+  }
+
+  public PrintStream(File file, Charset charset) throws IOException {
+    this(openFile(file), false, charset);
   }
 
   public synchronized void print(String s) {

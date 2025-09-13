@@ -65,6 +65,17 @@ public abstract class Charset implements Comparable<Charset> {
     throw new UnsupportedCharsetException(charsetName);
   }
 
+  public static Charset forName(String charsetName, Charset fallback) {
+    if (charsetName == null) {
+      throw new IllegalArgumentException("Null charset name");
+    }
+    try {
+      return forName(charsetName);
+    } catch (IllegalArgumentException ex) {
+      return fallback;
+    }
+  }
+
   public static boolean isSupported(String charsetName) {
     try {
       forName(charsetName);

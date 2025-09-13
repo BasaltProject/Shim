@@ -23,6 +23,9 @@
 
 package java.io;
 
+import java.nio.charset.Charset;
+import java.util.Objects;
+
 public class PrintWriter extends Writer {
   private static final char[] newline
     = System.getProperty("line.separator").toCharArray();
@@ -45,6 +48,50 @@ public class PrintWriter extends Writer {
 
   public PrintWriter(OutputStream out) {
     this(out, false);
+  }
+
+  private static OutputStream openFile(String fileName) throws FileNotFoundException {
+    try {
+      return new FileOutputStream(fileName);
+    } catch (FileNotFoundException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new FileNotFoundException(e.getMessage());
+    }
+  }
+
+  private static OutputStream openFile(File file) throws FileNotFoundException {
+    return openFile(file.getPath());
+  }
+
+  public PrintWriter(OutputStream out, boolean autoFlush, Charset charset) {
+    this(new OutputStreamWriter(out, charset), autoFlush);
+  }
+
+  public PrintWriter(String fileName) throws FileNotFoundException {
+    this(openFile(fileName), false);
+  }
+
+  public PrintWriter(String fileName, String csn)
+      throws FileNotFoundException, UnsupportedEncodingException {
+    this(new OutputStreamWriter(openFile(fileName), csn), false);
+  }
+
+  public PrintWriter(String fileName, Charset charset) throws IOException {
+    this(new OutputStreamWriter(openFile(fileName), charset), false);
+  }
+
+  public PrintWriter(File file) throws FileNotFoundException {
+    this(openFile(file), false);
+  }
+
+  public PrintWriter(File file, String csn)
+      throws FileNotFoundException, UnsupportedEncodingException {
+    this(new OutputStreamWriter(openFile(file), csn), false);
+  }
+
+  public PrintWriter(File file, Charset charset) throws IOException {
+    this(new OutputStreamWriter(openFile(file), charset), false);
   }
 
   public synchronized void print(String s) {

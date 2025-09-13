@@ -42,6 +42,10 @@ public abstract class Matcher implements MatchResult {
 
   public abstract boolean matches();
 
+  public boolean lookingAt() {
+    return find(0) && start == 0;
+  }
+
   public boolean find() {
     return find(end);
   }

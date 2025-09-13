@@ -80,7 +80,15 @@ public final class Byte extends Number implements Comparable<Byte>, java.lang.co
   }
 
   public static byte parseByte(String s) {
-    return (byte) Integer.parseInt(s);
+    return parseByte(s, 10);
+  }
+
+  public static byte parseByte(String s, int radix) {
+    int i = Integer.parseInt(s, radix);
+    if (i < MIN_VALUE || i > MAX_VALUE) {
+      throw new NumberFormatException("Value out of range. Value:\"" + s + "\" Radix:" + radix);
+    }
+    return (byte) i;
   }
 
   public byte byteValue() {
