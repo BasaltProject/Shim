@@ -28,6 +28,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -47,6 +49,124 @@ public class MethodHandles {
       throw new IllegalArgumentException("Not an array class: " + arrayClass);
     }
     return VarHandle.makeArrayHandle(arrayClass);
+  }
+
+  public static VarHandle byteArrayViewVarHandle(Class<?> viewArrayClass, ByteOrder byteOrder) {
+    Objects.requireNonNull(viewArrayClass, "viewArrayClass");
+    Objects.requireNonNull(byteOrder, "byteOrder");
+    if (!viewArrayClass.isArray() || viewArrayClass == byte[].class || viewArrayClass == boolean[].class
+        || !viewArrayClass.getComponentType().isPrimitive()) {
+      throw new IllegalArgumentException("not a supported view array class: " + viewArrayClass);
+    }
+    return VarHandle.makeByteArrayViewHandle(viewArrayClass, byteOrder);
+  }
+
+  public static VarHandle byteBufferViewVarHandle(Class<?> viewArrayClass, ByteOrder byteOrder) {
+    Objects.requireNonNull(viewArrayClass, "viewArrayClass");
+    Objects.requireNonNull(byteOrder, "byteOrder");
+    if (!viewArrayClass.isArray() || viewArrayClass == byte[].class || viewArrayClass == boolean[].class
+        || !viewArrayClass.getComponentType().isPrimitive()) {
+      throw new IllegalArgumentException("not a supported view array class: " + viewArrayClass);
+    }
+    return VarHandle.makeByteBufferViewHandle(viewArrayClass, byteOrder);
+  }
+
+  public static VarHandle filterValue(VarHandle target, MethodHandle filterToTarget, MethodHandle filterFromTarget) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(filterToTarget, "filterToTarget");
+    Objects.requireNonNull(filterFromTarget, "filterFromTarget");
+    Class<?> targetType = target.varType();
+    MethodType toType = filterToTarget.type();
+    MethodType fromType = filterFromTarget.type();
+    if (toType.parameterCount() != 1 || toType.returnType() != targetType) {
+      throw new IllegalArgumentException("filterToTarget must be (V) -> targetType: " + toType);
+    }
+    if (fromType.parameterCount() != 1 || fromType.parameterType(0) != targetType) {
+      throw new IllegalArgumentException("filterFromTarget must be (targetType) -> V: " + fromType);
+    }
+    Class<?> valueType = toType.parameterType(0);
+    if (fromType.returnType() != valueType) {
+      throw new IllegalArgumentException("filter return type must match valueType: " + fromType);
+    }
+    return VarHandle.makeFilterValue(target, filterToTarget, filterFromTarget);
+  }
+
+  public static VarHandle filterCoordinates(VarHandle target, int pos, MethodHandle... filters) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(filters, "filters");
+    int coordCount = target.coordinateTypes().size();
+    if (pos < 0 || pos >= coordCount || pos + filters.length > coordCount) {
+      throw new IllegalArgumentException("pos out of range: " + pos);
+    }
+    for (int i = 0; i < filters.length; i++) {
+      MethodHandle f = Objects.requireNonNull(filters[i], "filter");
+      Class<?> coord = target.coordinateTypes().get(pos + i);
+      if (f.type().parameterCount() != 1 || f.type().returnType() != coord) {
+        throw new IllegalArgumentException("filter " + i + " must have signature (C) -> " + coord);
+      }
+    }
+    return VarHandle.makeFilterCoordinates(target, pos, filters);
+  }
+
+  public static VarHandle insertCoordinates(VarHandle target, int pos, Object... values) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(values, "values");
+    int coordCount = target.coordinateTypes().size();
+    if (pos < 0 || pos >= coordCount || pos + values.length > coordCount) {
+      throw new IllegalArgumentException("pos out of range: " + pos);
+    }
+    return VarHandle.makeInsertCoordinates(target, pos, values);
+  }
+
+  public static VarHandle dropCoordinates(VarHandle target, int pos, List<Class<?>> valueTypes) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(valueTypes, "valueTypes");
+    int coordCount = target.coordinateTypes().size();
+    if (pos < 0 || pos > coordCount) {
+      throw new IllegalArgumentException("pos out of range: " + pos);
+    }
+    return VarHandle.makeDropCoordinates(target, pos, valueTypes);
+  }
+
+  public static VarHandle dropCoordinates(VarHandle target, int pos, Class<?>... valueTypes) {
+    Objects.requireNonNull(valueTypes, "valueTypes");
+    return dropCoordinates(target, pos, Arrays.asList(valueTypes));
+  }
+
+  public static VarHandle permuteCoordinates(VarHandle target, List<Class<?>> newCoordinates, int... reorder) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(newCoordinates, "newCoordinates");
+    Objects.requireNonNull(reorder, "reorder");
+    int targetCoords = target.coordinateTypes().size();
+    if (reorder.length != targetCoords) {
+      throw new IllegalArgumentException("reorder length must equal target coordinates count");
+    }
+    for (int i = 0; i < reorder.length; i++) {
+      int r = reorder[i];
+      if (r < 0 || r >= newCoordinates.size()) {
+        throw new IllegalArgumentException("reorder index out of range: " + r);
+      }
+      Class<?> targetCoord = target.coordinateTypes().get(i);
+      Class<?> newCoord = newCoordinates.get(r);
+      if (!targetCoord.isAssignableFrom(newCoord)) {
+        throw new IllegalArgumentException("cannot assign " + newCoord + " to " + targetCoord);
+      }
+    }
+    return VarHandle.makePermuteCoordinates(target, newCoordinates, reorder);
+  }
+
+  public static VarHandle collectCoordinates(VarHandle target, int pos, MethodHandle filter) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(filter, "filter");
+    int coordCount = target.coordinateTypes().size();
+    if (pos < 0 || pos >= coordCount) {
+      throw new IllegalArgumentException("pos out of range: " + pos);
+    }
+    Class<?> targetCoord = target.coordinateTypes().get(pos);
+    if (filter.type().returnType() != targetCoord) {
+      throw new IllegalArgumentException("filter return type must match target coordinate: " + targetCoord);
+    }
+    return VarHandle.makeCollectCoordinates(target, pos, filter);
   }
 
   public static MethodHandle identity(Class<?> type) {
@@ -426,19 +546,31 @@ public class MethodHandles {
 
     public VarHandle findVarHandle(Class<?> recv, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = recv.getField(name);
+      Field f;
+      try {
+        f = recv.getField(name);
+      } catch (NoSuchFieldException e) {
+        f = recv.getDeclaredField(name);
+      }
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) != 0) {
         throw new NoSuchFieldException(name);
       }
+      f.setAccessible(true);
       return VarHandle.makeFieldHandle(f, false);
     }
 
     public VarHandle findStaticVarHandle(Class<?> decl, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = decl.getField(name);
+      Field f;
+      try {
+        f = decl.getField(name);
+      } catch (NoSuchFieldException e) {
+        f = decl.getDeclaredField(name);
+      }
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) == 0) {
         throw new NoSuchFieldException(name);
       }
+      f.setAccessible(true);
       return VarHandle.makeFieldHandle(f, true);
     }
 
