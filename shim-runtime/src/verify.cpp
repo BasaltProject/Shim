@@ -218,6 +218,108 @@ unsigned validateMethodDescriptor(Thread* t, GcByteArray* descriptor, bool insta
     return slots;
 }
 
+namespace {
+
+unsigned slotsOf(unsigned kind)
+{
+    return kind == 'J' || kind == 'D' ? 2 : 1;
+}
+
+void methodShape(GcByteArray* descriptor, unsigned* argumentSlots, unsigned* returnSlots)
+{
+    const int8_t* bytes = descriptor->body().begin();
+    unsigned position = 1;
+    unsigned slots = 0;
+    while (bytes[position] != ')') {
+        unsigned kind = bytes[position];
+        while (bytes[position] == '[') ++position;
+        if (bytes[position] == 'L') {
+            while (bytes[position] != ';') ++position;
+        }
+        ++position;
+        slots += kind == '[' ? 1 : slotsOf(kind);
+    }
+    *argumentSlots = slots;
+    unsigned kind = bytes[position + 1];
+    *returnSlots = kind == 'V' ? 0 : slotsOf(kind);
+}
+
+void stackEffect(GcCode* code, unsigned pc, unsigned* pops, unsigned* pushes)
+{
+    const uint8_t* bytes = code->body().begin();
+    unsigned opcode = bytes[pc];
+    if (opcode == 196) opcode = bytes[pc + 1];
+    unsigned in = 0, out = 0;
+    if (opcode >= 1 && opcode <= 8) out = 1;
+    else if (opcode == 9 || opcode == 10 || opcode == 14 || opcode == 15 || opcode == 20) out = 2;
+    else if ((opcode >= 11 && opcode <= 13) || (opcode >= 16 && opcode <= 19)) out = 1;
+    else if (opcode >= 21 && opcode <= 25) out = opcode == 22 || opcode == 24 ? 2 : 1;
+    else if (opcode >= 26 && opcode <= 45) out = ((opcode - 26) / 4) % 2 == 1 ? 2 : 1;
+    else if (opcode >= 46 && opcode <= 53) { in = 2; out = opcode == 47 || opcode == 49 ? 2 : 1; }
+    else if (opcode >= 54 && opcode <= 58) in = opcode == 55 || opcode == 57 ? 2 : 1;
+    else if (opcode >= 59 && opcode <= 78) in = ((opcode - 59) / 4) % 2 == 1 ? 2 : 1;
+    else if (opcode >= 79 && opcode <= 86) in = opcode == 80 || opcode == 82 ? 4 : 3;
+    else if (opcode == 87) in = 1;
+    else if (opcode == 88) in = 2;
+    else if (opcode == 89) { in = 1; out = 2; }
+    else if (opcode == 90) { in = 2; out = 3; }
+    else if (opcode == 91) { in = 3; out = 4; }
+    else if (opcode == 92) { in = 2; out = 4; }
+    else if (opcode == 93) { in = 3; out = 5; }
+    else if (opcode == 94) { in = 4; out = 6; }
+    else if (opcode == 95) { in = 2; out = 2; }
+    else if (opcode >= 96 && opcode <= 115) { out = (opcode - 96) % 2 == 1 ? 2 : 1; in = 2 * out; }
+    else if (opcode >= 116 && opcode <= 119) { out = opcode == 117 || opcode == 119 ? 2 : 1; in = out; }
+    else if (opcode >= 120 && opcode <= 125) { out = opcode % 2 == 1 ? 2 : 1; in = out + 1; }
+    else if (opcode >= 126 && opcode <= 131) { out = opcode % 2 == 1 ? 2 : 1; in = 2 * out; }
+    else if (opcode >= 133 && opcode <= 147) {
+        static const uint8_t table[15][2] = { {1,2}, {1,1}, {1,2}, {2,1}, {2,1}, {2,2}, {1,1}, {1,2},
+            {1,2}, {2,1}, {2,2}, {2,1}, {1,1}, {1,1}, {1,1} };
+        in = table[opcode - 133][0];
+        out = table[opcode - 133][1];
+    } else if (opcode == 148 || opcode == 151 || opcode == 152) { in = 4; out = 1; }
+    else if (opcode == 149 || opcode == 150) { in = 2; out = 1; }
+    else if ((opcode >= 153 && opcode <= 158) || opcode == 170 || opcode == 171
+             || opcode == 198 || opcode == 199) in = 1;
+    else if (opcode >= 159 && opcode <= 166) in = 2;
+    else if (opcode == 168 || opcode == 201) out = 1;
+    else if (opcode >= 172 && opcode <= 176) in = opcode == 173 || opcode == 175 ? 2 : 1;
+    else if (opcode == 187) out = 1;
+    else if (opcode == 188 || opcode == 189 || opcode == 190 || opcode == 192 || opcode == 193) { in = 1; out = 1; }
+    else if (opcode == 191 || opcode == 194 || opcode == 195) in = 1;
+    else if (opcode == 197) { in = bytes[pc + 3]; out = 1; }
+    *pops = in;
+    *pushes = out;
+}
+
+void memberEffect(Thread* t, GcCode* code, unsigned pc, unsigned* pops, unsigned* pushes)
+{
+    const uint8_t* bytes = code->body().begin();
+    unsigned opcode = bytes[pc];
+    unsigned index = word16(bytes + pc + 1) - 1;
+    if (opcode == 186) {
+        GcInvocation* invocation = cast<GcInvocation>(t, singletonObject(t, code->pool(), index));
+        unsigned arguments, result;
+        methodShape(invocation->template_()->spec(), &arguments, &result);
+        *pops = arguments;
+        *pushes = result;
+        return;
+    }
+    GcReference* reference = cast<GcReference>(t, singletonObject(t, code->pool(), index));
+    if (opcode >= 178 && opcode <= 181) {
+        unsigned size = slotsOf(reference->spec()->body()[0]);
+        *pops = opcode == 179 ? size : (opcode == 180 ? 1 : (opcode == 181 ? 1 + size : 0));
+        *pushes = opcode == 178 || opcode == 180 ? size : 0;
+        return;
+    }
+    unsigned arguments, result;
+    methodShape(reference->spec(), &arguments, &result);
+    *pops = arguments + (opcode == 184 ? 0 : 1);
+    *pushes = result;
+}
+
+} // namespace
+
 void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsigned returnKind)
 {
     PROTECT(t, code);
@@ -254,50 +356,61 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsi
     }
     // Legacy subroutine return addresses need a separate flow model.
     if (major < 51) return;
-    THREAD_RUNTIME_ARRAY(t, uint8_t, reached, code->length());
+    THREAD_RUNTIME_ARRAY(t, int32_t, depths, code->length());
     THREAD_RUNTIME_ARRAY(t, unsigned, pending, code->length());
-    memset(RUNTIME_ARRAY_BODY(reached), 0, code->length());
+    for (unsigned i = 0; i < code->length(); ++i) RUNTIME_ARRAY_BODY(depths)[i] = -1;
     unsigned head = 0, tail = 0;
-    auto enqueue = [&](unsigned pc) {
+    auto enqueue = [&](unsigned pc, unsigned depth) {
         require(t, pc < code->length(), "Execution falls outside Code array");
-        if (!RUNTIME_ARRAY_BODY(reached)[pc]) {
-            RUNTIME_ARRAY_BODY(reached)[pc] = 1;
+        require(t, depth <= code->maxStack(), "Operand stack exceeds max_stack");
+        if (RUNTIME_ARRAY_BODY(depths)[pc] < 0) {
+            RUNTIME_ARRAY_BODY(depths)[pc] = static_cast<int32_t>(depth);
             RUNTIME_ARRAY_BODY(pending)[tail++] = pc;
+        } else {
+            require(t, RUNTIME_ARRAY_BODY(depths)[pc] == static_cast<int32_t>(depth),
+                    "Inconsistent operand stack height at merge point");
         }
     };
-    enqueue(0);
+    enqueue(0, 0);
     while (head < tail) {
         unsigned pc = RUNTIME_ARRAY_BODY(pending)[head++];
+        unsigned depth = RUNTIME_ARRAY_BODY(depths)[pc];
         const uint8_t* bytes = code->body().begin();
         unsigned opcode = bytes[pc];
         unsigned next = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts), major);
+        unsigned pops, pushes;
+        if (opcode >= 178 && opcode <= 186) memberEffect(t, code, pc, &pops, &pushes);
+        else stackEffect(code, pc, &pops, &pushes);
+        require(t, depth >= pops, "Operand stack underflow");
+        unsigned after = depth - pops + pushes;
+        require(t, after <= code->maxStack(), "Operand stack exceeds max_stack");
         if (handlers) {
             for (unsigned i = 0; i < handlers->length(); ++i) {
                 uint64_t entry = handlers->body()[i];
                 if (pc >= exceptionHandlerStart(entry) && pc < exceptionHandlerEnd(entry)) {
-                    enqueue(exceptionHandlerIp(entry));
+                    enqueue(exceptionHandlerIp(entry), 1);
                 }
             }
         }
         if ((opcode >= 153 && opcode <= 168) || opcode == 198 || opcode == 199) {
-            enqueue(pc + static_cast<int16_t>(word16(bytes + pc + 1)));
+            enqueue(pc + static_cast<int16_t>(word16(bytes + pc + 1)), after);
         } else if (opcode == 200 || opcode == 201) {
-            enqueue(pc + word32(bytes + pc + 1));
+            enqueue(pc + word32(bytes + pc + 1), after);
         } else if (opcode == 170 || opcode == 171) {
             unsigned position = (pc + 4) & ~3u;
-            enqueue(pc + word32(bytes + position));
+            enqueue(pc + word32(bytes + position), after);
             unsigned count = opcode == 170 ? word32(bytes + position + 8) - word32(bytes + position + 4) + 1
                 : word32(bytes + position + 4);
             unsigned stride = opcode == 170 ? 4 : 8;
             position += opcode == 170 ? 12 : 8;
             for (unsigned i = 0; i < count; ++i) {
-                enqueue(pc + word32(bytes + position + i * stride + (opcode == 171 ? 4 : 0)));
+                enqueue(pc + word32(bytes + position + i * stride + (opcode == 171 ? 4 : 0)), after);
             }
         }
         bool terminal = opcode == 167 || opcode == 200 || opcode == 170 || opcode == 171
             || (opcode >= 172 && opcode <= 177) || opcode == 191 || opcode == 169
             || (opcode == 196 && bytes[pc + 1] == 169);
-        if (!terminal) enqueue(next);
+        if (!terminal) enqueue(next, after);
     }
 }
 

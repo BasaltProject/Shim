@@ -112,7 +112,7 @@ object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* po
             if (kind >= REF_getField and kind <= REF_putStatic) {
                 GcReference* ref = cast<GcReference>(t, value);
                 PROTECT(t, ref);
-                GcClass* class_ = resolveClass(t, loader, ref->class_());
+                GcClass* class_ = resolveClassInObject(t, loader, ref, ReferenceClass);
                 PROTECT(t, class_);
                 GcField* field = cast<GcField>(t, findInHierarchy(t, class_, ref->name(), ref->spec(), findFieldInClass, GcNoSuchFieldError::Type));
                 PROTECT(t, field);

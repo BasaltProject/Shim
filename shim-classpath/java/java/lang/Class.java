@@ -131,6 +131,7 @@ public final class Class <T>
   }
 
   public String descriptorString() {
+    if (isArray()) return "[" + getComponentType().descriptorString();
     if (this == void.class) return "V";
     if (this == boolean.class) return "Z";
     if (this == byte.class) return "B";
@@ -140,29 +141,29 @@ public final class Class <T>
     if (this == long.class) return "J";
     if (this == float.class) return "F";
     if (this == double.class) return "D";
-    String name = getName().replace('.', '/');
-    return isArray() ? name : "L" + name + ";";
+    String name = getName();
+    if (isHidden()) {
+      int suffix = name.lastIndexOf('/');
+      name = name.substring(0, suffix).replace('.', '/') + "." + name.substring(suffix + 1);
+    } else {
+      name = name.replace('.', '/');
+    }
+    return "L" + name + ";";
   }
 
   public Class componentType() {
     return getComponentType();
   }
 
-  private static final java.util.concurrent.ConcurrentHashMap<Class<?>, Boolean> HIDDEN_CLASSES =
-      new java.util.concurrent.ConcurrentHashMap<Class<?>, Boolean>();
-
-  public static void markHidden(Class<?> c) {
-    if (c != null) {
-      HIDDEN_CLASSES.put(c, Boolean.TRUE);
-    }
-  }
-
   public boolean isHidden() {
-    return HIDDEN_CLASSES.containsKey(this);
+    return (vmClass.vmFlags & (1 << 12)) != 0;
   }
 
   public java.util.Optional<java.lang.constant.ClassDesc> describeConstable() {
-    return java.util.Optional.of(java.lang.constant.ClassDesc.ofDescriptor(descriptorString()));
+    Class<?> element = this;
+    while (element.isArray()) element = element.getComponentType();
+    return element.isHidden() ? java.util.Optional.empty()
+        : java.util.Optional.of(java.lang.constant.ClassDesc.ofDescriptor(descriptorString()));
   }
 
   public Class arrayType() {
@@ -203,14 +204,29 @@ public final class Class <T>
       }
     }
 
-    return new String(shim.Utf8.decode16(c.name, 0, c.name.length - 1)).replace('/', '.');
+    if (c.arrayDimensions > 0 && c.arrayElementClass != null) {
+      VMClass leaf = c.arrayElementClass;
+      while (leaf.arrayDimensions > 0) leaf = leaf.arrayElementClass;
+      if ((leaf.vmFlags & (1 << 12)) != 0) {
+        return c.arrayElementClass.arrayDimensions > 0 ? "[" + getName(c.arrayElementClass)
+            : "[L" + getName(c.arrayElementClass) + ";";
+      }
+    }
+    String name = new String(shim.Utf8.decode16(c.name, 0, c.name.length - 1));
+    if ((c.vmFlags & (1 << 12)) != 0) {
+      int suffix = name.lastIndexOf('/');
+      return name.substring(0, suffix).replace('/', '.') + name.substring(suffix);
+    }
+    return name.replace('/', '.');
   }
 
   public String getCanonicalName() {
+    if (isHidden()) return null;
     if ((vmClass.vmFlags & PrimitiveFlag) != 0) {
       return getName();
     } else if (isArray()) {
-      return getComponentType().getCanonicalName() + "[]";
+      String componentName = getComponentType().getCanonicalName();
+      return componentName == null ? null : componentName + "[]";
     } else {
       return getName().replace('$', '.');
     }
@@ -222,7 +238,7 @@ public final class Class <T>
     } else if (isArray()) {
       return getComponentType().getSimpleName() + "[]";
     } else {
-      String name = getCanonicalName();
+      String name = isHidden() ? getName() : getCanonicalName();
       int index = name.lastIndexOf('.');
       if (index >= 0) {
         return name.substring(index + 1);
@@ -748,7 +764,7 @@ public final class Class <T>
     if ((vmClass.vmFlags & PrimitiveFlag) != 0 || isArray()) {
       return null;
     } else {
-      String name = getCanonicalName();
+      String name = getName();
       int index = name.lastIndexOf('.');
       if (index >= 0) {
         return vmClass.loader.getPackage(name.substring(0, index));
@@ -935,6 +951,10 @@ public final class Class <T>
       return this;
     }
     ClassAddendum addendum = vmClass.addendum;
+    if (isHidden()) {
+      return addendum != null && addendum.hiddenNestHost != null
+          ? SystemClassLoader.getClass(addendum.hiddenNestHost) : this;
+    }
     if (addendum != null && addendum.nestHost != null) {
       try {
         String hostName = Classes.toString(addendum.nestHost).replace('/', '.');

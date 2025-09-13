@@ -188,6 +188,36 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_defineLambdaVMClass(Thread* t, object, uintptr_t* arguments)
+{
+  GcClassLoader* loader = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
+  if (loader == 0) loader = roots(t)->bootLoader();
+  PROTECT(t, loader);
+  GcClass* target = cast<GcClass>(t, reinterpret_cast<object>(arguments[2]));
+  PROTECT(t, target);
+  GcByteArray* bytes = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[1]));
+  unsigned length = bytes->length();
+  uint8_t* buffer = static_cast<uint8_t*>(t->m->heap->allocate(length));
+  THREAD_RESOURCE2(t, uint8_t*, buffer, unsigned, length, t->m->heap->free(buffer, length));
+  memcpy(buffer, bytes->body().begin(), length);
+  return reinterpret_cast<int64_t>(defineClass(t, loader, buffer, length, target));
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_defineHiddenVMClass(Thread* t, object, uintptr_t* arguments)
+{
+  GcClass* host = cast<GcClass>(t, reinterpret_cast<object>(arguments[0]));
+  PROTECT(t, host);
+  GcByteArray* bytes = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[1]));
+  unsigned length = bytes->length();
+  uint8_t* buffer = static_cast<uint8_t*>(t->m->heap->allocate(length));
+  THREAD_RESOURCE2(t, uint8_t*, buffer, unsigned, length, t->m->heap->free(buffer, length));
+  memcpy(buffer, bytes->body().begin(), length);
+  return reinterpret_cast<int64_t>(
+      parseClass(t, host->loader(), buffer, length, GcNoClassDefFoundError::Type, host));
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_shim_Classes_makeString(Thread* t, object, uintptr_t* arguments)
 {
   GcByteArray* array
