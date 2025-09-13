@@ -26,7 +26,6 @@ package java.lang;
 import java.util.Map;
 import java.util.Objects;
 import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class Thread implements Runnable {
   // set and accessed from within LockSupport
@@ -47,7 +46,7 @@ public class Thread implements Runnable {
   private String name;
   private ThreadGroup group;
 
-  private static final AtomicLong nextThreadId = new AtomicLong(1);
+  private static native long nextThreadId();
   private final long tid;
   private final boolean isVirtual;
 
@@ -57,22 +56,23 @@ public class Thread implements Runnable {
   public static final int NORM_PRIORITY = 5;
   public static final int MAX_PRIORITY = 10;
 
-  public Thread(ThreadGroup group, Runnable task, String name, long stackSize, boolean isVirtual) {
-    this.isVirtual = isVirtual;
-    this.tid = nextThreadId.getAndIncrement();
-    this.group = (group == null ? (Thread.currentThread() != null ? Thread.currentThread().group : null) : group);
-    this.task = task;
-    this.name = (name != null) ? name : (isVirtual ? "" : "Thread-" + tid);
-    if (isVirtual) {
-      this.daemon = true;
-      this.priority = (byte) NORM_PRIORITY;
-    } else {
-      this.priority = (byte) NORM_PRIORITY;
-    }
+  public Thread(ThreadGroup group, Runnable task, String name, long stackSize, boolean inheritThreadLocals) {
+    this(group, task, Objects.requireNonNull(name), stackSize, inheritThreadLocals, false);
+  }
 
+  private Thread(ThreadGroup group, Runnable task, String name, long stackSize,
+                 boolean inheritThreadLocals, boolean isVirtual) {
     Thread current = currentThread();
+    this.isVirtual = isVirtual;
+    this.tid = nextThreadId();
+    this.group = group == null && current != null ? current.group : group;
+    this.task = task;
+    this.name = name != null ? name : (isVirtual ? "" : "Thread-" + tid);
+    this.daemon = isVirtual || (current != null && current.isDaemon());
+    this.priority = (byte) (isVirtual || current == null ? NORM_PRIORITY : current.getPriority());
+
     if (current != null) {
-      Map<ThreadLocal, Object> map = current.locals;
+      Map<ThreadLocal, Object> map = inheritThreadLocals ? current.locals : null;
       if (map != null) {
         for (Map.Entry<ThreadLocal, Object> e: map.entrySet()) {
           if (e.getKey() instanceof InheritableThreadLocal) {
@@ -81,32 +81,36 @@ public class Thread implements Runnable {
           }
         }
       }
-      classLoader = current.classLoader;
+      classLoader = inheritThreadLocals ? current.classLoader : ClassLoader.getSystemClassLoader();
     }
   }
 
   public Thread(ThreadGroup group, Runnable task, String name, long stackSize) {
-    this(group, task, name, stackSize, false);
+    this(group, task, name, stackSize, true);
   }
 
   public Thread(ThreadGroup group, Runnable task, String name) {
-    this(group, task, name, 0, false);
+    this(group, task, name, 0, true);
   }
 
   public Thread(ThreadGroup group, String name) {
-    this(group, null, name, 0, false);
+    this(group, null, name, 0, true);
+  }
+
+  public Thread(ThreadGroup group, Runnable task) {
+    this(group, task, null, 0, true, false);
   }
 
   public Thread(Runnable task, String name) {
-    this(null, task, name, 0, false);
+    this(null, task, name, 0, true);
   }
 
   public Thread(Runnable task) {
-    this(null, task, null, 0, false);
+    this(null, task, null, 0, true, false);
   }
 
   public Thread(String name) {
-    this(null, null, name, 0, false);
+    this(null, null, name, 0, true);
   }
 
   public Thread() {
@@ -122,7 +126,7 @@ public class Thread implements Runnable {
   }
 
   public final long threadId() {
-    return tid != 0 ? tid : 1;
+    return tid;
   }
 
   public long getId() {
@@ -430,8 +434,8 @@ public class Thread implements Runnable {
     private boolean inheritLocals = true;
     private UncaughtExceptionHandler ueh;
     private ThreadGroup group;
-    private boolean daemon = false;
-    private int priority = NORM_PRIORITY;
+    private Boolean daemon;
+    private int priority;
     private long stackSize = 0;
 
     @Override
@@ -500,9 +504,9 @@ public class Thread implements Runnable {
     @Override
     public Thread unstarted(Runnable task) {
       Objects.requireNonNull(task);
-      Thread t = new Thread(group, task, nextName(), stackSize, false);
-      t.daemon = daemon;
-      t.priority = (byte) priority;
+      Thread t = new Thread(group, task, nextName(), stackSize, inheritLocals, false);
+      if (daemon != null) t.daemon = daemon.booleanValue();
+      if (priority != 0) t.priority = (byte) priority;
       if (ueh != null) {
         t.setUncaughtExceptionHandler(ueh);
       }
@@ -572,7 +576,7 @@ public class Thread implements Runnable {
     @Override
     public Thread unstarted(Runnable task) {
       Objects.requireNonNull(task);
-      Thread t = new Thread(null, task, nextName(), 0, true);
+      Thread t = new Thread(null, task, nextName(), 0, inheritLocals, true);
       if (ueh != null) {
         t.setUncaughtExceptionHandler(ueh);
       }

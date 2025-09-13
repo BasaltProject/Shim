@@ -168,6 +168,12 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Thread_nextThreadId(Thread* t, object, uintptr_t*)
+{
+  return static_cast<int64_t>(allocateThreadId(t));
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_shim_Classes_defineVMClass(Thread* t, object, uintptr_t* arguments)
 {
   GcClassLoader* loader

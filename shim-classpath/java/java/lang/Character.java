@@ -201,11 +201,11 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static boolean isDigit(char c) {
-    return c >= '0' && c <= '9';
+    return isDigit((int) c);
   }
 
   public static boolean isDigit(int c) {
-    return c >= '0' && c <= '9';
+    return getType(c) == DECIMAL_DIGIT_NUMBER;
   }
 
   public static int digit(char c, int radix) {
@@ -237,35 +237,39 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static boolean isLetter(int c) {
-    return canCastToChar(c) && isLetter((char) c);
+    int type = getType(c);
+    return type >= UPPERCASE_LETTER && type <= OTHER_LETTER;
   }
 
   public static boolean isLetter(char c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    return isLetter((int) c);
   }
 
   public static boolean isLetterOrDigit(char c) {
-    return isDigit(c) || isLetter(c);
+    return isLetterOrDigit((int) c);
   }
 
   public static boolean isLetterOrDigit(int c) {
-    return canCastToChar(c) && (isDigit((char) c) || isLetter((char) c));
+    int type = getType(c);
+    return (type >= UPPERCASE_LETTER && type <= OTHER_LETTER) || type == DECIMAL_DIGIT_NUMBER;
   }
 
   public static boolean isLowerCase(int c) {
-    return canCastToChar(c) && isLowerCase((char) c);
+    return getType(c) == LOWERCASE_LETTER
+        || CharacterData.hasProperty(c, CharacterData.OTHER_LOWERCASE);
   }
 
   public static boolean isLowerCase(char c) {
-    return (c >= 'a' && c <= 'z');
+    return isLowerCase((int) c);
   }
 
   public static boolean isUpperCase(char c) {
-    return (c >= 'A' && c <= 'Z');
+    return isUpperCase((int) c);
   }
 
   public static boolean isUpperCase(int c) {
-    return canCastToChar(c) && isUpperCase((char) c);
+    return getType(c) == UPPERCASE_LETTER
+        || CharacterData.hasProperty(c, CharacterData.OTHER_UPPERCASE);
   }
 
   public static boolean isTitleCase(char c) {
@@ -273,11 +277,7 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static boolean isTitleCase(int cp) {
-    return cp == 0x01C5 || cp == 0x01C8 || cp == 0x01CB || cp == 0x01F2
-        || (cp >= 0x1F88 && cp <= 0x1F8F)
-        || (cp >= 0x1F98 && cp <= 0x1F9F)
-        || (cp >= 0x1FA8 && cp <= 0x1FAF)
-        || cp == 0x1FBC || cp == 0x1FCC || cp == 0x1FFC;
+    return getType(cp) == TITLECASE_LETTER;
   }
 
   public static boolean isWhitespace(char c) {
@@ -295,7 +295,30 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static boolean isSpaceChar(char c) {
-    return isWhitespace(c);
+    return isSpaceChar((int) c);
+  }
+
+  public static boolean isSpaceChar(int codePoint) {
+    int type = getType(codePoint);
+    return type == SPACE_SEPARATOR || type == LINE_SEPARATOR || type == PARAGRAPH_SEPARATOR;
+  }
+
+  public static boolean isDefined(char c) {
+    return isDefined((int) c);
+  }
+
+  public static boolean isDefined(int codePoint) {
+    return getType(codePoint) != UNASSIGNED;
+  }
+
+  public static boolean isAlphabetic(int codePoint) {
+    int type = getType(codePoint);
+    return (type >= UPPERCASE_LETTER && type <= OTHER_LETTER) || type == LETTER_NUMBER
+        || CharacterData.hasProperty(codePoint, CharacterData.OTHER_ALPHABETIC);
+  }
+
+  public static boolean isIdeographic(int codePoint) {
+    return CharacterData.hasProperty(codePoint, CharacterData.IDEOGRAPHIC);
   }
 
   public static boolean isHighSurrogate(char ch) {
@@ -319,55 +342,7 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static int getType(int cp) {
-    if (cp < 0 || cp > 0x10FFFF) {
-      return UNASSIGNED;
-    }
-    if (cp >= 0xD800 && cp <= 0xDFFF) {
-      return SURROGATE;
-    }
-    if (isIdentifierIgnorable(cp)) {
-      if ((cp >= 0x0000 && cp <= 0x0008) || (cp >= 0x000E && cp <= 0x001B) || (cp >= 0x007F && cp <= 0x009F)) {
-        return CONTROL;
-      }
-      return FORMAT;
-    }
-    if (isISOControl(cp)) {
-      return CONTROL;
-    }
-    if (isDigit(cp)) {
-      return DECIMAL_DIGIT_NUMBER;
-    }
-    if (isUpperCase(cp)) {
-      return UPPERCASE_LETTER;
-    }
-    if (isLowerCase(cp)) {
-      return LOWERCASE_LETTER;
-    }
-    if (isTitleCase(cp)) {
-      return TITLECASE_LETTER;
-    }
-    if (cp == '_' || cp == 0x203F || cp == 0x2040 || cp == 0x2054 || cp == 0xFE33 || cp == 0xFE34 || cp == 0xFE4D || cp == 0xFE4E || cp == 0xFE4F || cp == 0xFF3F) {
-      return CONNECTOR_PUNCTUATION;
-    }
-    if (cp == '$' || cp == 0x00A2 || cp == 0x00A3 || cp == 0x00A4 || cp == 0x00A5 || cp == 0x20AC) {
-      return CURRENCY_SYMBOL;
-    }
-    if (cp >= 0x2160 && cp <= 0x2188) {
-      return LETTER_NUMBER;
-    }
-    if (cp == ' ' || cp == 0x00A0 || (cp >= 0x2000 && cp <= 0x200A) || cp == 0x202F || cp == 0x205F || cp == 0x3000) {
-      return SPACE_SEPARATOR;
-    }
-    if (cp == 0x2028) {
-      return LINE_SEPARATOR;
-    }
-    if (cp == 0x2029) {
-      return PARAGRAPH_SEPARATOR;
-    }
-    if (isLetter(cp)) {
-      return OTHER_LETTER;
-    }
-    return OTHER_PUNCTUATION;
+    return CharacterData.getType(cp);
   }
 
   public static boolean isIdentifierIgnorable(char ch) {
@@ -378,13 +353,7 @@ public final class Character implements Comparable<Character>, java.lang.constan
     return (codePoint >= 0x0000 && codePoint <= 0x0008)
         || (codePoint >= 0x000E && codePoint <= 0x001B)
         || (codePoint >= 0x007F && codePoint <= 0x009F)
-        || (codePoint >= 0x200C && codePoint <= 0x200F)
-        || (codePoint >= 0x202A && codePoint <= 0x202E)
-        || (codePoint >= 0x2060 && codePoint <= 0x206F)
-        || (codePoint == 0xFEFF)
-        || (codePoint >= 0xFFF9 && codePoint <= 0xFFFB)
-        || (codePoint >= 0x1D173 && codePoint <= 0x1D17A)
-        || (codePoint >= 0xE0001 && codePoint <= 0xE007F);
+        || getType(codePoint) == FORMAT;
   }
 
   public static boolean isJavaIdentifierStart(char ch) {
@@ -427,7 +396,8 @@ public final class Character implements Comparable<Character>, java.lang.constan
         || type == TITLECASE_LETTER
         || type == MODIFIER_LETTER
         || type == OTHER_LETTER
-        || type == LETTER_NUMBER;
+        || type == LETTER_NUMBER
+        || CharacterData.hasProperty(codePoint, CharacterData.OTHER_ID_START);
   }
 
   public static boolean isUnicodeIdentifierPart(char ch) {
@@ -441,7 +411,8 @@ public final class Character implements Comparable<Character>, java.lang.constan
         || type == DECIMAL_DIGIT_NUMBER
         || type == COMBINING_SPACING_MARK
         || type == NON_SPACING_MARK
-        || isIdentifierIgnorable(codePoint);
+        || isIdentifierIgnorable(codePoint)
+        || CharacterData.hasProperty(codePoint, CharacterData.OTHER_ID_CONTINUE);
   }
 
   public static int toCodePoint(char high, char low) {

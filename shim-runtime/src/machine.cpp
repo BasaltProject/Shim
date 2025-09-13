@@ -4004,6 +4004,7 @@ Machine::Machine(System* system,
       heapLock(0),
       classLock(0),
       hiddenClassSequence(0),
+      threadIdSequence(0),
       referenceLock(0),
       shutdownLock(0),
       libraries(0),
@@ -6319,6 +6320,12 @@ GcMethod* getCaller(Thread* t, unsigned target, bool skipMethodInvoke)
   t->m->processor->walkStack(t, &v);
 
   return v.method;
+}
+
+uint64_t allocateThreadId(Thread* t)
+{
+  ACQUIRE_RAW(t, t->m->stateLock);
+  return ++t->m->threadIdSequence;
 }
 
 GcClass* defineClass(Thread* t,

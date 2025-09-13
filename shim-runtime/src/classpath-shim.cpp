@@ -64,8 +64,7 @@ class MyClasspath : public Classpath {
     const unsigned NewState = 0;
     const unsigned NormalPriority = 5;
 
-    static uint64_t nextThreadId = 1;
-    uint64_t tid = nextThreadId++;
+    uint64_t tid = allocateThreadId(t);
 
     return vm::makeThread(t,
                           0,
