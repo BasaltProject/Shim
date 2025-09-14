@@ -2428,6 +2428,7 @@ void compile(MyThread* t,
 
 GcMethod* resolveMethod(Thread* t, GcPair* pair)
 {
+  PROTECT(t, pair);
   GcReference* reference = cast<GcReference>(t, pair->second());
   PROTECT(t, reference);
 
@@ -2438,7 +2439,8 @@ GcMethod* resolveMethod(Thread* t, GcPair* pair)
       ReferenceClass);
 
   return cast<GcMethod>(t,
-                        findInHierarchy(t,
+                        resolveMember(t,
+                                        cast<GcMethod>(t, pair->first())->class_()->loader(),
                                         class_,
                                         reference->name(),
                                         reference->spec(),
@@ -2544,9 +2546,11 @@ int64_t findVirtualMethodFromReference(MyThread* t,
 
   GcMethod* target = resolveMethod(t, pair);
 
+  if (!instance) throwNew(t, GcNullPointerException::Type);
+
   if (target->class_()->flags() & ACC_INTERFACE) {
     target = findInterfaceMethod(t, target, objectClass(t, instance));
-  } else {
+  } else if (methodVirtual(t, target)) {
     target = findVirtualMethod(t, target, objectClass(t, instance));
   }
 
@@ -2919,8 +2923,19 @@ void NO_RETURN throw_(MyThread* t, GcThrowable* o)
   }
 }
 
+GcClass* loadedClassInPool(Thread* t, GcMethod* method, unsigned index)
+{
+  object entry = singletonObject(t, method->code()->pool(), index);
+  if (objectClass(t, entry) == type(t, GcReference::Type)) {
+    return findLoadedClass(t, method->class_()->loader(), cast<GcReference>(t, entry)->name());
+  }
+  return cast<GcClass>(t, entry);
+}
+
 void checkCast(MyThread* t, GcClass* class_, object o)
 {
+  PROTECT(t, class_);
+  PROTECT(t, o);
   if (UNLIKELY(o and not isAssignableFrom(t, class_, objectClass(t, o)))) {
     GcByteArray* classNameFrom = objectClass(t, o)->name();
     GcByteArray* classNameTo = class_->name();
@@ -2944,6 +2959,8 @@ void checkCast(MyThread* t, GcClass* class_, object o)
 
 void checkCastFromReference(MyThread* t, GcPair* pair, object o)
 {
+  if (!o) return;
+  PROTECT(t, pair);
   PROTECT(t, o);
 
   GcClass* c
@@ -2956,6 +2973,7 @@ void checkCastFromReference(MyThread* t, GcPair* pair, object o)
 
 GcField* resolveField(Thread* t, GcPair* pair)
 {
+  PROTECT(t, pair);
   GcReference* reference = cast<GcReference>(t, pair->second());
   PROTECT(t, reference);
 
@@ -2966,7 +2984,8 @@ GcField* resolveField(Thread* t, GcPair* pair)
       ReferenceClass);
 
   return cast<GcField>(t,
-                       findInHierarchy(t,
+                       resolveMember(t,
+                                       cast<GcMethod>(t, pair->first())->class_()->loader(),
                                        class_,
                                        reference->name(),
                                        reference->spec(),
@@ -2982,6 +3001,8 @@ uint64_t getFieldValue(Thread* t, object target, GcField* field)
     return fieldAtOffset<int8_t>(target, field->offset());
 
   case CharField:
+    return fieldAtOffset<uint16_t>(target, field->offset());
+
   case ShortField:
     return fieldAtOffset<int16_t>(target, field->offset());
 
@@ -3146,6 +3167,8 @@ uint64_t instanceOf64(Thread* t, GcClass* class_, object o)
 
 uint64_t instanceOfFromReference(Thread* t, GcPair* pair, object o)
 {
+  if (!o) return 0;
+  PROTECT(t, pair);
   PROTECT(t, o);
 
   GcClass* c
@@ -4533,7 +4556,7 @@ loop:
       PROTECT(t, reference);
 
       GcClass* class_
-          = resolveClassInPool(t, context->method, index - 1, false);
+          = loadedClassInPool(t, context->method, index - 1);
 
       object argument;
       Thunk thunk;
@@ -5188,7 +5211,7 @@ loop:
       PROTECT(t, reference);
 
       GcClass* class_
-          = resolveClassInPool(t, context->method, index - 1, false);
+          = loadedClassInPool(t, context->method, index - 1);
 
       ir::Value* instance = frame->pop(ir::Type::object());
 

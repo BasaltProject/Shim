@@ -47,7 +47,13 @@
   (array maybe_object body))
 
 (type classLoader java/lang/ClassLoader
-  (object map))
+  (object map)
+  (object constraints))
+
+(type loadingConstraint
+  (class bound)
+  (loadingConstraint parent)
+  (uint32_t rank))
 
 (type systemClassLoader shim/SystemClassLoader
   (void* finder))
@@ -223,6 +229,8 @@
 (type exception java/lang/Exception)
 
 (type runtimeException java/lang/RuntimeException)
+
+(type securityException java/lang/SecurityException)
 
 (type nullPointerException java/lang/NullPointerException)
 

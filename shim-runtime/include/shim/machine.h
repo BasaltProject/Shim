@@ -2423,7 +2423,8 @@ GcClass* parseClass(Thread* t,
                     const uint8_t* data,
                     unsigned length,
                     Gc::Type throwType = GcNoClassDefFoundError::Type,
-                    GcClass* hiddenHost = 0);
+                    GcClass* hiddenHost = 0,
+                    GcByteArray* expectedName = 0);
 
 GcClass* resolveClass(Thread* t,
                       GcClassLoader* loader,
@@ -2721,6 +2722,11 @@ inline GcMethod* findMethodOrNull(Thread* t,
 
 inline GcMethod* findVirtualMethod(Thread* t, GcMethod* method, GcClass* class_)
 {
+  if (UNLIKELY(class_->vmFlags() & BootstrapFlag)) {
+    PROTECT(t, method);
+    PROTECT(t, class_);
+    resolveSystemClass(t, roots(t)->bootLoader(), class_->name());
+  }
   return cast<GcMethod>(
       t, cast<GcArray>(t, class_->virtualTable())->body()[method->offset()]);
 }
@@ -3406,6 +3412,15 @@ inline unsigned poolSize(Thread* t, GcSingleton* pool)
   return singletonCount(t, pool) - poolMaskSize(t, pool);
 }
 
+object resolveMember(Thread* t,
+                     GcClassLoader* loader,
+                     GcClass* class_,
+                     GcByteArray* name,
+                     GcByteArray* spec,
+                     object (*find)(Thread*, GcClass*, GcByteArray*, GcByteArray*),
+                     Gc::Type errorType,
+                     bool throw_ = true);
+
 inline GcClass* resolveClassInObject(Thread* t,
                                      GcClassLoader* loader,
                                      object container,
@@ -3493,7 +3508,8 @@ inline object resolve(
         = resolveClassInObject(t, loader, o, ReferenceClass, throw_);
 
     if (class_) {
-      o = findInHierarchy(t,
+      o = resolveMember(t,
+                          loader,
                           class_,
                           reference->name(),
                           reference->spec(),
@@ -3812,7 +3828,8 @@ GcClass* defineClass(Thread* t,
                      GcClassLoader* loader,
                      const uint8_t* buffer,
                      unsigned length,
-                     GcClass* hiddenTarget = 0);
+                     GcClass* hiddenTarget = 0,
+                     GcByteArray* expectedName = 0);
 
 inline GcMethod* methodClone(Thread* t, GcMethod* method)
 {

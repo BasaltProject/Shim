@@ -15,16 +15,22 @@ public final class PublicMethods {
   private PublicMethods() { }
 
   public static Method[] get(Class<?> type) {
+    return get(type, null, null);
+  }
+
+  private static Method[] get(Class<?> type, String name, Class<?>[] parameters) {
     if (type.isPrimitive()) return new Method[0];
     ArrayList<Method> methods = new ArrayList<Method>();
     for (Method method : type.getDeclaredMethods()) {
-      if (Modifier.isPublic(method.getModifiers())) methods.add(method);
+      if (Modifier.isPublic(method.getModifiers())
+          && (name == null || (name.equals(method.getName())
+              && sameParameters(parameters, method.getParameterTypes())))) methods.add(method);
     }
     if (!type.isInterface() && type.getSuperclass() != null) {
-      for (Method method : get(type.getSuperclass())) methods.add(method);
+      for (Method method : get(type.getSuperclass(), name, parameters)) methods.add(method);
     }
     for (Class<?> parent : type.getInterfaces()) {
-      for (Method method : get(parent)) {
+      for (Method method : get(parent, name, parameters)) {
         if (!Modifier.isStatic(method.getModifiers())) methods.add(method);
       }
     }
@@ -65,6 +71,13 @@ public final class PublicMethods {
     Class<?> parent = b.getDeclaringClass();
     if (owner.isInterface() != parent.isInterface()) return !owner.isInterface();
     return parent.isAssignableFrom(owner);
+  }
+
+  public static Method find(Class<?> type, String name, Class<?>[] parameters)
+    throws NoSuchMethodException
+  {
+    if (parameters == null) parameters = new Class<?>[0];
+    return find(get(type, name, parameters), name, parameters);
   }
 
   public static Method find(Method[] methods, String name, Class<?>[] parameters)
