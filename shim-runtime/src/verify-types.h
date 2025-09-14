@@ -16,18 +16,41 @@ namespace verification {
 enum Kind { kTop = 0, kInt, kFloat, kReference, kLong, kDouble, kSecond, kNull, kUninitializedThis, kAllocationBase };
 // Allocation values encode kAllocationBase + bytecode offset, including offsets above 65,526.
 typedef uint32_t Value;
-inline bool isUninitialized(unsigned kind) { return kind >= kUninitializedThis; }
-inline bool isMovableReference(unsigned kind) { return isUninitialized(kind) || kind == kReference || kind == kNull; }
-
+enum ArrayElement { eBoolean = 1, eByte, eChar, eShort, eInt, eLong, eFloat, eDouble, eObject };
+const unsigned kArrayBase = 0x20000;
+inline bool isArrayKind(unsigned kind) { return kind >= kArrayBase && kind < kArrayBase + 0x1000; }
+inline unsigned arrayRank(unsigned kind) { return (kind - kArrayBase) >> 4; }
+inline unsigned arrayElement(unsigned kind) { return kind & 15; }
+inline unsigned arrayKind(unsigned rank, unsigned element) { return kArrayBase + (rank << 4) + element; }
+inline bool isUninitialized(unsigned kind) { return kind >= kUninitializedThis && kind < kArrayBase; }
 inline bool isWideKind(unsigned kind) { return kind == kLong || kind == kDouble; }
-inline bool isReferenceKind(unsigned kind) { return kind == kReference || kind == kNull; }
+inline bool isReferenceKind(unsigned kind) { return kind == kReference || kind == kNull || isArrayKind(kind); }
+inline bool isMovableReference(unsigned kind) { return isUninitialized(kind) || isReferenceKind(kind); }
 inline bool assignable(unsigned actual, unsigned expected)
 {
-    return expected == kTop || actual == expected || (actual == kNull && expected == kReference);
+    if (expected == kTop || actual == expected) return true;
+    if (actual == kNull && isReferenceKind(expected)) return true;
+    if (expected == kReference && isReferenceKind(actual)) return true;
+    if (isArrayKind(actual) && isArrayKind(expected)) {
+        return arrayElement(expected) == eObject &&
+            (arrayRank(actual) > arrayRank(expected)
+             || (arrayRank(actual) == arrayRank(expected) && arrayElement(actual) == eObject));
+    }
+    return false;
 }
 inline unsigned mergeKind(unsigned first, unsigned second)
 {
-    return first == second ? first : (isReferenceKind(first) && isReferenceKind(second) ? kReference : kTop);
+    if (first == second) return first;
+    if (first == kNull && isReferenceKind(second)) return second;
+    if (second == kNull && isReferenceKind(first)) return first;
+    if (isArrayKind(first) && isArrayKind(second)) {
+        unsigned rank = arrayRank(first) < arrayRank(second) ? arrayRank(first) : arrayRank(second);
+        bool primitive = (arrayRank(first) == rank && arrayElement(first) != eObject)
+            || (arrayRank(second) == rank && arrayElement(second) != eObject);
+        if (primitive) --rank;
+        return rank ? arrayKind(rank, eObject) : kReference;
+    }
+    return isReferenceKind(first) && isReferenceKind(second) ? kReference : kTop;
 }
 inline unsigned descriptorKind(unsigned kind)
 {
@@ -39,6 +62,33 @@ inline unsigned descriptorKind(unsigned kind)
     case 'L': case '[': return kReference;
     default: return kInt;
     }
+}
+inline unsigned descriptorValue(const int8_t* bytes)
+{
+    unsigned rank = 0;
+    while (bytes[rank] == '[') ++rank;
+    if (!rank) return descriptorKind(bytes[0]);
+    unsigned element;
+    switch (bytes[rank]) {
+    case 'Z': element = eBoolean; break;
+    case 'B': element = eByte; break;
+    case 'C': element = eChar; break;
+    case 'S': element = eShort; break;
+    case 'I': element = eInt; break;
+    case 'J': element = eLong; break;
+    case 'F': element = eFloat; break;
+    case 'D': element = eDouble; break;
+    default: element = eObject; break;
+    }
+    return arrayKind(rank, element);
+}
+inline unsigned classValue(GcByteArray* name)
+{
+    return name->body()[0] == '[' ? descriptorValue(name->body().begin()) : kReference;
+}
+inline unsigned componentValue(unsigned kind)
+{
+    return arrayRank(kind) > 1 ? arrayKind(arrayRank(kind) - 1, arrayElement(kind)) : kReference;
 }
 inline unsigned mapWord(GcByteArray* frame, unsigned position)
 {

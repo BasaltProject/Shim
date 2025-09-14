@@ -2406,13 +2406,10 @@ void disassembleCode(const char* prefix, uint8_t* code, unsigned length)
 }
 
 GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, unsigned major,
-                  GcByteArray* descriptor, bool instance, unsigned argumentSlots,
-                  bool constructor, unsigned attributeLength, GcClass* owner)
+                  unsigned argumentSlots, unsigned attributeLength, GcByteArray** verificationMaps)
 {
   PROTECT(t, pool);
   PROTECT(t, tags);
-  PROTECT(t, descriptor);
-  PROTECT(t, owner);
   unsigned attributeStart = s.position();
   if (attributeLength < 12 || attributeLength > s.remaining()) {
     throwNew(t, GcClassFormatError::Type, "Truncated Code attribute");
@@ -2492,8 +2489,7 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
       code->setLineNumberTable(t, lnt);
     } else s.skip(length);
   }
-  verifyCode(t, code, tags, major, descriptor, instance, constructor, stackMaps, owner);
-  if (DebugClassReader) disassembleCode("      ", code->body().begin(), length);
+  *verificationMaps = stackMaps;
 
   return code;
 }
@@ -2569,7 +2565,8 @@ GcList* addInterfaceMethods(Thread* t,
   return 0;
 }
 
-void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, GcByteArray* tags, unsigned major)
+void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, GcByteArray* tags,
+                      unsigned major, GcArray** verificationMethods)
 {
   PROTECT(t, class_);
   PROTECT(t, pool);
@@ -2602,6 +2599,8 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
   PROTECT(t, newVirtuals);
 
   unsigned count = s.read2();
+  GcArray* verification = count ? makeArray(t, count * 2) : 0;
+  PROTECT(t, verification);
 
   if (DebugClassReader) {
     fprintf(stderr, "  method count %d\n", count);
@@ -2616,6 +2615,8 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
 
     GcCode* code = 0;
     PROTECT(t, code);
+    GcByteArray* verificationMaps = 0;
+    PROTECT(t, verificationMaps);
 
     for (unsigned i = 0; i < count; ++i) {
       unsigned flags = s.read2();
@@ -2642,6 +2643,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
 
       addendum = 0;
       code = 0;
+      verificationMaps = 0;
       bool needsCode = !(flags & (ACC_NATIVE | ACC_ABSTRACT))
           || vm::strcmp(reinterpret_cast<const int8_t*>("<clinit>"),
                         cast<GcByteArray>(t, singletonObject(t, pool, name - 1))->body().begin()) == 0;
@@ -2658,11 +2660,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
             throwNew(t, GcClassFormatError::Type, "Unexpected or duplicate Code attribute");
           }
           unsigned codeStart = s.position();
-          GcByteArray* descriptor = cast<GcByteArray>(t, singletonObject(t, pool, spec - 1));
-          bool constructor = vm::strcmp(reinterpret_cast<const int8_t*>("<init>"),
-              cast<GcByteArray>(t, singletonObject(t, pool, name - 1))->body().begin()) == 0;
-          code = parseCode(t, s, pool, tags, major, descriptor, !(flags & ACC_STATIC), argumentSlots,
-                           constructor, length, class_);
+          code = parseCode(t, s, pool, tags, major, argumentSlots, length, &verificationMaps);
           if (s.position() - codeStart != length) {
             throwNew(t, GcClassFormatError::Type, "Incorrect Code attribute length");
           }
@@ -2797,6 +2795,10 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
       }
 
       methodTable->setBodyElement(t, i, method);
+      if (code) {
+        verification->setBodyElement(t, i * 2, method);
+        verification->setBodyElement(t, i * 2 + 1, verificationMaps);
+      }
     }
 
     class_->setMethodTable(t, methodTable);
@@ -2934,6 +2936,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
       }
     }
   }
+  *verificationMethods = verification;
 }
 
 void parseAttributeTable(Thread* t,
@@ -5206,9 +5209,29 @@ GcClass* parseClass(Thread* t,
 
   parseFieldTable(t, s, class_, pool, poolTags);
 
-  parseMethodTable(t, s, class_, pool, poolTags, majorVer);
+  GcArray* verificationMethods = 0;
+  PROTECT(t, verificationMethods);
+  parseMethodTable(t, s, class_, pool, poolTags, majorVer, &verificationMethods);
 
   parseAttributeTable(t, s, class_, pool, poolTags, majorVer, invocations);
+
+  // Verify declared bytecode with complete metadata, before binding pool references.
+  for (unsigned i = 0; verificationMethods && i < verificationMethods->length(); i += 2) {
+    GcMethod* method = cast<GcMethod>(t, verificationMethods->body()[i]);
+    if (!method) continue;
+    PROTECT(t, method);
+    bool constructor = vm::strcmp(method->name()->body().begin(), reinterpret_cast<const int8_t*>("<init>")) == 0;
+    verifyCode(t, cast<GcCode>(t, method->code()), poolTags, majorVer, method->spec(),
+               !(method->flags() & ACC_STATIC), constructor,
+               cast<GcByteArray>(t, verificationMethods->body()[i + 1]), class_);
+    if (DebugClassReader) {
+      GcCode* code = cast<GcCode>(t, method->code());
+      disassembleCode("      ", code->body().begin(), code->length());
+    }
+    verificationMethods->setBodyElement(t, i, 0);
+    verificationMethods->setBodyElement(t, i + 1, 0);
+  }
+  verificationMethods = 0;
 
   GcArray* vtable = cast<GcArray>(t, class_->virtualTable());
   unsigned vtableLength = (vtable ? vtable->length() : 0);
