@@ -100,17 +100,18 @@ public class Field<T> extends AccessibleObject implements Member {
     return new AnnotatedTypeImpl(getGenericType());
   }
 
-  public Object get(Object instance) throws IllegalAccessException {
-    Object target;
+  private Object target(Object instance) {
     if ((vmField.flags & Modifier.STATIC) != 0) {
-      target = vmField.class_.staticTable;
-    } else if (Class.isInstance(vmField.class_, instance)) {
-      target = instance;
-    } else {
-      throw new IllegalArgumentException();
+      Classes.initialize(vmField.class_);
+      return vmField.class_.staticTable;
     }
+    if (instance == null) throw new NullPointerException();
+    if (!Class.isInstance(vmField.class_, instance)) throw new IllegalArgumentException();
+    return instance;
+  }
 
-    Classes.initialize(vmField.class_);
+  public Object get(Object instance) throws IllegalAccessException {
+    Object target = target(instance);
 
     switch (vmField.code) {
     case ByteField:
@@ -155,214 +156,143 @@ public class Field<T> extends AccessibleObject implements Member {
     }
   }
 
+  private static int valueCode(Object value) {
+    if (value instanceof Boolean) return BooleanField;
+    if (value instanceof Byte) return ByteField;
+    if (value instanceof Character) return CharField;
+    if (value instanceof Short) return ShortField;
+    if (value instanceof Integer) return IntField;
+    if (value instanceof Long) return LongField;
+    if (value instanceof Float) return FloatField;
+    if (value instanceof Double) return DoubleField;
+    throw new IllegalArgumentException();
+  }
+
+  private static boolean widens(int source, int destination) {
+    if (source == destination) return true;
+    switch (source) {
+    case ByteField:
+      if (destination == ShortField) return true;
+    case ShortField:
+    case CharField:
+      if (destination == IntField) return true;
+    case IntField:
+      if (destination == LongField) return true;
+    case LongField:
+      if (destination == FloatField) return true;
+    case FloatField:
+      return destination == DoubleField;
+    default:
+      return false;
+    }
+  }
+
+  private static Object convert(Object value, int destination) {
+    int source = valueCode(value);
+    if (!widens(source, destination)) throw new IllegalArgumentException();
+    if (source == destination) return value;
+    Number number = source == CharField ? Integer.valueOf((Character) value) : (Number) value;
+    switch (destination) {
+    case ShortField: return Short.valueOf(number.shortValue());
+    case IntField: return Integer.valueOf(number.intValue());
+    case LongField: return Long.valueOf(number.longValue());
+    case FloatField: return Float.valueOf(number.floatValue());
+    case DoubleField: return Double.valueOf(number.doubleValue());
+    default: throw new IllegalArgumentException();
+    }
+  }
+
+  private Object getConverted(Object instance, int destination) throws IllegalAccessException {
+    Object value = get(instance);
+    if (vmField.code == ObjectField) throw new IllegalArgumentException();
+    return convert(value, destination);
+  }
+
   public boolean getBoolean(Object instance) throws IllegalAccessException {
-    return ((Boolean) get(instance)).booleanValue();
+    return ((Boolean) getConverted(instance, BooleanField)).booleanValue();
   }
 
   public byte getByte(Object instance) throws IllegalAccessException {
-    return ((Byte) get(instance)).byteValue();
+    return ((Byte) getConverted(instance, ByteField)).byteValue();
   }
 
   public short getShort(Object instance) throws IllegalAccessException {
-    return ((Short) get(instance)).shortValue();
+    return ((Short) getConverted(instance, ShortField)).shortValue();
   }
 
   public char getChar(Object instance) throws IllegalAccessException {
-    return ((Character) get(instance)).charValue();
+    return ((Character) getConverted(instance, CharField)).charValue();
   }
 
   public int getInt(Object instance) throws IllegalAccessException {
-    return ((Integer) get(instance)).intValue();
+    return ((Integer) getConverted(instance, IntField)).intValue();
   }
 
   public float getFloat(Object instance) throws IllegalAccessException {
-    return ((Float) get(instance)).floatValue();
+    return ((Float) getConverted(instance, FloatField)).floatValue();
   }
 
   public long getLong(Object instance) throws IllegalAccessException {
-    return ((Long) get(instance)).longValue();
+    return ((Long) getConverted(instance, LongField)).longValue();
   }
 
   public double getDouble(Object instance) throws IllegalAccessException {
-    return ((Double) get(instance)).doubleValue();
+    return ((Double) getConverted(instance, DoubleField)).doubleValue();
   }
 
-  private boolean matchType(Object value) {
-    switch (vmField.code) {
-    case ByteField:
-      return value instanceof Byte;
-
-    case BooleanField:
-      return value instanceof Boolean;
-
-    case CharField:
-      return value instanceof Character;
-
-    case ShortField:
-      return value instanceof Short;
-
-    case IntField:
-      return value instanceof Integer;
-
-    case LongField:
-      return value instanceof Long;
-
-    case FloatField:
-      return value instanceof Float;
-
-    case DoubleField:
-      return value instanceof Double;
-
-    case ObjectField:
-      return value == null || getType().isInstance(value);
-
-    default:
-      throw new Error();
-    }
+  public void set(Object instance, Object value) throws IllegalAccessException {
+    setValue(instance, value, false);
   }
 
-  public void set(Object instance, Object value)
-    throws IllegalAccessException
-  {
-    Object target;
-    if ((vmField.flags & Modifier.STATIC) != 0) {
-      target = vmField.class_.staticTable;
-    } else if (Class.isInstance(vmField.class_, instance)) {
-      target = instance;
-    } else {
-      throw new IllegalArgumentException();
-    }
-
-    if (! matchType(value)) {
-      throw new IllegalArgumentException();
-    }
-
-    Classes.initialize(vmField.class_);
-
-    switch (vmField.code) {
-    case ByteField:
-      setPrimitive(target, vmField.code, vmField.offset, (Byte) value);
-      break;
-
-    case BooleanField:
-      setPrimitive
-        (target, vmField.code, vmField.offset, ((Boolean) value) ? 1 : 0);
-      break;
-
-    case CharField:
-      setPrimitive(target, vmField.code, vmField.offset, (Character) value);
-      break;
-
-    case ShortField:
-      setPrimitive(target, vmField.code, vmField.offset, (Short) value);
-      break;
-
-    case IntField:
-      setPrimitive(target, vmField.code, vmField.offset, (Integer) value);
-      break;
-
-    case LongField:
-      setPrimitive(target, vmField.code, vmField.offset, (Long) value);
-      break;
-
-    case FloatField:
-      setPrimitive(target, vmField.code, vmField.offset,
-                   Float.floatToRawIntBits((Float) value));
-      break;
-
-    case DoubleField:
-      setPrimitive(target, vmField.code, vmField.offset,
-                   Double.doubleToRawLongBits((Double) value));
-      break;
-
-    case ObjectField:
+  private void setValue(Object instance, Object value, boolean primitiveOnly) throws IllegalAccessException {
+    Object target = target(instance);
+    if (vmField.code == ObjectField) {
+      if (primitiveOnly || (value != null && !getType().isInstance(value))) throw new IllegalArgumentException();
       setObject(target, vmField.offset, value);
-      break;
-
-    default:
-      throw new Error();
+      return;
     }
-  }
-
-  private void set(Object instance, long value)
-    throws IllegalAccessException
-  {
-    Object target;
-    if ((vmField.flags & Modifier.STATIC) != 0) {
-      target = vmField.class_.staticTable;
-    } else if (Class.isInstance(vmField.class_, instance)) {
-      target = instance;
-    } else {
-      throw new IllegalArgumentException();
-    }
-
-    Classes.initialize(vmField.class_);
-
+    value = convert(value, vmField.code);
+    long bits;
     switch (vmField.code) {
-    case ByteField:
-    case BooleanField:
-    case CharField:
-    case ShortField:
-    case IntField:
-    case LongField:
-    case FloatField:
-    case DoubleField:
-      setPrimitive(target, vmField.code, vmField.offset, value);
-      break;
-
-    default:
-      throw new IllegalArgumentException
-        ("needed " + getType() + ", got primitive type when setting "
-         + Class.getName(vmField.class_) + "." + getName());
+    case BooleanField: bits = ((Boolean) value) ? 1 : 0; break;
+    case CharField: bits = (Character) value; break;
+    case FloatField: bits = Float.floatToRawIntBits((Float) value); break;
+    case DoubleField: bits = Double.doubleToRawLongBits((Double) value); break;
+    default: bits = ((Number) value).longValue(); break;
     }
+    setPrimitive(target, vmField.code, vmField.offset, bits);
   }
 
-  public void setByte(Object instance, byte value)
-    throws IllegalAccessException
-  {
-    set(instance, value & 0xff);
+  public void setBoolean(Object instance, boolean value) throws IllegalAccessException {
+    setValue(instance, Boolean.valueOf(value), true);
   }
 
-  public void setBoolean(Object instance, boolean value)
-    throws IllegalAccessException
-  {
-    set(instance, value ? 1 : 0);
+  public void setByte(Object instance, byte value) throws IllegalAccessException {
+    setValue(instance, Byte.valueOf(value), true);
   }
 
-  public void setChar(Object instance, char value)
-    throws IllegalAccessException
-  {
-    set(instance, value & 0xffff);
+  public void setShort(Object instance, short value) throws IllegalAccessException {
+    setValue(instance, Short.valueOf(value), true);
   }
 
-  public void setShort(Object instance, short value)
-    throws IllegalAccessException
-  {
-    set(instance, value & 0xffff);
+  public void setChar(Object instance, char value) throws IllegalAccessException {
+    setValue(instance, Character.valueOf(value), true);
   }
 
-  public void setInt(Object instance, int value)
-    throws IllegalAccessException
-  {
-    set(instance, value & 0xffffffffl);
+  public void setInt(Object instance, int value) throws IllegalAccessException {
+    setValue(instance, Integer.valueOf(value), true);
   }
 
-  public void setLong(Object instance, long value)
-    throws IllegalAccessException
-  {
-    set(instance, value);
+  public void setFloat(Object instance, float value) throws IllegalAccessException {
+    setValue(instance, Float.valueOf(value), true);
   }
 
-  public void setFloat(Object instance, float value)
-    throws IllegalAccessException
-  {
-    set(instance, Float.floatToIntBits(value));
+  public void setLong(Object instance, long value) throws IllegalAccessException {
+    setValue(instance, Long.valueOf(value), true);
   }
 
-  public void setDouble(Object instance, double value)
-    throws IllegalAccessException
-  {
-    set(instance, Double.doubleToLongBits(value));
+  public void setDouble(Object instance, double value) throws IllegalAccessException {
+    setValue(instance, Double.valueOf(value), true);
   }
 
   private Annotation getAnnotation(Object[] a) {

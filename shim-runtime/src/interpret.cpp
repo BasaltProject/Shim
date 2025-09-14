@@ -746,6 +746,9 @@ void pushField(Thread* t, object target, GcField* field)
     break;
 
   case CharField:
+    pushInt(t, fieldAtOffset<uint16_t>(target, field->offset()));
+    break;
+
   case ShortField:
     pushInt(t, fieldAtOffset<int16_t>(target, field->offset()));
     break;

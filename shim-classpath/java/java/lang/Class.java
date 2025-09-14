@@ -318,6 +318,7 @@ public final class Class <T>
   }
 
   public Field getDeclaredField(String name) throws NoSuchFieldException {
+    if (name == null) throw new NullPointerException();
     int index = Classes.findField(vmClass, name);
     if (index < 0) {
       throw new NoSuchFieldException(name);
@@ -327,13 +328,7 @@ public final class Class <T>
   }
 
   public Field getField(String name) throws NoSuchFieldException {
-    for (VMClass c = vmClass; c != null; c = c.super_) {
-      int index = Classes.findField(c, name);
-      if (index >= 0) {
-        return new Field(vmClass.fieldTable[index]);
-      }
-    }
-    throw new NoSuchFieldException(name);
+    return shim.PublicFields.find(this, name);
   }
 
   public Method getDeclaredMethod(String name, Class ... parameterTypes)
@@ -342,12 +337,7 @@ public final class Class <T>
     if (name.startsWith("<")) {
       throw new NoSuchMethodException(name);
     }
-    int index = Classes.findMethod(vmClass, name, parameterTypes);
-    if (index < 0) {
-      throw new NoSuchMethodException(name);
-    } else {
-      return new Method(vmClass.methodTable[index]);
-    }
+    return shim.PublicMethods.find(getDeclaredMethods(), name, parameterTypes);
   }
 
   public Method getMethod(String name, Class ... parameterTypes)
@@ -356,13 +346,7 @@ public final class Class <T>
     if (name.startsWith("<")) {
       throw new NoSuchMethodException(name);
     }
-    for (VMClass c = vmClass; c != null; c = c.super_) {
-      int index = Classes.findMethod(c, name, parameterTypes);
-      if (index >= 0) {
-        return new Method(c.methodTable[index]);
-      }
-    }
-    throw new NoSuchMethodException(name);
+    return shim.PublicMethods.find(getMethods(), name, parameterTypes);
   }
 
   public Constructor getConstructor(Class ... parameterTypes)
@@ -447,6 +431,7 @@ public final class Class <T>
 
   public Field[] getDeclaredFields() {
     if (vmClass.fieldTable != null) {
+      Classes.link(vmClass);
       Field[] array = new Field[vmClass.fieldTable.length];
       for (int i = 0; i < vmClass.fieldTable.length; ++i) {
         array[i] = new Field(vmClass.fieldTable[i]);
@@ -457,31 +442,8 @@ public final class Class <T>
     }
   }
 
-  private int countPublicFields() {
-    int count = 0;
-    if (vmClass.fieldTable != null) {
-      for (int i = 0; i < vmClass.fieldTable.length; ++i) {
-        if (((vmClass.fieldTable[i].flags & Modifier.PUBLIC)) != 0) {
-          ++ count;
-        }
-      }
-    }
-    return count;
-  }
-
   public Field[] getFields() {
-    Field[] array = new Field[countPublicFields()];
-    if (vmClass.fieldTable != null) {
-      Classes.link(vmClass);
-
-      int ai = 0;
-      for (int i = 0; i < vmClass.fieldTable.length; ++i) {
-        if (((vmClass.fieldTable[i].flags & Modifier.PUBLIC)) != 0) {
-          array[ai++] = new Field(vmClass.fieldTable[i]);
-        }
-      }
-    }
-    return array;
+    return shim.PublicFields.get(this);
   }
 
   private static void getAllFields(VMClass vmClass, ArrayList<Field> fields) {
@@ -508,7 +470,7 @@ public final class Class <T>
   }
 
   public Method[] getMethods() {
-    return Classes.getMethods(vmClass, true);
+    return shim.PublicMethods.get(this);
   }
 
   public Class[] getInterfaces() {
