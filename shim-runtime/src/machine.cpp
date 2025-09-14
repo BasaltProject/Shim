@@ -2405,15 +2405,28 @@ void disassembleCode(const char* prefix, uint8_t* code, unsigned length)
   }
 }
 
-GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, unsigned major, unsigned returnKind)
+GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, unsigned major,
+                  GcByteArray* descriptor, bool instance, unsigned argumentSlots,
+                  bool constructor, unsigned attributeLength, GcClass* owner)
 {
   PROTECT(t, pool);
   PROTECT(t, tags);
+  PROTECT(t, descriptor);
+  PROTECT(t, owner);
+  unsigned attributeStart = s.position();
+  if (attributeLength < 12 || attributeLength > s.remaining()) {
+    throwNew(t, GcClassFormatError::Type, "Truncated Code attribute");
+  }
 
   unsigned maxStack = s.read2();
   unsigned maxLocals = s.read2();
+  if (maxLocals < argumentSlots) {
+    throwNew(t, GcClassFormatError::Type, "Method arguments exceed max_locals");
+  }
   unsigned length = s.read4();
-  if (length == 0 || length > 65535) throwNew(t, GcClassFormatError::Type, "Invalid Code length");
+  if (length == 0 || length > 65535 || length > attributeLength - 12) {
+    throwNew(t, GcClassFormatError::Type, "Invalid Code length");
+  }
 
   if (DebugClassReader) {
     fprintf(stderr,
@@ -2427,6 +2440,9 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
   s.read(code->body().begin(), length);
   PROTECT(t, code);
   unsigned ehtLength = s.read2();
+  if (uint64_t(s.position() - attributeStart) + 8 * ehtLength + 2 > attributeLength) {
+    throwNew(t, GcClassFormatError::Type, "Truncated exception handler table");
+  }
   if (ehtLength) {
     GcExceptionHandlerTable* eht = makeExceptionHandlerTable(t, ehtLength);
     for (unsigned i = 0; i < ehtLength; ++i) {
@@ -2445,32 +2461,39 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
 
     code->setExceptionHandlerTable(t, eht);
   }
-  verifyCode(t, code, tags, major, returnKind);
-  if (DebugClassReader) {
-    disassembleCode("      ", code->body().begin(), length);
-  }
-
+  GcByteArray* stackMaps = 0;
+  PROTECT(t, stackMaps);
   unsigned attributeCount = s.read2();
   for (unsigned j = 0; j < attributeCount; ++j) {
-    GcByteArray* name
-        = cast<GcByteArray>(t, singletonObject(t, pool, s.read2() - 1));
+    if (uint64_t(s.position() - attributeStart) + 6 > attributeLength) {
+      throwNew(t, GcClassFormatError::Type, "Truncated Code subattribute");
+    }
+    unsigned nameIndex = s.read2();
+    requireConstantTag(t, tags, nameIndex - 1, CONSTANT_Utf8);
+    GcByteArray* name = cast<GcByteArray>(t, singletonObject(t, pool, nameIndex - 1));
     unsigned length = s.read4();
-
-    if (vm::strcmp(reinterpret_cast<const int8_t*>("LineNumberTable"),
-                   name->body().begin()) == 0) {
+    if (length > attributeLength - (s.position() - attributeStart)) {
+      throwNew(t, GcClassFormatError::Type, "Code subattribute exceeds Code length");
+    }
+    if (major >= 50 && vm::strcmp(reinterpret_cast<const int8_t*>("StackMapTable"), name->body().begin()) == 0) {
+      if (stackMaps) throwNew(t, GcClassFormatError::Type, "Duplicate StackMapTable attribute");
+      stackMaps = makeByteArray(t, length);
+      s.read(reinterpret_cast<uint8_t*>(stackMaps->body().begin()), length);
+    } else if (vm::strcmp(reinterpret_cast<const int8_t*>("LineNumberTable"), name->body().begin()) == 0) {
+      if (length < 2) throwNew(t, GcClassFormatError::Type, "Truncated LineNumberTable");
       unsigned lntLength = s.read2();
+      if (length != 2 + 4 * lntLength) throwNew(t, GcClassFormatError::Type, "Invalid LineNumberTable length");
       GcLineNumberTable* lnt = makeLineNumberTable(t, lntLength);
       for (unsigned i = 0; i < lntLength; ++i) {
         unsigned ip = s.read2();
         unsigned line = s.read2();
         lnt->body()[i] = lineNumber(ip, line);
       }
-
       code->setLineNumberTable(t, lnt);
-    } else {
-      s.skip(length);
-    }
+    } else s.skip(length);
   }
+  verifyCode(t, code, tags, major, descriptor, instance, constructor, stackMaps, owner);
+  if (DebugClassReader) disassembleCode("      ", code->body().begin(), length);
 
   return code;
 }
@@ -2635,15 +2658,13 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
             throwNew(t, GcClassFormatError::Type, "Unexpected or duplicate Code attribute");
           }
           unsigned codeStart = s.position();
-          const char* descriptor = reinterpret_cast<const char*>(
-              cast<GcByteArray>(t, singletonObject(t, pool, spec - 1))->body().begin());
-          unsigned returnKind = strchr(descriptor, ')')[1];
-          code = parseCode(t, s, pool, tags, major, returnKind);
+          GcByteArray* descriptor = cast<GcByteArray>(t, singletonObject(t, pool, spec - 1));
+          bool constructor = vm::strcmp(reinterpret_cast<const int8_t*>("<init>"),
+              cast<GcByteArray>(t, singletonObject(t, pool, name - 1))->body().begin()) == 0;
+          code = parseCode(t, s, pool, tags, major, descriptor, !(flags & ACC_STATIC), argumentSlots,
+                           constructor, length, class_);
           if (s.position() - codeStart != length) {
             throwNew(t, GcClassFormatError::Type, "Incorrect Code attribute length");
-          }
-          if (code->maxLocals() < argumentSlots) {
-            throwNew(t, GcClassFormatError::Type, "Method arguments exceed max_locals");
           }
         } else if (vm::strcmp(reinterpret_cast<const int8_t*>("Exceptions"),
                               attributeName->body().begin()) == 0) {

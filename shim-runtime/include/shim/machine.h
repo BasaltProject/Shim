@@ -2400,7 +2400,10 @@ object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* po
 object resolveDynamicConstant(Thread* t, GcDynamicConstant* constant, GcClass* owner);
 uint64_t dynamicConstantBits(Thread* t, GcDynamicConstant* constant, object value);
 
-void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsigned returnKind);
+void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, GcByteArray* descriptor,
+                bool instance, bool constructor, GcByteArray* stackMaps, GcClass* owner);
+void verifyStackTypes(Thread* t, GcCode* code, GcByteArray* tags, const int32_t* depths, const unsigned* nexts,
+                      GcByteArray* descriptor, bool instance, GcArray* maps, bool constructor, GcClass* owner);
 void validateFieldDescriptor(Thread* t, GcByteArray* descriptor);
 unsigned validateMethodDescriptor(Thread* t, GcByteArray* descriptor, bool instance);
 
