@@ -2730,9 +2730,11 @@ class MyCompiler : public Compiler {
                            ir::Value* index,
                            intptr_t handler)
   {
+    ir::Value* length = load(ir::ExtendMode::Signed,
+                            memory(object, ir::Type::i4(), lengthOffset),
+                            ir::Type::i4());
     appendBoundsCheck(&c,
-                      static_cast<Value*>(object),
-                      lengthOffset,
+                      static_cast<Value*>(length),
                       static_cast<Value*>(index),
                       handler);
   }

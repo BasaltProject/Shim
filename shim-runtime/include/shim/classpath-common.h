@@ -73,9 +73,11 @@ object getTrace(Thread* t, unsigned skipCount)
 
 bool compatibleArrayTypes(Thread* t UNUSED, GcClass* a, GcClass* b)
 {
-  return a->arrayElementSize() and b->arrayElementSize()
-         and (a == b or (not((a->vmFlags() & PrimitiveFlag)
-                             or (b->vmFlags() & PrimitiveFlag))));
+  if (not a->arrayElementSize() or not b->arrayElementSize()) return false;
+  GcClass* source = a->arrayElementClass();
+  GcClass* destination = b->arrayElementClass();
+  return source == destination
+      or not ((source->vmFlags() | destination->vmFlags()) & PrimitiveFlag);
 }
 
 void arrayCopy(Thread* t,
@@ -85,51 +87,57 @@ void arrayCopy(Thread* t,
                int32_t dstOffset,
                int32_t length)
 {
-  if (LIKELY(src and dst)) {
-    if (LIKELY(compatibleArrayTypes(
-            t, objectClass(t, src), objectClass(t, dst)))) {
-      unsigned elementSize = objectClass(t, src)->arrayElementSize();
+  if (UNLIKELY(src == 0 or dst == 0)) throwNew(t, GcNullPointerException::Type);
+  PROTECT(t, src);
+  PROTECT(t, dst);
+  GcClass* sourceClass = objectClass(t, src);
+  GcClass* destinationClass = objectClass(t, dst);
+  PROTECT(t, sourceClass);
+  PROTECT(t, destinationClass);
+  if (UNLIKELY(not compatibleArrayTypes(t, sourceClass, destinationClass))) {
+    throwNew(t, GcArrayStoreException::Type);
+  }
 
-      if (LIKELY(elementSize)) {
-        intptr_t sl = fieldAtOffset<uintptr_t>(src, BytesPerWord);
-        intptr_t dl = fieldAtOffset<uintptr_t>(dst, BytesPerWord);
-        if (LIKELY(length > 0)) {
-          if (LIKELY(srcOffset >= 0 and srcOffset + length > srcOffset and srcOffset + length <= sl
-                     and dstOffset >= 0 and dstOffset + length > dstOffset and dstOffset + length <= dl)) {
-            uint8_t* sbody = &fieldAtOffset<uint8_t>(src, ArrayBody);
-            uint8_t* dbody = &fieldAtOffset<uint8_t>(dst, ArrayBody);
-            if (src == dst) {
-              memmove(dbody + (dstOffset * elementSize),
-                      sbody + (srcOffset * elementSize),
-                      length * elementSize);
-            } else {
-              memcpy(dbody + (dstOffset * elementSize),
-                     sbody + (srcOffset * elementSize),
-                     length * elementSize);
-            }
+  uintptr_t sourceLength = fieldAtOffset<uintptr_t>(src, BytesPerWord);
+  uintptr_t destinationLength = fieldAtOffset<uintptr_t>(dst, BytesPerWord);
+  if (UNLIKELY(length < 0 or srcOffset < 0 or dstOffset < 0
+      or static_cast<uintptr_t>(srcOffset) > sourceLength
+      or static_cast<uintptr_t>(length) > sourceLength - static_cast<uintptr_t>(srcOffset)
+      or static_cast<uintptr_t>(dstOffset) > destinationLength
+      or static_cast<uintptr_t>(length) > destinationLength - static_cast<uintptr_t>(dstOffset))) {
+    throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+  }
+  if (length == 0) return;
 
-            if (objectClass(t, dst)->objectMask()) {
-              mark(t, dst, ArrayBody + (dstOffset * BytesPerWord), length);
-            }
-
-            return;
-          } else {
-            throwNew(t, GcIndexOutOfBoundsException::Type);
-          }
-        } else if (LIKELY(length < 0)) {
-          throwNew(t, GcIndexOutOfBoundsException::Type, "%d", length);
-          return;
-        } else {
-          return;
-        }
+  bool primitive = sourceClass->arrayElementClass()->vmFlags() & PrimitiveFlag;
+  if (not primitive
+      and not isAssignableFrom(t, destinationClass->arrayElementClass(), sourceClass->arrayElementClass())) {
+    for (int32_t i = 0; i < length; ++i) {
+      object value = (&fieldAtOffset<object>(src, ArrayBody))[srcOffset + i];
+      PROTECT(t, value);
+      if (value and not instanceOf(t, destinationClass->arrayElementClass(), value)) {
+        throwNew(t, GcArrayStoreException::Type);
       }
+      (&fieldAtOffset<object>(dst, ArrayBody))[dstOffset + i] = value;
+      t->m->heap->mark(dst, ArrayBody / BytesPerWord + dstOffset + i, 1);
     }
-  } else {
-    throwNew(t, GcNullPointerException::Type);
     return;
   }
 
-  throwNew(t, GcArrayStoreException::Type);
+  uintptr_t elementSize = sourceClass->arrayElementSize();
+  uint8_t* sourceBody = &fieldAtOffset<uint8_t>(src, ArrayBody);
+  uint8_t* destinationBody = &fieldAtOffset<uint8_t>(dst, ArrayBody);
+  uintptr_t sourceStart = static_cast<uintptr_t>(srcOffset) * elementSize;
+  uintptr_t destinationStart = static_cast<uintptr_t>(dstOffset) * elementSize;
+  uintptr_t size = static_cast<uintptr_t>(length) * elementSize;
+  if (src == dst) {
+    memmove(destinationBody + destinationStart, sourceBody + sourceStart, size);
+  } else {
+    memcpy(destinationBody + destinationStart, sourceBody + sourceStart, size);
+  }
+  if (not primitive) {
+    t->m->heap->mark(dst, ArrayBody / BytesPerWord + dstOffset, length);
+  }
 }
 
 void runOnLoadIfFound(Thread* t, System::Library* library)

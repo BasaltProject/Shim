@@ -1996,17 +1996,15 @@ void appendJump(Context* c,
 class BoundsCheckEvent : public Event {
  public:
   BoundsCheckEvent(Context* c,
-                   Value* object,
-                   unsigned lengthOffset,
+                   Value* length,
                    Value* index,
                    intptr_t handler)
       : Event(c),
-        object(object),
-        lengthOffset(lengthOffset),
+        length(length),
         index(index),
         handler(handler)
   {
-    this->addRead(c, object, generalRegisterMask(c));
+    this->addRead(c, length, generalRegisterMask(c));
     this->addRead(c, index, generalRegisterOrConstantMask(c));
   }
 
@@ -2049,13 +2047,6 @@ class BoundsCheckEvent : public Event {
     }
 
     if (constant == 0 or constant->value->value() >= 0) {
-      assertT(c, object->source->type(c) == lir::Operand::Type::RegisterPair);
-      MemorySite length(static_cast<RegisterSite*>(object->source)->number,
-                        lengthOffset,
-                        NoRegister,
-                        1);
-      length.acquired = true;
-
       CodePromise* nextPromise
           = compiler::codePromise(c, static_cast<Promise*>(0));
 
@@ -2068,8 +2059,8 @@ class BoundsCheckEvent : public Event {
             index->source,
             index->source,
             4,
-            &length,
-            &length,
+            length->source,
+            length->source,
             c->targetInfo.pointerSize,
             &next,
             &next);
@@ -2089,25 +2080,23 @@ class BoundsCheckEvent : public Event {
       nextPromise->offset = a->offset();
     }
 
-    popRead(c, this, object);
+    popRead(c, this, length);
     popRead(c, this, index);
   }
 
-  Value* object;
-  unsigned lengthOffset;
+  Value* length;
   Value* index;
   intptr_t handler;
 };
 
 void appendBoundsCheck(Context* c,
-                       Value* object,
-                       unsigned lengthOffset,
+                       Value* length,
                        Value* index,
                        intptr_t handler)
 {
   append(c,
          new (c->zone)
-         BoundsCheckEvent(c, object, lengthOffset, index, handler));
+         BoundsCheckEvent(c, length, index, handler));
 }
 
 class FrameSiteEvent : public Event {

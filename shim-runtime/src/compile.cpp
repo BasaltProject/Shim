@@ -2756,6 +2756,32 @@ uint64_t lookUpAddress(int32_t key,
   return default_;
 }
 
+void storeReferenceArray(MyThread* t, object array, uint32_t index, object value)
+{
+  PROTECT(t, array);
+  PROTECT(t, value);
+  if (UNLIKELY(array == 0)) throwNew(t, GcNullPointerException::Type);
+  if (UNLIKELY(index >= objectArrayLength(t, array))) throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+  if (value && !instanceOf(t, objectClass(t, array)->arrayElementClass(), value)) {
+    throwNew(t, GcArrayStoreException::Type);
+  }
+  setField(t, array, ArrayBody + (index * BytesPerWord), value);
+}
+
+void storeByteArray(MyThread* t, object array, uint32_t index, uint32_t value)
+{
+  if (UNLIKELY(array == 0)) throwNew(t, GcNullPointerException::Type);
+  if (objectClass(t, array) == type(t, GcBooleanArray::Type)) {
+    GcBooleanArray* target = cast<GcBooleanArray>(t, array);
+    if (UNLIKELY(index >= target->length())) throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+    target->body()[index] = value & 1;
+  } else {
+    GcByteArray* target = cast<GcByteArray>(t, array);
+    if (UNLIKELY(index >= target->length())) throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+    target->body()[index] = value;
+  }
+}
+
 void setMaybeNull(MyThread* t, object o, unsigned offset, object value)
 {
   if (LIKELY(o)) {
@@ -3064,8 +3090,11 @@ void setObjectFieldValueFromReference(MyThread* t,
 void setFieldValue(MyThread* t, object target, GcField* field, uint32_t value)
 {
   switch (field->code()) {
-  case ByteField:
   case BooleanField:
+    fieldAtOffset<int8_t>(target, field->offset()) = value & 1;
+    break;
+
+  case ByteField:
     fieldAtOffset<int8_t>(target, field->offset()) = value;
     break;
 
@@ -3238,8 +3267,10 @@ unsigned resultSize(MyThread* t, unsigned code)
 ir::Value* popField(MyThread* t, Frame* frame, int code)
 {
   switch (code) {
-  case ByteField:
   case BooleanField:
+    return frame->c->binaryOp(lir::And, ir::Type::i4(),
+        frame->pop(ir::Type::i4()), frame->c->constant(1, ir::Type::i4()));
+  case ByteField:
   case CharField:
   case ShortField:
   case IntField:
@@ -4336,29 +4367,17 @@ loop:
         frame->trace(0, 0);
       }
 
-      if (CheckArrayBounds) {
+      if (CheckArrayBounds and instruction != bastore and instruction != aastore) {
         c->checkBounds(array, TargetArrayLength, index, aioobThunk(t));
       }
 
       switch (instruction) {
-      case aastore: {
+      case aastore:
         c->nativeCall(
-            c->constant(getThunk(t, setMaybeNullThunk), ir::Type::iptr()),
-            0,
-            frame->trace(0, 0),
-            ir::Type::void_(),
-            args(c->threadRegister(),
-                 array,
-                 c->binaryOp(lir::Add,
-                             ir::Type::i4(),
-                             c->constant(TargetArrayBody, ir::Type::i4()),
-                             c->binaryOp(lir::ShiftLeft,
-                                         ir::Type::i4(),
-                                         c->constant(log(TargetBytesPerWord),
-                                                     ir::Type::i4()),
-                                         index)),
-                 value));
-      } break;
+            c->constant(getThunk(t, storeReferenceArrayThunk), ir::Type::iptr()),
+            0, frame->trace(0, 0), ir::Type::void_(),
+            args(c->threadRegister(), array, index, value));
+        break;
 
       case fastore:
         c->store(value,
@@ -4371,8 +4390,10 @@ loop:
         break;
 
       case bastore:
-        c->store(value,
-                 c->memory(array, ir::Type::i1(), TargetArrayBody, index));
+        c->nativeCall(
+            c->constant(getThunk(t, storeByteArrayThunk), ir::Type::iptr()),
+            0, frame->trace(0, 0), ir::Type::void_(),
+            args(c->threadRegister(), array, index, value));
         break;
 
       case castore:
@@ -5645,7 +5666,22 @@ loop:
 
     case ireturn: {
       handleExit(t, frame);
-      c->return_(frame->pop(ir::Type::i4()));
+      ir::Value* value = frame->pop(ir::Type::i4());
+      switch (context->method->returnCode()) {
+      case BooleanField:
+        value = c->binaryOp(lir::And, ir::Type::i4(), value, c->constant(1, ir::Type::i4()));
+        break;
+      case ByteField:
+        value = c->truncateThenExtend(ir::ExtendMode::Signed, ir::Type::i4(), ir::Type::i1(), value);
+        break;
+      case CharField:
+        value = c->truncateThenExtend(ir::ExtendMode::Unsigned, ir::Type::i4(), ir::Type::i2(), value);
+        break;
+      case ShortField:
+        value = c->truncateThenExtend(ir::ExtendMode::Signed, ir::Type::i4(), ir::Type::i2(), value);
+        break;
+      }
+      c->return_(value);
     }
       goto next;
 
