@@ -579,4 +579,219 @@ public final class Math {
     }
     return (float) fma((double) a, (double) b, (double) c);
   }
+
+  public static native double log10(double v);
+
+  public static double cbrt(double x) {
+    final int b1 = 715094163;
+    final int b2 = 696219795;
+    final double c = 5.42857142857142815906e-01;
+    final double d = -7.05306122448979611050e-01;
+    final double e = 1.41428571428571436819e+00;
+    final double f = 1.60714285714285720630e+00;
+    final double g = 3.57142857142857150787e-01;
+    long bits = Double.doubleToRawLongBits(x);
+    int hx = (int) (bits >>> 32);
+    int sign = hx & 0x80000000;
+    hx ^= sign;
+    if (hx >= 0x7ff00000) {
+      return x + x;
+    }
+    if ((hx | (int) bits) == 0) {
+      return x;
+    }
+    x = Double.longBitsToDouble(((long) hx << 32) | (bits & 0xffffffffL));
+    double t = 0.0;
+    if (hx < 0x00100000) {
+      t = Double.longBitsToDouble(0x43500000L << 32);
+      t *= x;
+      long tb = Double.doubleToRawLongBits(t);
+      t = Double.longBitsToDouble((((long) ((int) (tb >>> 32) / 3 + b2)) << 32) | (tb & 0xffffffffL));
+    } else {
+      t = Double.longBitsToDouble((long) (hx / 3 + b1) << 32);
+    }
+    double r = t * t / x;
+    double s = c + r * t;
+    t *= g + f / (s + e + d / s);
+    long tb = Double.doubleToRawLongBits(t);
+    t = Double.longBitsToDouble((((long) ((int) (tb >>> 32) + 1)) << 32));
+    s = t * t;
+    r = x / s;
+    double w = t + t;
+    r = (r - t) / (w + r);
+    t = t + t * r;
+    tb = Double.doubleToRawLongBits(t);
+    return Double.longBitsToDouble(tb | ((long) sign << 32));
+  }
+
+  public static native double expm1(double v);
+
+  public static native double log1p(double v);
+
+  public static native double hypot(double x, double y);
+
+  public static native double IEEEremainder(double dividend, double divisor);
+
+  private static final double DEGREES_TO_RADIANS = 0.017453292519943295;
+  private static final double RADIANS_TO_DEGREES = 57.29577951308232;
+
+  public static double toRadians(double angdeg) {
+    return angdeg * DEGREES_TO_RADIANS;
+  }
+
+  public static double toDegrees(double angrad) {
+    return angrad * RADIANS_TO_DEGREES;
+  }
+
+  public static double rint(double a) {
+    double twoToThe52 = (double) (1L << 52);
+    double sign = copySign(1.0, a);
+    a = abs(a);
+    if (a < twoToThe52) {
+      a = (twoToThe52 + a) - twoToThe52;
+    }
+    return sign * a;
+  }
+
+  private static double powerOfTwoD(int n) {
+    return Double.longBitsToDouble((((long) n + (long) Double.MAX_EXPONENT) << 52) & 0x7FF0000000000000L);
+  }
+
+  public static double scalb(double d, int scaleFactor) {
+    final int maxScale = Double.MAX_EXPONENT + -Double.MIN_EXPONENT + 53 + 1;
+    final double twoToTheDoubleScaleUp = powerOfTwoD(512);
+    final double twoToTheDoubleScaleDown = powerOfTwoD(-512);
+    int scaleIncrement;
+    double expDelta;
+    if (scaleFactor < 0) {
+      scaleFactor = max(scaleFactor, -maxScale);
+      scaleIncrement = -512;
+      expDelta = twoToTheDoubleScaleDown;
+    } else {
+      scaleFactor = min(scaleFactor, maxScale);
+      scaleIncrement = 512;
+      expDelta = twoToTheDoubleScaleUp;
+    }
+    int t = (scaleFactor >> 9 - 1) >>> 32 - 9;
+    int expAdjust = ((scaleFactor + t) & (512 - 1)) - t;
+    d *= powerOfTwoD(expAdjust);
+    scaleFactor -= expAdjust;
+    while (scaleFactor != 0) {
+      d *= expDelta;
+      scaleFactor -= scaleIncrement;
+    }
+    return d;
+  }
+
+  public static float scalb(float f, int scaleFactor) {
+    final int maxScale = Float.MAX_EXPONENT + -Float.MIN_EXPONENT + 24 + 1;
+    scaleFactor = max(min(scaleFactor, maxScale), -maxScale);
+    return (float) ((double) f * powerOfTwoD(scaleFactor));
+  }
+
+  public static long multiplyFull(int x, int y) {
+    return (long) x * (long) y;
+  }
+
+  public static int absExact(int a) {
+    if (a == Integer.MIN_VALUE) {
+      throw new ArithmeticException("Overflow to represent absolute value of Integer.MIN_VALUE");
+    }
+    return abs(a);
+  }
+
+  public static long absExact(long a) {
+    if (a == Long.MIN_VALUE) {
+      throw new ArithmeticException("Overflow to represent absolute value of Long.MIN_VALUE");
+    }
+    return abs(a);
+  }
+
+  public static int unsignedMultiplyExact(int x, int y) {
+    long r = Integer.toUnsignedLong(x) * Integer.toUnsignedLong(y);
+    if ((r >>> 32) != 0) {
+      throw new ArithmeticException("integer overflow");
+    }
+    return (int) r;
+  }
+
+  public static long unsignedMultiplyExact(long x, int y) {
+    return unsignedMultiplyExact(x, Integer.toUnsignedLong(y));
+  }
+
+  public static long unsignedMultiplyExact(long x, long y) {
+    long hi = unsignedMultiplyHigh(x, y);
+    if (hi != 0) {
+      throw new ArithmeticException("long overflow");
+    }
+    return x * y;
+  }
+
+  public static int powExact(int base, int exponent) {
+    if (exponent < 0) {
+      throw new ArithmeticException("Negative exponent");
+    }
+    int result = 1;
+    while (exponent > 0) {
+      if ((exponent & 1) == 1) {
+        result = multiplyExact(result, base);
+      }
+      exponent >>= 1;
+      if (exponent > 0) {
+        base = multiplyExact(base, base);
+      }
+    }
+    return result;
+  }
+
+  public static long powExact(long base, int exponent) {
+    if (exponent < 0) {
+      throw new ArithmeticException("Negative exponent");
+    }
+    long result = 1;
+    while (exponent > 0) {
+      if ((exponent & 1) == 1) {
+        result = multiplyExact(result, base);
+      }
+      exponent >>= 1;
+      if (exponent > 0) {
+        base = multiplyExact(base, base);
+      }
+    }
+    return result;
+  }
+
+  public static int unsignedPowExact(int base, int exponent) {
+    if (exponent < 0) {
+      throw new ArithmeticException("Negative exponent");
+    }
+    int result = 1;
+    while (exponent > 0) {
+      if ((exponent & 1) == 1) {
+        result = unsignedMultiplyExact(result, base);
+      }
+      exponent >>= 1;
+      if (exponent > 0) {
+        base = unsignedMultiplyExact(base, base);
+      }
+    }
+    return result;
+  }
+
+  public static long unsignedPowExact(long base, int exponent) {
+    if (exponent < 0) {
+      throw new ArithmeticException("Negative exponent");
+    }
+    long result = 1;
+    while (exponent > 0) {
+      if ((exponent & 1) == 1) {
+        result = unsignedMultiplyExact(result, base);
+      }
+      exponent >>= 1;
+      if (exponent > 0) {
+        base = unsignedMultiplyExact(base, base);
+      }
+    }
+    return result;
+  }
 }

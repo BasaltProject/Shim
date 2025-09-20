@@ -1237,6 +1237,36 @@ extern "C" JNIEXPORT jdouble JNICALL
 }
 
 extern "C" JNIEXPORT jdouble JNICALL
+    Java_java_lang_Math_log10(JNIEnv*, jclass, jdouble val)
+{
+  return log10(val);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+    Java_java_lang_Math_expm1(JNIEnv*, jclass, jdouble val)
+{
+  return expm1(val);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+    Java_java_lang_Math_log1p(JNIEnv*, jclass, jdouble val)
+{
+  return log1p(val);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+    Java_java_lang_Math_hypot(JNIEnv*, jclass, jdouble x, jdouble y)
+{
+  return hypot(x, y);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+    Java_java_lang_Math_IEEEremainder(JNIEnv*, jclass, jdouble dividend, jdouble divisor)
+{
+  return remainder(dividend, divisor);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
     Java_java_lang_Math_log(JNIEnv*, jclass, jdouble val)
 {
   return log(val);

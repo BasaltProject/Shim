@@ -426,5 +426,70 @@ public final class Long extends Number implements Comparable<Long>,
   public Long resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
     return this;
   }
-}
 
+  public static Long valueOf(String s, int radix) throws NumberFormatException {
+    return Long.valueOf(parseLong(s, radix));
+  }
+
+  public static Long decode(String nm) {
+    int radix = 10;
+    int index = 0;
+    boolean negative = false;
+    long result;
+    if (nm.isEmpty()) {
+      throw new NumberFormatException("Zero length string");
+    }
+    char firstChar = nm.charAt(0);
+    if (firstChar == '-') {
+      negative = true;
+      index++;
+    } else if (firstChar == '+') {
+      index++;
+    }
+    if (nm.startsWith("0x", index) || nm.startsWith("0X", index)) {
+      index += 2;
+      radix = 16;
+    } else if (nm.startsWith("#", index)) {
+      index++;
+      radix = 16;
+    } else if (nm.startsWith("0", index) && nm.length() > 1 + index) {
+      index++;
+      radix = 8;
+    }
+    if (nm.startsWith("-", index) || nm.startsWith("+", index)) {
+      throw new NumberFormatException("Sign character in wrong position");
+    }
+    try {
+      result = parseLong(nm.substring(index), radix);
+      result = negative ? -result : result;
+    } catch (NumberFormatException e) {
+      String constant = negative ? ("-" + nm.substring(index)) : nm.substring(index);
+      result = parseLong(constant, radix);
+    }
+    return Long.valueOf(result);
+  }
+
+  public static Long getLong(String nm) {
+    return getLong(nm, null);
+  }
+
+  public static Long getLong(String nm, long val) {
+    Long result = getLong(nm, null);
+    return result == null ? Long.valueOf(val) : result;
+  }
+
+  public static Long getLong(String nm, Long val) {
+    String v = null;
+    try {
+      v = System.getProperty(nm);
+    } catch (IllegalArgumentException | NullPointerException e) {
+    }
+    if (v != null) {
+      try {
+        return Long.decode(v);
+      } catch (NumberFormatException e) {
+      }
+    }
+    return val;
+  }
+}

@@ -248,6 +248,14 @@ public class Collections {
     return (Enumeration<T>) EMPTY_ENUMERATION;
   }
   
+  public static <T> ArrayList<T> list(Enumeration<T> e) {
+    ArrayList<T> result = new ArrayList<T>();
+    while (e.hasMoreElements()) {
+      result.add(e.nextElement());
+    }
+    return result;
+  }
+
   public static <T> Enumeration<T> enumeration(Collection<T> c) {
     return new IteratorEnumeration<T> (c.iterator());
   }

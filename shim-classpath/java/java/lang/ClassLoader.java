@@ -59,7 +59,7 @@ public abstract class ClassLoader {
   }
 
   public String getName() {
-    return name;
+    return name == null && this == shim.SystemClassLoader.appLoader() ? "app" : name;
   }
 
   private Map<String, Package> packages() {
@@ -155,8 +155,10 @@ public abstract class ClassLoader {
     return shim.SystemClassLoader.appLoader();
   }
 
+  private static final ClassLoader platformLoader = new shim.PlatformClassLoader();
+
   public static ClassLoader getPlatformClassLoader() {
-    return shim.SystemClassLoader.bootLoader();
+    return platformLoader;
   }
 
   public synchronized Module getUnnamedModule() {
@@ -234,6 +236,7 @@ public abstract class ClassLoader {
   }
 
   public final ClassLoader getParent() {
+    if (this == shim.SystemClassLoader.appLoader()) return getPlatformClassLoader();
     return parent == shim.SystemClassLoader.bootLoader() ? null : parent;
   }
 

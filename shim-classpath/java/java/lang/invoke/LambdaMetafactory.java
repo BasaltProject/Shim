@@ -160,14 +160,54 @@ public class LambdaMetafactory {
     return result;
   }
 
+  private static String wrapperName(String spec) {
+    switch (spec) {
+    case "Z": return "java/lang/Boolean";
+    case "B": return "java/lang/Byte";
+    case "S": return "java/lang/Short";
+    case "C": return "java/lang/Character";
+    case "I": return "java/lang/Integer";
+    case "F": return "java/lang/Float";
+    case "J": return "java/lang/Long";
+    case "D": return "java/lang/Double";
+    default: throw new AssertionError("no wrapper for " + spec);
+    }
+  }
+
+  private static void widenPrimitive(ByteArrayOutputStream out, String from, String to) throws IOException {
+    if (from.equals(to) || from.equals("V") || to.equals("V") || from.equals("Z") || to.equals("Z")) return;
+    boolean intLike = from.equals("B") || from.equals("S") || from.equals("C") || from.equals("I");
+    switch (to) {
+    case "J":
+      if (intLike) write1(out, 0x85);
+      break;
+    case "F":
+      write1(out, intLike ? 0x86 : 0x89);
+      break;
+    case "D":
+      if (intLike) write1(out, 0x87);
+      else if (from.equals("J")) write1(out, 0x8a);
+      else if (from.equals("F")) write1(out, 0x8d);
+      break;
+    default:
+      break;
+    }
+  }
+
   private static void maybeBoxOrUnbox(ByteArrayOutputStream out,
                                       List<PoolEntry> pool,
                                       MethodType.TypeSpec from,
                                       MethodType.TypeSpec to)
     throws IOException
   {
+    if (to.type().isPrimitive() && from.type().isPrimitive()) {
+      widenPrimitive(out, from.spec(), to.spec());
+      return;
+    }
     if (to.type().isPrimitive()) {
       if (! (from.type().isPrimitive() || "V".equals(to.spec()))) {
+        write1(out, 0xc0);
+        write2(out, ConstantPool.addClass(pool, wrapperName(to.spec())) + 1);
         write1(out, invokevirtual);
 
         try {

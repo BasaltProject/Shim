@@ -30,6 +30,10 @@ public class StringBuffer implements CharSequence, Appendable, Comparable<String
     sb = new StringBuilder(s);
   }
 
+  public StringBuffer(CharSequence seq) {
+    this(seq.toString());
+  }
+
   public StringBuffer(int capacity) {
     sb = new StringBuilder(capacity);
   }
@@ -190,4 +194,93 @@ public class StringBuffer implements CharSequence, Appendable, Comparable<String
   public synchronized int codePointCount(int start, int end) {
     return sb.codePointCount(start, end);
   }
+
+  public synchronized StringBuffer reverse() {
+    sb.reverse();
+    return this;
+  }
+
+  public synchronized StringBuffer appendCodePoint(int codePoint) {
+    sb.appendCodePoint(codePoint);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, Object o) {
+    sb.insert(i, o);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, char[] chars) {
+    sb.insert(i, chars);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, char[] chars, int offset, int length) {
+    sb.insert(i, chars, offset, length);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, CharSequence seq) {
+    sb.insert(i, seq);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, CharSequence seq, int start, int end) {
+    sb.insert(i, seq, start, end);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, boolean v) {
+    sb.insert(i, v);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, long v) {
+    sb.insert(i, v);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, float v) {
+    sb.insert(i, v);
+    return this;
+  }
+
+  public synchronized StringBuffer insert(int i, double v) {
+    sb.insert(i, v);
+    return this;
+  }
+
+  public synchronized StringBuffer repeat(int codePoint, int count) {
+    sb.repeat(codePoint, count);
+    return this;
+  }
+
+  public synchronized StringBuffer repeat(CharSequence seq, int count) {
+    sb.repeat(seq, count);
+    return this;
+  }
+
+  public synchronized int lastIndexOf(String s) {
+    return sb.lastIndexOf(s);
+  }
+
+  public synchronized int lastIndexOf(String s, int lastIndex) {
+    return sb.lastIndexOf(s, lastIndex);
+  }
+
+  public synchronized String substring(int start) {
+    return substring(start, length());
+  }
+
+  public synchronized int offsetByCodePoints(int index, int codePointOffset) {
+    return Character.offsetByCodePoints(this, index, codePointOffset);
+  }
+
+  public synchronized int capacity() {
+    return Math.max(16, length());
+  }
+
+  public synchronized void ensureCapacity(int minimumCapacity) { }
+
+  public synchronized void trimToSize() { }
 }

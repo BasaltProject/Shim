@@ -13,6 +13,7 @@ import java.util.OptionalDouble;
 import java.util.PrimitiveIterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.DoubleSummaryStatistics;
 import java.util.function.BiConsumer;
 import java.util.function.DoubleBinaryOperator;
 import java.util.function.DoubleConsumer;
@@ -194,5 +195,55 @@ public interface DoubleStream extends BaseStream<Double, DoubleStream> {
     Objects.requireNonNull(a);
     Objects.requireNonNull(b);
     return Stream.concat(a.boxed(), b.boxed()).mapToDouble(Double::doubleValue).onClose(a::close).onClose(b::close);
+  }
+
+  default DoubleSummaryStatistics summaryStatistics() {
+    return collect(DoubleSummaryStatistics::new, DoubleSummaryStatistics::accept, DoubleSummaryStatistics::combine);
+  }
+
+  interface Builder extends DoubleConsumer {
+    @Override
+    void accept(double t);
+
+    default Builder add(double t) {
+      accept(t);
+      return this;
+    }
+
+    DoubleStream build();
+  }
+
+  public static Builder builder() {
+    return new Builder() {
+      private final java.util.ArrayList<Double> list = new java.util.ArrayList<>();
+      private boolean built;
+
+      @Override
+      public void accept(double t) {
+        if (built) throw new IllegalStateException();
+        list.add(t);
+      }
+
+      @Override
+      public DoubleStream build() {
+        if (built) throw new IllegalStateException();
+        built = true;
+        return list.stream().mapToDouble(Double::doubleValue);
+      }
+    };
+  }
+
+  @FunctionalInterface
+  interface DoubleMapMultiConsumer {
+    void accept(double value, DoubleConsumer dc);
+  }
+
+  default DoubleStream mapMulti(DoubleMapMultiConsumer mapper) {
+    java.util.Objects.requireNonNull(mapper);
+    return flatMap(e -> {
+      Builder buffer = DoubleStream.builder();
+      mapper.accept(e, buffer);
+      return buffer.build();
+    });
   }
 }

@@ -1,0 +1,24 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ * SPDX-License-Identifier: MIT
+ */
+
+package java.util;
+
+public class MissingFormatArgumentException extends IllegalFormatException {
+  private final String specifier;
+
+  public MissingFormatArgumentException(String specifier) {
+    this.specifier = specifier;
+  }
+
+  public String getFormatSpecifier() {
+    return specifier;
+  }
+
+  public String getMessage() {
+    return "Format specifier '" + specifier + "'";
+  }
+}

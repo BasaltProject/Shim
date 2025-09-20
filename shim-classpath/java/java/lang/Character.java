@@ -558,4 +558,143 @@ public final class Character implements Comparable<Character>, java.lang.constan
   public static boolean isEmoji(int codePoint) {
     return CharacterEmojiData.hasProperty(codePoint, CharacterEmojiData.EMOJI);
   }
+
+  public static int toChars(int codePoint, char[] dst, int dstIndex) {
+    if (isBmpCodePoint(codePoint)) {
+      dst[dstIndex] = (char) codePoint;
+      return 1;
+    }
+    if (!isValidCodePoint(codePoint)) {
+      throw new IllegalArgumentException(String.format("Not a valid Unicode code point: 0x%X", codePoint));
+    }
+    dst[dstIndex + 1] = lowSurrogate(codePoint);
+    dst[dstIndex] = highSurrogate(codePoint);
+    return 2;
+  }
+
+  public static int codePointAt(char[] a, int index) {
+    return codePointAt(a, index, a.length);
+  }
+
+  public static int codePointAt(char[] a, int index, int limit) {
+    if (index >= limit || index < 0 || limit > a.length) {
+      throw new IndexOutOfBoundsException();
+    }
+    char c1 = a[index];
+    if (isHighSurrogate(c1) && ++index < limit) {
+      char c2 = a[index];
+      if (isLowSurrogate(c2)) {
+        return toCodePoint(c1, c2);
+      }
+    }
+    return c1;
+  }
+
+  public static int codePointBefore(char[] a, int index) {
+    return codePointBefore(a, index, 0);
+  }
+
+  public static int codePointBefore(char[] a, int index, int start) {
+    if (index <= start || start < 0 || index > a.length) {
+      throw new IndexOutOfBoundsException();
+    }
+    char c2 = a[--index];
+    if (isLowSurrogate(c2) && index > start) {
+      char c1 = a[--index];
+      if (isHighSurrogate(c1)) {
+        return toCodePoint(c1, c2);
+      }
+    }
+    return c2;
+  }
+
+  public static int codePointCount(char[] a, int offset, int count) {
+    if (count > a.length - offset || offset < 0 || count < 0) {
+      throw new IndexOutOfBoundsException();
+    }
+    int endIndex = offset + count;
+    int n = count;
+    for (int i = offset; i < endIndex; ) {
+      if (isHighSurrogate(a[i++]) && i < endIndex && isLowSurrogate(a[i])) {
+        n--;
+        i++;
+      }
+    }
+    return n;
+  }
+
+  public static int offsetByCodePoints(CharSequence seq, int index, int codePointOffset) {
+    int length = seq.length();
+    if (index < 0 || index > length) {
+      throw new IndexOutOfBoundsException();
+    }
+    int x = index;
+    if (codePointOffset >= 0) {
+      int i;
+      for (i = 0; x < length && i < codePointOffset; i++) {
+        if (isHighSurrogate(seq.charAt(x++)) && x < length && isLowSurrogate(seq.charAt(x))) {
+          x++;
+        }
+      }
+      if (i < codePointOffset) {
+        throw new IndexOutOfBoundsException();
+      }
+    } else {
+      int i;
+      for (i = codePointOffset; x > 0 && i < 0; i++) {
+        if (isLowSurrogate(seq.charAt(--x)) && x > 0 && isHighSurrogate(seq.charAt(x - 1))) {
+          x--;
+        }
+      }
+      if (i < 0) {
+        throw new IndexOutOfBoundsException();
+      }
+    }
+    return x;
+  }
+
+  public static int offsetByCodePoints(char[] a, int start, int count, int index, int codePointOffset) {
+    if (count > a.length - start || start < 0 || count < 0 || index < start || index > start + count) {
+      throw new IndexOutOfBoundsException();
+    }
+    int x = index;
+    if (codePointOffset >= 0) {
+      int limit = start + count;
+      int i;
+      for (i = 0; x < limit && i < codePointOffset; i++) {
+        if (isHighSurrogate(a[x++]) && x < limit && isLowSurrogate(a[x])) {
+          x++;
+        }
+      }
+      if (i < codePointOffset) {
+        throw new IndexOutOfBoundsException();
+      }
+    } else {
+      int i;
+      for (i = codePointOffset; x > start && i < 0; i++) {
+        if (isLowSurrogate(a[--x]) && x > start && isHighSurrogate(a[x - 1])) {
+          x--;
+        }
+      }
+      if (i < 0) {
+        throw new IndexOutOfBoundsException();
+      }
+    }
+    return x;
+  }
+
+  @Deprecated
+  public static boolean isJavaLetter(char ch) {
+    return isJavaIdentifierStart(ch);
+  }
+
+  @Deprecated
+  public static boolean isJavaLetterOrDigit(char ch) {
+    return isJavaIdentifierPart(ch);
+  }
+
+  @Deprecated
+  public static boolean isSpace(char ch) {
+    return ch <= 0x0020 && (((1L << 0x09) | (1L << 0x0A) | (1L << 0x0C) | (1L << 0x0D) | (1L << 0x20)) >> ch & 1L) != 0;
+  }
 }

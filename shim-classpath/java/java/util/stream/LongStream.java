@@ -14,6 +14,7 @@ import java.util.OptionalLong;
 import java.util.PrimitiveIterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.LongSummaryStatistics;
 import java.util.function.BiConsumer;
 import java.util.function.LongBinaryOperator;
 import java.util.function.LongConsumer;
@@ -211,5 +212,55 @@ public interface LongStream extends BaseStream<Long, LongStream> {
     Objects.requireNonNull(a);
     Objects.requireNonNull(b);
     return Stream.concat(a.boxed(), b.boxed()).mapToLong(Long::longValue).onClose(a::close).onClose(b::close);
+  }
+
+  default LongSummaryStatistics summaryStatistics() {
+    return collect(LongSummaryStatistics::new, LongSummaryStatistics::accept, LongSummaryStatistics::combine);
+  }
+
+  interface Builder extends LongConsumer {
+    @Override
+    void accept(long t);
+
+    default Builder add(long t) {
+      accept(t);
+      return this;
+    }
+
+    LongStream build();
+  }
+
+  public static Builder builder() {
+    return new Builder() {
+      private final java.util.ArrayList<Long> list = new java.util.ArrayList<>();
+      private boolean built;
+
+      @Override
+      public void accept(long t) {
+        if (built) throw new IllegalStateException();
+        list.add(t);
+      }
+
+      @Override
+      public LongStream build() {
+        if (built) throw new IllegalStateException();
+        built = true;
+        return list.stream().mapToLong(Long::longValue);
+      }
+    };
+  }
+
+  @FunctionalInterface
+  interface LongMapMultiConsumer {
+    void accept(long value, LongConsumer dc);
+  }
+
+  default LongStream mapMulti(LongMapMultiConsumer mapper) {
+    java.util.Objects.requireNonNull(mapper);
+    return flatMap(e -> {
+      Builder buffer = LongStream.builder();
+      mapper.accept(e, buffer);
+      return buffer.build();
+    });
   }
 }

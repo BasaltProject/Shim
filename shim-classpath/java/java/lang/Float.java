@@ -231,4 +231,13 @@ public final class Float extends Number implements Comparable<Float>,
   public Float resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
     return this;
   }
+
+  public static String toHexString(float f) {
+    if (Math.abs(f) < MIN_NORMAL && f != 0.0f) {
+      double scaled = (double) f * Double.longBitsToDouble(127L << 52);
+      String s = Double.toHexString(scaled);
+      return s.endsWith("p-1022") ? s.substring(0, s.length() - 6) + "p-126" : s;
+    }
+    return Double.toHexString(f);
+  }
 }

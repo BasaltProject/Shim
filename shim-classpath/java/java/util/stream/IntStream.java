@@ -14,6 +14,7 @@ import java.util.OptionalInt;
 import java.util.PrimitiveIterator;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.IntSummaryStatistics;
 import java.util.function.BiConsumer;
 import java.util.function.IntBinaryOperator;
 import java.util.function.IntConsumer;
@@ -213,5 +214,55 @@ public interface IntStream extends BaseStream<Integer, IntStream> {
     Objects.requireNonNull(a);
     Objects.requireNonNull(b);
     return Stream.concat(a.boxed(), b.boxed()).mapToInt(Integer::intValue).onClose(a::close).onClose(b::close);
+  }
+
+  default IntSummaryStatistics summaryStatistics() {
+    return collect(IntSummaryStatistics::new, IntSummaryStatistics::accept, IntSummaryStatistics::combine);
+  }
+
+  interface Builder extends IntConsumer {
+    @Override
+    void accept(int t);
+
+    default Builder add(int t) {
+      accept(t);
+      return this;
+    }
+
+    IntStream build();
+  }
+
+  public static Builder builder() {
+    return new Builder() {
+      private final java.util.ArrayList<Integer> list = new java.util.ArrayList<>();
+      private boolean built;
+
+      @Override
+      public void accept(int t) {
+        if (built) throw new IllegalStateException();
+        list.add(t);
+      }
+
+      @Override
+      public IntStream build() {
+        if (built) throw new IllegalStateException();
+        built = true;
+        return list.stream().mapToInt(Integer::intValue);
+      }
+    };
+  }
+
+  @FunctionalInterface
+  interface IntMapMultiConsumer {
+    void accept(int value, IntConsumer dc);
+  }
+
+  default IntStream mapMulti(IntMapMultiConsumer mapper) {
+    java.util.Objects.requireNonNull(mapper);
+    return flatMap(e -> {
+      Builder buffer = IntStream.builder();
+      mapper.accept(e, buffer);
+      return buffer.build();
+    });
   }
 }
