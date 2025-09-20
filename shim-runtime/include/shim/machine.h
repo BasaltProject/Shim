@@ -3412,6 +3412,14 @@ inline unsigned poolSize(Thread* t, GcSingleton* pool)
   return singletonCount(t, pool) - poolMaskSize(t, pool);
 }
 
+GcClass* nestHostOf(Thread* t, GcClass* c);
+
+bool classAccessible(Thread* t, GcClass* accessor, GcClass* c);
+
+void checkClassAccess(Thread* t, GcClass* accessor, GcClass* c);
+
+void setHiddenNestHost(Thread* t, GcClass* defined, GcClass* host);
+
 object resolveMember(Thread* t,
                      GcClassLoader* loader,
                      GcClass* class_,
@@ -3419,7 +3427,8 @@ object resolveMember(Thread* t,
                      GcByteArray* spec,
                      object (*find)(Thread*, GcClass*, GcByteArray*, GcByteArray*),
                      Gc::Type errorType,
-                     bool throw_ = true);
+                     bool throw_ = true,
+                     GcClass* accessor = 0);
 
 inline GcClass* resolveClassInObject(Thread* t,
                                      GcClassLoader* loader,
@@ -3465,6 +3474,11 @@ inline GcClass* resolveClassInPool(Thread* t,
         = resolveClass(t, loader, cast<GcReference>(t, o)->name(), throw_);
 
     if (c) {
+      if (not classAccessible(t, method->class_(), c)) {
+        if (!throw_) return 0;
+        PROTECT(t, c);
+        checkClassAccess(t, method->class_(), c);
+      }
       storeStoreMemoryBarrier();
 
       method->code()->pool()->setBodyElement(
@@ -3491,7 +3505,8 @@ inline object resolve(
     unsigned index,
     object (*find)(vm::Thread*, GcClass*, GcByteArray*, GcByteArray*),
     Gc::Type errorType,
-    bool throw_ = true)
+    bool throw_ = true,
+    GcClass* accessor = 0)
 {
   object o = singletonObject(t, pool, index);
 
@@ -3515,7 +3530,8 @@ inline object resolve(
                           reference->spec(),
                           find,
                           errorType,
-                          throw_);
+                          throw_,
+                          accessor);
 
       if (o) {
         storeStoreMemoryBarrier();
@@ -3547,7 +3563,8 @@ inline GcField* resolveField(Thread* t,
                                index,
                                findFieldInClass,
                                GcNoSuchFieldError::Type,
-                               throw_));
+                               throw_,
+                               method->class_()));
 }
 
 inline GcField* resolveField(Thread* t,
@@ -3650,7 +3667,8 @@ inline GcMethod* resolveMethod(Thread* t,
                                 index,
                                 findMethodInClass,
                                 GcNoSuchMethodError::Type,
-                                throw_));
+                                throw_,
+                                method->class_()));
 
   return handle ? handle->method() : 0;
 }
