@@ -30,184 +30,504 @@ public class Collections {
 
   private Collections() { }
 
-  public static void shuffle(List list, Random random) {
-    Object[] array = Data.toArray(list, new Object[list.size()]);
-    for (int i = 0; i < array.length; ++i) {
-      int j = random.nextInt(array.length);
-      Object tmp = array[i];
-      array[i] = array[j];
-      array[j] = tmp;
-    }
- 
-    list.clear();
-    for (int i = 0; i < array.length; ++i) {
-      list.add(array[i]);
-    }
+  private static final int SHUFFLE_THRESHOLD = 5;
+  private static final int REVERSE_THRESHOLD = 18;
+
+  public static void shuffle(List<?> list, Random rnd) {
+    shuffle(list, (java.util.random.RandomGenerator) rnd);
   }
 
-  public static void shuffle(List list) {
+  public static void shuffle(List<?> list) {
     shuffle(list, new Random());
   }
 
-  public static void sort(List list) {
-    sort(list, new Comparator() {
-        public int compare(Object a, Object b) {
-          return ((Comparable) a).compareTo(b);
-        }
-      });
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static void shuffle(List<?> list, java.util.random.RandomGenerator rnd) {
+    int size = list.size();
+    if (size < SHUFFLE_THRESHOLD || list instanceof RandomAccess) {
+      for (int i = size; i > 1; i--) {
+        swap(list, i - 1, rnd.nextInt(i));
+      }
+    } else {
+      Object[] array = list.toArray();
+      for (int i = size; i > 1; i--) {
+        Object tmp = array[i - 1];
+        int j = rnd.nextInt(i);
+        array[i - 1] = array[j];
+        array[j] = tmp;
+      }
+      ListIterator it = list.listIterator();
+      for (Object e : array) {
+        it.next();
+        it.set(e);
+      }
+    }
   }
 
-  private final static int SORT_SIZE_THRESHOLD = 16;
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static void swap(List<?> list, int i, int j) {
+    final List l = list;
+    l.set(i, l.set(j, l.get(i)));
+  }
 
-  public static <T> void sort(List<T> list, Comparator<? super T> comparator) {
-    if (comparator == null) {
-      sort(list);
+  public static <T extends Comparable<? super T>> void sort(List<T> list) {
+    list.sort(null);
+  }
+
+  public static <T> void sort(List<T> list, Comparator<? super T> c) {
+    list.sort(c);
+  }
+
+  public static <T> int binarySearch(List<? extends Comparable<? super T>> list, T key) {
+    int low = 0;
+    int high = list.size() - 1;
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      Comparable<? super T> midVal = list.get(mid);
+      int cmp = midVal.compareTo(key);
+      if (cmp < 0) {
+        low = mid + 1;
+      } else if (cmp > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
+      }
+    }
+    return -(low + 1);
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> int binarySearch(List<? extends T> list, T key, Comparator<? super T> c) {
+    if (c == null) {
+      return binarySearch((List<? extends Comparable<? super T>>) list, key);
+    }
+    int low = 0;
+    int high = list.size() - 1;
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      T midVal = list.get(mid);
+      int cmp = c.compare(midVal, key);
+      if (cmp < 0) {
+        low = mid + 1;
+      } else if (cmp > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
+      }
+    }
+    return -(low + 1);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static void reverse(List<?> list) {
+    int size = list.size();
+    if (size < REVERSE_THRESHOLD || list instanceof RandomAccess) {
+      for (int i = 0, mid = size >> 1, j = size - 1; i < mid; i++, j--) {
+        swap(list, i, j);
+      }
+    } else {
+      ListIterator fwd = list.listIterator();
+      ListIterator rev = list.listIterator(size);
+      for (int i = 0, mid = list.size() >> 1; i < mid; i++) {
+        Object tmp = fwd.next();
+        fwd.set(rev.previous());
+        rev.set(tmp);
+      }
+    }
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static <T> void fill(List<? super T> list, T obj) {
+    int size = list.size();
+    if (size < 25 || list instanceof RandomAccess) {
+      for (int i = 0; i < size; i++) {
+        list.set(i, obj);
+      }
+    } else {
+      ListIterator<? super T> itr = list.listIterator();
+      for (int i = 0; i < size; i++) {
+        itr.next();
+        itr.set(obj);
+      }
+    }
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static <T> void copy(List<? super T> dest, List<? extends T> src) {
+    int srcSize = src.size();
+    if (srcSize > dest.size()) {
+      throw new IndexOutOfBoundsException("Source does not fit in dest");
+    }
+    if (srcSize < 10 || (src instanceof RandomAccess && dest instanceof RandomAccess)) {
+      for (int i = 0; i < srcSize; i++) {
+        dest.set(i, src.get(i));
+      }
+    } else {
+      ListIterator<? super T> di = dest.listIterator();
+      ListIterator<? extends T> si = src.listIterator();
+      for (int i = 0; i < srcSize; i++) {
+        di.next();
+        di.set(si.next());
+      }
+    }
+  }
+
+  public static <T extends Object & Comparable<? super T>> T min(Collection<? extends T> coll) {
+    Iterator<? extends T> i = coll.iterator();
+    T candidate = i.next();
+    while (i.hasNext()) {
+      T next = i.next();
+      if (next.compareTo(candidate) < 0) {
+        candidate = next;
+      }
+    }
+    return candidate;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static <T> T min(Collection<? extends T> coll, Comparator<? super T> comp) {
+    if (comp == null) {
+      return (T) min((Collection) coll);
+    }
+    Iterator<? extends T> i = coll.iterator();
+    T candidate = i.next();
+    while (i.hasNext()) {
+      T next = i.next();
+      if (comp.compare(next, candidate) < 0) {
+        candidate = next;
+      }
+    }
+    return candidate;
+  }
+
+  public static <T extends Object & Comparable<? super T>> T max(Collection<? extends T> coll) {
+    Iterator<? extends T> i = coll.iterator();
+    T candidate = i.next();
+    while (i.hasNext()) {
+      T next = i.next();
+      if (next.compareTo(candidate) > 0) {
+        candidate = next;
+      }
+    }
+    return candidate;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static <T> T max(Collection<? extends T> coll, Comparator<? super T> comp) {
+    if (comp == null) {
+      return (T) max((Collection) coll);
+    }
+    Iterator<? extends T> i = coll.iterator();
+    T candidate = i.next();
+    while (i.hasNext()) {
+      T next = i.next();
+      if (comp.compare(next, candidate) > 0) {
+        candidate = next;
+      }
+    }
+    return candidate;
+  }
+
+  public static void rotate(List<?> list, int distance) {
+    rotateList(list, distance);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static void rotateList(List list, int distance) {
+    int size = list.size();
+    if (size == 0) {
       return;
     }
+    distance = distance % size;
+    if (distance < 0) {
+      distance += size;
+    }
+    if (distance == 0) {
+      return;
+    }
+    for (int cycleStart = 0, nMoved = 0; nMoved != size; cycleStart++) {
+      Object displaced = list.get(cycleStart);
+      int i = cycleStart;
+      do {
+        i += distance;
+        if (i >= size) {
+          i -= size;
+        }
+        displaced = list.set(i, displaced);
+        nMoved++;
+      } while (i != cycleStart);
+    }
+  }
+
+  public static <T> boolean replaceAll(List<T> list, T oldVal, T newVal) {
+    boolean result = false;
     int size = list.size();
-    introSort(list, comparator, 0, size, size);
-    insertionSort(list, comparator);
-  }
-
-  private static <T > void introSort(List<T> list,
-    Comparator<? super T> comparator, int begin, int end, int limit)
-  {
-    while (end - begin > SORT_SIZE_THRESHOLD) {
-      if (limit == 0) {
-        heapSort(list, comparator, begin, end);
-        return;
-      }
-      limit >>= 1;
-
-      // median of three
-      T a = list.get(begin);
-      T b = list.get(begin + (end - begin) / 2 + 1);
-      T c = list.get(end - 1);
-      T median;
-      if (comparator.compare(a, b) < 0) {
-        median = comparator.compare(b, c) < 0 ?
-          b : (comparator.compare(a, c) < 0 ? c : a);
+    if (size < 11 || list instanceof RandomAccess) {
+      if (oldVal == null) {
+        for (int i = 0; i < size; i++) {
+          if (list.get(i) == null) {
+            list.set(i, newVal);
+            result = true;
+          }
+        }
       } else {
-        median = comparator.compare(b, c) > 0 ?
-          b : (comparator.compare(a, c) > 0 ? c : a);
-      }
-
-      // partition
-      int pivot, i = begin, j = end;
-      for (;;) {
-        while (comparator.compare(list.get(i), median) < 0) {
-          ++i;
+        for (int i = 0; i < size; i++) {
+          if (oldVal.equals(list.get(i))) {
+            list.set(i, newVal);
+            result = true;
+          }
         }
-        --j;
-        while (comparator.compare(median, list.get(j)) < 0) {
-          --j;
+      }
+    } else {
+      ListIterator<T> itr = list.listIterator();
+      if (oldVal == null) {
+        for (int i = 0; i < size; i++) {
+          if (itr.next() == null) {
+            itr.set(newVal);
+            result = true;
+          }
         }
-        if (i >= j) {
-          pivot = i;
-          break;
-        }
-        T swap = list.get(i);
-        list.set(i, list.get(j));
-        list.set(j, swap);
-        ++i;
-      }
-
-      introSort(list, comparator, pivot, end, limit);
-      end = pivot;
-    }
-  }
-
-  private static <T> void heapSort(List<T> list, Comparator<? super T> comparator,
-    int begin, int end)
-  {
-    int count = end - begin;
-    for (int i = count / 2 - 1; i >= 0; --i) {
-      siftDown(list, comparator, i, count, begin);
-    }
-    for (int i = count - 1; i > 0; --i) {
-      // swap begin and begin + i
-      T swap = list.get(begin + i);
-      list.set(begin + i, list.get(begin));
-      list.set(begin, swap);
-
-      siftDown(list, comparator, 0, i, begin);
-    }
-  }
-
-  private static <T> void siftDown(List<T> list, Comparator<? super T> comparator,
-    int i, int count, int offset)
-  {
-    T value = list.get(offset + i);
-    while (i < count / 2) {
-      int child = 2 * i + 1;
-      if (child + 1 < count &&
-          comparator.compare(list.get(child), list.get(child + 1)) < 0) {
-        ++child;
-      }
-      if (comparator.compare(value, list.get(child)) >= 0) {
-        break;
-      }
-      list.set(offset + i, list.get(offset + child));
-      i = child;
-    }
-    list.set(offset + i, value);
-  }
-
-  private static <T> void insertionSort(List<T> list,
-    Comparator<? super T> comparator)
-  {
-    int size = list.size();
-    for (int j = 1; j < size; ++j) {
-      T t = list.get(j);
-      int i = j - 1;
-      while (i >= 0 && comparator.compare(list.get(i), t) > 0) {
-        list.set(i + 1, list.get(i));
-        --i;
-      }
-      list.set(i + 1, t);
-    }
-  }
-
-  public static <T> int binarySearch(List<T> list, T needle) {
-    int left = -1, right = list.size();
-    while (left + 1 < right) {
-      int middle = (left + right) >> 1;
-      int result = ((Comparable)needle).compareTo(list.get(middle));
-      if (result < 0) {
-        right = middle;
-      } else if (result > 0) {
-        left = middle;
       } else {
-        return middle;
+        for (int i = 0; i < size; i++) {
+          if (oldVal.equals(itr.next())) {
+            itr.set(newVal);
+            result = true;
+          }
+        }
       }
     }
-    return -1 - right;
+    return result;
   }
 
-  public static <T> void reverse(List<T> list) {
-    int ascending = 0, descending = list.size() - 1;
-    while (ascending < descending) {
-      T tmp = list.get(ascending);
-      list.set(ascending++, list.get(descending));
-      list.set(descending--, tmp);
+  public static int indexOfSubList(List<?> source, List<?> target) {
+    int sourceSize = source.size();
+    int targetSize = target.size();
+    int maxCandidate = sourceSize - targetSize;
+    nextCand:
+    for (int candidate = 0; candidate <= maxCandidate; candidate++) {
+      for (int i = 0, j = candidate; i < targetSize; i++, j++) {
+        if (!Objects.equals(target.get(i), source.get(j))) {
+          continue nextCand;
+        }
+      }
+      return candidate;
+    }
+    return -1;
+  }
+
+  public static int lastIndexOfSubList(List<?> source, List<?> target) {
+    int sourceSize = source.size();
+    int targetSize = target.size();
+    int maxCandidate = sourceSize - targetSize;
+    nextCand:
+    for (int candidate = maxCandidate; candidate >= 0; candidate--) {
+      for (int i = 0, j = candidate; i < targetSize; i++, j++) {
+        if (!Objects.equals(target.get(i), source.get(j))) {
+          continue nextCand;
+        }
+      }
+      return candidate;
+    }
+    return -1;
+  }
+
+  public static int frequency(Collection<?> c, Object o) {
+    int result = 0;
+    if (o == null) {
+      for (Object e : c) {
+        if (e == null) {
+          result++;
+        }
+      }
+    } else {
+      for (Object e : c) {
+        if (o.equals(e)) {
+          result++;
+        }
+      }
+    }
+    return result;
+  }
+
+  public static boolean disjoint(Collection<?> c1, Collection<?> c2) {
+    Collection<?> contains = c2;
+    Collection<?> iterate = c1;
+    if (c1 instanceof Set) {
+      iterate = c2;
+      contains = c1;
+    } else if (!(c2 instanceof Set)) {
+      int c1size = c1.size();
+      int c2size = c2.size();
+      if (c1size == 0 || c2size == 0) {
+        return true;
+      }
+      if (c1size > c2size) {
+        iterate = c2;
+        contains = c1;
+      }
+    }
+    for (Object e : iterate) {
+      if (contains.contains(e)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @SafeVarargs
+  public static <T> boolean addAll(Collection<? super T> c, T... elements) {
+    boolean result = false;
+    for (T element : elements) {
+      result |= c.add(element);
+    }
+    return result;
+  }
+
+  public static <T> List<T> nCopies(int n, T o) {
+    if (n < 0) {
+      throw new IllegalArgumentException("List length = " + n);
+    }
+    return new CopiesList<T>(n, o);
+  }
+
+  private static class CopiesList<E> extends AbstractList<E> implements RandomAccess, Serializable {
+    final int n;
+    final E element;
+
+    CopiesList(int n, E e) {
+      this.n = n;
+      element = e;
+    }
+
+    public int size() {
+      return n;
+    }
+
+    public boolean contains(Object obj) {
+      return n != 0 && Objects.equals(obj, element);
+    }
+
+    public int indexOf(Object o) {
+      return contains(o) ? 0 : -1;
+    }
+
+    public int lastIndexOf(Object o) {
+      return contains(o) ? n - 1 : -1;
+    }
+
+    public Object[] toArray() {
+      final Object[] a = new Object[n];
+      if (element != null) {
+        Arrays.fill(a, 0, n, element);
+      }
+      return a;
+    }
+
+    public E get(int index) {
+      Objects.checkIndex(index, n);
+      return element;
+    }
+
+    public List<E> subList(int fromIndex, int toIndex) {
+      if (fromIndex < 0) {
+        throw new IndexOutOfBoundsException("fromIndex = " + fromIndex);
+      }
+      if (toIndex > n) {
+        throw new IndexOutOfBoundsException("toIndex = " + toIndex);
+      }
+      if (fromIndex > toIndex) {
+        throw new IllegalArgumentException("fromIndex(" + fromIndex + ") > toIndex(" + toIndex + ")");
+      }
+      return new CopiesList<E>(toIndex - fromIndex, element);
     }
   }
 
-  public static final List EMPTY_LIST
-    = new UnmodifiableList<Object>(new ArrayList<Object>(0));
+  public static final List EMPTY_LIST = new EmptyList<Object>();
+
+  private static class EmptyList<E> extends AbstractList<E> implements RandomAccess, Serializable {
+    public Iterator<E> iterator() {
+      return emptyIterator();
+    }
+
+    public ListIterator<E> listIterator() {
+      return emptyListIterator();
+    }
+
+    public int size() {
+      return 0;
+    }
+
+    public boolean isEmpty() {
+      return true;
+    }
+
+    public void clear() { }
+
+    public boolean contains(Object obj) {
+      return false;
+    }
+
+    public boolean containsAll(Collection<?> c) {
+      return c.isEmpty();
+    }
+
+    public Object[] toArray() {
+      return new Object[0];
+    }
+
+    public <T> T[] toArray(T[] a) {
+      if (a.length > 0) {
+        a[0] = null;
+      }
+      return a;
+    }
+
+    public E get(int index) {
+      throw new IndexOutOfBoundsException("Index: " + index);
+    }
+
+    public boolean equals(Object o) {
+      return (o instanceof List) && ((List<?>) o).isEmpty();
+    }
+
+    public int hashCode() {
+      return 1;
+    }
+
+    public boolean removeIf(java.util.function.Predicate<? super E> filter) {
+      Objects.requireNonNull(filter);
+      return false;
+    }
+
+    public void replaceAll(java.util.function.UnaryOperator<E> operator) {
+      Objects.requireNonNull(operator);
+    }
+
+    public void sort(Comparator<? super E> c) { }
+
+    public void forEach(java.util.function.Consumer<? super E> action) {
+      Objects.requireNonNull(action);
+    }
+  }
 
   public static final <E> List<E> emptyList() {
     return EMPTY_LIST;
   }
 
+  @SuppressWarnings("rawtypes")
+  public static final Map EMPTY_MAP = new UnmodifiableMap<Object, Object>(new HashMap<Object, Object>(0));
+
+  @SuppressWarnings("rawtypes")
+  public static final Set EMPTY_SET = new UnmodifiableSet<Object>(new HashSet<Object>(0));
+
+  @SuppressWarnings("unchecked")
   public static final <K,V> Map<K,V> emptyMap() {
-    return (Map<K, V>) new UnmodifiableMap<Object, Object>(
-      new HashMap<Object, Object>(0));
+    return (Map<K, V>) EMPTY_MAP;
   }
 
+  @SuppressWarnings("unchecked")
   public static final <T> Set<T> emptySet() {
-    return (Set<T>) new UnmodifiableSet<Object>(
-      new HashSet<Object>(0));
+    return (Set<T>) EMPTY_SET;
   }
 
   private static final Iterator<Object> EMPTY_ITERATOR = new Iterator<Object>() {
@@ -284,260 +604,83 @@ public class Collections {
     }
   }
 
-  static class SynchronizedCollection<T> implements Collection<T> {
-    protected final Object lock;
-    protected final Collection<T> collection;
-
-    public SynchronizedCollection(Object lock, Collection<T> collection) {
-      this.lock = lock;
-      this.collection = collection;
-    }
-
-    public int size() {
-      synchronized (lock) { return collection.size(); }
-    }
-
-    public boolean isEmpty() {
-      return size() == 0;
-    }
-
-    public boolean contains(Object e) {
-      synchronized (lock) { return collection.contains(e); }
-    }
-
-    public boolean add(T e) {
-      synchronized (lock) { return collection.add(e); }
-    }
-
-    public boolean addAll(Collection<? extends T> collection) {
-      synchronized (lock) { return this.collection.addAll(collection); }
-    }
-
-    public boolean remove(Object e) {
-      synchronized (lock) { return collection.remove((T)e); }
-    }
-
-    public Object[] toArray() {
-      return toArray(new Object[size()]);      
-    }
-
-    public <T> T[] toArray(T[] array) {
-      synchronized (lock) { return collection.toArray(array); }
-    }
-
-    public void clear() {
-      synchronized (lock) { collection.clear(); }
-    }
-
-    public Iterator<T> iterator() {
-      return new SynchronizedIterator<T>(lock, collection.iterator());
-    }
-
-    public boolean containsAll(Collection<?> c) {
-      synchronized (lock) { return collection.containsAll(c); }
-    }
-
-    public boolean removeAll(Collection<?> c) {
-      synchronized (lock) { return collection.removeAll(c); }
-    }
-  }
-  
-  static class SynchronizedMap<K,V> implements Map<K,V> {
-    protected final Object lock;
-    protected final Map<K,V> map;
-
-    SynchronizedMap(Map<K,V> map) {
-      this.map = map;
-      this.lock = this;
-    }
-
-    SynchronizedMap(Object lock, Map<K,V> map) {
-      this.lock = lock;
-      this.map = map;
-    }
-    
-    public void clear() {
-      synchronized (lock) { map.clear(); }
-    }
-    public boolean containsKey(Object key) {
-      synchronized (lock) { return map.containsKey(key); }
-    }
-    public boolean containsValue(Object value) {
-      synchronized (lock) { return map.containsValue(value); }
-    }
-    public Set<java.util.Map.Entry<K, V>> entrySet() {
-      synchronized (lock) { return new SynchronizedSet<java.util.Map.Entry<K, V>>(lock, map.entrySet()); }
-    }
-    public V get(Object key) {
-      synchronized (lock) { return map.get(key); }
-    }
-    public boolean isEmpty() {
-      synchronized (lock) { return map.isEmpty(); }
-    }
-    public Set<K> keySet() {
-      synchronized (lock) { return new SynchronizedSet<K>(lock, map.keySet()); }
-    }
-    public V put(K key, V value) {
-      synchronized (lock) { return map.put(key, value); }
-    }
-    public void putAll(Map<? extends K, ? extends V> elts) {
-      synchronized (lock) { map.putAll(elts); }
-    }
-    public V remove(Object key) {
-      synchronized (lock) { return map.remove(key); }
-    }
-    public int size() {
-      synchronized (lock) { return map.size(); }
-    }
-    public Collection<V> values() {
-      synchronized (lock) { return new SynchronizedCollection<V>(lock, map.values()); }
-    }
-  }
-  
-  public static <K,V> Map<K,V> synchronizedMap(Map<K,V> map) {
-    return new SynchronizedMap<K, V> (map); 
-  }
-  
-  static class SynchronizedSet<T>
-    extends SynchronizedCollection<T>
-    implements Set<T>
-  {
-    public SynchronizedSet(Object lock, Set<T> set) {
-      super(lock, set);
-    }
+  public static <E> Collection<E> checkedCollection(Collection<E> c, Class<E> type) {
+    return new CheckedViews.CheckedCollection<E>(c, type);
   }
 
-  public static <V> Set<V> synchronizedSet(Set<V> set) {
-    return new SynchronizedSet<V> (set, set);
+  public static <E> Queue<E> checkedQueue(Queue<E> queue, Class<E> type) {
+    return new CheckedViews.CheckedQueue<E>(queue, type);
   }
-  
-  static class SynchronizedList<T>
-    extends SynchronizedCollection<T>
-    implements List<T>
-  {
-    private final List<T> list;
-    
-    public SynchronizedList(List<T> list) {
-      super(list, list);
-      
-      this.list = list;
-    }
 
-    public boolean equals(Object other) {
-      if (other == this) return true;
-      synchronized (lock) {
-        return list.equals(other);
-      }
-    }
-
-    public int hashCode() {
-      synchronized (lock) {
-        return list.hashCode();
-      }
-    }
-
-    @Override
-    public T get(int index) {
-      synchronized (lock) {
-        return list.get(index);
-      }
-    }
-
-    @Override
-    public T set(int index, T value) {
-      synchronized (lock) {
-        return list.set(index, value);
-      }
-    }
-
-    @Override
-    public T remove(int index) {
-      synchronized (lock) {
-        return list.remove(index);
-      }
-    }
-
-    @Override
-    public void add(int index, T element) {
-      synchronized (lock) {
-        list.add(index, element);
-      }
-    }
-
-    @Override
-    public boolean addAll(int startIndex, Collection<? extends T> c) {
-      synchronized (lock) {
-        return list.addAll(startIndex, c);
-      }
-    }
-
-    @Override
-    public int indexOf(Object value) {
-      synchronized (lock) {
-        return list.indexOf(value);
-      }
-    }
-
-    @Override
-    public int lastIndexOf(Object value) {
-      synchronized (lock) {
-        return list.lastIndexOf(value);
-      }
-    }
-
-    @Override
-    public ListIterator<T> listIterator(int index) {
-      // as described in the javadocs, user should be synchronized on list before calling
-      return list.listIterator(index);
-    }
-
-    @Override
-    public ListIterator<T> listIterator() {
-      // as described in the javadocs, user should be synchronized on list before calling
-      return list.listIterator();
-    }
+  public static <E> Set<E> checkedSet(Set<E> s, Class<E> type) {
+    return new CheckedViews.CheckedSet<E>(s, type);
   }
-  
-  static class RandomAccessSynchronizedList<T>
-    extends SynchronizedList<T>
-    implements RandomAccess
-  {
-    public RandomAccessSynchronizedList(List<T> list) {
-      super(list);
-    }
+
+  public static <E> SortedSet<E> checkedSortedSet(SortedSet<E> s, Class<E> type) {
+    return new CheckedViews.CheckedSortedSet<E>(s, type);
   }
-  
+
+  public static <E> NavigableSet<E> checkedNavigableSet(NavigableSet<E> s, Class<E> type) {
+    return new CheckedViews.CheckedNavigableSet<E>(s, type);
+  }
+
+  public static <E> List<E> checkedList(List<E> list, Class<E> type) {
+    return list instanceof RandomAccess ? new CheckedViews.CheckedRandomAccessList<E>(list, type)
+                                        : new CheckedViews.CheckedList<E>(list, type);
+  }
+
+  public static <K, V> Map<K, V> checkedMap(Map<K, V> m, Class<K> keyType, Class<V> valueType) {
+    return new CheckedViews.CheckedMap<K, V>(m, keyType, valueType);
+  }
+
+  public static <K, V> SortedMap<K, V> checkedSortedMap(SortedMap<K, V> m, Class<K> keyType, Class<V> valueType) {
+    return new CheckedViews.CheckedSortedMap<K, V>(m, keyType, valueType);
+  }
+
+  public static <K, V> NavigableMap<K, V> checkedNavigableMap(NavigableMap<K, V> m, Class<K> keyType,
+                                                              Class<V> valueType) {
+    return new CheckedViews.CheckedNavigableMap<K, V>(m, keyType, valueType);
+  }
+
+  public static <T> Collection<T> synchronizedCollection(Collection<T> c) {
+    return new SyncViews.SynchronizedCollection<T>(c);
+  }
+
+  static <T> Collection<T> synchronizedCollection(Collection<T> c, Object mutex) {
+    return new SyncViews.SynchronizedCollection<T>(c, mutex);
+  }
+
+  static <T> Set<T> synchronizedSet(Set<T> s, Object mutex) {
+    return new SyncViews.SynchronizedSet<T>(s, mutex);
+  }
+
+  public static <T> Set<T> synchronizedSet(Set<T> s) {
+    return new SyncViews.SynchronizedSet<T>(s);
+  }
+
+  public static <T> SortedSet<T> synchronizedSortedSet(SortedSet<T> s) {
+    return new SyncViews.SynchronizedSortedSet<T>(s);
+  }
+
+  public static <T> NavigableSet<T> synchronizedNavigableSet(NavigableSet<T> s) {
+    return new SyncViews.SynchronizedNavigableSet<T>(s);
+  }
+
   public static <T> List<T> synchronizedList(List<T> list) {
-    List<T> result;
-    if (list instanceof RandomAccess) {
-      result = new RandomAccessSynchronizedList<T>(list);
-    } else {
-      result = new SynchronizedList<T>(list);
-    }
-    
-    return result;
+    return list instanceof RandomAccess ? new SyncViews.SynchronizedRandomAccessList<T>(list)
+                                        : new SyncViews.SynchronizedList<T>(list);
   }
 
-  static class SynchronizedIterator<T> implements Iterator<T> {
-    private final Object lock;
-    private final Iterator<T> it;
+  public static <K, V> Map<K, V> synchronizedMap(Map<K, V> m) {
+    return new SyncViews.SynchronizedMap<K, V>(m);
+  }
 
-    public SynchronizedIterator(Object lock, Iterator<T> it) {
-      this.lock = lock;
-      this.it = it;
-    }
+  public static <K, V> SortedMap<K, V> synchronizedSortedMap(SortedMap<K, V> m) {
+    return new SyncViews.SynchronizedSortedMap<K, V>(m);
+  }
 
-    public T next() {
-      synchronized (lock) { return it.next(); }
-    }
-
-    public boolean hasNext() {
-      synchronized (lock) { return it.hasNext(); }
-    }
-
-    public void remove() {
-      synchronized (lock) { it.remove(); }
-    }
+  public static <K, V> NavigableMap<K, V> synchronizedNavigableMap(NavigableMap<K, V> m) {
+    return new SyncViews.SynchronizedNavigableMap<K, V>(m);
   }
 
   static class ArrayListIterator<T> implements ListIterator<T> {
@@ -719,10 +862,128 @@ public class Collections {
     public boolean containsAll(Collection<?> c) {
       return inner.containsAll(c);
     }
-  }
+  
+    public List<T> subList(int fromIndex, int toIndex) {
+      return new UnmodifiableList<T>(inner.subList(fromIndex, toIndex));
+    }
+
+    public boolean removeIf(java.util.function.Predicate<? super T> filter) {
+      throw new UnsupportedOperationException();
+    }
+
+    public boolean retainAll(Collection<?> c) {
+      throw new UnsupportedOperationException();
+    }
+
+    public void replaceAll(java.util.function.UnaryOperator<T> operator) {
+      throw new UnsupportedOperationException();
+    }
+
+    public void sort(Comparator<? super T> c) {
+      throw new UnsupportedOperationException();
+    }
+}
 
   public static <K,V> Map<K,V> unmodifiableMap(Map<K,V> m) {
 	  return new UnmodifiableMap<K, V>(m);
+  }
+
+  static class UnmodifiableEntrySet<K, V> extends UnmodifiableSet<Map.Entry<K, V>> {
+    UnmodifiableEntrySet(Set<Map.Entry<K, V>> s) {
+      super(s);
+    }
+
+    private static <K, V> Map.Entry<K, V> wrap(Map.Entry<? extends K, ? extends V> e) {
+      return new UnmodifiableMapEntry<K, V>(e);
+    }
+
+    @Override
+    public Iterator<Map.Entry<K, V>> iterator() {
+      final Iterator<Map.Entry<K, V>> i = super.iterator();
+      return new Iterator<Map.Entry<K, V>>() {
+        public boolean hasNext() {
+          return i.hasNext();
+        }
+
+        public Map.Entry<K, V> next() {
+          return wrap(i.next());
+        }
+
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    @Override
+    public Object[] toArray() {
+      Object[] a = super.toArray();
+      for (int i = 0; i < a.length; i++) {
+        @SuppressWarnings("unchecked")
+        Map.Entry<K, V> e = (Map.Entry<K, V>) a[i];
+        a[i] = wrap(e);
+      }
+      return a;
+    }
+
+    @Override
+    public <T> T[] toArray(T[] a) {
+      Object[] arr = super.toArray(a.length == 0 ? a : Arrays.copyOf(a, 0));
+      for (int i = 0; i < arr.length; i++) {
+        @SuppressWarnings("unchecked")
+        Map.Entry<K, V> e = (Map.Entry<K, V>) arr[i];
+        arr[i] = wrap(e);
+      }
+      if (arr.length > a.length) {
+        @SuppressWarnings("unchecked")
+        T[] result = (T[]) arr;
+        return result;
+      }
+      System.arraycopy(arr, 0, a, 0, arr.length);
+      if (a.length > arr.length) {
+        a[arr.length] = null;
+      }
+      return a;
+    }
+  }
+
+  static class UnmodifiableMapEntry<K, V> implements Map.Entry<K, V> {
+    private final Map.Entry<? extends K, ? extends V> e;
+
+    UnmodifiableMapEntry(Map.Entry<? extends K, ? extends V> e) {
+      this.e = Objects.requireNonNull(e);
+    }
+
+    public K getKey() {
+      return e.getKey();
+    }
+
+    public V getValue() {
+      return e.getValue();
+    }
+
+    public V setValue(V value) {
+      throw new UnsupportedOperationException();
+    }
+
+    public int hashCode() {
+      return e.hashCode();
+    }
+
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof Map.Entry)) {
+        return false;
+      }
+      Map.Entry<?, ?> t = (Map.Entry<?, ?>) o;
+      return Objects.equals(e.getKey(), t.getKey()) && Objects.equals(e.getValue(), t.getValue());
+    }
+
+    public String toString() {
+      return e.toString();
+    }
   }
 
   static class UnmodifiableMap<K, V> implements Map<K, V> {
@@ -745,7 +1006,7 @@ public class Collections {
     }
 
     public Set<Map.Entry<K, V>> entrySet() {
-      return unmodifiableSet(inner.entrySet());
+      return new UnmodifiableEntrySet<K, V>(inner.entrySet());
     }
 
     public V get(Object key) {
@@ -791,7 +1052,51 @@ public class Collections {
     public String toString() {
       return inner.toString();
     }
-  }
+  
+    public V putIfAbsent(K key, V value) {
+      throw new UnsupportedOperationException();
+    }
+
+    public boolean remove(Object key, Object value) {
+      throw new UnsupportedOperationException();
+    }
+
+    public boolean replace(K key, V oldValue, V newValue) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V replace(K key, V value) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V computeIfAbsent(K key, java.util.function.Function<? super K, ? extends V> mappingFunction) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V computeIfPresent(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V compute(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V merge(K key, V value, java.util.function.BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+      throw new UnsupportedOperationException();
+    }
+
+    public void replaceAll(java.util.function.BiFunction<? super K, ? super V, ? extends V> function) {
+      throw new UnsupportedOperationException();
+    }
+
+    public V getOrDefault(Object k, V defaultValue) {
+      return inner.getOrDefault(k, defaultValue);
+    }
+
+    public void forEach(java.util.function.BiConsumer<? super K, ? super V> action) {
+      inner.forEach(action);
+    }
+}
 
   public static <K,V> SortedMap<K,V> unmodifiableSortedMap(SortedMap<K,V> m) {
     return new UnmodifiableSortedMap<K, V>(m);
@@ -995,10 +1300,21 @@ public class Collections {
     public String toString() {
       return inner.toString();
     }
-  }
   
-  public static <T> UnmodifiableCollection<T> unmodifiableCollection(Collection<T> collection) {
-    return new UnmodifiableCollection<T>(collection);
+    @Override
+    public boolean removeIf(java.util.function.Predicate<? super T> filter) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean retainAll(Collection<?> c) {
+      throw new UnsupportedOperationException();
+    }
+}
+  
+  @SuppressWarnings("unchecked")
+  public static <T> Collection<T> unmodifiableCollection(Collection<? extends T> collection) {
+    return new UnmodifiableCollection<T>((Collection<T>) collection);
   }
 
   static class UnmodifiableSet<T> extends UnmodifiableCollection<T> 
