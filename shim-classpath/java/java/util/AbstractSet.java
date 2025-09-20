@@ -1,27 +1,54 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util;
 
-public abstract class AbstractSet<T> extends AbstractCollection<T> implements Set<T> {
+public abstract class AbstractSet<E> extends AbstractCollection<E> implements Set<E> {
+  protected AbstractSet() { }
+
+  public boolean equals(Object o) {
+    if (o == this) {
+      return true;
+    }
+    if (!(o instanceof Set)) {
+      return false;
+    }
+    Collection<?> c = (Collection<?>) o;
+    if (c.size() != size()) {
+      return false;
+    }
+    try {
+      return containsAll(c);
+    } catch (ClassCastException | NullPointerException unused) {
+      return false;
+    }
+  }
+
+  public int hashCode() {
+    int h = 0;
+    Iterator<E> i = iterator();
+    while (i.hasNext()) {
+      E obj = i.next();
+      if (obj != null) {
+        h += obj.hashCode();
+      }
+    }
+    return h;
+  }
+
+  public boolean removeAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    boolean modified = false;
+    if (size() > c.size()) {
+      for (Object e : c) {
+        modified |= remove(e);
+      }
+    } else {
+      for (Iterator<?> i = iterator(); i.hasNext(); ) {
+        if (c.contains(i.next())) {
+          i.remove();
+          modified = true;
+        }
+      }
+    }
+    return modified;
+  }
 }

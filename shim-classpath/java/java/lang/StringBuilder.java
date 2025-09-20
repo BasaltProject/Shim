@@ -505,4 +505,11 @@ public class StringBuilder implements CharSequence, Appendable, Comparable<Strin
     }
     return this;
   }
+
+  public int capacity() {
+    return Math.max(16, length);
+  }
+
+
+  public void trimToSize() { }
 }

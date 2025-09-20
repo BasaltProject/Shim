@@ -1,132 +1,178 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util;
 
-/**
- * @author zsombor
- * 
- */
-public abstract class AbstractCollection<T> implements Collection<T> {
-  public boolean add(T element) {
-    throw new UnsupportedOperationException("adding to "
-                                            + this.getClass().getName());
-  }
+import java.lang.reflect.Array;
 
-  public boolean addAll(Collection<? extends T> collection) {
-    boolean result = false;
-    for (T obj : collection) {
-      result |= add(obj);
-    }
-    return result;
-  }
+public abstract class AbstractCollection<E> implements Collection<E> {
+  protected AbstractCollection() { }
 
-  public boolean retainAll(Collection<?> c) {
-    boolean changed = false;
-    for (Iterator<T> iter = iterator(); iter.hasNext();) {
-      if (!c.contains(iter.next())) {
-        iter.remove();
-        changed = true;
-      }
-    }
-    return changed;
-  }
+  public abstract Iterator<E> iterator();
 
-  public void clear() {
-    throw new UnsupportedOperationException("clear() in "
-                                            + this.getClass().getName());
-  }
-
-  public boolean contains(Object element) {
-    if (element != null) {
-      for (Iterator<T> iter = iterator(); iter.hasNext();) {
-        if (element.equals(iter.next())) {
-          return true;
-        }
-      }
-    } else {
-      for (Iterator<T> iter = iterator(); iter.hasNext();) {
-        if (iter.next()==null) {
-          return true;
-        }
-      }
-                        
-    }
-    return false;
-  }
-
-  public boolean containsAll(Collection<?> c) {
-    if (c == null) {
-      throw new NullPointerException("Collection is null");
-    }
-
-    Iterator<?> it = c.iterator();
-    while (it.hasNext()) {
-      if (! contains(it.next())) {
-        return false;
-      }
-    }
-
-    return true;
-  }
+  public abstract int size();
 
   public boolean isEmpty() {
     return size() == 0;
   }
 
-  public boolean remove(Object element) {
-    throw new UnsupportedOperationException("remove(T) in "
-                                            + this.getClass().getName());
+  public boolean contains(Object o) {
+    Iterator<E> it = iterator();
+    if (o == null) {
+      while (it.hasNext()) {
+        if (it.next() == null) {
+          return true;
+        }
+      }
+    } else {
+      while (it.hasNext()) {
+        if (o.equals(it.next())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public Object[] toArray() {
+    Object[] r = new Object[size()];
+    Iterator<E> it = iterator();
+    for (int i = 0; i < r.length; i++) {
+      if (!it.hasNext()) {
+        return Arrays.copyOf(r, i);
+      }
+      r[i] = it.next();
+    }
+    return it.hasNext() ? finishToArray(r, it) : r;
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> T[] toArray(T[] a) {
+    int size = size();
+    T[] r = a.length >= size ? a : (T[]) Array.newInstance(a.getClass().getComponentType(), size);
+    Iterator<E> it = iterator();
+    for (int i = 0; i < r.length; i++) {
+      if (!it.hasNext()) {
+        if (a == r) {
+          r[i] = null;
+        } else if (a.length < i) {
+          return Arrays.copyOf(r, i);
+        } else {
+          System.arraycopy(r, 0, a, 0, i);
+          if (a.length > i) {
+            a[i] = null;
+          }
+        }
+        return a;
+      }
+      r[i] = (T) it.next();
+    }
+    return it.hasNext() ? finishToArray(r, it) : r;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> T[] finishToArray(T[] r, Iterator<?> it) {
+    int len = r.length;
+    int i = len;
+    while (it.hasNext()) {
+      if (i == len) {
+        len = i + (i >> 1) + 1;
+        r = Arrays.copyOf(r, len);
+      }
+      r[i++] = (T) it.next();
+    }
+    return (i == len) ? r : Arrays.copyOf(r, i);
+  }
+
+  public boolean add(E e) {
+    throw new UnsupportedOperationException();
+  }
+
+  public boolean remove(Object o) {
+    Iterator<E> it = iterator();
+    if (o == null) {
+      while (it.hasNext()) {
+        if (it.next() == null) {
+          it.remove();
+          return true;
+        }
+      }
+    } else {
+      while (it.hasNext()) {
+        if (o.equals(it.next())) {
+          it.remove();
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public boolean containsAll(Collection<?> c) {
+    for (Object e : c) {
+      if (!contains(e)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public boolean addAll(Collection<? extends E> c) {
+    boolean modified = false;
+    for (E e : c) {
+      if (add(e)) {
+        modified = true;
+      }
+    }
+    return modified;
   }
 
   public boolean removeAll(Collection<?> c) {
-    if (c == null) {
-      throw new NullPointerException("Collection is null");
-    }
-
-    boolean changed = false;
-
-    Iterator<?> it = c.iterator();
+    Objects.requireNonNull(c);
+    boolean modified = false;
+    Iterator<?> it = iterator();
     while (it.hasNext()) {
-      changed = remove(it.next()) || changed;
+      if (c.contains(it.next())) {
+        it.remove();
+        modified = true;
+      }
     }
-
-    return changed;
+    return modified;
   }
 
-  public abstract int size();
-
-  public Object[] toArray() {
-    return toArray(new Object[size()]);      
+  public boolean retainAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    boolean modified = false;
+    Iterator<E> it = iterator();
+    while (it.hasNext()) {
+      if (!c.contains(it.next())) {
+        it.remove();
+        modified = true;
+      }
+    }
+    return modified;
   }
 
-  public <S> S[] toArray(S[] array) {
-    return shim.Data.toArray(this, array);
+  public void clear() {
+    Iterator<E> it = iterator();
+    while (it.hasNext()) {
+      it.next();
+      it.remove();
+    }
   }
-
-  public abstract Iterator<T> iterator();
 
   public String toString() {
-    return shim.Data.toString(this);
+    Iterator<E> it = iterator();
+    if (!it.hasNext()) {
+      return "[]";
+    }
+    StringBuilder sb = new StringBuilder();
+    sb.append('[');
+    for (;;) {
+      E e = it.next();
+      sb.append(e == this ? "(this Collection)" : e);
+      if (!it.hasNext()) {
+        return sb.append(']').toString();
+      }
+      sb.append(',').append(' ');
+    }
   }
 }
