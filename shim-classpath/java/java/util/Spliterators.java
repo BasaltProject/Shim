@@ -875,4 +875,240 @@ public final class Spliterators {
       }
     }
   }
+
+  public abstract static class AbstractSpliterator<T> implements Spliterator<T> {
+    static final int kBatchUnit = 1 << 10;
+    static final int kMaxBatch = 1 << 25;
+    private final int characteristics;
+    private long est;
+    private int batch;
+
+    protected AbstractSpliterator(long est, int additionalCharacteristics) {
+      this.est = est;
+      this.characteristics = ((additionalCharacteristics & Spliterator.SIZED) != 0)
+          ? additionalCharacteristics | Spliterator.SUBSIZED : additionalCharacteristics;
+    }
+
+    static final class Holder<T> implements Consumer<T> {
+      T value;
+
+      @Override
+      public void accept(T v) {
+        value = v;
+      }
+    }
+
+    @Override
+    public Spliterator<T> trySplit() {
+      Holder<T> holder = new Holder<T>();
+      long s = est;
+      if (s > 1 && tryAdvance(holder)) {
+        int n = batch + kBatchUnit;
+        if (n > s) {
+          n = (int) s;
+        }
+        if (n > kMaxBatch) {
+          n = kMaxBatch;
+        }
+        Object[] a = new Object[n];
+        int j = 0;
+        do {
+          a[j] = holder.value;
+        } while (++j < n && tryAdvance(holder));
+        batch = j;
+        if (est != Long.MAX_VALUE) {
+          est -= j;
+        }
+        return new ArraySpliterator<T>(a, 0, j, characteristics());
+      }
+      return null;
+    }
+
+    @Override
+    public long estimateSize() {
+      return est;
+    }
+
+    @Override
+    public int characteristics() {
+      return characteristics;
+    }
+  }
+
+  public abstract static class AbstractIntSpliterator implements Spliterator.OfInt {
+    static final int kBatchUnit = 1 << 10;
+    static final int kMaxBatch = 1 << 25;
+    private final int characteristics;
+    private long est;
+    private int batch;
+
+    protected AbstractIntSpliterator(long est, int additionalCharacteristics) {
+      this.est = est;
+      this.characteristics = ((additionalCharacteristics & Spliterator.SIZED) != 0)
+          ? additionalCharacteristics | Spliterator.SUBSIZED : additionalCharacteristics;
+    }
+
+    static final class Holder implements IntConsumer {
+      int value;
+
+      @Override
+      public void accept(int v) {
+        value = v;
+      }
+    }
+
+    @Override
+    public Spliterator.OfInt trySplit() {
+      Holder holder = new Holder();
+      long s = est;
+      if (s > 1 && tryAdvance(holder)) {
+        int n = batch + kBatchUnit;
+        if (n > s) {
+          n = (int) s;
+        }
+        if (n > kMaxBatch) {
+          n = kMaxBatch;
+        }
+        int[] a = new int[n];
+        int j = 0;
+        do {
+          a[j] = holder.value;
+        } while (++j < n && tryAdvance(holder));
+        batch = j;
+        if (est != Long.MAX_VALUE) {
+          est -= j;
+        }
+        return new IntArraySpliterator(a, 0, j, characteristics());
+      }
+      return null;
+    }
+
+    @Override
+    public long estimateSize() {
+      return est;
+    }
+
+    @Override
+    public int characteristics() {
+      return characteristics;
+    }
+  }
+
+  public abstract static class AbstractLongSpliterator implements Spliterator.OfLong {
+    static final int kBatchUnit = 1 << 10;
+    static final int kMaxBatch = 1 << 25;
+    private final int characteristics;
+    private long est;
+    private int batch;
+
+    protected AbstractLongSpliterator(long est, int additionalCharacteristics) {
+      this.est = est;
+      this.characteristics = ((additionalCharacteristics & Spliterator.SIZED) != 0)
+          ? additionalCharacteristics | Spliterator.SUBSIZED : additionalCharacteristics;
+    }
+
+    static final class Holder implements LongConsumer {
+      long value;
+
+      @Override
+      public void accept(long v) {
+        value = v;
+      }
+    }
+
+    @Override
+    public Spliterator.OfLong trySplit() {
+      Holder holder = new Holder();
+      long s = est;
+      if (s > 1 && tryAdvance(holder)) {
+        int n = batch + kBatchUnit;
+        if (n > s) {
+          n = (int) s;
+        }
+        if (n > kMaxBatch) {
+          n = kMaxBatch;
+        }
+        long[] a = new long[n];
+        int j = 0;
+        do {
+          a[j] = holder.value;
+        } while (++j < n && tryAdvance(holder));
+        batch = j;
+        if (est != Long.MAX_VALUE) {
+          est -= j;
+        }
+        return new LongArraySpliterator(a, 0, j, characteristics());
+      }
+      return null;
+    }
+
+    @Override
+    public long estimateSize() {
+      return est;
+    }
+
+    @Override
+    public int characteristics() {
+      return characteristics;
+    }
+  }
+
+  public abstract static class AbstractDoubleSpliterator implements Spliterator.OfDouble {
+    static final int kBatchUnit = 1 << 10;
+    static final int kMaxBatch = 1 << 25;
+    private final int characteristics;
+    private long est;
+    private int batch;
+
+    protected AbstractDoubleSpliterator(long est, int additionalCharacteristics) {
+      this.est = est;
+      this.characteristics = ((additionalCharacteristics & Spliterator.SIZED) != 0)
+          ? additionalCharacteristics | Spliterator.SUBSIZED : additionalCharacteristics;
+    }
+
+    static final class Holder implements DoubleConsumer {
+      double value;
+
+      @Override
+      public void accept(double v) {
+        value = v;
+      }
+    }
+
+    @Override
+    public Spliterator.OfDouble trySplit() {
+      Holder holder = new Holder();
+      long s = est;
+      if (s > 1 && tryAdvance(holder)) {
+        int n = batch + kBatchUnit;
+        if (n > s) {
+          n = (int) s;
+        }
+        if (n > kMaxBatch) {
+          n = kMaxBatch;
+        }
+        double[] a = new double[n];
+        int j = 0;
+        do {
+          a[j] = holder.value;
+        } while (++j < n && tryAdvance(holder));
+        batch = j;
+        if (est != Long.MAX_VALUE) {
+          est -= j;
+        }
+        return new DoubleArraySpliterator(a, 0, j, characteristics());
+      }
+      return null;
+    }
+
+    @Override
+    public long estimateSize() {
+      return est;
+    }
+
+    @Override
+    public int characteristics() {
+      return characteristics;
+    }
+  }
 }
