@@ -33,7 +33,7 @@ public class IndexOutOfBoundsException extends RuntimeException {
   }
 
   public IndexOutOfBoundsException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public IndexOutOfBoundsException() {

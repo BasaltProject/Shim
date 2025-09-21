@@ -33,7 +33,7 @@ public class InterruptedException extends Exception {
   }
 
   public InterruptedException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public InterruptedException() {

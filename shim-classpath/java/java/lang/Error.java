@@ -33,7 +33,7 @@ public class Error extends Throwable {
   }
 
   public Error(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public Error() {

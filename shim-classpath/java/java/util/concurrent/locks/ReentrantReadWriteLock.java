@@ -165,7 +165,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
       synchronized (rwLock.sync) {
         Integer h = rwLock.readHolds.get();
         if (h == null || h <= 0) {
-          throw new IllegalMonitorStateException("Calling thread does not hold read lock");
+          throw new IllegalMonitorStateException("attempt to unlock read lock, not locked by current thread");
         }
         if (h == 1) {
           rwLock.readHolds.remove();
@@ -288,7 +288,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
       synchronized (rwLock.sync) {
         Thread current = Thread.currentThread();
         if (rwLock.writerOwner != current) {
-          throw new IllegalMonitorStateException("Calling thread does not hold write lock");
+          throw new IllegalMonitorStateException();
         }
         rwLock.writeHoldCount--;
         if (rwLock.writeHoldCount == 0) {

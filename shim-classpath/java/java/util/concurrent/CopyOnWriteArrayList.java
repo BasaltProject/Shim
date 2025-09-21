@@ -532,49 +532,74 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
     private final CopyOnWriteArrayList<E> parent;
     private final int offset;
     private int size;
+    private Object[] expectedArray;
 
     COWSubList(CopyOnWriteArrayList<E> parent, int fromIndex, int toIndex) {
       this.parent = parent;
       this.offset = fromIndex;
       this.size = toIndex - fromIndex;
+      this.expectedArray = parent.getArray();
+    }
+
+    private void checkForComodification() {
+      if (parent.getArray() != expectedArray) {
+        throw new java.util.ConcurrentModificationException();
+      }
     }
 
     public int size() {
-      return size;
+      synchronized (parent.lock) {
+        checkForComodification();
+        return size;
+      }
     }
 
     public E get(int index) {
-      if (index < 0 || index >= size) throw new IndexOutOfBoundsException();
-      return parent.get(offset + index);
+      synchronized (parent.lock) {
+        java.util.Objects.checkIndex(index, size);
+        checkForComodification();
+        return parent.get(offset + index);
+      }
     }
 
     public E set(int index, E element) {
-      if (index < 0 || index >= size) throw new IndexOutOfBoundsException();
       synchronized (parent.lock) {
-        return parent.set(offset + index, element);
+        java.util.Objects.checkIndex(index, size);
+        checkForComodification();
+        E x = parent.set(offset + index, element);
+        expectedArray = parent.getArray();
+        return x;
       }
     }
 
     public boolean add(E e) {
       synchronized (parent.lock) {
+        checkForComodification();
         parent.add(offset + size, e);
+        expectedArray = parent.getArray();
         size++;
         return true;
       }
     }
 
     public void add(int index, E element) {
-      if (index < 0 || index > size) throw new IndexOutOfBoundsException();
       synchronized (parent.lock) {
+        checkForComodification();
+        if (index < 0 || index > size) {
+          throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size);
+        }
         parent.add(offset + index, element);
+        expectedArray = parent.getArray();
         size++;
       }
     }
 
     public E remove(int index) {
-      if (index < 0 || index >= size) throw new IndexOutOfBoundsException();
       synchronized (parent.lock) {
+        java.util.Objects.checkIndex(index, size);
+        checkForComodification();
         E res = parent.remove(offset + index);
+        expectedArray = parent.getArray();
         size--;
         return res;
       }
@@ -582,10 +607,19 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
 
     public void clear() {
       synchronized (parent.lock) {
+        checkForComodification();
         for (int i = size - 1; i >= 0; i--) {
           parent.remove(offset + i);
         }
+        expectedArray = parent.getArray();
         size = 0;
+      }
+    }
+
+    public java.util.Iterator<E> iterator() {
+      synchronized (parent.lock) {
+        checkForComodification();
+        return super.iterator();
       }
     }
   }

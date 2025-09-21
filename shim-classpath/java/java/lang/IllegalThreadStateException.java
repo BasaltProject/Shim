@@ -33,7 +33,7 @@ public class IllegalThreadStateException extends IllegalArgumentException {
   }
 
   public IllegalThreadStateException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public IllegalThreadStateException() {

@@ -168,8 +168,8 @@ public class Thread implements Runnable {
   }
 
   public synchronized void start() {
-    if (peer != 0) {
-      throw new IllegalStateException("thread already started");
+    if (peer != 0 || state != (byte) State.NEW.ordinal()) {
+      throw new IllegalThreadStateException();
     }
 
     state = (byte) State.RUNNABLE.ordinal();

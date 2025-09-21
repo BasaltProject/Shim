@@ -25,7 +25,7 @@ public class ConcurrentSkipListSet<E> extends AbstractSet<E>
   private static final long serialVersionUID = -2479143000061671589L;
   private static final Object PRESENT = Boolean.TRUE;
 
-  private final ConcurrentNavigableMap<E, Object> m;
+  private ConcurrentNavigableMap<E, Object> m;
 
   public ConcurrentSkipListSet() {
     this(new ConcurrentSkipListMap<E, Object>());
@@ -52,6 +52,11 @@ public class ConcurrentSkipListSet<E> extends AbstractSet<E>
   @Override
   public Iterator<E> iterator() {
     return m.navigableKeySet().iterator();
+  }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return m.keySet().spliterator();
   }
 
   @Override
@@ -123,17 +128,17 @@ public class ConcurrentSkipListSet<E> extends AbstractSet<E>
   }
 
   @Override
-  public SortedSet<E> subSet(E fromElement, E toElement) {
+  public NavigableSet<E> subSet(E fromElement, E toElement) {
     return subSet(fromElement, true, toElement, false);
   }
 
   @Override
-  public SortedSet<E> headSet(E toElement) {
+  public NavigableSet<E> headSet(E toElement) {
     return headSet(toElement, false);
   }
 
   @Override
-  public SortedSet<E> tailSet(E fromElement) {
+  public NavigableSet<E> tailSet(E fromElement) {
     return tailSet(fromElement, true);
   }
 
@@ -185,13 +190,14 @@ public class ConcurrentSkipListSet<E> extends AbstractSet<E>
   }
 
   @Override
-  public Object clone() {
+  public ConcurrentSkipListSet<E> clone() {
     ConcurrentSkipListSet<E> clone;
     try {
       clone = (ConcurrentSkipListSet<E>) super.clone();
     } catch (CloneNotSupportedException e) {
       throw new InternalError();
     }
+    clone.m = new ConcurrentSkipListMap<E, Object>((java.util.SortedMap<E, ?>) m);
     return clone;
   }
 

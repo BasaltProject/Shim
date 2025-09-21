@@ -2570,6 +2570,7 @@ int64_t getMethodAddress(MyThread* t, GcMethod* target)
 GcClass* resolveReferencedClass(Thread* t, GcPair* pair)
 {
   GcClass* accessor = cast<GcMethod>(t, pair->first())->class_();
+  PROTECT(t, accessor);
   GcClass* c = resolveClass(t, accessor->loader(), cast<GcReference>(t, pair->second())->name());
   PROTECT(t, c);
   checkClassAccess(t, accessor, c);
@@ -5653,7 +5654,6 @@ loop:
         }
       } else {
         GcReference* ref = cast<GcReference>(t, reference);
-        PROTECT(t, reference);
         PROTECT(t, ref);
 
         GcPair* pair = makePair(t, context->method, reference);

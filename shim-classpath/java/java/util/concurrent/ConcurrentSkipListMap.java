@@ -23,6 +23,9 @@ import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Spliterator;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
@@ -665,7 +668,7 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
   }
 
   @Override
-  public Object clone() {
+  public ConcurrentSkipListMap<K, V> clone() {
     ConcurrentSkipListMap<K, V> clone;
     try {
       clone = (ConcurrentSkipListMap<K, V>) super.clone();
@@ -691,7 +694,71 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     }
   }
 
+  static final class IterSpliterator<T> implements Spliterator<T> {
+    private final Iterator<T> it;
+    private final long est;
+    private final int characteristics;
+    private final Comparator<? super T> comparator;
+
+    IterSpliterator(Iterator<T> it, long est, int characteristics, Comparator<? super T> comparator) {
+      this.it = it;
+      this.est = est;
+      this.characteristics = characteristics;
+      this.comparator = comparator;
+    }
+
+    @Override
+    public boolean tryAdvance(Consumer<? super T> action) {
+      if (action == null) {
+        throw new NullPointerException();
+      }
+      if (it.hasNext()) {
+        action.accept(it.next());
+        return true;
+      }
+      return false;
+    }
+
+    @Override
+    public Spliterator<T> trySplit() {
+      return null;
+    }
+
+    @Override
+    public long estimateSize() {
+      return est;
+    }
+
+    @Override
+    public int characteristics() {
+      return characteristics;
+    }
+
+    @Override
+    public Comparator<? super T> getComparator() {
+      if ((characteristics & Spliterator.SORTED) == 0) {
+        throw new IllegalStateException();
+      }
+      return comparator;
+    }
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  static <K, V> Comparator<Map.Entry<K, V>> entryNaturalOrder() {
+    return (Comparator) Map.Entry.comparingByKey();
+  }
+
+  static final int kKeyCharacteristics = Spliterator.DISTINCT | Spliterator.SORTED | Spliterator.ORDERED
+      | Spliterator.NONNULL | Spliterator.CONCURRENT;
+  static final int kValueCharacteristics = Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT;
+
   class EntrySet extends AbstractSet<Map.Entry<K, V>> {
+    @Override
+    public Spliterator<Map.Entry<K, V>> spliterator() {
+      Comparator<? super K> cmp = comparator();
+      return new IterSpliterator<Map.Entry<K, V>>(iterator(), size(), kKeyCharacteristics,
+          cmp != null ? Map.Entry.<K, V>comparingByKey(cmp) : entryNaturalOrder());
+    }
     @Override
     public Iterator<Map.Entry<K, V>> iterator() {
       return new Iterator<Map.Entry<K, V>>() {
@@ -757,6 +824,11 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
 
   class Values extends AbstractCollection<V> {
     @Override
+    public Spliterator<V> spliterator() {
+      return new IterSpliterator<V>(iterator(), size(), kValueCharacteristics, null);
+    }
+
+    @Override
     public Iterator<V> iterator() {
       return new Iterator<V>() {
         private Node<K, V> current = head.forward[0];
@@ -804,6 +876,11 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
 
     KeySet(ConcurrentNavigableMap<E, ?> m) {
       this.m = m;
+    }
+
+    @Override
+    public Spliterator<E> spliterator() {
+      return new IterSpliterator<E>(iterator(), size(), kKeyCharacteristics, m.comparator());
     }
 
     @Override
@@ -961,7 +1038,7 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
         boolean isDescending) {
       if (!fromStart && !toEnd) {
         if (m.compare(lo, hi) > 0) {
-          throw new IllegalArgumentException("fromKey > toKey");
+          throw new IllegalArgumentException("inconsistent range");
         }
       }
       this.m = m;
@@ -1281,35 +1358,86 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
       return descendingMap().navigableKeySet();
     }
 
+    private ConcurrentNavigableMap<K, V> newSubMap(
+        boolean hasFrom, K fromKey, boolean fromInclusive, boolean hasTo, K toKey, boolean toInclusive) {
+      if (isDescending) {
+        boolean h = hasFrom;
+        hasFrom = hasTo;
+        hasTo = h;
+        K k = fromKey;
+        fromKey = toKey;
+        toKey = k;
+        boolean i = fromInclusive;
+        fromInclusive = toInclusive;
+        toInclusive = i;
+      }
+      boolean newFromStart = fromStart;
+      K newLo = lo;
+      boolean newLoInclusive = loInclusive;
+      boolean newToEnd = toEnd;
+      K newHi = hi;
+      boolean newHiInclusive = hiInclusive;
+      if (hasFrom) {
+        if (!fromStart) {
+          int c = m.compare(fromKey, lo);
+          if (c < 0 || (c == 0 && !loInclusive && fromInclusive)) {
+            throw new IllegalArgumentException("inconsistent range");
+          }
+        }
+        if (!toEnd) {
+          int c = m.compare(fromKey, hi);
+          if (c > 0 || (c == 0 && !hiInclusive && fromInclusive)) {
+            throw new IllegalArgumentException("inconsistent range");
+          }
+        }
+        newFromStart = false;
+        newLo = fromKey;
+        newLoInclusive = fromInclusive;
+      }
+      if (hasTo) {
+        if (!fromStart) {
+          int c = m.compare(toKey, lo);
+          if (c < 0 || (c == 0 && !loInclusive && toInclusive)) {
+            throw new IllegalArgumentException("inconsistent range");
+          }
+        }
+        if (!toEnd) {
+          int c = m.compare(toKey, hi);
+          if (c > 0 || (c == 0 && !hiInclusive && toInclusive)) {
+            throw new IllegalArgumentException("inconsistent range");
+          }
+        }
+        newToEnd = false;
+        newHi = toKey;
+        newHiInclusive = toInclusive;
+      }
+      return new ConcurrentSubMap<K, V>(
+          m, newFromStart, newLo, newLoInclusive, newToEnd, newHi, newHiInclusive, isDescending);
+    }
+
     @Override
     public ConcurrentNavigableMap<K, V> subMap(
         K fromKey, boolean fromInclusive, K toKey, boolean toInclusive) {
-      if (!inRange(fromKey)) {
-        throw new IllegalArgumentException("fromKey out of range");
+      if (fromKey == null || toKey == null) {
+        throw new NullPointerException();
       }
-      if (!inRange(toKey)) {
-        throw new IllegalArgumentException("toKey out of range");
-      }
-      return new ConcurrentSubMap<K, V>(
-          m, false, fromKey, fromInclusive, false, toKey, toInclusive, isDescending);
+      return newSubMap(true, fromKey, fromInclusive, true, toKey, toInclusive);
     }
 
     @Override
     public ConcurrentNavigableMap<K, V> headMap(K toKey, boolean inclusive) {
-      if (!inRange(toKey)) {
-        throw new IllegalArgumentException("toKey out of range");
+      if (toKey == null) {
+        throw new NullPointerException();
       }
-      return new ConcurrentSubMap<K, V>(
-          m, fromStart, lo, loInclusive, false, toKey, inclusive, isDescending);
+      return newSubMap(false, null, false, true, toKey, inclusive);
     }
 
     @Override
     public ConcurrentNavigableMap<K, V> tailMap(K fromKey, boolean inclusive) {
-      if (!inRange(fromKey)) {
-        throw new IllegalArgumentException("fromKey out of range");
+      if (fromKey == null) {
+        throw new NullPointerException();
       }
-      return new ConcurrentSubMap<K, V>(
-          m, false, fromKey, inclusive, toEnd, hi, hiInclusive, isDescending);
+      return newSubMap(true, fromKey, inclusive, false, null, false);
     }
 
     @Override

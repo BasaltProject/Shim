@@ -33,7 +33,7 @@ public class Exception extends Throwable {
   }
 
   public Exception(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public Exception() {
