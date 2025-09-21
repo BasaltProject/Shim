@@ -2,11 +2,24 @@
  * Copyright (c) 2026 BasaltMC.
  * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
  * SPDX-License-Identifier: MIT
  */
 
 package java.time;
+
+import static java.time.temporal.ChronoField.AMPM_OF_DAY;
+import static java.time.temporal.ChronoField.CLOCK_HOUR_OF_AMPM;
+import static java.time.temporal.ChronoField.CLOCK_HOUR_OF_DAY;
+import static java.time.temporal.ChronoField.HOUR_OF_AMPM;
+import static java.time.temporal.ChronoField.HOUR_OF_DAY;
+import static java.time.temporal.ChronoField.MICRO_OF_DAY;
+import static java.time.temporal.ChronoField.MILLI_OF_DAY;
+import static java.time.temporal.ChronoField.MINUTE_OF_DAY;
+import static java.time.temporal.ChronoField.MINUTE_OF_HOUR;
+import static java.time.temporal.ChronoField.NANO_OF_DAY;
+import static java.time.temporal.ChronoField.NANO_OF_SECOND;
+import static java.time.temporal.ChronoField.SECOND_OF_DAY;
+import static java.time.temporal.ChronoField.SECOND_OF_MINUTE;
 
 import java.io.Serializable;
 import java.time.format.DateTimeFormatter;
@@ -17,33 +30,51 @@ import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAdjuster;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalField;
+import java.time.temporal.TemporalQueries;
+import java.time.temporal.TemporalQuery;
 import java.time.temporal.TemporalUnit;
 import java.time.temporal.UnsupportedTemporalTypeException;
+import java.time.temporal.ValueRange;
 import java.util.Objects;
 
 public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<LocalTime>, Serializable {
-  public static final LocalTime MIN = new LocalTime(0, 0, 0, 0);
-  public static final LocalTime MAX = new LocalTime(23, 59, 59, 999999999);
-  public static final LocalTime MIDNIGHT = new LocalTime(0, 0, 0, 0);
-  public static final LocalTime NOON = new LocalTime(12, 0, 0, 0);
+  private static final long serialVersionUID = 6414437269572265201L;
 
-  private static final long NANOS_PER_SECOND = 1000000000L;
-  private static final long NANOS_PER_MINUTE = 60L * NANOS_PER_SECOND;
-  private static final long NANOS_PER_HOUR = 3600L * NANOS_PER_SECOND;
-  private static final long NANOS_PER_DAY = 86400L * NANOS_PER_SECOND;
-  private static final int SECONDS_PER_DAY = 86400;
+  public static final LocalTime MIN;
+  public static final LocalTime MAX;
+  public static final LocalTime MIDNIGHT;
+  public static final LocalTime NOON;
+
+  private static final LocalTime[] HOURS = new LocalTime[24];
+
+  static {
+    for (int i = 0; i < HOURS.length; i++) {
+      HOURS[i] = new LocalTime(i, 0, 0, 0);
+    }
+    MIDNIGHT = HOURS[0];
+    NOON = HOURS[12];
+    MIN = HOURS[0];
+    MAX = new LocalTime(23, 59, 59, 999_999_999);
+  }
+
+  static final int HOURS_PER_DAY = 24;
+  static final int MINUTES_PER_HOUR = 60;
+  static final int MINUTES_PER_DAY = MINUTES_PER_HOUR * HOURS_PER_DAY;
+  static final int SECONDS_PER_MINUTE = 60;
+  static final int SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+  static final int SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY;
+  static final long MILLIS_PER_DAY = SECONDS_PER_DAY * 1000L;
+  static final long MICROS_PER_DAY = SECONDS_PER_DAY * 1000_000L;
+  static final long NANOS_PER_MILLI = 1000_000L;
+  static final long NANOS_PER_SECOND = 1000_000_000L;
+  static final long NANOS_PER_MINUTE = NANOS_PER_SECOND * SECONDS_PER_MINUTE;
+  static final long NANOS_PER_HOUR = NANOS_PER_MINUTE * MINUTES_PER_HOUR;
+  static final long NANOS_PER_DAY = NANOS_PER_HOUR * HOURS_PER_DAY;
 
   private final byte hour;
   private final byte minute;
   private final byte second;
   private final int nano;
-
-  private LocalTime(int hour, int minute, int second, int nano) {
-    this.hour = (byte) hour;
-    this.minute = (byte) minute;
-    this.second = (byte) second;
-    this.nano = nano;
-  }
 
   public static LocalTime now() {
     return now(Clock.systemDefaultZone());
@@ -55,45 +86,57 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
 
   public static LocalTime now(Clock clock) {
     Objects.requireNonNull(clock, "clock");
-    Instant now = clock.instant();
-    ZoneOffset offset = clock.getZone().getRules().getOffset(now);
-    long localSecond = now.getEpochSecond() + offset.getTotalSeconds();
-    int secsOfDay = (int) Math.floorMod(localSecond, (long) SECONDS_PER_DAY);
-    return ofNanoOfDay(((long) secsOfDay) * NANOS_PER_SECOND + now.getNano());
+    final Instant now = clock.instant();
+    return ofInstant(now, clock.getZone());
   }
 
   public static LocalTime of(int hour, int minute) {
-    return of(hour, minute, 0, 0);
+    HOUR_OF_DAY.checkValidValue(hour);
+    if (minute == 0) {
+      return HOURS[hour];
+    }
+    MINUTE_OF_HOUR.checkValidValue(minute);
+    return new LocalTime(hour, minute, 0, 0);
   }
 
   public static LocalTime of(int hour, int minute, int second) {
-    return of(hour, minute, second, 0);
+    HOUR_OF_DAY.checkValidValue(hour);
+    if ((minute | second) == 0) {
+      return HOURS[hour];
+    }
+    MINUTE_OF_HOUR.checkValidValue(minute);
+    SECOND_OF_MINUTE.checkValidValue(second);
+    return new LocalTime(hour, minute, second, 0);
   }
 
   public static LocalTime of(int hour, int minute, int second, int nanoOfSecond) {
-    ChronoField.HOUR_OF_DAY.checkValidValue(hour);
-    ChronoField.MINUTE_OF_HOUR.checkValidValue(minute);
-    ChronoField.SECOND_OF_MINUTE.checkValidValue(second);
-    ChronoField.NANO_OF_SECOND.checkValidValue(nanoOfSecond);
+    HOUR_OF_DAY.checkValidValue(hour);
+    MINUTE_OF_HOUR.checkValidValue(minute);
+    SECOND_OF_MINUTE.checkValidValue(second);
+    NANO_OF_SECOND.checkValidValue(nanoOfSecond);
     return create(hour, minute, second, nanoOfSecond);
   }
 
-  public static LocalTime ofSecondOfDay(long secondOfDay) {
-    return ofSecondOfDay(secondOfDay, 0);
+  public static LocalTime ofInstant(Instant instant, ZoneId zone) {
+    Objects.requireNonNull(instant, "instant");
+    Objects.requireNonNull(zone, "zone");
+    ZoneOffset offset = zone.getRules().getOffset(instant);
+    long localSecond = instant.getEpochSecond() + offset.getTotalSeconds();
+    int secsOfDay = Math.floorMod(localSecond, SECONDS_PER_DAY);
+    return ofNanoOfDay(secsOfDay * NANOS_PER_SECOND + instant.getNano());
   }
 
-  public static LocalTime ofSecondOfDay(long secondOfDay, int nanoOfSecond) {
-    ChronoField.SECOND_OF_DAY.checkValidValue(secondOfDay);
-    ChronoField.NANO_OF_SECOND.checkValidValue(nanoOfSecond);
-    int hours = (int) (secondOfDay / 3600);
-    secondOfDay -= hours * 3600;
-    int minutes = (int) (secondOfDay / 60);
-    secondOfDay -= minutes * 60;
-    return create(hours, minutes, (int) secondOfDay, nanoOfSecond);
+  public static LocalTime ofSecondOfDay(long secondOfDay) {
+    SECOND_OF_DAY.checkValidValue(secondOfDay);
+    int hours = (int) (secondOfDay / SECONDS_PER_HOUR);
+    secondOfDay -= hours * SECONDS_PER_HOUR;
+    int minutes = (int) (secondOfDay / SECONDS_PER_MINUTE);
+    secondOfDay -= minutes * SECONDS_PER_MINUTE;
+    return create(hours, minutes, (int) secondOfDay, 0);
   }
 
   public static LocalTime ofNanoOfDay(long nanoOfDay) {
-    ChronoField.NANO_OF_DAY.checkValidValue(nanoOfDay);
+    NANO_OF_DAY.checkValidValue(nanoOfDay);
     int hours = (int) (nanoOfDay / NANOS_PER_HOUR);
     nanoOfDay -= hours * NANOS_PER_HOUR;
     int minutes = (int) (nanoOfDay / NANOS_PER_MINUTE);
@@ -105,54 +148,40 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
 
   public static LocalTime from(TemporalAccessor temporal) {
     Objects.requireNonNull(temporal, "temporal");
-    if (temporal instanceof LocalTime) {
-      return (LocalTime) temporal;
+    LocalTime time = temporal.query(TemporalQueries.localTime());
+    if (time == null) {
+      throw new DateTimeException("Unable to obtain LocalTime from TemporalAccessor: " + temporal + " of type "
+          + temporal.getClass().getName());
     }
-    if (temporal.isSupported(ChronoField.NANO_OF_DAY)) {
-      return ofNanoOfDay(temporal.getLong(ChronoField.NANO_OF_DAY));
+    return time;
+  }
+
+  public static LocalTime parse(CharSequence text) {
+    return parse(text, DateTimeFormatter.ISO_LOCAL_TIME);
+  }
+
+  public static LocalTime parse(CharSequence text, DateTimeFormatter formatter) {
+    Objects.requireNonNull(formatter, "formatter");
+    return formatter.parse(text, new TemporalQuery<LocalTime>() {
+      @Override
+      public LocalTime queryFrom(TemporalAccessor temporal) {
+        return LocalTime.from(temporal);
+      }
+    });
+  }
+
+  private static LocalTime create(int hour, int minute, int second, int nanoOfSecond) {
+    if ((minute | second | nanoOfSecond) == 0) {
+      return HOURS[hour];
     }
-    if (temporal.isSupported(ChronoField.SECOND_OF_DAY)) {
-      return ofSecondOfDay(temporal.getLong(ChronoField.SECOND_OF_DAY));
-    }
-    int hour = temporal.get(ChronoField.HOUR_OF_DAY);
-    int minute = temporal.get(ChronoField.MINUTE_OF_HOUR);
-    int second = temporal.isSupported(ChronoField.SECOND_OF_MINUTE) ? temporal.get(ChronoField.SECOND_OF_MINUTE) : 0;
-    int nano = temporal.isSupported(ChronoField.NANO_OF_SECOND) ? temporal.get(ChronoField.NANO_OF_SECOND) : 0;
-    return of(hour, minute, second, nano);
+    return new LocalTime(hour, minute, second, nanoOfSecond);
   }
 
-  private static LocalTime create(int hour, int minute, int second, int nano) {
-    if ((hour | minute | second | nano) == 0) {
-      return MIDNIGHT;
-    }
-    return new LocalTime(hour, minute, second, nano);
-  }
-
-  public int getHour() {
-    return hour;
-  }
-
-  public int getMinute() {
-    return minute;
-  }
-
-  public int getSecond() {
-    return second;
-  }
-
-  public int getNano() {
-    return nano;
-  }
-
-  public int toSecondOfDay() {
-    return hour * 3600 + minute * 60 + second;
-  }
-
-  public long toNanoOfDay() {
-    long total = hour * NANOS_PER_HOUR;
-    total += minute * NANOS_PER_MINUTE;
-    total += second * NANOS_PER_SECOND;
-    return total + nano;
+  private LocalTime(int hour, int minute, int second, int nanoOfSecond) {
+    this.hour = (byte) hour;
+    this.minute = (byte) minute;
+    this.second = (byte) second;
+    this.nano = nanoOfSecond;
   }
 
   @Override
@@ -172,54 +201,100 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
   }
 
   @Override
+  public ValueRange range(TemporalField field) {
+    return Temporal.super.range(field);
+  }
+
+  @Override
+  public int get(TemporalField field) {
+    if (field instanceof ChronoField) {
+      return get0(field);
+    }
+    return Temporal.super.get(field);
+  }
+
+  @Override
   public long getLong(TemporalField field) {
     if (field instanceof ChronoField) {
-      switch ((ChronoField) field) {
-        case NANO_OF_SECOND:
-          return nano;
-        case NANO_OF_DAY:
-          return toNanoOfDay();
-        case MICRO_OF_SECOND:
-          return nano / 1000L;
-        case MICRO_OF_DAY:
-          return toNanoOfDay() / 1000L;
-        case MILLI_OF_SECOND:
-          return nano / 1000000L;
-        case MILLI_OF_DAY:
-          return toNanoOfDay() / 1000000L;
-        case SECOND_OF_MINUTE:
-          return second;
-        case SECOND_OF_DAY:
-          return toSecondOfDay();
-        case MINUTE_OF_HOUR:
-          return minute;
-        case MINUTE_OF_DAY:
-          return hour * 60 + minute;
-        case HOUR_OF_AMPM:
-          return hour % 12;
-        case CLOCK_HOUR_OF_AMPM: {
-          int pm = hour % 12;
-          return (pm % 12 == 0 ? 12 : pm);
-        }
-        case HOUR_OF_DAY:
-          return hour;
-        case CLOCK_HOUR_OF_DAY:
-          return (hour == 0 ? 24 : hour);
-        case AMPM_OF_DAY:
-          return hour / 12;
-        default:
-          throw new UnsupportedTemporalTypeException("Unsupported field: " + field);
+      if (field == NANO_OF_DAY) {
+        return toNanoOfDay();
       }
+      if (field == MICRO_OF_DAY) {
+        return toNanoOfDay() / 1000;
+      }
+      return get0(field);
     }
     return field.getFrom(this);
+  }
+
+  private int get0(TemporalField field) {
+    switch ((ChronoField) field) {
+      case NANO_OF_SECOND:
+        return nano;
+      case NANO_OF_DAY:
+        throw new UnsupportedTemporalTypeException("Invalid field 'NanoOfDay' for get() method, use getLong() instead");
+      case MICRO_OF_SECOND:
+        return nano / 1000;
+      case MICRO_OF_DAY:
+        throw new UnsupportedTemporalTypeException("Invalid field 'MicroOfDay' for get() method, use getLong() instead");
+      case MILLI_OF_SECOND:
+        return nano / 1000_000;
+      case MILLI_OF_DAY:
+        return (int) (toNanoOfDay() / 1000_000);
+      case SECOND_OF_MINUTE:
+        return second;
+      case SECOND_OF_DAY:
+        return toSecondOfDay();
+      case MINUTE_OF_HOUR:
+        return minute;
+      case MINUTE_OF_DAY:
+        return hour * 60 + minute;
+      case HOUR_OF_AMPM:
+        return hour % 12;
+      case CLOCK_HOUR_OF_AMPM:
+        int ham = hour % 12;
+        return (ham % 12 == 0 ? 12 : ham);
+      case HOUR_OF_DAY:
+        return hour;
+      case CLOCK_HOUR_OF_DAY:
+        return (hour == 0 ? 24 : hour);
+      case AMPM_OF_DAY:
+        return hour / 12;
+      default:
+        throw new UnsupportedTemporalTypeException("Unsupported field: " + field);
+    }
+  }
+
+  public int getHour() {
+    return hour;
+  }
+
+  public int getMinute() {
+    return minute;
+  }
+
+  public int getSecond() {
+    return second;
+  }
+
+  public int getNano() {
+    return nano;
+  }
+
+  @Override
+  public LocalTime with(TemporalAdjuster adjuster) {
+    if (adjuster instanceof LocalTime) {
+      return (LocalTime) adjuster;
+    }
+    return (LocalTime) adjuster.adjustInto(this);
   }
 
   @Override
   public LocalTime with(TemporalField field, long newValue) {
     if (field instanceof ChronoField) {
-      ChronoField cf = (ChronoField) field;
-      cf.checkValidValue(newValue);
-      switch (cf) {
+      ChronoField f = (ChronoField) field;
+      f.checkValidValue(newValue);
+      switch (f) {
         case NANO_OF_SECOND:
           return withNano((int) newValue);
         case NANO_OF_DAY:
@@ -229,9 +304,9 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
         case MICRO_OF_DAY:
           return plusNanos((newValue - toNanoOfDay() / 1000) * 1000);
         case MILLI_OF_SECOND:
-          return withNano((int) newValue * 1000000);
+          return withNano((int) newValue * 1000_000);
         case MILLI_OF_DAY:
-          return plusNanos((newValue - toNanoOfDay() / 1000000) * 1000000);
+          return plusNanos((newValue - toNanoOfDay() / 1000_000) * 1000_000);
         case SECOND_OF_MINUTE:
           return withSecond((int) newValue);
         case SECOND_OF_DAY:
@@ -254,14 +329,14 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
           throw new UnsupportedTemporalTypeException("Unsupported field: " + field);
       }
     }
-    return (LocalTime) field.adjustInto(this, newValue);
+    return field.adjustInto(this, newValue);
   }
 
   public LocalTime withHour(int hour) {
     if (this.hour == hour) {
       return this;
     }
-    ChronoField.HOUR_OF_DAY.checkValidValue(hour);
+    HOUR_OF_DAY.checkValidValue(hour);
     return create(hour, minute, second, nano);
   }
 
@@ -269,7 +344,7 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
     if (this.minute == minute) {
       return this;
     }
-    ChronoField.MINUTE_OF_HOUR.checkValidValue(minute);
+    MINUTE_OF_HOUR.checkValidValue(minute);
     return create(hour, minute, second, nano);
   }
 
@@ -277,7 +352,7 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
     if (this.second == second) {
       return this;
     }
-    ChronoField.SECOND_OF_MINUTE.checkValidValue(second);
+    SECOND_OF_MINUTE.checkValidValue(second);
     return create(hour, minute, second, nano);
   }
 
@@ -285,26 +360,41 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
     if (this.nano == nanoOfSecond) {
       return this;
     }
-    ChronoField.NANO_OF_SECOND.checkValidValue(nanoOfSecond);
+    NANO_OF_SECOND.checkValidValue(nanoOfSecond);
     return create(hour, minute, second, nanoOfSecond);
   }
 
+  public LocalTime truncatedTo(TemporalUnit unit) {
+    if (unit == ChronoUnit.NANOS) {
+      return this;
+    }
+    Duration unitDur = unit.getDuration();
+    if (unitDur.getSeconds() > SECONDS_PER_DAY) {
+      throw new UnsupportedTemporalTypeException("Unit is too large to be used for truncation");
+    }
+    long dur = unitDur.toNanos();
+    if ((NANOS_PER_DAY % dur) != 0) {
+      throw new UnsupportedTemporalTypeException("Unit must divide into a standard day without remainder");
+    }
+    long nod = toNanoOfDay();
+    return ofNanoOfDay((nod / dur) * dur);
+  }
+
   @Override
-  public LocalTime plus(TemporalAmount amount) {
-    return (LocalTime) amount.addTo(this);
+  public LocalTime plus(TemporalAmount amountToAdd) {
+    return (LocalTime) amountToAdd.addTo(this);
   }
 
   @Override
   public LocalTime plus(long amountToAdd, TemporalUnit unit) {
     if (unit instanceof ChronoUnit) {
-      ChronoUnit f = (ChronoUnit) unit;
-      switch (f) {
+      switch ((ChronoUnit) unit) {
         case NANOS:
           return plusNanos(amountToAdd);
         case MICROS:
-          return plusNanos((amountToAdd % (NANOS_PER_DAY / 1000)) * 1000);
+          return plusNanos((amountToAdd % MICROS_PER_DAY) * 1000);
         case MILLIS:
-          return plusNanos((amountToAdd % (NANOS_PER_DAY / 1000000)) * 1000000);
+          return plusNanos((amountToAdd % MILLIS_PER_DAY) * 1000_000);
         case SECONDS:
           return plusSeconds(amountToAdd);
         case MINUTES:
@@ -317,14 +407,14 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
           throw new UnsupportedTemporalTypeException("Unsupported unit: " + unit);
       }
     }
-    return (LocalTime) unit.addTo(this, amountToAdd);
+    return unit.addTo(this, amountToAdd);
   }
 
   public LocalTime plusHours(long hoursToAdd) {
     if (hoursToAdd == 0) {
       return this;
     }
-    int newHour = ((int) (hoursToAdd % 24) + hour + 24) % 24;
+    int newHour = ((int) (hoursToAdd % HOURS_PER_DAY) + hour + HOURS_PER_DAY) % HOURS_PER_DAY;
     return create(newHour, minute, second, nano);
   }
 
@@ -332,49 +422,64 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
     if (minutesToAdd == 0) {
       return this;
     }
-    int m = (int) (minutesToAdd % 1440);
-    int newMinutes = hour * 60 + minute + m;
-    newMinutes = (newMinutes % 1440 + 1440) % 1440;
-    return create(newMinutes / 60, newMinutes % 60, second, nano);
-  }
-
-  public LocalTime plusSeconds(long secondsToAdd) {
-    if (secondsToAdd == 0) {
+    int mofd = hour * MINUTES_PER_HOUR + minute;
+    int newMofd = ((int) (minutesToAdd % MINUTES_PER_DAY) + mofd + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+    if (mofd == newMofd) {
       return this;
     }
-    int s = (int) (secondsToAdd % SECONDS_PER_DAY);
-    int newSec = toSecondOfDay() + s;
-    newSec = (newSec % SECONDS_PER_DAY + SECONDS_PER_DAY) % SECONDS_PER_DAY;
-    return ofSecondOfDay(newSec, nano);
+    int newHour = newMofd / MINUTES_PER_HOUR;
+    int newMinute = newMofd % MINUTES_PER_HOUR;
+    return create(newHour, newMinute, second, nano);
+  }
+
+  public LocalTime plusSeconds(long secondstoAdd) {
+    if (secondstoAdd == 0) {
+      return this;
+    }
+    int sofd = hour * SECONDS_PER_HOUR + minute * SECONDS_PER_MINUTE + second;
+    int newSofd = ((int) (secondstoAdd % SECONDS_PER_DAY) + sofd + SECONDS_PER_DAY) % SECONDS_PER_DAY;
+    if (sofd == newSofd) {
+      return this;
+    }
+    int newHour = newSofd / SECONDS_PER_HOUR;
+    int newMinute = (newSofd / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
+    int newSecond = newSofd % SECONDS_PER_MINUTE;
+    return create(newHour, newMinute, newSecond, nano);
   }
 
   public LocalTime plusNanos(long nanosToAdd) {
     if (nanosToAdd == 0) {
       return this;
     }
-    long totalNanos = (nanosToAdd % NANOS_PER_DAY) + toNanoOfDay();
-    totalNanos = (totalNanos % NANOS_PER_DAY + NANOS_PER_DAY) % NANOS_PER_DAY;
-    return ofNanoOfDay(totalNanos);
+    long nofd = toNanoOfDay();
+    long newNofd = ((nanosToAdd % NANOS_PER_DAY) + nofd + NANOS_PER_DAY) % NANOS_PER_DAY;
+    if (nofd == newNofd) {
+      return this;
+    }
+    int newHour = (int) (newNofd / NANOS_PER_HOUR);
+    int newMinute = (int) ((newNofd / NANOS_PER_MINUTE) % MINUTES_PER_HOUR);
+    int newSecond = (int) ((newNofd / NANOS_PER_SECOND) % SECONDS_PER_MINUTE);
+    int newNano = (int) (newNofd % NANOS_PER_SECOND);
+    return create(newHour, newMinute, newSecond, newNano);
   }
 
   @Override
-  public LocalTime minus(TemporalAmount amount) {
-    return (LocalTime) amount.subtractFrom(this);
+  public LocalTime minus(TemporalAmount amountToSubtract) {
+    return (LocalTime) amountToSubtract.subtractFrom(this);
   }
 
   @Override
   public LocalTime minus(long amountToSubtract, TemporalUnit unit) {
-    return (amountToSubtract == Long.MIN_VALUE)
-        ? plus(Long.MAX_VALUE, unit).plus(1, unit)
-        : plus(-amountToSubtract, unit);
+    return (amountToSubtract == Long.MIN_VALUE ? plus(Long.MAX_VALUE, unit).plus(1, unit)
+        : plus(-amountToSubtract, unit));
   }
 
   public LocalTime minusHours(long hoursToSubtract) {
-    return plusHours(-(hoursToSubtract % 24));
+    return plusHours(-(hoursToSubtract % HOURS_PER_DAY));
   }
 
   public LocalTime minusMinutes(long minutesToSubtract) {
-    return plusMinutes(-(minutesToSubtract % 1440));
+    return plusMinutes(-(minutesToSubtract % MINUTES_PER_DAY));
   }
 
   public LocalTime minusSeconds(long secondsToSubtract) {
@@ -385,31 +490,47 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
     return plusNanos(-(nanosToSubtract % NANOS_PER_DAY));
   }
 
+  @SuppressWarnings("unchecked")
+  @Override
+  public <R> R query(TemporalQuery<R> query) {
+    if (query == TemporalQueries.chronology() || query == TemporalQueries.zoneId() || query == TemporalQueries.zone()
+        || query == TemporalQueries.offset()) {
+      return null;
+    } else if (query == TemporalQueries.localTime()) {
+      return (R) this;
+    } else if (query == TemporalQueries.localDate()) {
+      return null;
+    } else if (query == TemporalQueries.precision()) {
+      return (R) ChronoUnit.NANOS;
+    }
+    return query.queryFrom(this);
+  }
+
   @Override
   public Temporal adjustInto(Temporal temporal) {
-    return temporal.with(ChronoField.NANO_OF_DAY, toNanoOfDay());
+    return temporal.with(NANO_OF_DAY, toNanoOfDay());
   }
 
   @Override
   public long until(Temporal endExclusive, TemporalUnit unit) {
     LocalTime end = LocalTime.from(endExclusive);
     if (unit instanceof ChronoUnit) {
-      long nanos = end.toNanoOfDay() - toNanoOfDay();
+      long nanosUntil = end.toNanoOfDay() - toNanoOfDay();
       switch ((ChronoUnit) unit) {
         case NANOS:
-          return nanos;
+          return nanosUntil;
         case MICROS:
-          return nanos / 1000;
+          return nanosUntil / 1000;
         case MILLIS:
-          return nanos / 1000000;
+          return nanosUntil / 1000_000;
         case SECONDS:
-          return nanos / NANOS_PER_SECOND;
+          return nanosUntil / NANOS_PER_SECOND;
         case MINUTES:
-          return nanos / NANOS_PER_MINUTE;
+          return nanosUntil / NANOS_PER_MINUTE;
         case HOURS:
-          return nanos / NANOS_PER_HOUR;
+          return nanosUntil / NANOS_PER_HOUR;
         case HALF_DAYS:
-          return nanos / (12 * NANOS_PER_HOUR);
+          return nanosUntil / (12 * NANOS_PER_HOUR);
         default:
           throw new UnsupportedTemporalTypeException("Unsupported unit: " + unit);
       }
@@ -417,17 +538,49 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
     return unit.between(this, end);
   }
 
+  public String format(DateTimeFormatter formatter) {
+    Objects.requireNonNull(formatter, "formatter");
+    return formatter.format(this);
+  }
+
   public LocalDateTime atDate(LocalDate date) {
     return LocalDateTime.of(date, this);
   }
 
+  public OffsetTime atOffset(ZoneOffset offset) {
+    return OffsetTime.of(this, offset);
+  }
+
+  public int toSecondOfDay() {
+    int total = hour * SECONDS_PER_HOUR;
+    total += minute * SECONDS_PER_MINUTE;
+    total += second;
+    return total;
+  }
+
+  public long toNanoOfDay() {
+    long total = hour * NANOS_PER_HOUR;
+    total += minute * NANOS_PER_MINUTE;
+    total += second * NANOS_PER_SECOND;
+    total += nano;
+    return total;
+  }
+
+  public long toEpochSecond(LocalDate date, ZoneOffset offset) {
+    Objects.requireNonNull(date, "date");
+    Objects.requireNonNull(offset, "offset");
+    long secs = date.toEpochDay() * SECONDS_PER_DAY + toSecondOfDay();
+    secs -= offset.getTotalSeconds();
+    return secs;
+  }
+
   @Override
   public int compareTo(LocalTime other) {
-    int cmp = Byte.compare(hour, other.hour);
+    int cmp = Integer.compare(hour, other.hour);
     if (cmp == 0) {
-      cmp = Byte.compare(minute, other.minute);
+      cmp = Integer.compare(minute, other.minute);
       if (cmp == 0) {
-        cmp = Byte.compare(second, other.second);
+        cmp = Integer.compare(second, other.second);
         if (cmp == 0) {
           cmp = Integer.compare(nano, other.nano);
         }
@@ -464,46 +617,26 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder(18);
-    appendZeroPadded(sb, hour, 2);
-    sb.append(':');
-    appendZeroPadded(sb, minute, 2);
-    if (second > 0 || nano > 0) {
-      sb.append(':');
-      appendZeroPadded(sb, second, 2);
-      if (nano > 0) {
-        sb.append('.');
-        if (nano % 1000000 == 0) {
-          appendZeroPadded(sb, nano / 1000000, 3);
-        } else if (nano % 1000 == 0) {
-          appendZeroPadded(sb, nano / 1000, 6);
+    StringBuilder buf = new StringBuilder(18);
+    int hourValue = hour;
+    int minuteValue = minute;
+    int secondValue = second;
+    int nanoValue = nano;
+    buf.append(hourValue < 10 ? "0" : "").append(hourValue).append(minuteValue < 10 ? ":0" : ":")
+        .append(minuteValue);
+    if (secondValue > 0 || nanoValue > 0) {
+      buf.append(secondValue < 10 ? ":0" : ":").append(secondValue);
+      if (nanoValue > 0) {
+        buf.append('.');
+        if (nanoValue % 1000_000 == 0) {
+          buf.append(Integer.toString((nanoValue / 1000_000) + 1000).substring(1));
+        } else if (nanoValue % 1000 == 0) {
+          buf.append(Integer.toString((nanoValue / 1000) + 1000_000).substring(1));
         } else {
-          appendZeroPadded(sb, nano, 9);
+          buf.append(Integer.toString((nanoValue) + 1000_000_000).substring(1));
         }
       }
     }
-    return sb.toString();
-  }
-
-  public String format(DateTimeFormatter formatter) {
-    Objects.requireNonNull(formatter, "formatter");
-    return formatter.format(this);
-  }
-
-  public static LocalTime parse(CharSequence text) {
-    return parse(text, DateTimeFormatter.ISO_LOCAL_TIME);
-  }
-
-  public static LocalTime parse(CharSequence text, DateTimeFormatter formatter) {
-    Objects.requireNonNull(formatter, "formatter");
-    return formatter.parse(text, LocalTime::from);
-  }
-
-  private static void appendZeroPadded(StringBuilder sb, int value, int digits) {
-    String s = Integer.toString(value);
-    for (int i = s.length(); i < digits; ++i) {
-      sb.append('0');
-    }
-    sb.append(s);
+    return buf.toString();
   }
 }
