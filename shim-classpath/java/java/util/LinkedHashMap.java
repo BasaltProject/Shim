@@ -1,505 +1,677 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util;
 
+import java.io.IOException;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+
 public class LinkedHashMap<K, V> extends HashMap<K, V> implements SequencedMap<K, V> {
-  private static class LinkedKey<K> {
-    private final K key;
-    private LinkedKey<K> previous, next;
+  static class Entry<K, V> extends HashMap.Node<K, V> {
+    Entry<K, V> before, after;
 
-    public LinkedKey(K key) {
-      this.key = key;
-    }
-
-    public boolean equals(Object other) {
-      LinkedKey<K> o = (LinkedKey<K>) other;
-      return key.equals(o.key);
-    }
-
-    public int hashCode() {
-      return key.hashCode();
+    Entry(int hash, K key, V value, Node<K, V> next) {
+      super(hash, key, value, next);
     }
   }
 
-  private LinkedKey first, last;
-  private HashMap<K, LinkedKey<K>> lookup;
+  transient LinkedHashMap.Entry<K, V> head;
+  transient LinkedHashMap.Entry<K, V> tail;
+  final boolean accessOrder;
 
-  public LinkedHashMap(int capacity) {
-    super(capacity);
-    lookup = new HashMap<K, LinkedKey<K>>();
+  private void linkNodeLast(LinkedHashMap.Entry<K, V> p) {
+    LinkedHashMap.Entry<K, V> last = tail;
+    tail = p;
+    if (last == null) {
+      head = p;
+    } else {
+      p.before = last;
+      last.after = p;
+    }
+  }
+
+  private void linkNodeFirst(LinkedHashMap.Entry<K, V> p) {
+    LinkedHashMap.Entry<K, V> first = head;
+    head = p;
+    if (first == null) {
+      tail = p;
+    } else {
+      p.after = first;
+      first.before = p;
+    }
+  }
+
+  private void unlink(LinkedHashMap.Entry<K, V> p) {
+    LinkedHashMap.Entry<K, V> b = p.before;
+    LinkedHashMap.Entry<K, V> a = p.after;
+    p.before = p.after = null;
+    if (b == null) {
+      head = a;
+    } else {
+      b.after = a;
+    }
+    if (a == null) {
+      tail = b;
+    } else {
+      a.before = b;
+    }
+  }
+
+  Node<K, V> newNode(int hash, K key, V value, Node<K, V> e) {
+    LinkedHashMap.Entry<K, V> p = new LinkedHashMap.Entry<>(hash, key, value, e);
+    linkNodeLast(p);
+    return p;
+  }
+
+  void reinitialize() {
+    super.reinitialize();
+    head = tail = null;
+  }
+
+  void afterNodeRemoval(Node<K, V> e) {
+    unlink((LinkedHashMap.Entry<K, V>) e);
+  }
+
+  void afterNodeInsertion(boolean evict) {
+    LinkedHashMap.Entry<K, V> first;
+    if (evict && (first = head) != null && removeEldestEntry(first)) {
+      K key = first.key;
+      removeNode(hash(key), key, null, false, true);
+    }
+  }
+
+  void afterNodeAccess(Node<K, V> e) {
+    LinkedHashMap.Entry<K, V> last;
+    if (accessOrder && (last = tail) != e) {
+      LinkedHashMap.Entry<K, V> p = (LinkedHashMap.Entry<K, V>) e;
+      LinkedHashMap.Entry<K, V> b = p.before;
+      LinkedHashMap.Entry<K, V> a = p.after;
+      p.after = null;
+      if (b == null) {
+        head = a;
+      } else {
+        b.after = a;
+      }
+      if (a != null) {
+        a.before = b;
+      } else {
+        last = b;
+      }
+      if (last == null) {
+        head = p;
+      } else {
+        p.before = last;
+        last.after = p;
+      }
+      tail = p;
+      ++modCount;
+    }
+  }
+
+  void internalWriteEntries(java.io.ObjectOutputStream s) throws IOException {
+    for (LinkedHashMap.Entry<K, V> e = head; e != null; e = e.after) {
+      s.writeObject(e.key);
+      s.writeObject(e.value);
+    }
+  }
+
+  public LinkedHashMap(int initialCapacity, float loadFactor) {
+    super(initialCapacity, loadFactor);
+    accessOrder = false;
+  }
+
+  public LinkedHashMap(int initialCapacity) {
+    super(initialCapacity);
+    accessOrder = false;
   }
 
   public LinkedHashMap() {
-    this(0);
+    super();
+    accessOrder = false;
   }
 
-  public LinkedHashMap(Map<K, V> map) {
-    this(map.size());
-    putAll(map);
+  public LinkedHashMap(Map<? extends K, ? extends V> m) {
+    super();
+    accessOrder = false;
+    putMapEntries(m, false);
   }
 
-  public V put(K key, V value) {
-    if (!super.containsKey(key)) {
-      LinkedKey<K> k = new LinkedKey<K>(key);
-      if (first == null) {
-        first = k;
-      } else {
-        last.next = k;
-        k.previous = last;
+  public LinkedHashMap(int initialCapacity, float loadFactor, boolean accessOrder) {
+    super(initialCapacity, loadFactor);
+    this.accessOrder = accessOrder;
+  }
+
+  public boolean containsValue(Object value) {
+    for (LinkedHashMap.Entry<K, V> e = head; e != null; e = e.after) {
+      V v = e.value;
+      if (v == value || (value != null && value.equals(v))) {
+        return true;
       }
-      last = k;
-      lookup.put(key, k);
     }
-    return super.put(key, value);
+    return false;
   }
 
-  public V remove(Object key) {
-    LinkedKey<K> linked = lookup.get(key);
-    if (linked == null) {
+  public V get(Object key) {
+    Node<K, V> e;
+    if ((e = getNode(key)) == null) {
       return null;
     }
-    if (linked.previous == null) {
-      first = linked.next;
-    } else {
-      linked.previous.next = linked.next;
+    if (accessOrder) {
+      afterNodeAccess(e);
     }
-    if (linked.next == null) {
-      last = linked.previous;
-    } else {
-      linked.next.previous = linked.previous;
+    return e.value;
+  }
+
+  public V getOrDefault(Object key, V defaultValue) {
+    Node<K, V> e;
+    if ((e = getNode(key)) == null) {
+      return defaultValue;
     }
-    return super.remove(key);
+    if (accessOrder) {
+      afterNodeAccess(e);
+    }
+    return e.value;
   }
 
   public void clear() {
-    first = last = null;
     super.clear();
+    head = tail = null;
   }
 
-  public Set<Entry<K, V>> entrySet() {
-    return new EntrySet();
+  protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+    return false;
   }
 
   public Set<K> keySet() {
-    return new KeySet();
+    Set<K> ks = keySet;
+    if (ks == null) {
+      ks = new LinkedKeySet();
+      keySet = ks;
+    }
+    return ks;
+  }
+
+  final class LinkedKeySet extends AbstractSet<K> {
+    public final int size() {
+      return size;
+    }
+
+    public final void clear() {
+      LinkedHashMap.this.clear();
+    }
+
+    public final Iterator<K> iterator() {
+      return new LinkedKeyIterator();
+    }
+
+    public final boolean contains(Object o) {
+      return containsKey(o);
+    }
+
+    public final boolean remove(Object key) {
+      return removeNode(hash(key), key, null, false, true) != null;
+    }
+
+    public final void forEach(Consumer<? super K> action) {
+      if (action == null) {
+        throw new NullPointerException();
+      }
+      int mc = modCount;
+      for (LinkedHashMap.Entry<K, V> e = head; e != null; e = e.after) {
+        action.accept(e.key);
+      }
+      if (modCount != mc) {
+        throw new ConcurrentModificationException();
+      }
+    }
   }
 
   public Collection<V> values() {
-    return new Values();
+    Collection<V> vs = values;
+    if (vs == null) {
+      vs = new LinkedValues();
+      values = vs;
+    }
+    return vs;
   }
 
-  Iterator<Entry<K, V>> iterator() {
-    return new MyIterator();
-  }
-
- private class EntrySet extends AbstractSet<Entry<K, V>> {
-    public int size() {
-      return LinkedHashMap.this.size();
+  final class LinkedValues extends AbstractCollection<V> {
+    public final int size() {
+      return size;
     }
 
-    public boolean isEmpty() {
-      return LinkedHashMap.this.isEmpty();
-    }
-
-    public boolean contains(Object o) {
-      return (o instanceof Entry<?,?>)
-        && containsKey(((Entry<?,?>)o).getKey());
-    }
-
-    public boolean add(Entry<K, V> e) {
-      return put(e.getKey(), e.getValue()) != null;
-    }
-
-    public boolean remove(Object o) {
-      return (o instanceof Entry<?,?>) && remove((Entry<?,?>)o);
-    }
-
-    public boolean remove(Entry<K, V> e) {
-      return LinkedHashMap.this.remove(e.getKey()) != null;
-    }
-
-    public Object[] toArray() {
-      return toArray(new Object[size()]);
-    }
-
-    public <T> T[] toArray(T[] array) {
-      return shim.Data.toArray(this, array);
-    }
-
-    public void clear() {
+    public final void clear() {
       LinkedHashMap.this.clear();
     }
 
-    public Iterator<Entry<K, V>> iterator() {
-      return new MyIterator();
-    }
-  }
-
-  private class KeySet extends AbstractSet<K> {
-    public int size() {
-      return LinkedHashMap.this.size();
+    public final Iterator<V> iterator() {
+      return new LinkedValueIterator();
     }
 
-    public boolean isEmpty() {
-      return LinkedHashMap.this.isEmpty();
+    public final boolean contains(Object o) {
+      return containsValue(o);
     }
 
-    public boolean contains(Object key) {
-      return containsKey(key);
-    }
-
-    public boolean add(K key) {
-      return put(key, null) != null;
-    }
-
-    public boolean remove(Object key) {
-      return LinkedHashMap.this.remove(key) != null;
-    }
-
-    public Object[] toArray() {
-      return toArray(new Object[size()]);
-    }
-
-    public <T> T[] toArray(T[] array) {
-      return shim.Data.toArray(this, array);
-    }
-
-    public void clear() {
-      LinkedHashMap.this.clear();
-    }
-
-    public Iterator<K> iterator() {
-      return new shim.Data.KeyIterator(new MyIterator());
-    }
-  }
-
-  private class Values implements Collection<V> {
-    public int size() {
-      return LinkedHashMap.this.size();
-    }
-
-    public boolean isEmpty() {
-      return LinkedHashMap.this.isEmpty();
-    }
-
-    public boolean contains(Object value) {
-      return containsValue(value);
-    }
-
-    public boolean containsAll(Collection<?> c) {
-      if (c == null) {
-        throw new NullPointerException("collection is null");
+    public final void forEach(Consumer<? super V> action) {
+      if (action == null) {
+        throw new NullPointerException();
       }
-
-      Iterator<?> it = c.iterator();
-      while (it.hasNext()) {
-        if (! contains(it.next())) {
-          return false;
-        }
+      int mc = modCount;
+      for (LinkedHashMap.Entry<K, V> e = head; e != null; e = e.after) {
+        action.accept(e.value);
       }
-
-      return true;
-    }
-
-    public boolean add(V value) {
-      throw new UnsupportedOperationException();
-    }
-
-    public boolean addAll(Collection<? extends V> collection) {
-      throw new UnsupportedOperationException();
-    }
-
-    public boolean remove(Object value) {
-      throw new UnsupportedOperationException();
-    }
-
-    public boolean removeAll(Collection<?> c) {
-      throw new UnsupportedOperationException();
-    }
-
-    public Object[] toArray() {
-      return toArray(new Object[size()]);
-    }
-
-    public <T> T[] toArray(T[] array) {
-      return shim.Data.toArray(this, array);
-    }
-
-    public void clear() {
-      LinkedHashMap.this.clear();
-    }
-
-    public Iterator<V> iterator() {
-      return new shim.Data.ValueIterator(new MyIterator());
+      if (modCount != mc) {
+        throw new ConcurrentModificationException();
+      }
     }
   }
 
-  private class MyIterator implements Iterator<Entry<K, V>> {
-    private LinkedKey<K> current = first;
+  public Set<Map.Entry<K, V>> entrySet() {
+    Set<Map.Entry<K, V>> es;
+    return (es = entrySet) == null ? (entrySet = new LinkedEntrySet()) : es;
+  }
 
-    public Entry<K, V> next() {
-      if (!hasNext()) {
+  final class LinkedEntrySet extends AbstractSet<Map.Entry<K, V>> {
+    public final int size() {
+      return size;
+    }
+
+    public final void clear() {
+      LinkedHashMap.this.clear();
+    }
+
+    public final Iterator<Map.Entry<K, V>> iterator() {
+      return new LinkedEntryIterator();
+    }
+
+    public final boolean contains(Object o) {
+      if (!(o instanceof Map.Entry)) {
+        return false;
+      }
+      Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+      Object key = e.getKey();
+      Node<K, V> candidate = getNode(key);
+      return candidate != null && candidate.equals(e);
+    }
+
+    public final boolean remove(Object o) {
+      if (o instanceof Map.Entry) {
+        Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+        Object key = e.getKey();
+        Object value = e.getValue();
+        return removeNode(hash(key), key, value, true, true) != null;
+      }
+      return false;
+    }
+
+    public final void forEach(Consumer<? super Map.Entry<K, V>> action) {
+      if (action == null) {
+        throw new NullPointerException();
+      }
+      int mc = modCount;
+      for (LinkedHashMap.Entry<K, V> e = head; e != null; e = e.after) {
+        action.accept(e);
+      }
+      if (modCount != mc) {
+        throw new ConcurrentModificationException();
+      }
+    }
+  }
+
+  public void forEach(BiConsumer<? super K, ? super V> action) {
+    if (action == null) {
+      throw new NullPointerException();
+    }
+    int mc = modCount;
+    for (LinkedHashMap.Entry<K, V> e = head; e != null; e = e.after) {
+      action.accept(e.key, e.value);
+    }
+    if (modCount != mc) {
+      throw new ConcurrentModificationException();
+    }
+  }
+
+  public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
+    if (function == null) {
+      throw new NullPointerException();
+    }
+    int mc = modCount;
+    for (LinkedHashMap.Entry<K, V> e = head; e != null; e = e.after) {
+      e.value = function.apply(e.key, e.value);
+    }
+    if (modCount != mc) {
+      throw new ConcurrentModificationException();
+    }
+  }
+
+  abstract class LinkedHashIterator {
+    LinkedHashMap.Entry<K, V> next;
+    LinkedHashMap.Entry<K, V> current;
+    int expectedModCount;
+
+    LinkedHashIterator() {
+      next = head;
+      expectedModCount = modCount;
+      current = null;
+    }
+
+    public final boolean hasNext() {
+      return next != null;
+    }
+
+    final LinkedHashMap.Entry<K, V> nextNode() {
+      LinkedHashMap.Entry<K, V> e = next;
+      if (modCount != expectedModCount) {
+        throw new ConcurrentModificationException();
+      }
+      if (e == null) {
         throw new NoSuchElementException();
       }
-      Entry<K, V> result = find(current.key);
-      current = current.next;
-      return result;
+      current = e;
+      next = e.after;
+      return e;
     }
 
-    public boolean hasNext() {
-      return current != null;
-    }
-
-    public void remove() {
-      LinkedHashMap.this.remove(current == null ?
-        last.key : current.previous.key);
+    public final void remove() {
+      Node<K, V> p = current;
+      if (p == null) {
+        throw new IllegalStateException();
+      }
+      if (modCount != expectedModCount) {
+        throw new ConcurrentModificationException();
+      }
+      current = null;
+      removeNode(p.hash, p.key, null, false, false);
+      expectedModCount = modCount;
     }
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public Entry<K, V> firstEntry() {
-    if (first == null) {
+  final class LinkedKeyIterator extends LinkedHashIterator implements Iterator<K> {
+    public final K next() {
+      return nextNode().getKey();
+    }
+  }
+
+  final class LinkedValueIterator extends LinkedHashIterator implements Iterator<V> {
+    public final V next() {
+      return nextNode().value;
+    }
+  }
+
+  final class LinkedEntryIterator extends LinkedHashIterator implements Iterator<Map.Entry<K, V>> {
+    public final Map.Entry<K, V> next() {
+      return nextNode();
+    }
+  }
+
+  public static <K, V> LinkedHashMap<K, V> newLinkedHashMap(int numMappings) {
+    if (numMappings < 0) {
+      throw new IllegalArgumentException("Negative number of mappings: " + numMappings);
+    }
+    return new LinkedHashMap<>(HashMap.calculateHashMapCapacity(numMappings));
+  }
+
+  private static <K, V> Map.Entry<K, V> snapshot(LinkedHashMap.Entry<K, V> e) {
+    return e == null ? null : new NullableKeyValueHolder<K, V>(e.key, e.value);
+  }
+
+  private static final class NullableKeyValueHolder<K, V> implements Map.Entry<K, V> {
+    private final K key;
+    private final V value;
+
+    NullableKeyValueHolder(K key, V value) {
+      this.key = key;
+      this.value = value;
+    }
+
+    public K getKey() {
+      return key;
+    }
+
+    public V getValue() {
+      return value;
+    }
+
+    public V setValue(V value) {
+      throw new UnsupportedOperationException("not supported");
+    }
+
+    public boolean equals(Object o) {
+      if (!(o instanceof Map.Entry)) {
+        return false;
+      }
+      Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+      return Objects.equals(key, e.getKey()) && Objects.equals(value, e.getValue());
+    }
+
+    public int hashCode() {
+      return Objects.hashCode(key) ^ Objects.hashCode(value);
+    }
+
+    public String toString() {
+      return key + "=" + value;
+    }
+  }
+
+  public Map.Entry<K, V> firstEntry() {
+    return snapshot(head);
+  }
+
+  public Map.Entry<K, V> lastEntry() {
+    return snapshot(tail);
+  }
+
+  public Map.Entry<K, V> pollFirstEntry() {
+    LinkedHashMap.Entry<K, V> e = head;
+    if (e == null) {
       return null;
     }
-    K k = (K) first.key;
-    return Map.entry(k, get(k));
+    Map.Entry<K, V> result = snapshot(e);
+    removeNode(e.hash, e.key, null, false, false);
+    return result;
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public Entry<K, V> lastEntry() {
-    if (last == null) {
+  public Map.Entry<K, V> pollLastEntry() {
+    LinkedHashMap.Entry<K, V> e = tail;
+    if (e == null) {
       return null;
     }
-    K k = (K) last.key;
-    return Map.entry(k, get(k));
+    Map.Entry<K, V> result = snapshot(e);
+    removeNode(e.hash, e.key, null, false, false);
+    return result;
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public Entry<K, V> pollFirstEntry() {
-    if (first == null) {
-      return null;
+  public V putFirst(K k, V v) {
+    Node<K, V> existing = getNode(k);
+    if (existing == null) {
+      V old = put(k, v);
+      moveToFirst((LinkedHashMap.Entry<K, V>) getNode(k), false);
+      return old;
     }
-    K k = (K) first.key;
-    V v = remove(k);
-    return Map.entry(k, v);
+    V old = existing.value;
+    existing.value = v;
+    moveToFirst((LinkedHashMap.Entry<K, V>) existing, true);
+    return old;
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public Entry<K, V> pollLastEntry() {
-    if (last == null) {
-      return null;
+  public V putLast(K k, V v) {
+    Node<K, V> existing = getNode(k);
+    if (existing == null) {
+      return put(k, v);
     }
-    K k = (K) last.key;
-    V v = remove(k);
-    return Map.entry(k, v);
+    V old = existing.value;
+    existing.value = v;
+    moveToLast((LinkedHashMap.Entry<K, V>) existing);
+    return old;
   }
 
-  @Override
-  public V putFirst(K key, V value) {
-    if (containsKey(key)) {
-      remove(key);
+  private void moveToFirst(LinkedHashMap.Entry<K, V> p, boolean counted) {
+    if (head != p) {
+      unlink(p);
+      linkNodeFirst(p);
+      if (counted) {
+        ++modCount;
+      }
+    } else if (counted) {
+      ++modCount;
     }
-    LinkedKey<K> k = new LinkedKey<K>(key);
-    if (first == null) {
-      first = last = k;
-    } else {
-      k.next = first;
-      first.previous = k;
-      first = k;
-    }
-    lookup.put(key, k);
-    return super.put(key, value);
   }
 
-  @Override
-  public V putLast(K key, V value) {
-    if (containsKey(key)) {
-      remove(key);
+  private void moveToLast(LinkedHashMap.Entry<K, V> p) {
+    if (tail != p) {
+      unlink(p);
+      linkNodeLast(p);
     }
-    return put(key, value);
+    ++modCount;
   }
 
-  @Override
   public SequencedMap<K, V> reversed() {
     return new ReversedView();
   }
 
-  private class ReversedView extends AbstractMap<K, V> implements SequencedMap<K, V> {
-    @Override
+  private final class ReversedView extends AbstractMap<K, V> implements SequencedMap<K, V> {
     public int size() {
       return LinkedHashMap.this.size();
     }
 
-    @Override
-    public boolean isEmpty() {
-      return LinkedHashMap.this.isEmpty();
-    }
-
-    @Override
     public boolean containsKey(Object key) {
       return LinkedHashMap.this.containsKey(key);
     }
 
-    @Override
     public boolean containsValue(Object value) {
       return LinkedHashMap.this.containsValue(value);
     }
 
-    @Override
     public V get(Object key) {
       return LinkedHashMap.this.get(key);
     }
 
-    @Override
     public V put(K key, V value) {
-      return LinkedHashMap.this.putFirst(key, value);
+      return LinkedHashMap.this.put(key, value);
     }
 
-    @Override
     public V remove(Object key) {
       return LinkedHashMap.this.remove(key);
     }
 
-    @Override
     public void clear() {
       LinkedHashMap.this.clear();
     }
 
-    @Override
-    public void putAll(Map<? extends K, ? extends V> m) {
-      for (Map.Entry<? extends K, ? extends V> e : m.entrySet()) {
-        put(e.getKey(), e.getValue());
-      }
-    }
-
-    @Override
     public SequencedMap<K, V> reversed() {
       return LinkedHashMap.this;
     }
 
-    @Override
-    public Entry<K, V> firstEntry() {
+    public Map.Entry<K, V> firstEntry() {
       return LinkedHashMap.this.lastEntry();
     }
 
-    @Override
-    public Entry<K, V> lastEntry() {
+    public Map.Entry<K, V> lastEntry() {
       return LinkedHashMap.this.firstEntry();
     }
 
-    @Override
-    public Entry<K, V> pollFirstEntry() {
+    public Map.Entry<K, V> pollFirstEntry() {
       return LinkedHashMap.this.pollLastEntry();
     }
 
-    @Override
-    public Entry<K, V> pollLastEntry() {
+    public Map.Entry<K, V> pollLastEntry() {
       return LinkedHashMap.this.pollFirstEntry();
     }
 
-    @Override
     public V putFirst(K key, V value) {
       return LinkedHashMap.this.putLast(key, value);
     }
 
-    @Override
     public V putLast(K key, V value) {
       return LinkedHashMap.this.putFirst(key, value);
     }
 
-    @Override
-    public Set<Entry<K, V>> entrySet() {
-      return new AbstractSet<Entry<K, V>>() {
-        @Override
+    public Set<Map.Entry<K, V>> entrySet() {
+      return new AbstractSet<Map.Entry<K, V>>() {
         public int size() {
           return LinkedHashMap.this.size();
         }
 
-        @Override
-        public Iterator<Entry<K, V>> iterator() {
-          return new Iterator<Entry<K, V>>() {
-            private LinkedKey current = last;
-
-            @Override
-            public boolean hasNext() {
-              return current != null;
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public Entry<K, V> next() {
-              if (!hasNext()) {
-                throw new NoSuchElementException();
-              }
-              Entry<K, V> res = find((K) current.key);
-              current = current.previous;
-              return res;
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public void remove() {
-              LinkedHashMap.this.remove((K) (current == null ? first.key : current.next.key));
+        public Iterator<Map.Entry<K, V>> iterator() {
+          return new ReversedIterator<Map.Entry<K, V>>() {
+            Map.Entry<K, V> map(LinkedHashMap.Entry<K, V> e) {
+              return e;
             }
           };
         }
       };
     }
 
-    @Override
     public Set<K> keySet() {
       return new AbstractSet<K>() {
-        @Override
         public int size() {
-          return ReversedView.this.size();
+          return LinkedHashMap.this.size();
         }
 
-        @Override
+        public boolean contains(Object o) {
+          return LinkedHashMap.this.containsKey(o);
+        }
+
         public Iterator<K> iterator() {
-          return new shim.Data.KeyIterator(ReversedView.this.entrySet().iterator());
+          return new ReversedIterator<K>() {
+            K map(LinkedHashMap.Entry<K, V> e) {
+              return e.key;
+            }
+          };
         }
       };
     }
 
-    @Override
     public Collection<V> values() {
       return new AbstractCollection<V>() {
-        @Override
         public int size() {
-          return ReversedView.this.size();
+          return LinkedHashMap.this.size();
         }
 
-        @Override
         public Iterator<V> iterator() {
-          return new shim.Data.ValueIterator(ReversedView.this.entrySet().iterator());
+          return new ReversedIterator<V>() {
+            V map(LinkedHashMap.Entry<K, V> e) {
+              return e.value;
+            }
+          };
         }
       };
     }
   }
-}
 
+  private abstract class ReversedIterator<T> implements Iterator<T> {
+    LinkedHashMap.Entry<K, V> next = tail;
+    LinkedHashMap.Entry<K, V> current;
+    int expectedModCount = modCount;
+
+    abstract T map(LinkedHashMap.Entry<K, V> e);
+
+    public boolean hasNext() {
+      return next != null;
+    }
+
+    public T next() {
+      if (modCount != expectedModCount) {
+        throw new ConcurrentModificationException();
+      }
+      if (next == null) {
+        throw new NoSuchElementException();
+      }
+      current = next;
+      next = next.before;
+      return map(current);
+    }
+
+    public void remove() {
+      if (current == null) {
+        throw new IllegalStateException();
+      }
+      if (modCount != expectedModCount) {
+        throw new ConcurrentModificationException();
+      }
+      removeNode(current.hash, current.key, null, false, false);
+      current = null;
+      expectedModCount = modCount;
+    }
+  }
+}

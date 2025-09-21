@@ -33,11 +33,19 @@ public class PropertyResourceBundle extends ResourceBundle {
     map.load(in);
   }
 
+  public PropertyResourceBundle(java.io.Reader reader) throws IOException {
+    map.load(reader);
+  }
+
   public Object handleGetObject(String key) {
     return map.get(key);
   }
 
   public Enumeration<String> getKeys() {
-    return map.keys();
+    List<String> keys = new ArrayList<String>();
+    for (Object key : map.keySet()) {
+      keys.add((String) key);
+    }
+    return Collections.enumeration(keys);
   }
 }

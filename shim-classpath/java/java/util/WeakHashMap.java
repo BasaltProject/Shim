@@ -28,11 +28,11 @@ import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 
 public class WeakHashMap<K, V> implements Map<K, V> {
-  private final HashMap<K, V> map;
+  private final HelperHashMap<K, V> map;
   private final ReferenceQueue queue;
 
   public WeakHashMap(int capacity) {
-    map = new HashMap(capacity, new MyHelper());
+    map = new HelperHashMap(capacity, new MyHelper());
     queue = new ReferenceQueue();
   }
 
@@ -104,14 +104,14 @@ public class WeakHashMap<K, V> implements Map<K, V> {
 
   private static class MyCell<K, V>
     extends WeakReference<K>
-    implements HashMap.Cell<K, V>
+    implements HelperHashMap.Cell<K, V>
   {
     public V value;
-    public HashMap.Cell<K, V> next;
+    public HelperHashMap.Cell<K, V> next;
     public int hashCode;
 
     public MyCell(K key, ReferenceQueue queue, V value,
-                  HashMap.Cell<K, V> next, int hashCode)
+                  HelperHashMap.Cell<K, V> next, int hashCode)
     {
       super(key, queue);
       this.value = value;
@@ -133,11 +133,11 @@ public class WeakHashMap<K, V> implements Map<K, V> {
       return old;
     }
 
-    public HashMap.Cell<K, V> next() {
+    public HelperHashMap.Cell<K, V> next() {
       return next;
     }
 
-    public void setNext(HashMap.Cell<K, V> next) {
+    public void setNext(HelperHashMap.Cell<K, V> next) {
       this.next = next;
     }
 
@@ -147,9 +147,9 @@ public class WeakHashMap<K, V> implements Map<K, V> {
   }
 
   private class MyHelper<K, V>
-    extends HashMap.MyHelper<K, V>
+    extends HelperHashMap.MyHelper<K, V>
   {
-    public HashMap.Cell<K, V> make(K key, V value, HashMap.Cell<K, V> next) {
+    public HelperHashMap.Cell<K, V> make(K key, V value, HelperHashMap.Cell<K, V> next) {
       return new MyCell(key, queue, value, next, hash(key));
     }
   }

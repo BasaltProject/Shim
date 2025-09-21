@@ -24,10 +24,10 @@
 package java.util;
 
 public class IdentityHashMap<K, V> implements Map<K, V> {
-  private final HashMap<K, V> map;
+  private final HelperHashMap<K, V> map;
 
   public IdentityHashMap(int capacity) {
-    map = new HashMap(capacity, new MyHelper());
+    map = new HelperHashMap(capacity, new MyHelper());
   }
 
   public IdentityHashMap() {
@@ -83,7 +83,7 @@ public class IdentityHashMap<K, V> implements Map<K, V> {
   }
 
   private static class MyHelper<K, V>
-    extends HashMap.MyHelper<K, V>
+    extends HelperHashMap.MyHelper<K, V>
   {
     public int hash(K a) {
       return (a == null ? 0 : System.identityHashCode(a));
