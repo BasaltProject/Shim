@@ -13,7 +13,7 @@ import java.time.Duration;
 public enum ChronoUnit implements TemporalUnit {
   NANOS("Nanos", Duration.ofNanos(1)),
   MICROS("Micros", Duration.ofNanos(1000)),
-  MILLIS("Millis", Duration.ofMillis(1)),
+  MILLIS("Millis", Duration.ofNanos(1000_000)),
   SECONDS("Seconds", Duration.ofSeconds(1)),
   MINUTES("Minutes", Duration.ofSeconds(60)),
   HOURS("Hours", Duration.ofSeconds(3600)),
@@ -54,6 +54,11 @@ public enum ChronoUnit implements TemporalUnit {
   @Override
   public boolean isTimeBased() {
     return compareTo(DAYS) < 0;
+  }
+
+  @Override
+  public boolean isSupportedBy(Temporal temporal) {
+    return temporal.isSupported(this);
   }
 
   @Override
