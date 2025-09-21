@@ -1,184 +1,325 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util.concurrent;
 
 import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
-import shim.Atomic;
+public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<E>, java.io.Serializable {
+  private static class Node<E> {
+    volatile E item;
+    volatile Node<E> next;
 
-public class ConcurrentLinkedQueue<T> extends AbstractQueue<T> {
-  private static final long QueueHead;
-  private static final long QueueTail;
-  private static final long NodeNext;
-
-  static {
-    try {
-      QueueHead = Atomic.getOffset
-        (ConcurrentLinkedQueue.class.getField("head"));
-
-      QueueTail = Atomic.getOffset
-        (ConcurrentLinkedQueue.class.getField("tail"));
-
-      NodeNext = Atomic.getOffset
-        (Node.class.getField("next"));
-    } catch (NoSuchFieldException e) {
-      throw new RuntimeException(e);
+    Node(E item) {
+      this.item = item;
     }
   }
 
-  private volatile Node<T> head = new Node<T>(null, null);
-  private volatile Node<T> tail = head;
+  private transient Node<E> head;
+  private transient Node<E> tail;
+  private final transient Object lock = new Object();
 
-  @Override
-  public void clear() {
-    // TODO - can we safely make this O(1)?
-    while (poll() != null) { }
+  public ConcurrentLinkedQueue() {
+    head = tail = new Node<E>(null);
   }
 
-  @Override
-  public boolean offer(T element) {
-    add(element);
-    
+  public ConcurrentLinkedQueue(Collection<? extends E> c) {
+    this();
+    for (E e : c) {
+      offer(e);
+    }
+  }
+
+  public boolean add(E e) {
+    return offer(e);
+  }
+
+  public boolean offer(E e) {
+    Node<E> node = new Node<E>(Objects.requireNonNull(e));
+    synchronized (lock) {
+      tail.next = node;
+      tail = node;
+    }
     return true;
   }
 
-  @Override
-  public boolean add(T value) {
-    Node<T> n = new Node<T>(value, null);
-    while (true) {
-      Node<T> t = tail;
-      Node<T> next = tail.next;
-      if (t == tail) {
-        if (next != null) {
-          Atomic.compareAndSwapObject(this, QueueTail, t, next);
-        } else if (Atomic.compareAndSwapObject(tail, NodeNext, null, n)) {
-          Atomic.compareAndSwapObject(this, QueueTail, t, n);
-          break;
-        }
+  public E poll() {
+    synchronized (lock) {
+      Node<E> first = head.next;
+      if (first == null) {
+        return null;
       }
-    }
-
-    return true;
-  }
-
-  @Override
-  public T peek() {
-    return poll(false);
-  }
-
-  @Override
-  public T poll() {
-    return poll(true);
-  }
-
-  private T poll(boolean remove) {
-    while (true) {
-      Node<T> h = head;
-      Node<T> t = tail;
-      Node<T> next = head.next;
-
-      if (h == head) {
-        if (h == t) {
-          if (next != null) {
-            Atomic.compareAndSwapObject(this, QueueTail, t, next);
-          } else {
-            return null;
-          }
-        } else {
-          T value = next.value;
-          if ((! remove)
-              || Atomic.compareAndSwapObject(this, QueueHead, h, next))
-          {
-            return value;
-          }
-        }
-      }
+      E item = first.item;
+      Node<E> old = head;
+      old.next = old;
+      head = first;
+      first.item = null;
+      return item;
     }
   }
 
-  private static class Node<T> {
-    public volatile T value;
-    public volatile Node<T> next;
-
-    public Node(T value, Node<T> next) {
-      this.value = value;
-      this.next = next;
+  public E peek() {
+    synchronized (lock) {
+      Node<E> first = head.next;
+      return first == null ? null : first.item;
     }
   }
 
-  @Override
-  public int size() {
-    // TODO - implement
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public boolean isEmpty() {
-    return size() == 0;
+    synchronized (lock) {
+      return head.next == null;
+    }
   }
 
-  @Override
-  public boolean contains(Object element) {
-    // TODO - implement
-    throw new UnsupportedOperationException();
+  public int size() {
+    synchronized (lock) {
+      int count = 0;
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        if (p.item != null) {
+          ++count;
+        }
+      }
+      return count;
+    }
   }
 
-  @Override
-  public boolean containsAll(Collection<?> c) {
-    // TODO - implement
-    throw new UnsupportedOperationException();
+  public boolean contains(Object o) {
+    if (o == null) {
+      return false;
+    }
+    synchronized (lock) {
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        if (o.equals(p.item)) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
-  @Override
-  public boolean remove(Object element) {
-    // TODO - implement
-    throw new UnsupportedOperationException();
+  public boolean remove(Object o) {
+    if (o == null) {
+      return false;
+    }
+    synchronized (lock) {
+      for (Node<E> pred = head, p = pred.next; p != null; pred = p, p = p.next) {
+        if (o.equals(p.item)) {
+          unlink(p, pred);
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
-  @Override
-  public boolean removeAll(Collection<?> c) {
-    // TODO - implement
-    throw new UnsupportedOperationException();
+  private void unlink(Node<E> p, Node<E> pred) {
+    p.item = null;
+    pred.next = p.next;
+    if (tail == p) {
+      tail = pred;
+    }
   }
 
-  @Override
+  public boolean addAll(Collection<? extends E> c) {
+    if (c == this) {
+      throw new IllegalArgumentException();
+    }
+    boolean added = false;
+    for (E e : c) {
+      offer(e);
+      added = true;
+    }
+    return added;
+  }
+
+  public String toString() {
+    synchronized (lock) {
+      Node<E> p = head.next;
+      if (p == null) {
+        return "[]";
+      }
+      StringBuilder sb = new StringBuilder();
+      sb.append('[');
+      for (;;) {
+        E e = p.item;
+        sb.append(e == this ? "(this Collection)" : e);
+        p = p.next;
+        if (p == null) {
+          return sb.append(']').toString();
+        }
+        sb.append(',').append(' ');
+      }
+    }
+  }
+
   public Object[] toArray() {
-    // TODO - implement
-    throw new UnsupportedOperationException();
+    synchronized (lock) {
+      java.util.ArrayList<E> list = new java.util.ArrayList<E>();
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        list.add(p.item);
+      }
+      return list.toArray();
+    }
   }
 
-  @Override
-  public <S> S[] toArray(S[] array) {
-    // TODO - implement
-    throw new UnsupportedOperationException();
+  public <T> T[] toArray(T[] a) {
+    synchronized (lock) {
+      java.util.ArrayList<E> list = new java.util.ArrayList<E>();
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        list.add(p.item);
+      }
+      return list.toArray(a);
+    }
   }
 
-  @Override
-  public Iterator<T> iterator() {
-    // TODO - implement
-    throw new UnsupportedOperationException();
+  public void clear() {
+    synchronized (lock) {
+      Node<E> p = head.next;
+      while (p != null) {
+        Node<E> n = p.next;
+        p.item = null;
+        p = n;
+      }
+      head.next = null;
+      tail = head;
+    }
+  }
+
+  public Iterator<E> iterator() {
+    return new Itr();
+  }
+
+  private class Itr implements Iterator<E> {
+    private Node<E> nextNode;
+    private E nextItem;
+    private Node<E> lastRet;
+
+    Itr() {
+      synchronized (lock) {
+        advance(head);
+      }
+    }
+
+    private void advance(Node<E> from) {
+      Node<E> p = from;
+      for (;;) {
+        p = (p.next == p) ? head : p.next;
+        if (p == null) {
+          nextNode = null;
+          nextItem = null;
+          return;
+        }
+        E item = p.item;
+        if (item != null) {
+          nextNode = p;
+          nextItem = item;
+          return;
+        }
+      }
+    }
+
+    public boolean hasNext() {
+      return nextNode != null;
+    }
+
+    public E next() {
+      synchronized (lock) {
+        Node<E> p = nextNode;
+        if (p == null) {
+          throw new NoSuchElementException();
+        }
+        E x = nextItem;
+        lastRet = p;
+        advance(p);
+        return x;
+      }
+    }
+
+    public void remove() {
+      Node<E> l = lastRet;
+      if (l == null) {
+        throw new IllegalStateException();
+      }
+      lastRet = null;
+      synchronized (lock) {
+        for (Node<E> pred = head, p = pred.next; p != null; pred = p, p = p.next) {
+          if (p == l) {
+            unlink(p, pred);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  public Spliterator<E> spliterator() {
+    return Spliterators.spliterator(this, Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT);
+  }
+
+  public boolean removeIf(Predicate<? super E> filter) {
+    Objects.requireNonNull(filter);
+    return bulkRemove(filter);
+  }
+
+  public boolean removeAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    return bulkRemove(e -> c.contains(e));
+  }
+
+  public boolean retainAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    return bulkRemove(e -> !c.contains(e));
+  }
+
+  private boolean bulkRemove(Predicate<? super E> filter) {
+    boolean removed = false;
+    synchronized (lock) {
+      for (Node<E> pred = head, p = pred.next; p != null;) {
+        if (filter.test(p.item)) {
+          unlink(p, pred);
+          removed = true;
+          p = pred.next;
+        } else {
+          pred = p;
+          p = p.next;
+        }
+      }
+    }
+    return removed;
+  }
+
+  public void forEach(Consumer<? super E> action) {
+    Objects.requireNonNull(action);
+    for (Iterator<E> it = iterator(); it.hasNext();) {
+      action.accept(it.next());
+    }
+  }
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    s.defaultWriteObject();
+    synchronized (lock) {
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        if (p.item != null) {
+          s.writeObject(p.item);
+        }
+      }
+    }
+    s.writeObject(null);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    head = tail = new Node<E>(null);
+    for (Object item; (item = s.readObject()) != null;) {
+      offer((E) item);
+    }
   }
 }
