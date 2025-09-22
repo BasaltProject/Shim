@@ -42,17 +42,18 @@ public abstract class DateFormat extends Format {
   public static final int HOUR0_FIELD = 16;
   public static final int TIMEZONE_FIELD = 17;
 
+  private static final String kNarrowNoBreak = "\u202f";
+  private static final String[] kDatePatterns = {"EEEE, MMMM d, y", "MMMM d, y", "MMM d, y", "M/d/yy"};
+  private static final String[] kTimePatterns = {"h:mm:ss" + kNarrowNoBreak + "a zzzz",
+      "h:mm:ss" + kNarrowNoBreak + "a z", "h:mm:ss" + kNarrowNoBreak + "a", "h:mm" + kNarrowNoBreak + "a"};
+
   protected Calendar calendar;
   protected NumberFormat numberFormat;
-  private boolean lenient = true;
 
-  protected DateFormat() {
-    this.calendar = Calendar.getInstance();
-    this.numberFormat = NumberFormat.getIntegerInstance();
-  }
+  protected DateFormat() { }
 
   @Override
-  public StringBuffer format(Object obj, StringBuffer toAppendTo, FieldPosition fieldPosition) {
+  public final StringBuffer format(Object obj, StringBuffer toAppendTo, FieldPosition fieldPosition) {
     if (obj instanceof Date) {
       return format((Date) obj, toAppendTo, fieldPosition);
     } else if (obj instanceof Number) {
@@ -62,11 +63,11 @@ public abstract class DateFormat extends Format {
     }
   }
 
+  public abstract StringBuffer format(Date date, StringBuffer toAppendTo, FieldPosition fieldPosition);
+
   public final String format(Date date) {
     return format(date, new StringBuffer(), new FieldPosition(0)).toString();
   }
-
-  public abstract StringBuffer format(Date date, StringBuffer toAppendTo, FieldPosition fieldPosition);
 
   public Date parse(String source) throws ParseException {
     ParsePosition pos = new ParsePosition(0);
@@ -84,58 +85,64 @@ public abstract class DateFormat extends Format {
     return parse(source, pos);
   }
 
-  public static DateFormat getTimeInstance() {
-    return getTimeInstance(DEFAULT, Locale.getDefault());
-  }
-
-  public static DateFormat getTimeInstance(int style) {
-    return getTimeInstance(style, Locale.getDefault());
-  }
-
-  public static DateFormat getTimeInstance(int style, Locale aLocale) {
-    String pattern = "HH:mm:ss";
-    if (style == SHORT) {
-      pattern = "HH:mm";
+  private static void checkStyle(int style) {
+    if (style < FULL || style > SHORT) {
+      throw new IllegalArgumentException("Illegal date style " + style);
     }
-    return new SimpleDateFormat(pattern, aLocale);
   }
 
-  public static DateFormat getDateInstance() {
-    return getDateInstance(DEFAULT, Locale.getDefault());
-  }
-
-  public static DateFormat getDateInstance(int style) {
-    return getDateInstance(style, Locale.getDefault());
-  }
-
-  public static DateFormat getDateInstance(int style, Locale aLocale) {
-    String pattern = "yyyy-MM-dd";
-    if (style == SHORT) {
-      pattern = "yy-MM-dd";
+  private static void checkTimeStyle(int style) {
+    if (style < FULL || style > SHORT) {
+      throw new IllegalArgumentException("Illegal time style " + style);
     }
-    return new SimpleDateFormat(pattern, aLocale);
   }
 
-  public static DateFormat getDateTimeInstance() {
-    return getDateTimeInstance(DEFAULT, DEFAULT, Locale.getDefault());
+  public static final DateFormat getTimeInstance() {
+    return getTimeInstance(DEFAULT, Locale.getDefault(Locale.Category.FORMAT));
   }
 
-  public static DateFormat getDateTimeInstance(int dateStyle, int timeStyle) {
-    return getDateTimeInstance(dateStyle, timeStyle, Locale.getDefault());
+  public static final DateFormat getTimeInstance(int style) {
+    return getTimeInstance(style, Locale.getDefault(Locale.Category.FORMAT));
   }
 
-  public static DateFormat getDateTimeInstance(int dateStyle, int timeStyle, Locale aLocale) {
-    String dPat = (dateStyle == SHORT) ? "yy-MM-dd" : "yyyy-MM-dd";
-    String tPat = (timeStyle == SHORT) ? "HH:mm" : "HH:mm:ss";
-    return new SimpleDateFormat(dPat + " " + tPat, aLocale);
+  public static final DateFormat getTimeInstance(int style, Locale aLocale) {
+    checkTimeStyle(style);
+    return new SimpleDateFormat(kTimePatterns[style], aLocale);
   }
 
-  public static DateFormat getInstance() {
+  public static final DateFormat getDateInstance() {
+    return getDateInstance(DEFAULT, Locale.getDefault(Locale.Category.FORMAT));
+  }
+
+  public static final DateFormat getDateInstance(int style) {
+    return getDateInstance(style, Locale.getDefault(Locale.Category.FORMAT));
+  }
+
+  public static final DateFormat getDateInstance(int style, Locale aLocale) {
+    checkStyle(style);
+    return new SimpleDateFormat(kDatePatterns[style], aLocale);
+  }
+
+  public static final DateFormat getDateTimeInstance() {
+    return getDateTimeInstance(DEFAULT, DEFAULT, Locale.getDefault(Locale.Category.FORMAT));
+  }
+
+  public static final DateFormat getDateTimeInstance(int dateStyle, int timeStyle) {
+    return getDateTimeInstance(dateStyle, timeStyle, Locale.getDefault(Locale.Category.FORMAT));
+  }
+
+  public static final DateFormat getDateTimeInstance(int dateStyle, int timeStyle, Locale aLocale) {
+    checkStyle(dateStyle);
+    checkTimeStyle(timeStyle);
+    return new SimpleDateFormat(kDatePatterns[dateStyle] + ", " + kTimePatterns[timeStyle], aLocale);
+  }
+
+  public static final DateFormat getInstance() {
     return getDateTimeInstance(SHORT, SHORT);
   }
 
   public static Locale[] getAvailableLocales() {
-    return new Locale[] {Locale.getDefault(), Locale.ROOT, Locale.US};
+    return new Locale[] {Locale.ROOT, Locale.US};
   }
 
   public void setCalendar(Calendar newCalendar) {
@@ -147,7 +154,7 @@ public abstract class DateFormat extends Format {
   }
 
   public void setNumberFormat(NumberFormat newNumberFormat) {
-    this.numberFormat = Objects.requireNonNull(newNumberFormat, "newNumberFormat");
+    this.numberFormat = newNumberFormat;
   }
 
   public NumberFormat getNumberFormat() {
@@ -155,25 +162,49 @@ public abstract class DateFormat extends Format {
   }
 
   public void setTimeZone(TimeZone zone) {
-    if (calendar != null) {
-      calendar.setTime(new Date());
-    }
+    calendar.setTimeZone(zone);
   }
 
   public TimeZone getTimeZone() {
-    return TimeZone.getDefault();
+    return calendar.getTimeZone();
   }
 
   public void setLenient(boolean lenient) {
-    this.lenient = lenient;
+    calendar.setLenient(lenient);
   }
 
   public boolean isLenient() {
-    return lenient;
+    return calendar.isLenient();
+  }
+
+  @Override
+  public int hashCode() {
+    return numberFormat == null ? 0 : numberFormat.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
+    }
+    DateFormat other = (DateFormat) obj;
+    return calendar.getFirstDayOfWeek() == other.calendar.getFirstDayOfWeek()
+        && calendar.getMinimalDaysInFirstWeek() == other.calendar.getMinimalDaysInFirstWeek()
+        && calendar.isLenient() == other.calendar.isLenient()
+        && calendar.getTimeZone().equals(other.calendar.getTimeZone())
+        && Objects.equals(numberFormat, other.numberFormat);
   }
 
   @Override
   public Object clone() {
-    return super.clone();
+    DateFormat other = (DateFormat) super.clone();
+    other.calendar = (Calendar) calendar.clone();
+    if (numberFormat != null) {
+      other.numberFormat = (NumberFormat) numberFormat.clone();
+    }
+    return other;
   }
 }

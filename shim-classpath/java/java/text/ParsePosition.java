@@ -47,6 +47,6 @@ public class ParsePosition {
   }
 
   public String toString() {
-    return "index: " + index + "(error index: " + errorIndex + ")";
+    return getClass().getName() + "[index=" + index + ",errorIndex=" + errorIndex + ']';
   }
 }
