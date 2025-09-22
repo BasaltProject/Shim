@@ -45,7 +45,7 @@ public class PatternSyntaxException extends IllegalArgumentException {
     }
     sb.append(System.lineSeparator());
     sb.append(pattern);
-    if (index >= 0) {
+    if (index >= 0 && pattern != null && index < pattern.length()) {
       sb.append(System.lineSeparator());
       for (int i = 0; i < index; i++) {
         sb.append(' ');
