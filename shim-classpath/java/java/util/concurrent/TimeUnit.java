@@ -346,6 +346,73 @@ public enum TimeUnit {
       return 0;
     }
   };
+
+  public long convert(java.time.Duration duration) {
+    long secs = duration.getSeconds();
+    int nano = duration.getNano();
+    if (secs < 0 && nano > 0) {
+      secs++;
+      nano -= (int) NANOSECONDS_PER_SECOND;
+    }
+    long perUnitNanos = toNanos(1);
+    if (perUnitNanos > NANOSECONDS_PER_SECOND) {
+      return secs / toSeconds(1);
+    }
+    long unitsPerSecond = NANOSECONDS_PER_SECOND / perUnitNanos;
+    long whole = secs > Long.MAX_VALUE / unitsPerSecond ? Long.MAX_VALUE
+        : secs < Long.MIN_VALUE / unitsPerSecond ? Long.MIN_VALUE : secs * unitsPerSecond;
+    long frac = nano / perUnitNanos;
+    if (frac > 0 && whole > Long.MAX_VALUE - frac) {
+      return Long.MAX_VALUE;
+    }
+    if (frac < 0 && whole < Long.MIN_VALUE - frac) {
+      return Long.MIN_VALUE;
+    }
+    return whole + frac;
+  }
+
+  public java.time.temporal.ChronoUnit toChronoUnit() {
+    switch (this) {
+      case NANOSECONDS:
+        return java.time.temporal.ChronoUnit.NANOS;
+      case MICROSECONDS:
+        return java.time.temporal.ChronoUnit.MICROS;
+      case MILLISECONDS:
+        return java.time.temporal.ChronoUnit.MILLIS;
+      case SECONDS:
+        return java.time.temporal.ChronoUnit.SECONDS;
+      case MINUTES:
+        return java.time.temporal.ChronoUnit.MINUTES;
+      case HOURS:
+        return java.time.temporal.ChronoUnit.HOURS;
+      case DAYS:
+        return java.time.temporal.ChronoUnit.DAYS;
+      default:
+        throw new AssertionError();
+    }
+  }
+
+  public static TimeUnit of(java.time.temporal.ChronoUnit chronoUnit) {
+    java.util.Objects.requireNonNull(chronoUnit, "chronoUnit");
+    switch (chronoUnit) {
+      case NANOS:
+        return TimeUnit.NANOSECONDS;
+      case MICROS:
+        return TimeUnit.MICROSECONDS;
+      case MILLIS:
+        return TimeUnit.MILLISECONDS;
+      case SECONDS:
+        return TimeUnit.SECONDS;
+      case MINUTES:
+        return TimeUnit.MINUTES;
+      case HOURS:
+        return TimeUnit.HOURS;
+      case DAYS:
+        return TimeUnit.DAYS;
+      default:
+        throw new IllegalArgumentException("No TimeUnit equivalent for " + chronoUnit);
+    }
+  }
   
   private static final long NANOSECONDS_PER_MICROSECOND = 1000L;
   private static final long MICROSECONDS_PER_MILLISECOND = 1000L;
@@ -375,14 +442,14 @@ public enum TimeUnit {
   private static final long MINUETS_PER_DAY = MINUETS_PER_HOUR * HOURS_PER_DAY;
   
   private static long scale(long value, long conversion) {
-    long result = value * conversion;
-    if (value > 0 && result < value) {
+    long over = Long.MAX_VALUE / conversion;
+    if (value > over) {
       return Long.MAX_VALUE;
-    } else if (value < 0 && result > value) { 
-      return Long.MIN_VALUE;
-    } else {
-      return result;
     }
+    if (value < -over) {
+      return Long.MIN_VALUE;
+    }
+    return value * conversion;
   }
   
   public abstract long convert(long sourceDuration, TimeUnit sourceUnit);

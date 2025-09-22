@@ -3698,7 +3698,7 @@ extern "C" SHIM_EXPORT jint JNICALL
     heapLimit = 128 * 1024 * 1024;
 
   if (stackLimit == 0)
-    stackLimit = 128 * 1024;
+    stackLimit = 1024 * 1024;
 
   bool addClasspathProperty = classpath == 0;
   if (addClasspathProperty) {
