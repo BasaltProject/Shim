@@ -19,6 +19,8 @@ import java.util.function.Supplier;
 public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
   static final Executor asyncPool = ForkJoinPool.commonPool();
 
+  public static interface AsynchronousCompletionTask { }
+
   static final class AltResult {
     final Throwable ex;
 

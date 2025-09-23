@@ -161,6 +161,45 @@ public class SimpleDateFormat extends DateFormat {
     this.formatSymbols = (DateFormatSymbols) Objects.requireNonNull(newFormatSymbols, "newFormatSymbols").clone();
   }
 
+  private static final DateFormat.Field[] kFieldAttributes = {DateFormat.Field.ERA, DateFormat.Field.YEAR,
+      DateFormat.Field.MONTH, DateFormat.Field.DAY_OF_MONTH, DateFormat.Field.HOUR_OF_DAY1,
+      DateFormat.Field.HOUR_OF_DAY0, DateFormat.Field.MINUTE, DateFormat.Field.SECOND,
+      DateFormat.Field.MILLISECOND, DateFormat.Field.DAY_OF_WEEK, DateFormat.Field.DAY_OF_YEAR,
+      DateFormat.Field.DAY_OF_WEEK_IN_MONTH, DateFormat.Field.WEEK_OF_YEAR, DateFormat.Field.WEEK_OF_MONTH,
+      DateFormat.Field.AM_PM, DateFormat.Field.HOUR1, DateFormat.Field.HOUR0, DateFormat.Field.TIME_ZONE,
+      DateFormat.Field.TIME_ZONE, DateFormat.Field.YEAR, DateFormat.Field.DAY_OF_WEEK,
+      DateFormat.Field.TIME_ZONE, DateFormat.Field.MONTH};
+
+  private transient java.util.List<Object[]> fieldSegments;
+
+  @Override
+  public AttributedCharacterIterator formatToCharacterIterator(Object obj) {
+    Date date;
+    if (obj instanceof Date) {
+      date = (Date) obj;
+    } else if (obj instanceof Number) {
+      date = new Date(((Number) obj).longValue());
+    } else if (obj == null) {
+      throw new NullPointerException("formatToCharacterIterator must be passed non-null object");
+    } else {
+      throw new IllegalArgumentException("Cannot format given Object as a Date");
+    }
+    fieldSegments = new java.util.ArrayList<Object[]>();
+    try {
+      String text = format(date, new StringBuffer(), new FieldPosition(0)).toString();
+      AttributedString result = new AttributedString(text);
+      for (Object[] seg : fieldSegments) {
+        if ((Integer) seg[2] > (Integer) seg[1]) {
+          result.addAttribute((AttributedCharacterIterator.Attribute) seg[0],
+              (AttributedCharacterIterator.Attribute) seg[0], (Integer) seg[1], (Integer) seg[2]);
+        }
+      }
+      return result.getIterator();
+    } finally {
+      fieldSegments = null;
+    }
+  }
+
   @Override
   public StringBuffer format(Date date, StringBuffer buffer, FieldPosition position) {
     position.setBeginIndex(0);
@@ -178,6 +217,9 @@ public class SimpleDateFormat extends DateFormat {
       i += 3;
       int start = buffer.length();
       formatField(c, count, buffer);
+      if (fieldSegments != null) {
+        fieldSegments.add(new Object[] {kFieldAttributes[kPatternChars.indexOf(c)], start, buffer.length()});
+      }
       if (!positioned && position.getField() == kFieldIds[kPatternChars.indexOf(c)]) {
         positioned = true;
         position.setBeginIndex(start);

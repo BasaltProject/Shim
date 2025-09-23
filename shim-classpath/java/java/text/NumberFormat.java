@@ -23,6 +23,28 @@ public abstract class NumberFormat extends Format {
   public static final int INTEGER_FIELD = 0;
   public static final int FRACTION_FIELD = 1;
 
+  public static class Field extends Format.Field {
+    private static final long serialVersionUID = 7494728892700160890L;
+
+    protected Field(String name) {
+      super(name);
+    }
+
+    public static final Field INTEGER = new Field("integer");
+    public static final Field FRACTION = new Field("fraction");
+    public static final Field EXPONENT = new Field("exponent");
+    public static final Field DECIMAL_SEPARATOR = new Field("decimal separator");
+    public static final Field SIGN = new Field("sign");
+    public static final Field GROUPING_SEPARATOR = new Field("grouping separator");
+    public static final Field EXPONENT_SYMBOL = new Field("exponent symbol");
+    public static final Field PERCENT = new Field("percent");
+    public static final Field PERMILLE = new Field("per mille");
+    public static final Field CURRENCY = new Field("currency");
+    public static final Field EXPONENT_SIGN = new Field("exponent sign");
+    public static final Field PREFIX = new Field("prefix");
+    public static final Field SUFFIX = new Field("suffix");
+  }
+
   private boolean groupingUsed = true;
   private int maximumIntegerDigits = 40;
   private int minimumIntegerDigits = 1;

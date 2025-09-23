@@ -24,19 +24,13 @@
 package java.lang;
 
 public class InterruptedException extends Exception {
-  public InterruptedException(String message, Throwable cause) {
-    super(message, cause);
+  private static final long serialVersionUID = 6700697376100628473L;
+
+  public InterruptedException() {
+    super();
   }
 
   public InterruptedException(String message) {
-    this(message, null);
-  }
-
-  public InterruptedException(Throwable cause) {
-    this(cause == null ? null : cause.toString(), cause);
-  }
-
-  public InterruptedException() {
-    this(null, null);
+    super(message);
   }
 }

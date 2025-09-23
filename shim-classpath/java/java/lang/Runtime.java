@@ -476,8 +476,10 @@ public class Runtime {
   
   public native long maxMemory();
 
+  private static native int availableProcessors0();
+
   public int availableProcessors() {
-    return 4;
+    return availableProcessors0();
   }
 
   private static class MyProcess extends Process {

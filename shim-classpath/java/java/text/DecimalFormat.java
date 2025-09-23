@@ -50,6 +50,7 @@ public class DecimalFormat extends NumberFormat {
   private RoundingMode roundingMode = RoundingMode.HALF_EVEN;
   private boolean strict;
   private Currency currency;
+  private transient java.util.List<Object[]> segs;
 
   public DecimalFormat() {
     this("#,##0.###", DecimalFormatSymbols.getInstance(Locale.getDefault(Locale.Category.FORMAT)));
@@ -90,6 +91,7 @@ public class DecimalFormat extends NumberFormat {
       int start = result.length();
       result.append(symbols.getNaN());
       markField(fieldPosition, INTEGER_FIELD, start, result.length());
+      addSeg(NumberFormat.Field.INTEGER, start, result.length());
       return result;
     }
     boolean isNegative = ((number < 0.0) || (number == 0.0 && 1 / number < 0.0)) ^ (multiplier < 0);
@@ -97,11 +99,12 @@ public class DecimalFormat extends NumberFormat {
       number *= multiplier;
     }
     if (Double.isInfinite(number)) {
-      result.append(isNegative ? negativePrefix : positivePrefix);
+      appendAffix(result, isNegative ? negativePrefix : positivePrefix, isNegative ? negPrefixPattern : posPrefixPattern);
       int start = result.length();
       result.append(symbols.getInfinity());
       markField(fieldPosition, INTEGER_FIELD, start, result.length());
-      result.append(isNegative ? negativeSuffix : positiveSuffix);
+      addSeg(NumberFormat.Field.INTEGER, start, result.length());
+      appendAffix(result, isNegative ? negativeSuffix : positiveSuffix, isNegative ? negSuffixPattern : posSuffixPattern);
       return result;
     }
     if (isNegative) {
@@ -214,7 +217,7 @@ public class DecimalFormat extends NumberFormat {
     if (digitList.isZero()) {
       digitList.decimalAt = 0;
     }
-    result.append(isNegative ? negativePrefix : positivePrefix);
+    appendAffix(result, isNegative ? negativePrefix : positivePrefix, isNegative ? negPrefixPattern : posPrefixPattern);
     int intStart = result.length();
     int intEnd;
     int fracStart;
@@ -270,15 +273,25 @@ public class DecimalFormat extends NumberFormat {
       }
       markField(fieldPosition, INTEGER_FIELD, intStart, intEnd);
       markField(fieldPosition, FRACTION_FIELD, fracStart, result.length());
+      addSeg(NumberFormat.Field.INTEGER, intStart, intEnd);
+      if (addedDecimalSeparator) {
+        addSeg(NumberFormat.Field.DECIMAL_SEPARATOR, intEnd, fracStart);
+      }
+      addSeg(NumberFormat.Field.FRACTION, fracStart, result.length());
+      int expSymbolStart = result.length();
       result.append(symbols.getExponentSeparator());
+      addSeg(NumberFormat.Field.EXPONENT_SYMBOL, expSymbolStart, result.length());
       if (digitList.isZero()) {
         exponent = 0;
       }
       boolean negativeExponent = exponent < 0;
       if (negativeExponent) {
         exponent = -exponent;
+        int signStart = result.length();
         result.append(symbols.getMinusSign());
+        addSeg(NumberFormat.Field.EXPONENT_SIGN, signStart, result.length());
       }
+      int expStart = result.length();
       String exponentDigits = Integer.toString(exponent);
       for (int i = exponentDigits.length(); i < minExponentDigits; ++i) {
         result.append(zero);
@@ -286,6 +299,7 @@ public class DecimalFormat extends NumberFormat {
       for (int i = 0; i < exponentDigits.length(); ++i) {
         result.append((char) (exponentDigits.charAt(i) + zeroDelta));
       }
+      addSeg(NumberFormat.Field.EXPONENT, expStart, result.length());
     } else {
       int count = minIntDigits;
       int digitIndex = 0;
@@ -304,6 +318,7 @@ public class DecimalFormat extends NumberFormat {
           result.append(zero);
         }
         if (isGroupingUsed() && i > 0 && (groupingSize != 0) && (i % groupingSize == 0)) {
+          addSeg(NumberFormat.Field.GROUPING_SEPARATOR, result.length(), result.length() + 1);
           result.append(grouping);
         }
       }
@@ -332,9 +347,84 @@ public class DecimalFormat extends NumberFormat {
       }
       markField(fieldPosition, INTEGER_FIELD, intStart, intEnd);
       markField(fieldPosition, FRACTION_FIELD, fracStart, result.length());
+      addSeg(NumberFormat.Field.INTEGER, intStart, intEnd);
+      if (fracStart > intEnd) {
+        addSeg(NumberFormat.Field.DECIMAL_SEPARATOR, intEnd, fracStart);
+      }
+      addSeg(NumberFormat.Field.FRACTION, fracStart, result.length());
     }
-    result.append(isNegative ? negativeSuffix : positiveSuffix);
+    appendAffix(result, isNegative ? negativeSuffix : positiveSuffix, isNegative ? negSuffixPattern : posSuffixPattern);
     return result;
+  }
+
+  private void addSeg(NumberFormat.Field field, int begin, int end) {
+    if (segs != null && end > begin) {
+      segs.add(new Object[] {field, begin, end});
+    }
+  }
+
+  private void appendAffix(StringBuffer result, String expanded, String pattern) {
+    int base = result.length();
+    result.append(expanded);
+    if (segs == null || pattern == null) {
+      return;
+    }
+    int p = 0;
+    for (int i = 0; i < pattern.length();) {
+      char c = pattern.charAt(i++);
+      if (c == kQuote) {
+        c = pattern.charAt(i++);
+        switch (c) {
+          case kCurrencySign: {
+            String text;
+            if (i < pattern.length() && pattern.charAt(i) == kCurrencySign) {
+              ++i;
+              text = symbols.getInternationalCurrencySymbol();
+            } else {
+              text = symbols.getCurrencySymbol();
+            }
+            addSeg(NumberFormat.Field.CURRENCY, base + p, base + p + text.length());
+            p += text.length();
+            continue;
+          }
+          case '%':
+            addSeg(NumberFormat.Field.PERCENT, base + p, base + p + 1);
+            p++;
+            continue;
+          case '\u2030':
+            addSeg(NumberFormat.Field.PERMILLE, base + p, base + p + 1);
+            p++;
+            continue;
+          case '-':
+            addSeg(NumberFormat.Field.SIGN, base + p, base + p + 1);
+            p++;
+            continue;
+          default:
+            break;
+        }
+      }
+      p++;
+    }
+  }
+
+  @Override
+  public AttributedCharacterIterator formatToCharacterIterator(Object obj) {
+    if (obj == null) {
+      throw new NullPointerException("formatToCharacterIterator must be passed non-null object");
+    }
+    segs = new java.util.ArrayList<Object[]>();
+    try {
+      StringBuffer text = new StringBuffer();
+      format(obj, text, new FieldPosition(0));
+      AttributedString result = new AttributedString(text.toString());
+      for (Object[] seg : segs) {
+        result.addAttribute((AttributedCharacterIterator.Attribute) seg[0],
+            (AttributedCharacterIterator.Attribute) seg[0], (Integer) seg[1], (Integer) seg[2]);
+      }
+      return result.getIterator();
+    } finally {
+      segs = null;
+    }
   }
 
   @Override

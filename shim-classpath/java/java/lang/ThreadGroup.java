@@ -57,12 +57,23 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     }
   }
 
+  public final int getMaxPriority() {
+    return Thread.MAX_PRIORITY;
+  }
+
+  public final void setMaxPriority(int pri) { }
+
   public ThreadGroup getParent() {
     return parent;
   }
 
   public String getName() {
-    return name;
+    return name != null ? name : "main";
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getName() + "[name=" + getName() + ",maxpri=" + getMaxPriority() + "]";
   }
 
   public int activeCount() {
