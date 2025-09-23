@@ -44,6 +44,8 @@ public final class StandardSocketOptions {
   public static final SocketOption<Boolean> SO_REUSEPORT = new StdSocketOption<Boolean>("SO_REUSEPORT", Boolean.class);
   public static final SocketOption<Integer> SO_LINGER = new StdSocketOption<Integer>("SO_LINGER", Integer.class);
   public static final SocketOption<Integer> IP_TOS = new StdSocketOption<Integer>("IP_TOS", Integer.class);
+  public static final SocketOption<NetworkInterface> IP_MULTICAST_IF =
+      new StdSocketOption<NetworkInterface>("IP_MULTICAST_IF", NetworkInterface.class);
   public static final SocketOption<Integer> IP_MULTICAST_TTL =
       new StdSocketOption<Integer>("IP_MULTICAST_TTL", Integer.class);
   public static final SocketOption<Boolean> IP_MULTICAST_LOOP =

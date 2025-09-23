@@ -24,5 +24,7 @@
 package java.net;
 
 public enum StandardProtocolFamily implements ProtocolFamily {
-  INET;
+  INET,
+  INET6,
+  UNIX;
 }
