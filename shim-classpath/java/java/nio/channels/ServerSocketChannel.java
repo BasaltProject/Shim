@@ -1,106 +1,46 @@
 /*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  *
- * SPDX-License-Identifier: ISC AND MIT
+ * SPDX-License-Identifier: MIT
  */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.nio.channels;
 
 import java.io.IOException;
-
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.SocketOption;
+import java.nio.channels.spi.AbstractSelectableChannel;
+import java.nio.channels.spi.SelectorProvider;
 
-public class ServerSocketChannel extends SelectableChannel {
-  private final SocketChannel channel;
-
-  private ServerSocketChannel() throws IOException {
-    channel = new SocketChannel();
+public abstract class ServerSocketChannel extends AbstractSelectableChannel implements NetworkChannel {
+  protected ServerSocketChannel(SelectorProvider provider) {
+    super(provider);
   }
 
   public static ServerSocketChannel open() throws IOException {
-    Socket.init();
-    
-    return new ServerSocketChannel();
+    return SelectorProvider.provider().openServerSocketChannel();
   }
 
-  public int socketFD() {
-    return channel.socketFD();
+  public final int validOps() {
+    return SelectionKey.OP_ACCEPT;
   }
 
-  public void handleReadyOps(int ops) {
-    channel.handleReadyOps(ops);
+  public final ServerSocketChannel bind(SocketAddress local) throws IOException {
+    return bind(local, 0);
   }
 
-  public SelectableChannel configureBlocking(boolean v) throws IOException {
-    return channel.configureBlocking(v);
-  }
+  public abstract ServerSocketChannel bind(SocketAddress local, int backlog) throws IOException;
 
-  public void close() throws IOException {
-    channel.close();
-  }
+  @Override
+  public abstract <T> ServerSocketChannel setOption(SocketOption<T> name, T value) throws IOException;
 
-  public SocketChannel accept() throws IOException {
-    SocketChannel c = new SocketChannel();
-    c.socket = doAccept();
-    c.connected = true;
-    return c;
-  }
+  public abstract ServerSocket socket();
 
-  public ServerSocket socket() {
-    return new Handle();
-  }
+  public abstract SocketChannel accept() throws IOException;
 
-  private int doAccept() throws IOException {
-    while (true) {
-      int s = natDoAccept(channel.socket);
-      if (s != -1) {
-        return s;
-      }
-      // todo: throw ClosedByInterruptException if this thread was
-      // interrupted during the accept call
-    }
-  }
-
-  private void doListen(int socket, int host, int port) throws IOException {
-    Socket.init();
-
-    natDoListen(socket, host, port);
-  }
-
-  public class Handle extends ServerSocket {
-    public void bind(SocketAddress address)
-      throws IOException
-    {
-      InetSocketAddress a;
-      try {
-        a = (InetSocketAddress) address;
-      } catch (ClassCastException e) {
-        throw new IllegalArgumentException();
-      }
-      doListen(channel.socket, a.getAddress().getRawAddress(), a.getPort());
-    }
-  }
-
-  private static native int natDoAccept(int socket) throws IOException;
-  private static native void natDoListen(int socket, int host, int port) throws IOException;
+  @Override
+  public abstract SocketAddress getLocalAddress() throws IOException;
 }

@@ -1,56 +1,37 @@
 /*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  *
- * SPDX-License-Identifier: ISC AND MIT
+ * SPDX-License-Identifier: MIT
  */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.nio.channels;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.channels.spi.AbstractInterruptibleChannel;
+import java.nio.channels.spi.SelectorProvider;
 
-public abstract class SelectableChannel implements Channel {
-  private SelectionKey key;
-  private boolean open = true;
+public abstract class SelectableChannel extends AbstractInterruptibleChannel implements Channel {
+  protected SelectableChannel() { }
 
-  abstract int socketFD();
+  public abstract SelectorProvider provider();
 
-  abstract void handleReadyOps(int ops);
+  public abstract int validOps();
 
-  public abstract SelectableChannel configureBlocking(boolean v)
-    throws IOException;
+  public abstract boolean isRegistered();
 
-  public SelectionKey register(Selector selector, int interestOps,
-                               Object attachment)
-  {
-    key = new SelectionKey(this, selector, interestOps, attachment);
-    selector.add(key);
-    return key;
+  public abstract SelectionKey keyFor(Selector sel);
+
+  public abstract SelectionKey register(Selector sel, int ops, Object att) throws ClosedChannelException;
+
+  public final SelectionKey register(Selector sel, int ops) throws ClosedChannelException {
+    return register(sel, ops, null);
   }
 
-  public boolean isOpen() {
-    return open;
-  }
+  public abstract SelectableChannel configureBlocking(boolean block) throws IOException;
 
-  public void close() throws IOException {
-    open = false;
-    key = null;
-  }
+  public abstract boolean isBlocking();
+
+  public abstract Object blockingLock();
 }
