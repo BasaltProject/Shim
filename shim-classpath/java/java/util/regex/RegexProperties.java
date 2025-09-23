@@ -355,10 +355,10 @@ final class RegexProperties {
         p = (unicodeClass ? kPosixUnicode : kPosixAscii).get(rest);
       }
       if (p == null) {
-        p = scriptOrBlock(rest, pattern, index);
+        p = script(rest);
       }
       if (p == null) {
-        throw new PatternSyntaxException("Unknown character property name {" + rest + "}", pattern, index);
+        throw new PatternSyntaxException("Unknown character property name {" + name + "}", pattern, index);
       }
       return p;
     }
@@ -373,11 +373,27 @@ final class RegexProperties {
         }
         return p;
       }
+      if (key.equals("script") || key.equals("sc")) {
+        p = script(value);
+        if (p != null) {
+          return p;
+        }
+      }
+      if (key.equals("block") || key.equals("blk")) {
+        p = block(value);
+        if (p != null) {
+          return p;
+        }
+      }
       throw new PatternSyntaxException("Unknown Unicode property {name=<" + name.substring(0, eq) + ">, value=<"
           + value + ">}", pattern, index);
     }
     if (name.startsWith("In") && name.length() > 2) {
-      throw new PatternSyntaxException("Unknown character block name {" + name.substring(2) + "}", pattern, index);
+      p = block(name.substring(2));
+      if (p == null) {
+        throw new PatternSyntaxException("Unknown character property name {" + name + "}", pattern, index);
+      }
+      return p;
     }
     p = kJava.get(name);
     if (p == null) {
@@ -396,7 +412,31 @@ final class RegexProperties {
     return kCategories.get(name.toLowerCase(Locale.ROOT));
   }
 
-  private static CharPredicate scriptOrBlock(String name, String pattern, int index) {
-    return null;
+  private static CharPredicate script(String name) {
+    final Character.UnicodeScript sc;
+    try {
+      sc = Character.UnicodeScript.forName(name);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+    return new CharPredicate() {
+      public boolean is(int ch) {
+        return Character.UnicodeScript.of(ch) == sc;
+      }
+    };
+  }
+
+  private static CharPredicate block(String name) {
+    final Character.UnicodeBlock blk;
+    try {
+      blk = Character.UnicodeBlock.forName(name);
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+    return new CharPredicate() {
+      public boolean is(int ch) {
+        return Character.UnicodeBlock.of(ch) == blk;
+      }
+    };
   }
 }

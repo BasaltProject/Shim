@@ -751,18 +751,17 @@ public final class Class <T>
     return (Annotation) a[0];
   }
 
+  @SuppressWarnings("unchecked")
   public <T extends Annotation> T getAnnotation(Class<T> class_) {
-    for (VMClass c = vmClass; c != null; c = c.super_) {
-      if (c.addendum != null && c.addendum.annotationTable != null) {
-        Classes.link(c, c.loader);
-
-        Object[] table = (Object[]) c.addendum.annotationTable;
-        for (int i = 0; i < table.length; ++i) {
-          Object[] a = (Object[]) table[i];
-          if (a[1] == class_) {
-            return (T) getAnnotation(c, a);
-          }
-        }
+    java.util.Objects.requireNonNull(class_);
+    T declared = getDeclaredAnnotation(class_);
+    if (declared != null) {
+      return declared;
+    }
+    if (class_.getDeclaredAnnotation(java.lang.annotation.Inherited.class) != null) {
+      Class<?> sup = isInterface() ? null : getSuperclass();
+      if (sup != null) {
+        return (T) sup.getAnnotation(class_);
       }
     }
     return null;
@@ -786,7 +785,7 @@ public final class Class <T>
 
   public Annotation[] getDeclaredAnnotations() {
     if (vmClass.addendum != null && vmClass.addendum.annotationTable != null) {
-      Classes.link(vmClass);
+      Classes.link(vmClass, vmClass.loader);
 
       Object[] table = (Object[]) vmClass.addendum.annotationTable;
       Annotation[] array = new Annotation[table.length];
@@ -799,29 +798,20 @@ public final class Class <T>
     }
   }
 
-  private int countAnnotations() {
-    int count = 0;
-    for (VMClass c = vmClass; c != null; c = c.super_) {
-      if (c.addendum != null && c.addendum.annotationTable != null) {
-        count += ((Object[]) c.addendum.annotationTable).length;
-      }
-    }
-    return count;
-  }
-
   public Annotation[] getAnnotations() {
-    Annotation[] array = new Annotation[countAnnotations()];
-    int i = 0;
-    for (VMClass c = vmClass; c != null; c = c.super_) {
-      if (c.addendum != null && c.addendum.annotationTable != null) {
-        Object[] table = (Object[]) c.addendum.annotationTable;
-        for (int j = 0; j < table.length; ++j) {
-          array[i++] = getAnnotation(vmClass, (Object[]) table[j]);
+    java.util.LinkedHashMap<Class<?>, Annotation> map = new java.util.LinkedHashMap<Class<?>, Annotation>();
+    Class<?> sup = isInterface() ? null : getSuperclass();
+    if (sup != null) {
+      for (Annotation a : sup.getAnnotations()) {
+        if (a.annotationType().getDeclaredAnnotation(java.lang.annotation.Inherited.class) != null) {
+          map.put(a.annotationType(), a);
         }
       }
     }
-
-    return array;
+    for (Annotation a : getDeclaredAnnotations()) {
+      map.put(a.annotationType(), a);
+    }
+    return map.values().toArray(new Annotation[0]);
   }
 
   public ProtectionDomain getProtectionDomain() {

@@ -144,6 +144,24 @@ public class Classes {
     case 'c':{
       byte[] name = (byte[]) Singleton.getObject(pool, read2(in) - 1);
 
+      if (name.length == 2) {
+        switch (name[0]) {
+        case 'V': return void.class;
+        case 'Z': return boolean.class;
+        case 'B': return byte.class;
+        case 'C': return char.class;
+        case 'S': return short.class;
+        case 'I': return int.class;
+        case 'F': return float.class;
+        case 'J': return long.class;
+        case 'D': return double.class;
+        default: break;
+        }
+      }
+      if (name[0] == '[') {
+        return SystemClassLoader.getClass
+          (loadVMClass(loader, name, 0, name.length - 1));
+      }
       return SystemClassLoader.getClass
         (loadVMClass(loader, name, 1, name.length - 3));
     }
@@ -206,6 +224,28 @@ public class Classes {
         AssertionError error = new AssertionError();
         error.initCause(e);
         throw error;
+      }
+    }
+  }
+
+  public static void parseParameterAnnotations(ClassLoader loader, MethodAddendum addendum) {
+    if (addendum != null && addendum.parameterAnnotationTable instanceof byte[]) {
+      synchronized (addendum) {
+        if (!(addendum.parameterAnnotationTable instanceof byte[])) {
+          return;
+        }
+        try {
+          ByteArrayInputStream in = new ByteArrayInputStream((byte[]) addendum.parameterAnnotationTable);
+          Object[] table = new Object[read1(in)];
+          for (int i = 0; i < table.length; ++i) {
+            table[i] = parseAnnotationTable(loader, addendum.pool, in);
+          }
+          addendum.parameterAnnotationTable = table;
+        } catch (IOException e) {
+          AssertionError error = new AssertionError();
+          error.initCause(e);
+          throw error;
+        }
       }
     }
   }
