@@ -197,20 +197,163 @@ public class Locale implements Cloneable, Serializable {
     return this;
   }
 
+  private static final String[] kLanguageNames = {
+      "en", "English",
+      "de", "German",
+      "fr", "French",
+      "es", "Spanish",
+      "it", "Italian",
+      "pt", "Portuguese",
+      "ja", "Japanese",
+      "zh", "Chinese",
+      "ko", "Korean",
+      "ru", "Russian",
+      "nl", "Dutch",
+      "sv", "Swedish",
+      "da", "Danish",
+      "nb", "Norwegian Bokmål",
+      "no", "Norwegian",
+      "fi", "Finnish",
+      "pl", "Polish",
+      "cs", "Czech",
+      "tr", "Turkish",
+      "ar", "Arabic",
+      "he", "Hebrew",
+      "hi", "Hindi",
+      "el", "Greek",
+      "hu", "Hungarian",
+      "uk", "Ukrainian",
+      "th", "Thai",
+      "vi", "Vietnamese",
+      "id", "Indonesian",
+      "ro", "Romanian",
+      "bg", "Bulgarian",
+      "ca", "Catalan",
+      "hr", "Croatian",
+      "sk", "Slovak",
+      "sl", "Slovenian",
+      "lt", "Lithuanian",
+      "lv", "Latvian",
+      "et", "Estonian",
+      "is", "Icelandic",
+      "ga", "Irish",
+      "la", "Latin"};
+  private static final String[] kCountryNames = {
+      "US", "United States",
+      "GB", "United Kingdom",
+      "DE", "Germany",
+      "FR", "France",
+      "ES", "Spain",
+      "IT", "Italy",
+      "PT", "Portugal",
+      "BR", "Brazil",
+      "JP", "Japan",
+      "CN", "China",
+      "TW", "Taiwan",
+      "KR", "South Korea",
+      "RU", "Russia",
+      "NL", "Netherlands",
+      "SE", "Sweden",
+      "DK", "Denmark",
+      "NO", "Norway",
+      "FI", "Finland",
+      "PL", "Poland",
+      "CZ", "Czechia",
+      "TR", "Türkiye",
+      "AR", "Argentina",
+      "MX", "Mexico",
+      "CA", "Canada",
+      "AU", "Australia",
+      "NZ", "New Zealand",
+      "IN", "India",
+      "CH", "Switzerland",
+      "AT", "Austria",
+      "BE", "Belgium",
+      "IE", "Ireland",
+      "ZA", "South Africa",
+      "EG", "Egypt",
+      "SA", "Saudi Arabia",
+      "IL", "Israel",
+      "GR", "Greece",
+      "HU", "Hungary",
+      "UA", "Ukraine",
+      "TH", "Thailand",
+      "VN", "Vietnam",
+      "ID", "Indonesia",
+      "SG", "Singapore",
+      "HK", "Hong Kong SAR China",
+      "CL", "Chile",
+      "CO", "Colombia",
+      "PE", "Peru",
+      "RO", "Romania",
+      "BG", "Bulgaria",
+      "HR", "Croatia",
+      "SK", "Slovakia",
+      "SI", "Slovenia",
+      "LT", "Lithuania",
+      "LV", "Latvia",
+      "EE", "Estonia",
+      "IS", "Iceland",
+      "LU", "Luxembourg",
+      "AE", "United Arab Emirates"};
+
+  private static String lookup(String[] table, String key) {
+    for (int i = 0; i < table.length; i += 2) {
+      if (table[i].equals(key)) {
+        return table[i + 1];
+      }
+    }
+    return key;
+  }
+
   public String getDisplayLanguage() {
-    return language;
+    return getDisplayLanguage(getDefault(Category.DISPLAY));
+  }
+
+  public String getDisplayLanguage(Locale inLocale) {
+    return language.isEmpty() ? "" : lookup(kLanguageNames, language);
   }
 
   public String getDisplayCountry() {
-    return country;
+    return getDisplayCountry(getDefault(Category.DISPLAY));
+  }
+
+  public String getDisplayCountry(Locale inLocale) {
+    return country.isEmpty() ? "" : lookup(kCountryNames, country);
   }
 
   public String getDisplayVariant() {
     return variant;
   }
 
+  public String getDisplayVariant(Locale inLocale) {
+    return variant;
+  }
+
   public String getDisplayName() {
-    return toString();
+    return getDisplayName(getDefault(Category.DISPLAY));
+  }
+
+  public String getDisplayName(Locale inLocale) {
+    String lang = getDisplayLanguage(inLocale);
+    String ctry = getDisplayCountry(inLocale);
+    StringBuilder qualifiers = new StringBuilder();
+    if (!ctry.isEmpty()) {
+      qualifiers.append(ctry);
+    }
+    if (!variant.isEmpty()) {
+      if (qualifiers.length() > 0) {
+        qualifiers.append(", ");
+      }
+      qualifiers.append(variant);
+    }
+    if (lang.isEmpty()) {
+      return qualifiers.toString();
+    }
+    if (qualifiers.length() == 0) {
+      return lang;
+    }
+    return lang + " (" + qualifiers + ")";
   }
 
   @Override

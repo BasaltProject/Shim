@@ -741,13 +741,26 @@ public final class String
   public boolean regionMatches(boolean ignoreCase, int thisOffset,
                                String match, int matchOffset, int length)
   {
-    String a = substring(thisOffset, thisOffset + length);
-    String b = match.substring(matchOffset, matchOffset + length);
-    if (ignoreCase) {
-      return a.equalsIgnoreCase(b);
-    } else {
-      return a.equals(b);
+    if (matchOffset < 0 || thisOffset < 0 || (long) thisOffset + length > this.length
+        || (long) matchOffset + length > match.length) {
+      return false;
     }
+    for (int i = 0; i < length; i++) {
+      char x = charAt(thisOffset + i);
+      char y = match.charAt(matchOffset + i);
+      if (x == y) {
+        continue;
+      }
+      if (!ignoreCase) {
+        return false;
+      }
+      char ux = Character.toUpperCase(x);
+      char uy = Character.toUpperCase(y);
+      if (ux != uy && Character.toLowerCase(ux) != Character.toLowerCase(uy)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public boolean isEmpty() {

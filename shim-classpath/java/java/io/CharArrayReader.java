@@ -1,0 +1,117 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package java.io;
+
+public class CharArrayReader extends Reader {
+  protected char[] buf;
+  protected int pos;
+  protected int markedPos = 0;
+  protected int count;
+
+  public CharArrayReader(char[] buf) {
+    this.buf = buf;
+    this.pos = 0;
+    this.count = buf.length;
+  }
+
+  public CharArrayReader(char[] buf, int offset, int length) {
+    if (offset < 0 || offset > buf.length || length < 0 || offset + length < 0) {
+      throw new IllegalArgumentException();
+    }
+    this.buf = buf;
+    this.pos = offset;
+    this.count = Math.min(offset + length, buf.length);
+    this.markedPos = offset;
+  }
+
+  private void ensureOpen() throws IOException {
+    if (buf == null) {
+      throw new IOException("Stream closed");
+    }
+  }
+
+  public int read() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      if (pos >= count) {
+        return -1;
+      }
+      return buf[pos++];
+    }
+  }
+
+  public int read(char[] cbuf, int off, int len) throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      if (off < 0 || len < 0 || off > cbuf.length || len > cbuf.length - off) {
+        throw new IndexOutOfBoundsException();
+      }
+      if (len == 0) {
+        return 0;
+      }
+      if (pos >= count) {
+        return -1;
+      }
+      int avail = count - pos;
+      if (len > avail) {
+        len = avail;
+      }
+      if (len <= 0) {
+        return 0;
+      }
+      System.arraycopy(buf, pos, cbuf, off, len);
+      pos += len;
+      return len;
+    }
+  }
+
+  public long skip(long n) throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      long avail = count - pos;
+      if (n > avail) {
+        n = avail;
+      }
+      if (n < 0) {
+        return 0;
+      }
+      pos += (int) n;
+      return n;
+    }
+  }
+
+  public boolean ready() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      return (count - pos) > 0;
+    }
+  }
+
+  public boolean markSupported() {
+    return true;
+  }
+
+  public void mark(int readAheadLimit) throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      markedPos = pos;
+    }
+  }
+
+  public void reset() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      pos = markedPos;
+    }
+  }
+
+  public void close() {
+    buf = null;
+  }
+}

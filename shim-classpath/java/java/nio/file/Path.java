@@ -60,6 +60,22 @@ public interface Path extends Comparable<Path>, Iterable<Path>, Watchable {
     return resolve(getFileSystem().getPath(other));
   }
 
+  default Path resolve(String first, String... more) {
+    Path result = resolve(getFileSystem().getPath(first));
+    for (String segment : more) {
+      result = result.resolve(segment);
+    }
+    return result;
+  }
+
+  default Path resolve(Path first, Path... more) {
+    Path result = resolve(first);
+    for (Path segment : more) {
+      result = result.resolve(segment);
+    }
+    return result;
+  }
+
   default Path resolveSibling(Path other) {
     Objects.requireNonNull(other, "other");
     Path parent = getParent();

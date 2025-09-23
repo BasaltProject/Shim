@@ -28,6 +28,19 @@ import java.util.List;
 import java.util.Objects;
 
 public abstract class Reader implements Closeable, Readable {
+  protected Object lock;
+
+  protected Reader() {
+    this.lock = this;
+  }
+
+  protected Reader(Object lock) {
+    if (lock == null) {
+      throw new NullPointerException();
+    }
+    this.lock = lock;
+  }
+
   public int read(CharBuffer buffer) throws IOException {
     int c = read(buffer.array(),
                  buffer.arrayOffset() + buffer.position(),

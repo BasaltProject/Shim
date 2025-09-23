@@ -8,10 +8,14 @@
 
 package java.text;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.util.Currency;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class NumberFormat extends Format {
   private static final long serialVersionUID = -2308460120365585849L;
@@ -20,19 +24,19 @@ public abstract class NumberFormat extends Format {
   public static final int FRACTION_FIELD = 1;
 
   private boolean groupingUsed = true;
-  private byte maxIntegerDigits = 40;
-  private byte minIntegerDigits = 1;
-  private byte maxFractionDigits = 3;
-  private byte minFractionDigits = 0;
+  private int maximumIntegerDigits = 40;
+  private int minimumIntegerDigits = 1;
+  private int maximumFractionDigits = 3;
+  private int minimumFractionDigits = 0;
   private boolean parseIntegerOnly = false;
-  private RoundingMode roundingMode = RoundingMode.HALF_EVEN;
 
   protected NumberFormat() { }
 
   @Override
   public StringBuffer format(Object number, StringBuffer toAppendTo, FieldPosition pos) {
-    if (number instanceof Long || number instanceof Integer || number instanceof Short
-        || number instanceof Byte || number instanceof BigInteger) {
+    if (number instanceof Long || number instanceof Integer || number instanceof Short || number instanceof Byte
+        || number instanceof AtomicInteger || number instanceof AtomicLong
+        || (number instanceof BigInteger && ((BigInteger) number).bitLength() < 64)) {
       return format(((Number) number).longValue(), toAppendTo, pos);
     } else if (number instanceof Number) {
       return format(((Number) number).doubleValue(), toAppendTo, pos);
@@ -77,62 +81,59 @@ public abstract class NumberFormat extends Format {
     parseIntegerOnly = value;
   }
 
-  public static NumberFormat getInstance() {
-    return getInstance(Locale.getDefault());
+  public static final NumberFormat getInstance() {
+    return getNumberInstance(Locale.getDefault(Locale.Category.FORMAT));
   }
 
   public static NumberFormat getInstance(Locale inLocale) {
     return getNumberInstance(inLocale);
   }
 
-  public static NumberFormat getNumberInstance() {
-    return getNumberInstance(Locale.getDefault());
+  public static final NumberFormat getNumberInstance() {
+    return getNumberInstance(Locale.getDefault(Locale.Category.FORMAT));
   }
 
   public static NumberFormat getNumberInstance(Locale inLocale) {
-    DecimalFormat df = new DecimalFormat("#,##0.###", DecimalFormatSymbols.getInstance(inLocale));
-    df.setGroupingUsed(true);
-    return df;
+    return new DecimalFormat("#,##0.###", DecimalFormatSymbols.getInstance(inLocale));
   }
 
-  public static NumberFormat getIntegerInstance() {
-    return getIntegerInstance(Locale.getDefault());
+  public static final NumberFormat getIntegerInstance() {
+    return getIntegerInstance(Locale.getDefault(Locale.Category.FORMAT));
   }
 
   public static NumberFormat getIntegerInstance(Locale inLocale) {
     DecimalFormat df = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(inLocale));
-    df.setParseIntegerOnly(true);
     df.setMaximumFractionDigits(0);
+    df.setDecimalSeparatorAlwaysShown(false);
+    df.setParseIntegerOnly(true);
     return df;
   }
 
-  public static NumberFormat getCurrencyInstance() {
-    return getCurrencyInstance(Locale.getDefault());
+  public static final NumberFormat getCurrencyInstance() {
+    return getCurrencyInstance(Locale.getDefault(Locale.Category.FORMAT));
   }
 
   public static NumberFormat getCurrencyInstance(Locale inLocale) {
     DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(inLocale);
-    DecimalFormat df = new DecimalFormat("\u00A4#,##0.00", symbols);
-    df.setMinimumFractionDigits(2);
-    df.setMaximumFractionDigits(2);
-    return df;
+    String language = inLocale.getLanguage();
+    boolean suffix = !language.equals("en") && !language.isEmpty() && !language.equals("ja") && !language.equals("zh")
+        && !language.equals("ko") && !language.equals("pt") && !language.equals("nl");
+    return new DecimalFormat(suffix ? "#,##0.00 ¤" : "¤#,##0.00", symbols);
   }
 
-  public static NumberFormat getPercentInstance() {
-    return getPercentInstance(Locale.getDefault());
+  public static final NumberFormat getPercentInstance() {
+    return getPercentInstance(Locale.getDefault(Locale.Category.FORMAT));
   }
 
   public static NumberFormat getPercentInstance(Locale inLocale) {
-    DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(inLocale);
-    DecimalFormat df = new DecimalFormat("#,##0%", symbols);
-    df.setMultiplier(100);
-    df.setMinimumFractionDigits(0);
-    df.setMaximumFractionDigits(0);
-    return df;
+    String language = inLocale.getLanguage();
+    boolean spaced = !language.equals("en") && !language.isEmpty() && !language.equals("ja") && !language.equals("zh")
+        && !language.equals("ko") && !language.equals("pt") && !language.equals("nl") && !language.equals("it");
+    return new DecimalFormat(spaced ? "#,##0 %" : "#,##0%", DecimalFormatSymbols.getInstance(inLocale));
   }
 
   public static Locale[] getAvailableLocales() {
-    return new Locale[] {Locale.getDefault(), Locale.ROOT, Locale.US};
+    return new Locale[] {Locale.ROOT, Locale.US};
   }
 
   public boolean isGroupingUsed() {
@@ -144,65 +145,76 @@ public abstract class NumberFormat extends Format {
   }
 
   public int getMaximumIntegerDigits() {
-    return maxIntegerDigits;
+    return maximumIntegerDigits;
   }
 
   public void setMaximumIntegerDigits(int newValue) {
-    maxIntegerDigits = (byte) Math.max(0, newValue);
-    if (minIntegerDigits > maxIntegerDigits) {
-      minIntegerDigits = maxIntegerDigits;
+    maximumIntegerDigits = Math.max(0, newValue);
+    if (minimumIntegerDigits > maximumIntegerDigits) {
+      minimumIntegerDigits = maximumIntegerDigits;
     }
   }
 
   public int getMinimumIntegerDigits() {
-    return minIntegerDigits;
+    return minimumIntegerDigits;
   }
 
   public void setMinimumIntegerDigits(int newValue) {
-    minIntegerDigits = (byte) Math.max(0, newValue);
-    if (minIntegerDigits > maxIntegerDigits) {
-      maxIntegerDigits = minIntegerDigits;
+    minimumIntegerDigits = Math.max(0, newValue);
+    if (minimumIntegerDigits > maximumIntegerDigits) {
+      maximumIntegerDigits = minimumIntegerDigits;
     }
   }
 
   public int getMaximumFractionDigits() {
-    return maxFractionDigits;
+    return maximumFractionDigits;
   }
 
   public void setMaximumFractionDigits(int newValue) {
-    maxFractionDigits = (byte) Math.max(0, newValue);
-    if (minFractionDigits > maxFractionDigits) {
-      minFractionDigits = maxFractionDigits;
+    maximumFractionDigits = Math.max(0, newValue);
+    if (maximumFractionDigits < minimumFractionDigits) {
+      minimumFractionDigits = maximumFractionDigits;
     }
   }
 
   public int getMinimumFractionDigits() {
-    return minFractionDigits;
+    return minimumFractionDigits;
   }
 
   public void setMinimumFractionDigits(int newValue) {
-    minFractionDigits = (byte) Math.max(0, newValue);
-    if (minFractionDigits > maxFractionDigits) {
-      maxFractionDigits = minFractionDigits;
+    minimumFractionDigits = Math.max(0, newValue);
+    if (maximumFractionDigits < minimumFractionDigits) {
+      maximumFractionDigits = minimumFractionDigits;
     }
   }
 
+  public Currency getCurrency() {
+    throw new UnsupportedOperationException();
+  }
+
+  public void setCurrency(Currency currency) {
+    throw new UnsupportedOperationException();
+  }
+
   public RoundingMode getRoundingMode() {
-    return roundingMode;
+    throw new UnsupportedOperationException();
   }
 
   public void setRoundingMode(RoundingMode roundingMode) {
-    this.roundingMode = Objects.requireNonNull(roundingMode, "roundingMode");
+    throw new UnsupportedOperationException();
   }
 
-  @Override
-  public Object clone() {
-    return super.clone();
+  public boolean isStrict() {
+    throw new UnsupportedOperationException();
+  }
+
+  public void setStrict(boolean value) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public int hashCode() {
-    return maxIntegerDigits * 37 + maxFractionDigits;
+    return maximumIntegerDigits * 37 + maximumFractionDigits;
   }
 
   @Override
@@ -217,8 +229,14 @@ public abstract class NumberFormat extends Format {
       return false;
     }
     NumberFormat other = (NumberFormat) obj;
-    return maxIntegerDigits == other.maxIntegerDigits && minIntegerDigits == other.minIntegerDigits
-        && maxFractionDigits == other.maxFractionDigits && minFractionDigits == other.minFractionDigits
-        && groupingUsed == other.groupingUsed && parseIntegerOnly == other.parseIntegerOnly;
+    return maximumIntegerDigits == other.maximumIntegerDigits && minimumIntegerDigits == other.minimumIntegerDigits
+        && maximumFractionDigits == other.maximumFractionDigits
+        && minimumFractionDigits == other.minimumFractionDigits && groupingUsed == other.groupingUsed
+        && parseIntegerOnly == other.parseIntegerOnly;
+  }
+
+  @Override
+  public Object clone() {
+    return super.clone();
   }
 }

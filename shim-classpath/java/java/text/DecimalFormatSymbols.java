@@ -9,6 +9,7 @@
 package java.text;
 
 import java.io.Serializable;
+import java.util.Currency;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -59,10 +60,66 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
     this.infinity = "\u221E";
     this.NaN = "NaN";
     this.minusSign = '-';
-    this.currencySymbol = "$";
-    this.intlCurrencySymbol = "USD";
-    this.monetaryDecimalSeparator = '.';
     this.exponentSeparator = "E";
+    this.monetaryDecimalSeparator = '.';
+    String language = locale.getLanguage();
+    if (language.equals("de") || language.equals("es") || language.equals("it") || language.equals("pt")
+        || language.equals("nl") || language.equals("tr") || language.equals("id")) {
+      this.groupingSeparator = '.';
+      this.decimalSeparator = ',';
+    } else if (language.equals("fr")) {
+      this.groupingSeparator = '\u202f';
+      this.decimalSeparator = ',';
+    } else if (language.equals("ru") || language.equals("pl") || language.equals("cs") || language.equals("sv")
+        || language.equals("fi") || language.equals("nb") || language.equals("uk")) {
+      this.groupingSeparator = '\u00a0';
+      this.decimalSeparator = ',';
+    }
+    if (language.equals("de") && locale.getCountry().equals("CH")) {
+      this.groupingSeparator = '\u2019';
+      this.decimalSeparator = '.';
+    }
+    this.monetaryDecimalSeparator = this.decimalSeparator;
+    this.monetaryGroupingSeparator = this.groupingSeparator;
+    Currency found = null;
+    try {
+      found = Currency.getInstance(locale);
+    } catch (IllegalArgumentException e) {
+      found = null;
+    }
+    setCurrency(found != null ? found : Currency.getInstance("XXX"));
+  }
+
+  private char monetaryGroupingSeparator;
+  private Currency currency;
+
+  public Currency getCurrency() {
+    return currency;
+  }
+
+  public void setCurrency(Currency currency) {
+    if (currency == null) {
+      throw new NullPointerException();
+    }
+    this.currency = currency;
+    this.intlCurrencySymbol = currency.getCurrencyCode();
+    this.currencySymbol = currency.getSymbol(locale);
+  }
+
+  public char getMonetaryGroupingSeparator() {
+    return monetaryGroupingSeparator;
+  }
+
+  public void setMonetaryGroupingSeparator(char sep) {
+    this.monetaryGroupingSeparator = sep;
+  }
+
+  public Locale getLocale() {
+    return locale;
+  }
+
+  public static Locale[] getAvailableLocales() {
+    return new Locale[] {Locale.ROOT, Locale.US};
   }
 
   public char getZeroDigit() {
