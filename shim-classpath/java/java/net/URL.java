@@ -18,6 +18,8 @@ import java.io.InputStream;
 import java.util.Objects;
 
 public final class URL {
+  private static final long serialVersionUID = -7627629688361524110L;
+
   private final URLStreamHandler handler;
   private String protocol;
   private String host;

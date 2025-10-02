@@ -23,13 +23,33 @@
 
 package java.lang;
 
-public class StringBuilder implements CharSequence, Appendable, Comparable<StringBuilder> {
+public class StringBuilder implements java.io.Serializable, CharSequence, Appendable, Comparable<StringBuilder> {
+  private static final long serialVersionUID = 4383685877147921099L;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = new java.io.ObjectStreamField[0];
   private static final int BufferSize = 32;
 
   private Cell chain;
   private int length;
   private char[] buffer;
   private int position;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    s.defaultWriteObject();
+    s.writeInt(length);
+    char[] val = new char[Math.max(capacity(), length)];
+    getChars(0, length, val, 0);
+    s.writeObject(val);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    int count = s.readInt();
+    char[] val = (char[]) s.readObject();
+    if (count < 0 || count > val.length) {
+      throw new java.io.StreamCorruptedException("count value invalid");
+    }
+    append(val, 0, count);
+  }
 
   public StringBuilder(String s) {
     append(s);

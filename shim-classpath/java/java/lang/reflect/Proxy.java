@@ -49,15 +49,21 @@ import java.io.OutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-public class Proxy {
+public class Proxy implements java.io.Serializable {
+  private static final long serialVersionUID = -2222568056686623797L;
   private static int nextNumber;
 
   protected InvocationHandler h;
   protected final static Map<Class, Method[]> methodRefsMap =
     new HashMap<Class, Method[]>();
-  protected final Method[] methodRefs;
+  protected transient Method[] methodRefs;
 
   public Proxy() {
+    methodRefs = methodRefsMap.get(getClass());
+  }
+
+  private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+    in.defaultReadObject();
     methodRefs = methodRefsMap.get(getClass());
   }
 

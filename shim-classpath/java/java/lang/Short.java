@@ -24,6 +24,8 @@
 package java.lang;
 
 public final class Short extends Number implements Comparable<Short>, java.lang.constant.Constable {
+  private static final long serialVersionUID = 7515723908773894738L;
+
   public static final Class TYPE = shim.Classes.forCanonicalName("S");
 
   public static final short MIN_VALUE = -32768;

@@ -23,8 +23,36 @@
 
 package java.lang;
 
-public class StringBuffer implements CharSequence, Appendable, Comparable<StringBuffer> {
-  private final StringBuilder sb;
+public class StringBuffer implements java.io.Serializable, CharSequence, Appendable, Comparable<StringBuffer> {
+  private static final long serialVersionUID = 3388685877147921107L;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("value", char[].class),
+    new java.io.ObjectStreamField("count", Integer.TYPE),
+    new java.io.ObjectStreamField("shared", Boolean.TYPE)
+  };
+
+  private StringBuilder sb;
+
+  private synchronized void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField fields = s.putFields();
+    char[] val = new char[Math.max(sb.capacity(), sb.length())];
+    sb.getChars(0, sb.length(), val, 0);
+    fields.put("value", val);
+    fields.put("count", sb.length());
+    fields.put("shared", false);
+    s.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField fields = s.readFields();
+    char[] val = (char[]) fields.get("value", null);
+    int count = fields.get("count", 0);
+    if (val == null || count < 0 || count > val.length) {
+      throw new java.io.StreamCorruptedException("count value invalid");
+    }
+    sb = new StringBuilder(0);
+    sb.append(val, 0, count);
+  }
 
   public StringBuffer(String s) {
     sb = new StringBuilder(s);

@@ -24,6 +24,8 @@
 package java.lang.invoke;
 
 public class SerializedLambda implements java.io.Serializable {
+  private static final long serialVersionUID = 8025925345765570181L;
+
   public Object getCapturedArg(int i) {
     // todo
     return null;

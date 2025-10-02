@@ -23,6 +23,10 @@
 
 package java.lang;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamField;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Serializable;
@@ -30,6 +34,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Throwable implements Serializable {
+  private static final long serialVersionUID = -3042686055658047285L;
+  private static final ObjectStreamField[] serialPersistentFields = {
+    new ObjectStreamField("detailMessage", String.class),
+    new ObjectStreamField("cause", Throwable.class),
+    new ObjectStreamField("stackTrace", StackTraceElement[].class),
+    new ObjectStreamField("suppressedExceptions", List.class)
+  };
   private String message;
   private Object trace;
   private Throwable cause;
@@ -95,6 +106,30 @@ public class Throwable implements Serializable {
       sb.append(": ").append(message);
     }
     return sb.toString();
+  }
+
+  private void writeObject(ObjectOutputStream s) throws IOException {
+    StackTraceElement[] st = trace == null ? new StackTraceElement[0] : resolveTrace();
+    ObjectOutputStream.PutField fields = s.putFields();
+    fields.put("detailMessage", message);
+    fields.put("cause", cause == null ? this : cause);
+    fields.put("stackTrace", st);
+    fields.put("suppressedExceptions",
+        suppressedExceptions == null ? java.util.Collections.emptyList() : suppressedExceptions);
+    s.writeFields();
+  }
+
+  @SuppressWarnings("unchecked")
+  private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
+    ObjectInputStream.GetField fields = s.readFields();
+    message = (String) fields.get("detailMessage", null);
+    Throwable c = (Throwable) fields.get("cause", this);
+    cause = c == this ? null : c;
+    StackTraceElement[] st = (StackTraceElement[]) fields.get("stackTrace", null);
+    trace = st == null ? new StackTraceElement[0] : st.clone();
+    List<Throwable> suppressed = (List<Throwable>) fields.get("suppressedExceptions", null);
+    suppressedExceptions = suppressed == null || suppressed.isEmpty() ? null : new ArrayList<Throwable>(suppressed);
+    suppressionEnabled = true;
   }
 
   private static native Object trace(int skipCount);
