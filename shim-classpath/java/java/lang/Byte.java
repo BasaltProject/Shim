@@ -24,6 +24,8 @@
 package java.lang;
 
 public final class Byte extends Number implements Comparable<Byte>, java.lang.constant.Constable {
+  private static final long serialVersionUID = -7183698231559129828L;
+
   public static final Class TYPE = shim.Classes.forCanonicalName("B");
 
   public static final byte MIN_VALUE = -128;

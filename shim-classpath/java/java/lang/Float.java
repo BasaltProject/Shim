@@ -25,6 +25,8 @@ package java.lang;
 
 public final class Float extends Number implements Comparable<Float>,
     java.lang.constant.Constable, java.lang.constant.ConstantDesc {
+  private static final long serialVersionUID = -2671257302660747028L;
+
   public static final Class TYPE = shim.Classes.forCanonicalName("F");
   private static final int EXP_BIT_MASK = 0x7F800000;
   private static final int SIGNIF_BIT_MASK = 0x007FFFFF;

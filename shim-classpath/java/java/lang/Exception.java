@@ -24,6 +24,8 @@
 package java.lang;
 
 public class Exception extends Throwable {
+  private static final long serialVersionUID = -3387516993124229948L;
+
   public Exception(String message, Throwable cause) {
     super(message, cause);
   }

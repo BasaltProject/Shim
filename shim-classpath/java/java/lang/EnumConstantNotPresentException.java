@@ -8,6 +8,8 @@
 package java.lang;
 
 public class EnumConstantNotPresentException extends RuntimeException {
+  private static final long serialVersionUID = -6046998521960521108L;
+
   private Class<? extends Enum> enumType;
   private String constantName;
 

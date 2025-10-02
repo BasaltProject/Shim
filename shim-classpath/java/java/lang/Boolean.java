@@ -23,7 +23,9 @@
 
 package java.lang;
 
-public final class Boolean implements Comparable<Boolean>, java.lang.constant.Constable {
+public final class Boolean implements java.io.Serializable, Comparable<Boolean>, java.lang.constant.Constable {
+  private static final long serialVersionUID = -3665804199014368530L;
+
   public static final Class TYPE = shim.Classes.forCanonicalName("Z");
 
   public static final Boolean FALSE = new Boolean(false);
