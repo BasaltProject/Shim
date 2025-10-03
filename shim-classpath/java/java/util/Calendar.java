@@ -1011,6 +1011,10 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         cal.setGregorianChange(new Date(Long.MIN_VALUE));
         setWeekDefinition(MONDAY, 4);
       }
+      if (firstDayOfWeek != 0) {
+        cal.setFirstDayOfWeek(firstDayOfWeek);
+        cal.setMinimalDaysInFirstWeek(minimalDaysInFirstWeek);
+      }
       if (isInstantSet()) {
         cal.setTimeInMillis(instant);
         cal.complete();
