@@ -27,6 +27,8 @@ import java.net.URL;
 import java.security.cert.Certificate;
 
 public class CodeSource {
+  private static final long serialVersionUID = 4977541819976013951L;
+
   private final URL url;
 
   public CodeSource(URL url, Certificate[] certificates) {

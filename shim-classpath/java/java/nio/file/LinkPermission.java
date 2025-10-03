@@ -11,7 +11,7 @@ package java.nio.file;
 import java.security.BasicPermission;
 
 public final class LinkPermission extends BasicPermission {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = -1441492453772213220L;
 
   public LinkPermission(String name) {
     super(name);

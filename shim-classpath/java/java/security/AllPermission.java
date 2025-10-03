@@ -23,7 +23,9 @@
 
 package java.security;
 
-public class AllPermission extends Permission { 
+public class AllPermission extends Permission {
+  private static final long serialVersionUID = -2916474571451318075L;
+ 
   public AllPermission() {
     super("<all>");
   }

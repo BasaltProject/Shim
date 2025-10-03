@@ -9,7 +9,7 @@
 package java.nio.file;
 
 public class FileSystemAlreadyExistsException extends RuntimeException {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = -5438419127181131148L;
 
   public FileSystemAlreadyExistsException() { }
 

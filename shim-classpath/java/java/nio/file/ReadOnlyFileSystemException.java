@@ -9,7 +9,7 @@
 package java.nio.file;
 
 public class ReadOnlyFileSystemException extends UnsupportedOperationException {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = -6822409595617487197L;
 
   public ReadOnlyFileSystemException() { }
 }

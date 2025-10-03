@@ -24,6 +24,8 @@
 package java.security;
 
 public abstract class Permission {
+  private static final long serialVersionUID = -5636570222231596674L;
+
   
   protected String name;
   

@@ -14,7 +14,7 @@ import java.security.cert.CertPath;
 import java.util.Objects;
 
 public final class CodeSigner implements Serializable {
-  private static final long serialVersionUID = 6819288105675287527L;
+  private static final long serialVersionUID = 6819288105193937581L;
 
   private final CertPath signerCertPath;
   private final Timestamp timestamp;

@@ -9,7 +9,7 @@
 package java.nio.file;
 
 public class NotLinkException extends FileSystemException {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = -388655596416518021L;
 
   public NotLinkException(String file) {
     super(file);

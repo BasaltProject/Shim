@@ -23,6 +23,8 @@
 
 package java.security;
 
-public abstract class PermissionCollection { 
+public abstract class PermissionCollection {
+  private static final long serialVersionUID = -6727011328946861783L;
+ 
   public abstract void add(Permission p);
 }
