@@ -46,6 +46,15 @@ final class ZoneInfoTimeZone extends TimeZone {
     }
   }
 
+  private Object readResolve() {
+    ZoneInfoTimeZone resolved = (ZoneInfoTimeZone) find(getID());
+    if (resolved == null) {
+      throw new IllegalStateException("unknown time zone " + getID());
+    }
+    resolved.rawDelta = rawDelta;
+    return resolved;
+  }
+
   ZoneRules rules() {
     return rules;
   }

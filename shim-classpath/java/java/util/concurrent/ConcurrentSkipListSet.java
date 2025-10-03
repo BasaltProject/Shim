@@ -22,7 +22,7 @@ import java.util.SortedSet;
 public class ConcurrentSkipListSet<E> extends AbstractSet<E>
     implements NavigableSet<E>, Cloneable, Serializable {
 
-  private static final long serialVersionUID = -2479143000061671589L;
+  private static final long serialVersionUID = -2479143111061671589L;
   private static final Object PRESENT = Boolean.TRUE;
 
   private ConcurrentNavigableMap<E, Object> m;

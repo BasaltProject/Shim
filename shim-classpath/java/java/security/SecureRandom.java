@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Random;
 
 public class SecureRandom extends Random {
-  private static final long serialVersionUID = 4939644638883676188L;
+  private static final long serialVersionUID = 4940670005562187L;
 
   private static final FileInputStream urandomStream;
 

@@ -9,6 +9,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V>, Cloneable, java.io.Serializable {
+  private static final long serialVersionUID = 1421746759512286392L;
+
   private transient Entry<?, ?>[] table;
   private transient int count;
   private int threshold;
@@ -697,6 +699,16 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V>, Clon
   }
 
   private void writeObject(ObjectOutputStream s) throws IOException {
+    writeHashtable(s);
+  }
+
+  final void defaultWriteHashtable(ObjectOutputStream s, int length, float loadFactor) throws IOException {
+    this.threshold = (int) Math.min(length * loadFactor, MAX_ARRAY_SIZE + 1);
+    this.loadFactor = loadFactor;
+    s.defaultWriteObject();
+  }
+
+  void writeHashtable(ObjectOutputStream s) throws IOException {
     s.defaultWriteObject();
     s.writeInt(table.length);
     s.writeInt(count);
@@ -711,6 +723,11 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V>, Clon
 
   @SuppressWarnings("unchecked")
   private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
+    readHashtable(s);
+  }
+
+  @SuppressWarnings("unchecked")
+  void readHashtable(ObjectInputStream s) throws IOException, ClassNotFoundException {
     s.defaultReadObject();
     int origlength = s.readInt();
     int elements = s.readInt();

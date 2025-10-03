@@ -19,7 +19,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class CopyOnWriteArraySet<E> extends AbstractSet<E> implements Serializable {
-  private static final long serialVersionUID = 5457747651896043463L;
+  private static final long serialVersionUID = 5457747651344034263L;
 
   private final CopyOnWriteArrayList<E> al;
 

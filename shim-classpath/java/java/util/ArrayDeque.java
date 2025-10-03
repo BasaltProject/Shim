@@ -6,6 +6,8 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E>, Cloneable, Serializable {
+  private static final long serialVersionUID = 2340985798034038923L;
+
   transient Object[] elements;
   transient int head;
   transient int tail;

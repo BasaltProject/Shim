@@ -26,6 +26,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class PriorityBlockingQueue<E> extends AbstractQueue<E>
     implements BlockingQueue<E>, Serializable {
+  private static final long serialVersionUID = 5595510919245408276L;
+
 
   private static final int DEFAULT_INITIAL_CAPACITY = 11;
   private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;

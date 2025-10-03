@@ -35,6 +35,17 @@ public class Date implements Serializable, Cloneable, Comparable<Date> {
 
   private transient long fastTime;
 
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    s.defaultWriteObject();
+    s.writeLong(fastTime);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    fastTime = s.readLong();
+  }
+
+
   public Date() {
     this(System.currentTimeMillis());
   }

@@ -24,6 +24,8 @@
 package java.util;
 
 public class EventObject {
+  private static final long serialVersionUID = 5516075349620653480L;
+
   protected Object source;
 
   public EventObject(Object source) {

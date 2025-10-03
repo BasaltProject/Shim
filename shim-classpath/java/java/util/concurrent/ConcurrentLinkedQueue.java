@@ -13,6 +13,8 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<E>, java.io.Serializable {
+  private static final long serialVersionUID = 196745693267521676L;
+
   private static class Node<E> {
     volatile E item;
     volatile Node<E> next;
@@ -24,7 +26,7 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
 
   private transient Node<E> head;
   private transient Node<E> tail;
-  private final transient Object lock = new Object();
+  private transient Object lock = new Object();
 
   public ConcurrentLinkedQueue() {
     head = tail = new Node<E>(null);
@@ -317,6 +319,7 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E> implements Queue<
   @SuppressWarnings("unchecked")
   private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
     s.defaultReadObject();
+    lock = new Object();
     head = tail = new Node<E>(null);
     for (Object item; (item = s.readObject()) != null;) {
       offer((E) item);

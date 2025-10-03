@@ -26,6 +26,8 @@ package java.util;
 import java.io.Serializable;
 
 public class Locale implements Cloneable, Serializable {
+  private static final long serialVersionUID = 9149081749638150636L;
+
   public static final Locale ENGLISH = new Locale("en", "");
   public static final Locale FRENCH = new Locale("fr", "");
   public static final Locale GERMAN = new Locale("de", "");

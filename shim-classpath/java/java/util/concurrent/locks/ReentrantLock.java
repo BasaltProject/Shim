@@ -18,10 +18,15 @@ public class ReentrantLock implements Lock, Serializable {
   private static final long serialVersionUID = 7373984872572414699L;
 
   private final boolean fair;
-  private final Object sync = new Object();
-  private Thread owner;
-  private int holdCount;
-  private int waiters;
+  private transient Object sync = new Object();
+  private transient Thread owner;
+  private transient int holdCount;
+  private transient int waiters;
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    sync = new Object();
+  }
 
   public ReentrantLock() {
     this(false);

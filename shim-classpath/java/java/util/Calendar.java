@@ -121,7 +121,33 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
   static final int COMPUTED = 1;
   static final int MINIMUM_USER_STAMP = 2;
   static final int ALL_FIELDS = (1 << FIELD_COUNT) - 1;
-  private transient int nextStamp = MINIMUM_USER_STAMP;
+  private int nextStamp = MINIMUM_USER_STAMP;
+  private int serialVersionOnStream = 1;
+
+  private void writeObject(java.io.ObjectOutputStream stream) throws java.io.IOException {
+    if (!isTimeSet) {
+      try {
+        complete();
+      } catch (IllegalArgumentException e) {
+      }
+    }
+    stream.defaultWriteObject();
+  }
+
+  private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
+    stream.defaultReadObject();
+    stamp = new int[FIELD_COUNT];
+    if (fields == null) {
+      fields = new int[FIELD_COUNT];
+    }
+    if (isSet == null) {
+      isSet = new boolean[FIELD_COUNT];
+    }
+    for (int i = 0; i < FIELD_COUNT; ++i) {
+      stamp[i] = isSet[i] ? COMPUTED : UNSET;
+    }
+    serialVersionOnStream = 1;
+  }
 
   private static final String[] kFieldNames = {"ERA", "YEAR", "MONTH", "WEEK_OF_YEAR", "WEEK_OF_MONTH",
       "DAY_OF_MONTH", "DAY_OF_YEAR", "DAY_OF_WEEK", "DAY_OF_WEEK_IN_MONTH", "AM_PM", "HOUR", "HOUR_OF_DAY", "MINUTE",

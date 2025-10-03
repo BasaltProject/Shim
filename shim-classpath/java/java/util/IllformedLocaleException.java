@@ -8,6 +8,8 @@
 package java.util;
 
 public class IllformedLocaleException extends RuntimeException {
+  private static final long serialVersionUID = -5245986824925681401L;
+
   private final int errorIndex;
 
   public IllformedLocaleException() {

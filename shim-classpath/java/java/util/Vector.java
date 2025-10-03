@@ -6,6 +6,8 @@ import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public class Vector<E> extends AbstractList<E> implements List<E>, RandomAccess, Cloneable, java.io.Serializable {
+  private static final long serialVersionUID = -2767605614048989439L;
+
   protected Object[] elementData;
 
   protected int elementCount;

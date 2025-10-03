@@ -26,7 +26,7 @@ package java.util;
 import java.io.Serializable;
 
 public final class UUID implements Serializable, Comparable<UUID> {
-  private static final long serialVersionUID = -4856846379924848570L;
+  private static final long serialVersionUID = -4856846361193249489L;
 
   private final long mostSigBits;
   private final long leastSigBits;

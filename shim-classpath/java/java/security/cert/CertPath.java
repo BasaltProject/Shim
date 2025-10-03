@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Objects;
 
 public abstract class CertPath implements Serializable {
-  private static final long serialVersionUID = 6068470306641917886L;
+  private static final long serialVersionUID = 6068470306649138683L;
 
   private final String type;
 

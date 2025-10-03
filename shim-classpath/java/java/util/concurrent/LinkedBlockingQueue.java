@@ -15,6 +15,8 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class LinkedBlockingQueue<E> extends AbstractQueue<E> implements BlockingQueue<E>, java.io.Serializable {
+  private static final long serialVersionUID = -6903933977591709194L;
+
   static class Node<E> {
     E item;
     Node<E> next;
@@ -28,7 +30,7 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E> implements Blocking
   private int count;
   private transient Node<E> head;
   private transient Node<E> last;
-  private final Object lock = new Object();
+  private transient Object lock = new Object();
 
   public LinkedBlockingQueue() {
     this(Integer.MAX_VALUE);
@@ -435,6 +437,7 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E> implements Blocking
   @SuppressWarnings("unchecked")
   private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
     s.defaultReadObject();
+    lock = new Object();
     count = 0;
     last = head = new Node<E>(null);
     for (;;) {

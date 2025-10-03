@@ -39,6 +39,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public class Properties extends Hashtable<Object, Object> {
+  private static final long serialVersionUID = 4112578634029874840L;
+
   private transient volatile ConcurrentHashMap<Object, Object> map;
 
   protected volatile Properties defaults;
@@ -53,6 +55,44 @@ public class Properties extends Hashtable<Object, Object> {
 
   public Properties(Properties defaults) {
     this(defaults, 8);
+  }
+
+  @Override
+  void writeHashtable(java.io.ObjectOutputStream s) throws IOException {
+    ConcurrentHashMap<Object, Object> map = this.map;
+    List<Object> entryStack = new ArrayList<Object>(map.size() * 2);
+    for (Map.Entry<Object, Object> entry : map.entrySet()) {
+      entryStack.add(entry.getKey());
+      entryStack.add(entry.getValue());
+    }
+    float loadFactor = 0.75f;
+    int count = entryStack.size() / 2;
+    int length = (int) (count / loadFactor) + (count / 20) + 3;
+    if (length > count && (length & 1) == 0) {
+      length--;
+    }
+    defaultWriteHashtable(s, length, loadFactor);
+    s.writeInt(length);
+    s.writeInt(count);
+    for (int i = entryStack.size() - 1; i >= 0; i--) {
+      s.writeObject(entryStack.get(i));
+    }
+  }
+
+  @Override
+  void readHashtable(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    s.readInt();
+    int elements = s.readInt();
+    if (elements < 0) {
+      throw new java.io.StreamCorruptedException("Illegal # of Elements: " + elements);
+    }
+    map = new ConcurrentHashMap<Object, Object>(Math.max(elements, 8));
+    for (; elements > 0; elements--) {
+      Object key = s.readObject();
+      Object value = s.readObject();
+      map.put(key, value);
+    }
   }
 
   private Properties(Properties defaults, int initialCapacity) {
