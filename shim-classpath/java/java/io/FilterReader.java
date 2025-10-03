@@ -27,6 +27,7 @@ public abstract class FilterReader extends Reader {
   protected Reader in;
 
   protected FilterReader(Reader in) {
+    super(in);
     this.in = in;
   }
 
@@ -34,20 +35,16 @@ public abstract class FilterReader extends Reader {
     return in.read();
   }
 
-  public int read(char[] buffer, int offset, int length) throws IOException {
-    return in.read(buffer, offset, length);
-  }
-
-  public boolean ready() throws IOException {
-    throw new UnsupportedOperationException();
+  public int read(char[] cbuf, int off, int len) throws IOException {
+    return in.read(cbuf, off, len);
   }
 
   public long skip(long n) throws IOException {
-    throw new UnsupportedOperationException();
+    return in.skip(n);
   }
 
-  public void close() throws IOException {
-    in.close();
+  public boolean ready() throws IOException {
+    return in.ready();
   }
 
   public boolean markSupported() {
@@ -59,6 +56,10 @@ public abstract class FilterReader extends Reader {
   }
 
   public void reset() throws IOException {
-   in.reset();
+    in.reset();
+  }
+
+  public void close() throws IOException {
+    in.close();
   }
 }

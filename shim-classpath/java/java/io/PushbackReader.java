@@ -23,65 +23,136 @@
 
 package java.io;
 
-public class PushbackReader extends Reader {
-  private final Reader in;
-  private char savedChar;
-  private boolean hasSavedChar;
+import java.util.Objects;
 
-  public PushbackReader(Reader in, int bufferSize) {
-    if (bufferSize > 1) {
-      throw new IllegalArgumentException(bufferSize + " > 1");
+public class PushbackReader extends FilterReader {
+  private char[] buf;
+  private int pos;
+
+  public PushbackReader(Reader in, int size) {
+    super(in);
+    if (size <= 0) {
+      throw new IllegalArgumentException("size <= 0");
     }
-    this.in = in;
-    this.hasSavedChar = false;
+    this.buf = new char[size];
+    this.pos = size;
   }
 
   public PushbackReader(Reader in) {
     this(in, 1);
   }
 
-  public int read(char[] b, int offset, int length) throws IOException {
-    int count = 0;
-    if (hasSavedChar && length > 0) {
-      length--;
-      b[offset++] = savedChar;
-      hasSavedChar = false;
-      count = 1;
+  private void ensureOpen() throws IOException {
+    if (buf == null) {
+      throw new IOException("Stream closed");
     }
-    if (length > 0) {
-      int c = in.read(b, offset, length);
-      if (c == -1) {
-        if (count == 0) {
-          count = -1;
-        }
+  }
+
+  public int read() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      if (pos < buf.length) {
+        return buf[pos++];
       } else {
-        count += c;
+        return super.read();
       }
     }
-
-    return count;
   }
 
-  public void unread(char[] b, int offset, int length) throws IOException {
-    if (length != 1) {
-      throw new IOException("Can only push back 1 char, not " + length);
-    } else if (hasSavedChar) {
-      throw new IOException("Already have a saved char");
-    } else {
-      hasSavedChar = true;
-      savedChar = b[offset];
+  public int read(char[] cbuf, int off, int len) throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      Objects.checkFromIndexSize(off, len, cbuf.length);
+      if (len == 0) {
+        return 0;
+      }
+      int avail = buf.length - pos;
+      if (avail > 0) {
+        if (len < avail) {
+          avail = len;
+        }
+        System.arraycopy(buf, pos, cbuf, off, avail);
+        pos += avail;
+        off += avail;
+        len -= avail;
+      }
+      if (len > 0) {
+        len = super.read(cbuf, off, len);
+        if (len == -1) {
+          return (avail == 0) ? -1 : avail;
+        }
+        return avail + len;
+      }
+      return avail;
     }
-  }
-
-  public void unread(char[] b) throws IOException {
-    unread(b, 0, b.length);
   }
 
   public void unread(int c) throws IOException {
-    unread(new char[] { (char) c });
+    synchronized (lock) {
+      ensureOpen();
+      if (pos == 0) {
+        throw new IOException("Pushback buffer overflow");
+      }
+      buf[--pos] = (char) c;
+    }
+  }
+
+  public void unread(char[] cbuf, int off, int len) throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      if (len > pos) {
+        throw new IOException("Pushback buffer overflow");
+      }
+      pos -= len;
+      System.arraycopy(cbuf, off, buf, pos, len);
+    }
+  }
+
+  public void unread(char[] cbuf) throws IOException {
+    unread(cbuf, 0, cbuf.length);
+  }
+
+  public boolean ready() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      return (pos < buf.length) || super.ready();
+    }
+  }
+
+  public void mark(int readAheadLimit) throws IOException {
+    throw new IOException("mark/reset not supported");
+  }
+
+  public void reset() throws IOException {
+    throw new IOException("mark/reset not supported");
+  }
+
+  public boolean markSupported() {
+    return false;
   }
 
   public void close() throws IOException {
-    in.close();
+    super.close();
+    buf = null;
+  }
+
+  public long skip(long n) throws IOException {
+    if (n < 0L) {
+      throw new IllegalArgumentException("skip value is negative");
+    }
+    synchronized (lock) {
+      ensureOpen();
+      int avail = buf.length - pos;
+      if (avail > 0) {
+        if (n <= avail) {
+          pos += (int) n;
+          return n;
+        } else {
+          pos = buf.length;
+          n -= avail;
+        }
+      }
+      return avail + super.skip(n);
+    }
   }
 }

@@ -23,90 +23,173 @@
 
 package java.io;
 
-public class DataOutputStream extends OutputStream implements DataOutput {
-  private OutputStream out;
+public class DataOutputStream extends FilterOutputStream implements DataOutput {
+  protected int written;
+  private byte[] bytearr = null;
+  private final byte[] writeBuffer = new byte[8];
 
   public DataOutputStream(OutputStream out) {
-    this.out = out;
+    super(out);
   }
 
-  public void close() throws IOException {
-    out.close();
+  private void incCount(int value) {
+    int temp = written + value;
+    if (temp < 0) {
+      temp = Integer.MAX_VALUE;
+    }
+    written = temp;
+  }
+
+  public synchronized void write(int b) throws IOException {
+    out.write(b);
+    incCount(1);
+  }
+
+  public synchronized void write(byte[] b, int off, int len) throws IOException {
+    out.write(b, off, len);
+    incCount(len);
   }
 
   public void flush() throws IOException {
     out.flush();
   }
 
-  public void write(byte[] buffer) throws IOException {
-    out.write(buffer);
+  public final void writeBoolean(boolean v) throws IOException {
+    out.write(v ? 1 : 0);
+    incCount(1);
   }
 
-  public void write(byte[] buffer, int offset, int length) throws IOException {
-    out.write(buffer, offset, length);
+  public final void writeByte(int v) throws IOException {
+    out.write(v);
+    incCount(1);
   }
 
-  public void write(int b) throws IOException {
-    out.write(b);
+  public final void writeShort(int v) throws IOException {
+    writeBuffer[0] = (byte) (v >>> 8);
+    writeBuffer[1] = (byte) v;
+    out.write(writeBuffer, 0, 2);
+    incCount(2);
   }
 
-  public void writeBoolean(boolean b) throws IOException {
-    writeByte(b ? 1 : 0);
+  public final void writeChar(int v) throws IOException {
+    writeBuffer[0] = (byte) (v >>> 8);
+    writeBuffer[1] = (byte) v;
+    out.write(writeBuffer, 0, 2);
+    incCount(2);
   }
 
-  public void writeByte(int b) throws IOException {
-    out.write(b);
+  public final void writeInt(int v) throws IOException {
+    writeBuffer[0] = (byte) (v >>> 24);
+    writeBuffer[1] = (byte) (v >>> 16);
+    writeBuffer[2] = (byte) (v >>> 8);
+    writeBuffer[3] = (byte) v;
+    out.write(writeBuffer, 0, 4);
+    incCount(4);
   }
 
-  public void writeShort(int s) throws IOException {
-    write((byte)(s >> 8));
-    write((byte)s);
+  public final void writeLong(long v) throws IOException {
+    writeBuffer[0] = (byte) (v >>> 56);
+    writeBuffer[1] = (byte) (v >>> 48);
+    writeBuffer[2] = (byte) (v >>> 40);
+    writeBuffer[3] = (byte) (v >>> 32);
+    writeBuffer[4] = (byte) (v >>> 24);
+    writeBuffer[5] = (byte) (v >>> 16);
+    writeBuffer[6] = (byte) (v >>> 8);
+    writeBuffer[7] = (byte) v;
+    out.write(writeBuffer, 0, 8);
+    incCount(8);
   }
 
-  public void writeInt(int i) throws IOException {
-    write((byte)(i >> 24));
-    write((byte)(i >> 16));
-    write((byte)(i >> 8));
-    write((byte)i);
+  public final void writeFloat(float v) throws IOException {
+    writeInt(Float.floatToIntBits(v));
   }
 
-  public void writeFloat(float f) throws IOException {
-    writeInt(Float.floatToIntBits(f));
+  public final void writeDouble(double v) throws IOException {
+    writeLong(Double.doubleToLongBits(v));
   }
 
-  public void writeDouble(double d) throws IOException {
-    writeLong(Double.doubleToLongBits(d));
-  }
-
-  public void writeLong(long l) throws IOException {
-    write((byte)(l >> 56));
-    write((byte)(l >> 48));
-    write((byte)(l >> 40));
-    write((byte)(l >> 32));
-    write((byte)(l >> 24));
-    write((byte)(l >> 16));
-    write((byte)(l >> 8));
-    write((byte)l);
-  }
-
-  public void writeChar(int ch) throws IOException {
-    write((byte)(ch >> 8));
-    write((byte)ch);
-  }
-
-  public void writeChars(String s) throws IOException {
-    for (char ch : s.toCharArray()) {
-      writeChar(ch & 0xffff);
+  public final void writeBytes(String s) throws IOException {
+    int len = s.length();
+    for (int i = 0; i < len; i++) {
+      out.write((byte) s.charAt(i));
     }
+    incCount(len);
   }
 
-  public void writeBytes(String s) throws IOException {
-    out.write(s.getBytes());
+  public final void writeChars(String s) throws IOException {
+    int len = s.length();
+    for (int i = 0; i < len; i++) {
+      int v = s.charAt(i);
+      writeBuffer[0] = (byte) (v >>> 8);
+      writeBuffer[1] = (byte) v;
+      out.write(writeBuffer, 0, 2);
+    }
+    incCount(len * 2);
   }
 
-  public void writeUTF(String s) throws IOException {
-    byte[] bytes = s.getBytes("UTF-8");
-    writeShort((short)bytes.length);
-    out.write(bytes);
+  public final void writeUTF(String str) throws IOException {
+    writeUTF(str, this);
+  }
+
+  static int writeUTF(String str, DataOutput out) throws IOException {
+    int strlen = str.length();
+    int utflen = strlen;
+    for (int i = 0; i < strlen; i++) {
+      int c = str.charAt(i);
+      if (c >= 0x80 || c == 0) {
+        utflen += c >= 0x800 ? 2 : 1;
+      }
+    }
+    if (utflen > 65535 || utflen < strlen) {
+      throw new UTFDataFormatException(tooLongMsg(str, utflen));
+    }
+    final byte[] bytearr;
+    if (out instanceof DataOutputStream) {
+      DataOutputStream dos = (DataOutputStream) out;
+      if (dos.bytearr == null || dos.bytearr.length < utflen + 2) {
+        dos.bytearr = new byte[utflen + 2];
+      }
+      bytearr = dos.bytearr;
+    } else {
+      bytearr = new byte[utflen + 2];
+    }
+    int count = 0;
+    bytearr[count++] = (byte) (utflen >>> 8);
+    bytearr[count++] = (byte) utflen;
+    int i = 0;
+    for (i = 0; i < strlen; i++) {
+      int c = str.charAt(i);
+      if (!(c >= 0x0001 && c <= 0x007F)) {
+        break;
+      }
+      bytearr[count++] = (byte) c;
+    }
+    for (; i < strlen; i++) {
+      int c = str.charAt(i);
+      if (c >= 0x0001 && c <= 0x007F) {
+        bytearr[count++] = (byte) c;
+      } else if (c > 0x07FF) {
+        bytearr[count++] = (byte) (0xE0 | ((c >> 12) & 0x0F));
+        bytearr[count++] = (byte) (0x80 | ((c >> 6) & 0x3F));
+        bytearr[count++] = (byte) (0x80 | (c & 0x3F));
+      } else {
+        bytearr[count++] = (byte) (0xC0 | ((c >> 6) & 0x1F));
+        bytearr[count++] = (byte) (0x80 | (c & 0x3F));
+      }
+    }
+    out.write(bytearr, 0, utflen + 2);
+    return utflen + 2;
+  }
+
+  private static String tooLongMsg(String s, int bits32) {
+    int slen = s.length();
+    String head = s.substring(0, 8);
+    String tail = s.substring(slen - 8, slen);
+    long actualLength = (long) slen + Integer.toUnsignedLong(bits32 - slen);
+    return "encoded string (" + head + "..." + tail + ") too long: " + actualLength + " bytes";
+  }
+
+  public final int size() {
+    return written;
   }
 }

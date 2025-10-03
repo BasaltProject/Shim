@@ -23,274 +23,385 @@
 
 package java.io;
 
-import java.lang.IllegalArgumentException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannelImpl;
+import java.util.Objects;
+import shim.FileNative;
 
-public class RandomAccessFile implements DataInput, Closeable {
+public class RandomAccessFile implements DataOutput, DataInput, Closeable {
+  private final FileDescriptor fd;
+  private final boolean rw;
+  private final String path;
+  private final boolean readable;
+  private volatile boolean closed;
+  private FileChannel channel;
+  private final byte[] buffer8 = new byte[8];
 
-  private long peer;
-  private File file;
-  private long position = 0;
-  private long length;
-  private boolean allowWrite;
-
-  public RandomAccessFile(String name, String mode)
-    throws FileNotFoundException
-  {
-    this(new File(name), mode);
+  public RandomAccessFile(String name, String mode) throws FileNotFoundException {
+    this(name != null ? new File(name) : null, mode);
   }
 
-  public RandomAccessFile(File file, String mode)
-    throws FileNotFoundException
-  {
-    if (file == null) throw new NullPointerException();
-    if (mode.equals("rw")) allowWrite = true;
-    else if (! mode.equals("r")) throw new IllegalArgumentException();
-    this.file = file;
-    open();
+  public RandomAccessFile(File file, String mode) throws FileNotFoundException {
+    String name = (file != null ? file.getPath() : null);
+    int flags;
+    if (mode.equals("r")) {
+      flags = FileNative.READ;
+    } else if (mode.equals("rw")) {
+      flags = FileNative.READ | FileNative.WRITE | FileNative.CREATE;
+    } else if (mode.equals("rws")) {
+      flags = FileNative.READ | FileNative.WRITE | FileNative.CREATE | FileNative.SYNC;
+    } else if (mode.equals("rwd")) {
+      flags = FileNative.READ | FileNative.WRITE | FileNative.CREATE | FileNative.DSYNC;
+    } else {
+      throw new IllegalArgumentException("Illegal mode \"" + mode + "\" must be one of \"r\", \"rw\", \"rws\","
+          + " or \"rwd\"");
+    }
+    if (name == null) {
+      throw new NullPointerException();
+    }
+    if (file.isInvalid()) {
+      throw new FileNotFoundException("Invalid file path");
+    }
+    this.rw = (flags & FileNative.WRITE) != 0;
+    this.readable = true;
+    this.path = name;
+    this.fd = new FileDescriptor();
+    int r = FileNative.open(name, flags, 0666);
+    if (r < 0) {
+      throw new FileNotFoundException(name + " (" + FileNative.message(r) + ")");
+    }
+    fd.fd = r;
   }
 
-  private void open() throws FileNotFoundException {
-    long[] result = new long[2];
-    open(file.getPath(), allowWrite, result);
-    peer = result[0];
-    length = result[1];
+  RandomAccessFile(FileDescriptor fd, String path, boolean readable, boolean writable) {
+    this.fd = fd;
+    this.path = path;
+    this.readable = readable;
+    this.rw = writable;
   }
 
-  private static native void open(String name, boolean allowWrite, long[] result)
-    throws FileNotFoundException;
+  public final FileDescriptor getFD() throws IOException {
+    if (fd != null) {
+      return fd;
+    }
+    throw new IOException();
+  }
 
-  private void refresh() throws IOException {
-    if (file.length() != length) {
-      close();
-      open();
+  public final FileChannel getChannel() {
+    synchronized (this) {
+      if (channel == null) {
+        channel = new FileChannelImpl(this, readable, rw, false);
+      }
+      return channel;
     }
   }
 
-  public long length() throws IOException {
-    refresh();
-    return length;
-  }
-
-  public long getFilePointer() throws IOException {
-    return position;
-  }
-
-  public void seek(long position) throws IOException {
-    if (position < 0 || (!allowWrite && position > length())) throw new IOException();
-
-    this.position = position;
-  }
-
-  public int skipBytes(int count) throws IOException {
-    if (position + count > length()) throw new IOException();
-    this.position = position + count;
-    return count;
-  }
-  
-  public int read(byte b[], int off, int len) throws IOException {
-    if(b == null)
-      throw new IllegalArgumentException();
-    if (peer == 0)
-      throw new IOException();
-    if(len == 0)
-      return 0;
-    if (position + len > this.length)
-      throw new EOFException();
-    if (off < 0 || off + len > b.length)
-      throw new ArrayIndexOutOfBoundsException();
-    int bytesRead = readBytes(peer, position, b, off, len);
-    position += bytesRead;
-    return bytesRead;
-  }
-  
-  public int read(byte b[]) throws IOException {
-    if(b == null)
-      throw new IllegalArgumentException();
-    if (peer == 0)
-      throw new IOException();
-    if(b.length == 0)
-      return 0;
-    if (position + b.length > this.length)
-      throw new EOFException();
-    int bytesRead = readBytes(peer, position, b, 0, b.length);
-    position += bytesRead;
-    return bytesRead;
-  }
-
-  public void readFully(byte b[], int off, int len) throws IOException {
-    if (b == null)
-      throw new IllegalArgumentException();
-    if (peer == 0)
-      throw new IOException();
-    if(len == 0)
-      return;
-    if (position + len > this.length)
-      throw new EOFException();
-    if (off < 0 || off + len > b.length)
-      throw new ArrayIndexOutOfBoundsException();
-    int n = 0;
-    do {
-      int count = readBytes(peer, position, b, off + n, len - n);
-      position += count;
-      if (count == 0)
-        throw new EOFException();
-      n += count;
-    } while (n < len);
-  }
-  
-  public void readFully(byte b[]) throws IOException {
-    readFully(b, 0, b.length);
-  }
-
-  private static native int readBytes(long peer, long position, byte[] buffer,
-                                  int offset, int length);
-
-  public boolean readBoolean() throws IOException {
-    return readByte() != 0;
+  private void ensureOpen() throws IOException {
+    if (closed || fd.fd == -1) {
+      throw new IOException("Stream Closed");
+    }
   }
 
   public int read() throws IOException {
-    try {
-      return readByte() & 0xff;
-    } catch (final EOFException e) {
-      return -1;
+    ensureOpen();
+    int r = FileNative.readByte(fd.fd);
+    if (r < -1) {
+      throw new IOException(FileNative.strerror(-2 - r));
     }
+    return r;
   }
 
-  public byte readByte() throws IOException {
-    final byte[] buffer = new byte[1];
-    readFully(buffer);
-    return buffer[0];
-  }
-
-  public short readShort() throws IOException {
-    final byte[] buffer = new byte[2];
-    readFully(buffer);
-    return (short)((buffer[0] << 8) | buffer[1]);
-  }
-
-  public int readInt() throws IOException {
-    byte[] buf = new byte[4];
-    readFully(buf);
-    return ((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
-  }
-
-  public float readFloat() throws IOException {
-    return Float.floatToIntBits(readInt());
-  }
-
-  public double readDouble() throws IOException {
-    return Double.doubleToLongBits(readLong());
-  }
-
-  public long readLong() throws IOException {
-    return ((readInt() & 0xffffffffl) << 32) | (readInt() & 0xffffffffl);
-  }
-
-  public char readChar() throws IOException {
-    return (char)readShort();
-  }
-
-  public int readUnsignedByte() throws IOException {
-    return readByte() & 0xff;
-  }
-
-  public int readUnsignedShort() throws IOException {
-    return readShort() & 0xffff;
-  }
-
-  public String readUTF() throws IOException {
-    int length = readUnsignedShort();
-    byte[] bytes = new byte[length];
-    readFully(bytes);
-    return new String(bytes, "UTF-8");
-  }
-
-  @Deprecated
-  public String readLine() throws IOException {
-    int c = read();
-    if (c < 0) {
-      return null;
-    } else if (c == '\n') {
-      return "";
+  public int read(byte[] b, int off, int len) throws IOException {
+    Objects.checkFromIndexSize(off, len, b.length);
+    ensureOpen();
+    if (len == 0) {
+      return 0;
     }
-    StringBuilder builder = new StringBuilder();
-    for (;;) {
-      builder.append((char)c);
-      c = read();
-      if (c < 0 || c == '\n') {
-        return builder.toString();
+    int r = FileNative.read(fd.fd, b, off, len);
+    if (r < 0) {
+      throw new IOException(FileNative.message(r));
+    }
+    return r == 0 ? -1 : r;
+  }
+
+  public int read(byte[] b) throws IOException {
+    return read(b, 0, b.length);
+  }
+
+  public final void readFully(byte[] b) throws IOException {
+    readFully(b, 0, b.length);
+  }
+
+  public final void readFully(byte[] b, int off, int len) throws IOException {
+    int n = 0;
+    do {
+      int count = this.read(b, off + n, len - n);
+      if (count < 0) {
+        throw new EOFException();
       }
+      n += count;
+    } while (n < len);
+  }
+
+  public int skipBytes(int n) throws IOException {
+    long pos;
+    long len;
+    long newpos;
+    if (n <= 0) {
+      return 0;
     }
+    pos = getFilePointer();
+    len = length();
+    newpos = pos + n;
+    if (newpos > len) {
+      newpos = len;
+    }
+    seek(newpos);
+    return (int) (newpos - pos);
   }
 
   public void write(int b) throws IOException {
-    write(new byte[] { (byte) b }, 0, 1);
+    ensureOpen();
+    int r = FileNative.writeByte(fd.fd, b);
+    if (r < 0) {
+      throw new IOException(FileNative.message(r));
+    }
   }
 
   public void write(byte[] b) throws IOException {
-    if (b == null) throw new NullPointerException();
     write(b, 0, b.length);
   }
 
   public void write(byte[] b, int off, int len) throws IOException {
-    if (b == null) throw new NullPointerException();
-    if (off < 0 || len < 0 || off + len > b.length) throw new IndexOutOfBoundsException();
-    if (len == 0) return;
-    if (peer == 0) throw new IOException("closed");
-    int count = writeBytes(peer, position, b, off, len);
-    if (count > 0) {
-      position += count;
-      if (position > length) {
-        length = position;
-      }
+    Objects.checkFromIndexSize(off, len, b.length);
+    ensureOpen();
+    int r = FileNative.write(fd.fd, b, off, len);
+    if (r < 0) {
+      throw new IOException(FileNative.message(r));
     }
   }
 
-  private static native int writeBytes(long peer, long position, byte[] buffer,
-                                  int offset, int length);
+  public long getFilePointer() throws IOException {
+    ensureOpen();
+    long r = FileNative.seek(fd.fd, 0, 1);
+    if (r < 0) {
+      throw new IOException(FileNative.message((int) r));
+    }
+    return r;
+  }
 
-  public void close() throws IOException {
-    if (peer != 0) {
-      close(peer);
-      peer = 0;
+  public void seek(long pos) throws IOException {
+    if (pos < 0) {
+      throw new IOException("Negative seek offset");
+    }
+    ensureOpen();
+    long r = FileNative.seek(fd.fd, pos, 0);
+    if (r < 0) {
+      throw new IOException(FileNative.message((int) r));
     }
   }
 
-  private static native void close(long peer);
-
-  public boolean isWritable() {
-    return allowWrite;
+  public long length() throws IOException {
+    ensureOpen();
+    long r = FileNative.size(fd.fd);
+    if (r < 0) {
+      throw new IOException(FileNative.message((int) r));
+    }
+    return r;
   }
 
   public void setLength(long newLength) throws IOException {
-    if (newLength < 0) throw new IllegalArgumentException("Negative length: " + newLength);
-    if (peer == 0) throw new IOException("closed");
-    setLength(peer, newLength);
-    this.length = newLength;
-    if (this.position > newLength) {
-      this.position = newLength;
+    ensureOpen();
+    long pos = getFilePointer();
+    int r = FileNative.truncate(fd.fd, newLength);
+    if (r < 0) {
+      throw new IOException(FileNative.message(r));
+    }
+    if (pos > newLength) {
+      seek(newLength);
     }
   }
 
-  private static native void setLength(long peer, long length) throws IOException;
-
-  public void sync() throws IOException {
-    if (peer == 0) throw new IOException("closed");
-    sync(peer);
+  public void close() throws IOException {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    if (channel != null) {
+      channel.close();
+    }
+    fd.closeAll();
   }
 
-  private static native void sync(long peer) throws IOException;
-
-  public FileDescriptor getFD() throws IOException {
-    if (peer == 0) throw new IOException("closed");
-    return new FileDescriptor((int) peer);
+  public final boolean readBoolean() throws IOException {
+    int ch = this.read();
+    if (ch < 0) {
+      throw new EOFException();
+    }
+    return ch != 0;
   }
 
-  public FileChannel getChannel() {
-    return new java.nio.channels.FileChannelImpl(this, true, allowWrite, false);
+  public final byte readByte() throws IOException {
+    int ch = this.read();
+    if (ch < 0) {
+      throw new EOFException();
+    }
+    return (byte) ch;
+  }
+
+  public final int readUnsignedByte() throws IOException {
+    int ch = this.read();
+    if (ch < 0) {
+      throw new EOFException();
+    }
+    return ch;
+  }
+
+  public final short readShort() throws IOException {
+    int ch1 = this.read();
+    int ch2 = this.read();
+    if ((ch1 | ch2) < 0) {
+      throw new EOFException();
+    }
+    return (short) ((ch1 << 8) + ch2);
+  }
+
+  public final int readUnsignedShort() throws IOException {
+    int ch1 = this.read();
+    int ch2 = this.read();
+    if ((ch1 | ch2) < 0) {
+      throw new EOFException();
+    }
+    return (ch1 << 8) + ch2;
+  }
+
+  public final char readChar() throws IOException {
+    int ch1 = this.read();
+    int ch2 = this.read();
+    if ((ch1 | ch2) < 0) {
+      throw new EOFException();
+    }
+    return (char) ((ch1 << 8) + ch2);
+  }
+
+  public final int readInt() throws IOException {
+    int ch1 = this.read();
+    int ch2 = this.read();
+    int ch3 = this.read();
+    int ch4 = this.read();
+    if ((ch1 | ch2 | ch3 | ch4) < 0) {
+      throw new EOFException();
+    }
+    return (ch1 << 24) + (ch2 << 16) + (ch3 << 8) + ch4;
+  }
+
+  public final long readLong() throws IOException {
+    return ((long) (readInt()) << 32) + (readInt() & 0xFFFFFFFFL);
+  }
+
+  public final float readFloat() throws IOException {
+    return Float.intBitsToFloat(readInt());
+  }
+
+  public final double readDouble() throws IOException {
+    return Double.longBitsToDouble(readLong());
+  }
+
+  public final String readLine() throws IOException {
+    StringBuilder input = new StringBuilder();
+    int c = -1;
+    boolean eol = false;
+    while (!eol) {
+      switch (c = read()) {
+      case -1:
+      case '\n':
+        eol = true;
+        break;
+      case '\r':
+        eol = true;
+        long cur = getFilePointer();
+        if (read() != '\n') {
+          seek(cur);
+        }
+        break;
+      default:
+        input.append((char) c);
+        break;
+      }
+    }
+    if (c == -1 && input.length() == 0) {
+      return null;
+    }
+    return input.toString();
+  }
+
+  public final String readUTF() throws IOException {
+    return DataInputStream.readUTF(this);
+  }
+
+  public final void writeBoolean(boolean v) throws IOException {
+    write(v ? 1 : 0);
+  }
+
+  public final void writeByte(int v) throws IOException {
+    write(v);
+  }
+
+  public final void writeShort(int v) throws IOException {
+    buffer8[0] = (byte) (v >>> 8);
+    buffer8[1] = (byte) v;
+    write(buffer8, 0, 2);
+  }
+
+  public final void writeChar(int v) throws IOException {
+    writeShort(v);
+  }
+
+  public final void writeInt(int v) throws IOException {
+    buffer8[0] = (byte) (v >>> 24);
+    buffer8[1] = (byte) (v >>> 16);
+    buffer8[2] = (byte) (v >>> 8);
+    buffer8[3] = (byte) v;
+    write(buffer8, 0, 4);
+  }
+
+  public final void writeLong(long v) throws IOException {
+    for (int i = 0; i < 8; i++) {
+      buffer8[i] = (byte) (v >>> (56 - 8 * i));
+    }
+    write(buffer8, 0, 8);
+  }
+
+  public final void writeFloat(float v) throws IOException {
+    writeInt(Float.floatToIntBits(v));
+  }
+
+  public final void writeDouble(double v) throws IOException {
+    writeLong(Double.doubleToLongBits(v));
+  }
+
+  public final void writeBytes(String s) throws IOException {
+    int len = s.length();
+    byte[] b = new byte[len];
+    for (int i = 0; i < len; i++) {
+      b[i] = (byte) s.charAt(i);
+    }
+    write(b, 0, len);
+  }
+
+  public final void writeChars(String s) throws IOException {
+    int clen = s.length();
+    int blen = 2 * clen;
+    byte[] b = new byte[blen];
+    for (int i = 0, j = 0; i < clen; i++) {
+      char c = s.charAt(i);
+      b[j++] = (byte) (c >>> 8);
+      b[j++] = (byte) c;
+    }
+    write(b, 0, blen);
+  }
+
+  public final void writeUTF(String str) throws IOException {
+    DataOutputStream.writeUTF(str, this);
   }
 }
-

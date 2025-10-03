@@ -23,30 +23,40 @@
 
 package java.io;
 
-public class FileReader extends Reader {
-  private final Reader in;
+import java.nio.charset.Charset;
 
-  public FileReader(FileInputStream in) {
-    this.in = new InputStreamReader(in);
+public class FileReader extends InputStreamReader {
+  public FileReader(String fileName) throws FileNotFoundException {
+    super(open(new File(fileName)));
   }
-  
+
+  public FileReader(File file) throws FileNotFoundException {
+    super(open(file));
+  }
+
   public FileReader(FileDescriptor fd) {
-    this(new FileInputStream(fd));
+    super(new FileInputStream(fd));
   }
 
-  public FileReader(String path) throws IOException {
-    this(new FileInputStream(path));
+  public FileReader(String fileName, Charset charset) throws IOException {
+    super(open(new File(fileName)), charset);
   }
 
-  public FileReader(File file) throws IOException {
-    this(new FileInputStream(file));
+  public FileReader(File file, Charset charset) throws IOException {
+    super(open(file), charset);
   }
 
-  public int read(char[] b, int offset, int length) throws IOException {
-    return in.read(b, offset, length);
+  FileReader(FileInputStream in) {
+    super(in);
   }
 
-  public void close() throws IOException {
-    in.close();
+  private static FileInputStream open(File file) throws FileNotFoundException {
+    try {
+      return new FileInputStream(file);
+    } catch (FileNotFoundException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new FileNotFoundException(e.getMessage());
+    }
   }
 }

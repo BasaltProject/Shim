@@ -23,27 +23,42 @@
 
 package java.io;
 
-public class FileDescriptor {
+import shim.FileNative;
+
+public final class FileDescriptor {
+  int fd;
+
   public static final FileDescriptor in = new FileDescriptor(0);
   public static final FileDescriptor out = new FileDescriptor(1);
   public static final FileDescriptor err = new FileDescriptor(2);
 
-  final int value;
-
-  public FileDescriptor(int value) {
-    this.value = value;
+  public FileDescriptor() {
+    fd = -1;
   }
 
-  public FileDescriptor() {
-    this(-1);
+  public FileDescriptor(int fd) {
+    this.fd = fd;
   }
 
   public boolean valid() {
-    return value != -1;
+    return fd != -1;
   }
 
   public void sync() throws SyncFailedException {
-    // No-op or native sync
+    if (fd == -1 || FileNative.sync(fd, true) < 0) {
+      throw new SyncFailedException("sync failed");
+    }
+  }
+
+  void closeAll() throws IOException {
+    int old = fd;
+    if (old == -1) {
+      return;
+    }
+    fd = -1;
+    int r = FileNative.close(old);
+    if (r < 0) {
+      throw new IOException(FileNative.message(r));
+    }
   }
 }
-

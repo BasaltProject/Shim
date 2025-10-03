@@ -23,87 +23,59 @@
 
 package java.io;
 
-import shim.Utf8;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import sun.nio.cs.StreamDecoder;
 
 public class InputStreamReader extends Reader {
-  private static final int MultibytePadding = 4;
-
-  private final InputStream in;
+  private final StreamDecoder sd;
 
   public InputStreamReader(InputStream in) {
-    this.in = in;
+    super(in);
+    sd = StreamDecoder.forInputStreamReader(in, this, Charset.defaultCharset());
   }
 
-  public InputStreamReader(InputStream in, String encoding)
-    throws UnsupportedEncodingException
-  {
-    this(in);
-
-    if (! encoding.equals("UTF-8")) {
-      throw new UnsupportedEncodingException(encoding);
-    }    
-  }
-
-  public InputStreamReader(InputStream in, java.nio.charset.Charset cs) {
-    this(in);
-  }
-  
-  public int read(char[] b, int offset, int length) throws IOException {
-    if (length == 0) {
-      return 0;
+  public InputStreamReader(InputStream in, String charsetName) throws UnsupportedEncodingException {
+    super(in);
+    if (charsetName == null) {
+      throw new NullPointerException("charsetName");
     }
+    sd = StreamDecoder.forInputStreamReader(in, this, charsetName);
+  }
 
-    byte[] buffer = new byte[length + MultibytePadding];
-    int bufferLength = length;
-    int bufferOffset = 0;
-    while (true) {
-      int c = in.read(buffer, bufferOffset, bufferLength);
-
-      if (c <= 0) {
-        if (bufferOffset > 0) {
-          // if we've reached the end of the stream while trying to
-          // read a multibyte character, we still need to return any
-          // competely-decoded characters, plus \ufffd to indicate an
-          // unknown character
-          c = 1;
-          while (bufferOffset > 0) {
-            char[] buffer16 = Utf8.decode16(buffer, 0, bufferOffset);
-
-            if (buffer16 != null) {
-              System.arraycopy(buffer16, 0, b, offset, buffer16.length);
-              
-              c = buffer16.length + 1;
-              break;
-            } else {
-              -- bufferOffset;
-            }
-          }
-
-          b[offset + c - 1] = '\ufffd';
-        }
-
-        return c;
-      }
-
-      bufferOffset += c;
-
-      char[] buffer16 = Utf8.decode16(buffer, 0, bufferOffset);
-
-      if (buffer16 != null) {
-        bufferOffset = 0;
-
-        System.arraycopy(buffer16, 0, b, offset, buffer16.length);
-
-        return buffer16.length;
-      } else {
-        // the buffer ended in an incomplete multibyte character, so
-        // we try to read a another byte at a time until it's complete
-        bufferLength = 1;
-      }
+  public InputStreamReader(InputStream in, Charset cs) {
+    super(in);
+    if (cs == null) {
+      throw new NullPointerException("charset");
     }
+    sd = StreamDecoder.forInputStreamReader(in, this, cs);
+  }
+
+  public InputStreamReader(InputStream in, CharsetDecoder dec) {
+    super(in);
+    if (dec == null) {
+      throw new NullPointerException("charset decoder");
+    }
+    sd = StreamDecoder.forInputStreamReader(in, this, dec);
+  }
+
+  public String getEncoding() {
+    return sd.getEncoding();
+  }
+
+  public int read() throws IOException {
+    return sd.read();
+  }
+
+  public int read(char[] cbuf, int offset, int length) throws IOException {
+    return sd.read(cbuf, offset, length);
+  }
+
+  public boolean ready() throws IOException {
+    return sd.ready();
   }
 
   public void close() throws IOException {
-    in.close();
+    sd.close();
   }
 }

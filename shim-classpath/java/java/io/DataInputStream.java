@@ -23,123 +23,236 @@
 
 package java.io;
 
-public class DataInputStream extends InputStream implements DataInput {
-  private InputStream in;
-
+public class DataInputStream extends FilterInputStream implements DataInput {
   public DataInputStream(InputStream in) {
-    this.in = in;
+    super(in);
   }
 
-  public void close() throws IOException {
-    in.close();
+  private byte[] bytearr = new byte[80];
+  private char[] chararr = new char[80];
+
+  public final int read(byte[] b) throws IOException {
+    return in.read(b, 0, b.length);
   }
 
-  public int read(byte[] buffer) throws IOException {
-    return in.read(buffer);
+  public final int read(byte[] b, int off, int len) throws IOException {
+    return in.read(b, off, len);
   }
 
-  public int read(byte[] buffer, int offset, int length) throws IOException {
-    return in.read(buffer, offset, length);
-  }
-
-  public void readFully(byte[] b) throws IOException {
+  public final void readFully(byte[] b) throws IOException {
     readFully(b, 0, b.length);
   }
 
-  public void readFully(byte[] b, int offset, int length) throws IOException {
-    while (length > 0) {
-      int count = read(b, offset, length);
+  public final void readFully(byte[] b, int off, int len) throws IOException {
+    java.util.Objects.checkFromIndexSize(off, len, b.length);
+    int n = 0;
+    while (n < len) {
+      int count = in.read(b, off + n, len - n);
       if (count < 0) {
-        throw new EOFException("Reached EOF " + length + " bytes too early");
+        throw new EOFException();
       }
-      offset += count;
-      length -= count;
+      n += count;
     }
   }
 
-  public int read() throws IOException {
-    return in.read();
+  public final int skipBytes(int n) throws IOException {
+    int total = 0;
+    int cur = 0;
+    while (total < n && (cur = (int) in.skip(n - total)) > 0) {
+      total += cur;
+    }
+    return total;
   }
 
-  private int read0() throws IOException {
-    int b = in.read();
-    if (b < 0) {
+  public final boolean readBoolean() throws IOException {
+    int ch = in.read();
+    if (ch < 0) {
       throw new EOFException();
     }
-    return b;
+    return ch != 0;
   }
 
-  public boolean readBoolean() throws IOException {
-    return read0() != 0;
+  public final byte readByte() throws IOException {
+    int ch = in.read();
+    if (ch < 0) {
+      throw new EOFException();
+    }
+    return (byte) ch;
   }
 
-  public byte readByte() throws IOException {
-    return (byte)read0();
+  public final int readUnsignedByte() throws IOException {
+    int ch = in.read();
+    if (ch < 0) {
+      throw new EOFException();
+    }
+    return ch;
   }
 
-  public short readShort() throws IOException {
-    return (short)((read0() << 8) | read0());
+  public final short readShort() throws IOException {
+    int ch1 = in.read();
+    int ch2 = in.read();
+    if ((ch1 | ch2) < 0) {
+      throw new EOFException();
+    }
+    return (short) ((ch1 << 8) + ch2);
   }
 
-  public int readInt() throws IOException {
-    return ((read0() << 24) | (read0() << 16) | (read0() << 8) | read0());
+  public final int readUnsignedShort() throws IOException {
+    int ch1 = in.read();
+    int ch2 = in.read();
+    if ((ch1 | ch2) < 0) {
+      throw new EOFException();
+    }
+    return (ch1 << 8) + ch2;
   }
 
-  public float readFloat() throws IOException {
-    return Float.floatToIntBits(readInt());
+  public final char readChar() throws IOException {
+    int ch1 = in.read();
+    int ch2 = in.read();
+    if ((ch1 | ch2) < 0) {
+      throw new EOFException();
+    }
+    return (char) ((ch1 << 8) + ch2);
   }
 
-  public double readDouble() throws IOException {
-    return Double.doubleToLongBits(readLong());
+  public final int readInt() throws IOException {
+    int ch1 = in.read();
+    int ch2 = in.read();
+    int ch3 = in.read();
+    int ch4 = in.read();
+    if ((ch1 | ch2 | ch3 | ch4) < 0) {
+      throw new EOFException();
+    }
+    return (ch1 << 24) + (ch2 << 16) + (ch3 << 8) + ch4;
   }
 
-  public long readLong() throws IOException {
-    return ((readInt() & 0xffffffffl) << 32) | (readInt() & 0xffffffffl);
+  private final byte[] readBuffer = new byte[8];
+
+  public final long readLong() throws IOException {
+    readFully(readBuffer, 0, 8);
+    return (((long) readBuffer[0] << 56) + ((long) (readBuffer[1] & 255) << 48)
+        + ((long) (readBuffer[2] & 255) << 40) + ((long) (readBuffer[3] & 255) << 32)
+        + ((long) (readBuffer[4] & 255) << 24) + ((readBuffer[5] & 255) << 16) + ((readBuffer[6] & 255) << 8)
+        + (readBuffer[7] & 255));
   }
 
-  public char readChar() throws IOException {
-    return (char)readShort();
+  public final float readFloat() throws IOException {
+    return Float.intBitsToFloat(readInt());
   }
 
-  public int readUnsignedByte() throws IOException {
-    return readByte() & 0xff;
+  public final double readDouble() throws IOException {
+    return Double.longBitsToDouble(readLong());
   }
 
-  public int readUnsignedShort() throws IOException {
-    return readShort() & 0xffff;
-  }
-
-  public String readUTF() throws IOException {
-    int length = readUnsignedShort();
-    byte[] bytes = new byte[length];
-    readFully(bytes);
-    return new String(bytes, "UTF-8");
-  }
+  private char[] lineBuffer;
 
   @Deprecated
-  public String readLine() throws IOException {
-    int c = read();
-    if (c < 0) {
-      return null;
-    } else if (c == '\n') {
-      return "";
+  public final String readLine() throws IOException {
+    char[] buf = lineBuffer;
+    if (buf == null) {
+      buf = lineBuffer = new char[128];
     }
-    StringBuilder builder = new StringBuilder();
-    for (;;) {
-      builder.append((char)c);
-      c = read();
-      if (c < 0 || c == '\n') {
-        return builder.toString();
+    int room = buf.length;
+    int offset = 0;
+    int c;
+    loop:
+    while (true) {
+      switch (c = in.read()) {
+      case -1:
+      case '\n':
+        break loop;
+      case '\r':
+        int c2 = in.read();
+        if (c2 != '\n' && c2 != -1) {
+          if (!(in instanceof PushbackInputStream)) {
+            this.in = new PushbackInputStream(in);
+          }
+          ((PushbackInputStream) in).unread(c2);
+        }
+        break loop;
+      default:
+        if (--room < 0) {
+          buf = new char[offset + 128];
+          room = buf.length - offset - 1;
+          System.arraycopy(lineBuffer, 0, buf, 0, offset);
+          lineBuffer = buf;
+        }
+        buf[offset++] = (char) c;
+        break;
       }
     }
+    if (c == -1 && offset == 0) {
+      return null;
+    }
+    return String.copyValueOf(buf, 0, offset);
   }
 
-  public int skipBytes(int n) throws IOException {
-    for (int count = 0; count < n; ++count) {
-      if (read() < 0) {;
-        return count;
+  public final String readUTF() throws IOException {
+    return readUTF(this);
+  }
+
+  public static final String readUTF(DataInput in) throws IOException {
+    int utflen = in.readUnsignedShort();
+    byte[] bytearr = null;
+    char[] chararr = null;
+    if (in instanceof DataInputStream) {
+      DataInputStream dis = (DataInputStream) in;
+      if (dis.bytearr.length < utflen) {
+        dis.bytearr = new byte[utflen * 2];
+        dis.chararr = new char[utflen * 2];
+      }
+      chararr = dis.chararr;
+      bytearr = dis.bytearr;
+    } else {
+      bytearr = new byte[utflen];
+      chararr = new char[utflen];
+    }
+    int c, char2, char3;
+    int count = 0;
+    int chararrCount = 0;
+    in.readFully(bytearr, 0, utflen);
+    while (count < utflen) {
+      c = (int) bytearr[count] & 0xff;
+      if (c > 127) {
+        break;
+      }
+      count++;
+      chararr[chararrCount++] = (char) c;
+    }
+    while (count < utflen) {
+      c = (int) bytearr[count] & 0xff;
+      switch (c >> 4) {
+      case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+        count++;
+        chararr[chararrCount++] = (char) c;
+        break;
+      case 12: case 13:
+        count += 2;
+        if (count > utflen) {
+          throw new UTFDataFormatException("malformed input: partial character at end");
+        }
+        char2 = (int) bytearr[count - 1];
+        if ((char2 & 0xC0) != 0x80) {
+          throw new UTFDataFormatException("malformed input around byte " + count);
+        }
+        chararr[chararrCount++] = (char) (((c & 0x1F) << 6) | (char2 & 0x3F));
+        break;
+      case 14:
+        count += 3;
+        if (count > utflen) {
+          throw new UTFDataFormatException("malformed input: partial character at end");
+        }
+        char2 = (int) bytearr[count - 2];
+        char3 = (int) bytearr[count - 1];
+        if (((char2 & 0xC0) != 0x80) || ((char3 & 0xC0) != 0x80)) {
+          throw new UTFDataFormatException("malformed input around byte " + (count - 1));
+        }
+        chararr[chararrCount++] = (char) (((c & 0x0F) << 12) | ((char2 & 0x3F) << 6) | ((char3 & 0x3F) << 0));
+        break;
+      default:
+        throw new UTFDataFormatException("malformed input around byte " + count);
       }
     }
-    return n;
+    return new String(chararr, 0, chararrCount);
   }
 }
