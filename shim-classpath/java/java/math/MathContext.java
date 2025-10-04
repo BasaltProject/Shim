@@ -28,58 +28,56 @@ import java.io.Serializable;
 public final class MathContext implements Serializable {
   private static final long serialVersionUID = 5579720004786848255L;
 
+  private static final int kMinDigits = 0;
 
-  public static final MathContext DECIMAL32  = new MathContext( 7, RoundingMode.HALF_EVEN);
-  public static final MathContext DECIMAL64  = new MathContext(16, RoundingMode.HALF_EVEN);
+  public static final MathContext UNLIMITED = new MathContext(0, RoundingMode.HALF_UP);
+  public static final MathContext DECIMAL32 = new MathContext(7, RoundingMode.HALF_EVEN);
+  public static final MathContext DECIMAL64 = new MathContext(16, RoundingMode.HALF_EVEN);
   public static final MathContext DECIMAL128 = new MathContext(34, RoundingMode.HALF_EVEN);
-  public static final MathContext UNLIMITED  = new MathContext(0,  RoundingMode.HALF_UP);
 
-  private int precision;
-  private RoundingMode roundingMode;
+  final int precision;
+  final RoundingMode roundingMode;
 
-  public MathContext(int precision, RoundingMode roundingMode) {
-    if (precision < 0)
-        throw new IllegalArgumentException();
-    if (roundingMode == null)
-        throw new NullPointerException();
-    this.precision    = precision;
-    this.roundingMode = roundingMode;
+  public MathContext(int setPrecision) {
+    this(setPrecision, RoundingMode.HALF_UP);
   }
 
-  public MathContext(int precision) {
-    this(precision, RoundingMode.HALF_UP);
+  public MathContext(int setPrecision, RoundingMode setRoundingMode) {
+    if (setPrecision < kMinDigits) {
+      throw new IllegalArgumentException("Digits < 0");
+    }
+    if (setRoundingMode == null) {
+      throw new NullPointerException("null RoundingMode");
+    }
+    precision = setPrecision;
+    roundingMode = setRoundingMode;
   }
 
   public MathContext(String val) {
+    int setPrecision;
     if (val == null) {
-      throw new NullPointerException();
+      throw new NullPointerException("null String");
     }
     try {
-      int pIndex = val.indexOf("precision=");
-      int rIndex = val.indexOf("roundingMode=");
-      if (pIndex < 0 || rIndex < 0) {
-        throw new IllegalArgumentException("bad string format: " + val);
+      if (!val.startsWith("precision=")) {
+        throw new RuntimeException();
       }
-      int pStart = pIndex + 10;
-      int pEnd = val.indexOf(' ', pStart);
-      if (pEnd < 0) {
-        pEnd = val.length();
+      int fence = val.indexOf(' ');
+      int off = 10;
+      setPrecision = Integer.parseInt(val, off, fence, 10);
+      if (!val.startsWith("roundingMode=", fence + 1)) {
+        throw new RuntimeException();
       }
-      this.precision = Integer.parseInt(val.substring(pStart, pEnd));
-      if (this.precision < 0) {
-        throw new IllegalArgumentException("precision < 0");
-      }
-      int rStart = rIndex + 13;
-      int rEnd = val.indexOf(' ', rStart);
-      if (rEnd < 0) {
-        rEnd = val.length();
-      }
-      this.roundingMode = RoundingMode.valueOf(val.substring(rStart, rEnd));
-    } catch (IllegalArgumentException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalArgumentException("bad string format: " + val, e);
+      off = fence + 1 + 13;
+      String str = val.substring(off, val.length());
+      roundingMode = RoundingMode.valueOf(str);
+    } catch (RuntimeException re) {
+      throw new IllegalArgumentException("bad string format");
     }
+    if (setPrecision < kMinDigits) {
+      throw new IllegalArgumentException("Digits < 0");
+    }
+    precision = setPrecision;
   }
 
   public int getPrecision() {
@@ -91,28 +89,34 @@ public final class MathContext implements Serializable {
   }
 
   @Override
-  public boolean equals(Object that) {
-    return
-        (that instanceof MathContext) &&
-        (precision    == ((MathContext) that).getPrecision()) &&
-        (roundingMode == ((MathContext) that).getRoundingMode());
+  public boolean equals(Object x) {
+    MathContext mc;
+    if (!(x instanceof MathContext)) {
+      return false;
+    }
+    mc = (MathContext) x;
+    return mc.precision == this.precision && mc.roundingMode == this.roundingMode;
   }
 
   @Override
   public int hashCode() {
-    return
-        roundingMode.ordinal() |
-        (precision << 4);
+    return this.precision + roundingMode.hashCode() * 59;
   }
-
-  private final static String precisionString    = "precision=";
-  private final static String roundingModeString = " roundingMode=";
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder(48);
-    sb.append(precisionString).append(precision);
-    sb.append(roundingModeString).append(roundingMode);
-    return sb.toString();
+    return "precision=" + precision + " roundingMode=" + roundingMode.toString();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    if (precision < kMinDigits) {
+      String message = "MathContext: invalid digits in stream";
+      throw new java.io.StreamCorruptedException(message);
+    }
+    if (roundingMode == null) {
+      String message = "MathContext: null roundingMode in stream";
+      throw new java.io.StreamCorruptedException(message);
+    }
   }
 }
