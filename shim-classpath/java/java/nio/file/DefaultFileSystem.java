@@ -429,7 +429,14 @@ final class DefaultFileSystem extends FileSystem {
       if (!p.startsWith("/")) {
         p = "/" + p;
       }
-      return URI.create("file://" + p);
+      if (!p.endsWith("/") && new java.io.File(p).isDirectory()) {
+        p = p + "/";
+      }
+      try {
+        return new URI("file", "", p, null);
+      } catch (java.net.URISyntaxException e) {
+        throw new AssertionError(e);
+      }
     }
 
     @Override

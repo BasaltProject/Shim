@@ -78,15 +78,10 @@ public final class String
     this(data, 0, data.length);
   }
 
-  public String(byte bytes[], int offset, int length, String charsetName)
+  public String(byte[] bytes, int offset, int length, String charsetName)
     throws UnsupportedEncodingException
   {
-    this(bytes, offset, length);
-    if (! (charsetName.equalsIgnoreCase(UTF_8_ENCODING)
-           || charsetName.equalsIgnoreCase(ISO_8859_1_ENCODING)))
-    {
-      throw new UnsupportedEncodingException(charsetName);
-    }
+    this(decodeBytes(bytes, offset, length, sun.nio.cs.StringCoding.lookup(charsetName)));
   }
 
   public String(byte[] data, int offset, int length, boolean copy) {
@@ -94,7 +89,7 @@ public final class String
   }
 
   public String(byte[] data, int offset, int length) {
-    this(data, offset, length, true);
+    this(decodeBytes(data, offset, length, sun.nio.cs.UTF_8.INSTANCE));
   }
 
   public String(StringBuilder builder) {
@@ -155,14 +150,14 @@ public final class String
     this(bytes, 0, bytes.length, charset);
   }
 
-  private static String decodeBytes(byte[] bytes, int offset, int length, java.nio.charset.Charset charset) {
+  private static char[] decodeBytes(byte[] bytes, int offset, int length, java.nio.charset.Charset charset) {
+    if (charset == null) throw new NullPointerException("charset");
     if (bytes == null) throw new NullPointerException();
-    if (charset == null) throw new NullPointerException();
-    try {
-      return new String(bytes, offset, length, charset.name());
-    } catch (java.io.UnsupportedEncodingException e) {
-      return new String(bytes, offset, length);
+    if (offset < 0 || length < 0 || offset > bytes.length - length) {
+      throw new StringIndexOutOfBoundsException("Range [" + offset + ", " + offset + " + " + length
+                                                + ") out of bounds for length " + bytes.length);
     }
+    return sun.nio.cs.StringCoding.decode(charset, bytes, offset, length);
   }
 
   public String(byte bytes[], int highByte, int offset, int length) {
@@ -525,40 +520,43 @@ public final class String
   }
 
   public byte[] getBytes() {
-    try {
-      return getBytes(DEFAULT_ENCODING);
-    } catch (java.io.UnsupportedEncodingException ex) {
-      throw new RuntimeException(
-        "Default '" + DEFAULT_ENCODING + "' encoding not handled", ex);
-    }
+    return encodeChars(sun.nio.cs.UTF_8.INSTANCE);
   }
 
-  public byte[] getBytes(String format)
+  public byte[] getBytes(String charsetName)
     throws java.io.UnsupportedEncodingException
   {
-    if(data instanceof byte[]) {
-      byte[] b = new byte[length];
-      getBytes(0, length, b, 0);
-      return b;
-    }
-    String fmt = format.trim().toUpperCase();
-    if (DEFAULT_ENCODING.equals(fmt)) {
-      return Utf8.encode((char[])data, offset, length);
-    } else if (ISO_8859_1_ENCODING.equals(fmt) || LATIN_1_ENCODING.equals(fmt)) {
-      return Iso88591.encode((char[])data, offset, length);
-    } else {
-      throw new java.io.UnsupportedEncodingException(
-        "Encoding " + format + " not supported");
-    }
+    return encodeChars(sun.nio.cs.StringCoding.lookup(charsetName));
   }
 
   public byte[] getBytes(java.nio.charset.Charset charset) {
     if (charset == null) throw new NullPointerException();
-    try {
-      return getBytes(charset.name());
-    } catch (java.io.UnsupportedEncodingException e) {
-      return getBytes();
+    return encodeChars(charset);
+  }
+
+  private byte[] encodeChars(java.nio.charset.Charset charset) {
+    if (data instanceof byte[]) {
+      byte[] source = (byte[]) data;
+      if (charset == sun.nio.cs.UTF_8.INSTANCE || charset == sun.nio.cs.US_ASCII.INSTANCE
+          || charset == sun.nio.cs.ISO_8859_1.INSTANCE) {
+        boolean ascii = true;
+        for (int i = 0; i < length; ++i) {
+          if (source[offset + i] < 0) {
+            ascii = false;
+            break;
+          }
+        }
+        if (ascii) {
+          byte[] b = new byte[length];
+          System.arraycopy(source, offset, b, 0, length);
+          return b;
+        }
+      }
+      char[] chars = new char[length];
+      getChars(0, length, chars, 0);
+      return sun.nio.cs.StringCoding.encode(charset, chars, 0, length);
     }
+    return sun.nio.cs.StringCoding.encode(charset, (char[]) data, offset, length);
   }
 
   public void getChars(int srcOffset, int srcEnd,

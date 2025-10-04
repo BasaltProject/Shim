@@ -20,6 +20,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileAttribute;
@@ -92,7 +94,8 @@ public final class Files {
   }
 
   public static BufferedReader newBufferedReader(Path path, Charset cs) throws IOException {
-    return new BufferedReader(new InputStreamReader(newInputStream(path), cs));
+    CharsetDecoder decoder = cs.newDecoder();
+    return new BufferedReader(new InputStreamReader(newInputStream(path), decoder));
   }
 
   public static BufferedReader newBufferedReader(Path path) throws IOException {
@@ -100,7 +103,8 @@ public final class Files {
   }
 
   public static BufferedWriter newBufferedWriter(Path path, Charset cs, OpenOption... options) throws IOException {
-    return new BufferedWriter(new OutputStreamWriter(newOutputStream(path, options), cs));
+    CharsetEncoder encoder = cs.newEncoder();
+    return new BufferedWriter(new OutputStreamWriter(newOutputStream(path, options), encoder));
   }
 
   public static BufferedWriter newBufferedWriter(Path path, OpenOption... options) throws IOException {
@@ -400,7 +404,9 @@ public final class Files {
   }
 
   public static String readString(Path path, Charset cs) throws IOException {
-    return new String(readAllBytes(path), cs);
+    Objects.requireNonNull(cs, "cs");
+    byte[] bytes = readAllBytes(path);
+    return cs.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
   }
 
   public static List<String> readAllLines(Path path, Charset cs) throws IOException {
@@ -450,7 +456,21 @@ public final class Files {
 
   public static Path writeString(Path path, CharSequence csq, Charset cs, OpenOption... options) throws IOException {
     Objects.requireNonNull(csq, "csq");
-    return write(path, csq.toString().getBytes(cs), options);
+    Objects.requireNonNull(cs, "cs");
+    if (cs == StandardCharsets.UTF_8) {
+      for (int i = 0; i < csq.length(); i++) {
+        char c = csq.charAt(i);
+        if (Character.isHighSurrogate(c) && i + 1 < csq.length() && Character.isLowSurrogate(csq.charAt(i + 1))) {
+          i++;
+        } else if (Character.isSurrogate(c)) {
+          throw new java.nio.charset.UnmappableCharacterException(1);
+        }
+      }
+    }
+    java.nio.ByteBuffer encoded = cs.newEncoder().encode(java.nio.CharBuffer.wrap(csq));
+    byte[] exact = new byte[encoded.remaining()];
+    encoded.get(exact);
+    return write(path, exact, options);
   }
 
   public static Stream<Path> list(Path dir) throws IOException {

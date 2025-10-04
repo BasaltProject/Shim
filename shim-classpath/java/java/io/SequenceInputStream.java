@@ -1,14 +1,30 @@
 /*
- * Copyright (c) 2026 BasaltMC.
- * Licensed under MIT; see LICENSE:
+ * Based on Avian (https://github.com/ReadyTalk/avian).
+ * Original work Copyright (c) 2008-2015, Avian Contributors.
+ * Original work licensed under ISC; see LICENSE.txt:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
+ *
+ * Modifications Copyright (c) 2026 BasaltMC.
+ * Modifications licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: ISC AND MIT
  */
+
+/* Copyright (c) 2008-2015, Avian Contributors
+
+   Permission to use, copy, modify, and/or distribute this software
+   for any purpose with or without fee is hereby granted, provided
+   that the above copyright notice and this permission notice appear
+   in all copies.
+
+   There is NO WARRANTY for this software.  See license.txt for
+   details. */
 
 package java.io;
 
 import java.util.Enumeration;
+import java.util.Objects;
 import java.util.Vector;
 
 public class SequenceInputStream extends InputStream {
@@ -70,9 +86,8 @@ public class SequenceInputStream extends InputStream {
     } else if (b == null) {
       throw new NullPointerException();
     }
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    } else if (len == 0) {
+    Objects.checkFromIndexSize(off, len, b.length);
+    if (len == 0) {
       return 0;
     }
     do {

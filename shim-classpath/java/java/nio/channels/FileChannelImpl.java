@@ -367,7 +367,7 @@ public class FileChannelImpl extends FileChannel {
   public void force(boolean metaData) throws IOException {
     ensureOpen();
     synchronized (raf) {
-      raf.sync();
+      raf.getFD().sync();
     }
   }
 

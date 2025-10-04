@@ -23,25 +23,94 @@
 
 package java.io;
 
-public class StringReader extends Reader {
-  private final String in;
-  private int position = 0;
+import java.util.Objects;
 
-  public StringReader(String in) {
-    this.in = in;
+public class StringReader extends Reader {
+  private String str;
+  private int length;
+  private int next = 0;
+  private int mark = 0;
+
+  public StringReader(String s) {
+    this.str = s;
+    this.length = s.length();
   }
-  
-  public int read(char[] b, int offset, int length) throws IOException {
-    if (length > in.length() - position) {
-      length = in.length() - position;
-      if (length <= 0) {
+
+  private void ensureOpen() throws IOException {
+    if (str == null) {
+      throw new IOException("Stream closed");
+    }
+  }
+
+  public int read() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      if (next >= length) {
         return -1;
       }
+      return str.charAt(next++);
     }
-    in.getChars(position, position+length, b, offset);
-    position += length;
-    return length;
   }
 
-  public void close() throws IOException { }
+  public int read(char[] cbuf, int off, int len) throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      Objects.checkFromIndexSize(off, len, cbuf.length);
+      if (len == 0) {
+        return 0;
+      }
+      if (next >= length) {
+        return -1;
+      }
+      int n = Math.min(length - next, len);
+      str.getChars(next, next + n, cbuf, off);
+      next += n;
+      return n;
+    }
+  }
+
+  public long skip(long n) throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      if (next >= length) {
+        return 0;
+      }
+      long r = Math.min(length - next, n);
+      r = Math.max(-next, r);
+      next += (int) r;
+      return r;
+    }
+  }
+
+  public boolean ready() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      return true;
+    }
+  }
+
+  public boolean markSupported() {
+    return true;
+  }
+
+  public void mark(int readAheadLimit) throws IOException {
+    if (readAheadLimit < 0) {
+      throw new IllegalArgumentException("Read-ahead limit < 0");
+    }
+    synchronized (lock) {
+      ensureOpen();
+      mark = next;
+    }
+  }
+
+  public void reset() throws IOException {
+    synchronized (lock) {
+      ensureOpen();
+      next = mark;
+    }
+  }
+
+  public void close() {
+    str = null;
+  }
 }

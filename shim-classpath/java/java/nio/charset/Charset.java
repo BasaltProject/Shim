@@ -8,165 +8,224 @@
 
 package java.nio.charset;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.charset.spi.CharsetProvider;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import sun.nio.cs.StandardCharsets;
 
 public abstract class Charset implements Comparable<Charset> {
-  private final String canonicalName;
-  private final Set<String> aliases;
+  private final String name;
+  private final String[] aliases;
+  private Set<String> aliasSet;
 
-  protected Charset(String canonicalName, String[] aliases) {
-    this.canonicalName = Objects.requireNonNull(canonicalName, "canonicalName");
-    if (aliases == null || aliases.length == 0) {
-      this.aliases = Collections.emptySet();
-    } else {
-      Set<String> set = new HashSet<String>();
-      for (String a : aliases) {
-        set.add(a);
+  private static void checkName(String s) {
+    int n = s.length();
+    if (n == 0) {
+      throw new IllegalCharsetNameException(s);
+    }
+    for (int i = 0; i < n; i++) {
+      char c = s.charAt(i);
+      if (c >= 'A' && c <= 'Z') {
+        continue;
       }
-      this.aliases = Collections.unmodifiableSet(set);
+      if (c >= 'a' && c <= 'z') {
+        continue;
+      }
+      if (c >= '0' && c <= '9') {
+        continue;
+      }
+      if (c == '-' && i != 0) {
+        continue;
+      }
+      if (c == '+' && i != 0) {
+        continue;
+      }
+      if (c == ':' && i != 0) {
+        continue;
+      }
+      if (c == '_' && i != 0) {
+        continue;
+      }
+      if (c == '.' && i != 0) {
+        continue;
+      }
+      throw new IllegalCharsetNameException(s);
     }
   }
 
-  public static Charset defaultCharset() {
-    return StandardCharsets.UTF_8;
+  protected Charset(String canonicalName, String[] aliases) {
+    String[] as = aliases == null ? new String[0] : aliases;
+    checkName(canonicalName);
+    for (int i = 0; i < as.length; i++) {
+      checkName(as[i]);
+    }
+    this.name = canonicalName;
+    this.aliases = as;
+  }
+
+  private static CharsetProvider[] providers;
+
+  private static synchronized CharsetProvider[] providers() {
+    if (providers == null) {
+      java.util.List<CharsetProvider> list = new java.util.ArrayList<CharsetProvider>();
+      try {
+        for (CharsetProvider p : java.util.ServiceLoader.load(CharsetProvider.class,
+            ClassLoader.getSystemClassLoader())) {
+          list.add(p);
+        }
+      } catch (Throwable t) {
+        // providers are optional
+      }
+      providers = list.toArray(new CharsetProvider[0]);
+    }
+    return providers;
+  }
+
+  private static Charset lookup(String charsetName) {
+    if (charsetName == null) {
+      throw new IllegalArgumentException("Null charset name");
+    }
+    checkName(charsetName);
+    Charset cs = StandardCharsets.lookup(charsetName);
+    if (cs != null) {
+      return cs;
+    }
+    for (CharsetProvider p : providers()) {
+      cs = p.charsetForName(charsetName);
+      if (cs != null) {
+        return cs;
+      }
+    }
+    return null;
+  }
+
+  public static boolean isSupported(String charsetName) {
+    return lookup(charsetName) != null;
   }
 
   public static Charset forName(String charsetName) {
-    Objects.requireNonNull(charsetName, "charsetName");
-    String norm = charsetName.toUpperCase(Locale.ROOT);
-    if (norm.equals("UTF-8") || norm.equals("UTF8")) {
-      return StandardCharsets.UTF_8;
-    }
-    if (norm.equals("ISO-8859-1") || norm.equals("ISO8859_1") || norm.equals("LATIN1")) {
-      return StandardCharsets.ISO_8859_1;
-    }
-    if (norm.equals("US-ASCII") || norm.equals("ASCII")) {
-      return StandardCharsets.US_ASCII;
-    }
-    if (norm.equals("UTF-16") || norm.equals("UTF16")) {
-      return StandardCharsets.UTF_16;
-    }
-    if (norm.equals("UTF-16BE") || norm.equals("UTF16BE")) {
-      return StandardCharsets.UTF_16BE;
-    }
-    if (norm.equals("UTF-16LE") || norm.equals("UTF16LE")) {
-      return StandardCharsets.UTF_16LE;
+    Charset cs = lookup(charsetName);
+    if (cs != null) {
+      return cs;
     }
     throw new UnsupportedCharsetException(charsetName);
   }
 
   public static Charset forName(String charsetName, Charset fallback) {
-    if (charsetName == null) {
-      throw new IllegalArgumentException("Null charset name");
-    }
     try {
-      return forName(charsetName);
-    } catch (IllegalArgumentException ex) {
+      Charset cs = lookup(charsetName);
+      return cs != null ? cs : fallback;
+    } catch (IllegalCharsetNameException icne) {
       return fallback;
     }
   }
 
-  public static boolean isSupported(String charsetName) {
-    try {
-      forName(charsetName);
-      return true;
-    } catch (IllegalArgumentException ex) {
-      return false;
-    }
-  }
-
   public static SortedMap<String, Charset> availableCharsets() {
-    TreeMap<String, Charset> map = new TreeMap<String, Charset>(String.CASE_INSENSITIVE_ORDER);
-    map.put(StandardCharsets.UTF_8.name(), StandardCharsets.UTF_8);
-    map.put(StandardCharsets.ISO_8859_1.name(), StandardCharsets.ISO_8859_1);
-    map.put(StandardCharsets.US_ASCII.name(), StandardCharsets.US_ASCII);
-    map.put(StandardCharsets.UTF_16.name(), StandardCharsets.UTF_16);
-    map.put(StandardCharsets.UTF_16BE.name(), StandardCharsets.UTF_16BE);
-    map.put(StandardCharsets.UTF_16LE.name(), StandardCharsets.UTF_16LE);
-    return Collections.unmodifiableSortedMap(map);
+    TreeMap<String, Charset> m = new TreeMap<String, Charset>(String.CASE_INSENSITIVE_ORDER);
+    for (Charset cs : StandardCharsets.all()) {
+      m.put(cs.name(), cs);
+    }
+    for (CharsetProvider p : providers()) {
+      for (Iterator<Charset> i = p.charsets(); i.hasNext();) {
+        Charset cs = i.next();
+        if (!m.containsKey(cs.name())) {
+          m.put(cs.name(), cs);
+        }
+      }
+    }
+    return Collections.unmodifiableSortedMap(m);
   }
 
-  public String name() {
-    return canonicalName;
+  public static Charset defaultCharset() {
+    return sun.nio.cs.UTF_8.INSTANCE;
   }
 
-  public Set<String> aliases() {
-    return aliases;
+  public final String name() {
+    return name;
+  }
+
+  public final Set<String> aliases() {
+    if (aliasSet != null) {
+      return aliasSet;
+    }
+    Set<String> set = HashSet.newHashSet(aliases.length);
+    for (String alias : aliases) {
+      set.add(alias);
+    }
+    aliasSet = Collections.unmodifiableSet(set);
+    return aliasSet;
   }
 
   public String displayName() {
-    return canonicalName;
+    return name;
   }
 
-  public boolean isRegistered() {
-    return true;
+  public final boolean isRegistered() {
+    return !name.startsWith("X-") && !name.startsWith("x-");
   }
 
-  public boolean canEncode() {
-    return true;
+  public String displayName(Locale locale) {
+    return name;
   }
+
+  public abstract boolean contains(Charset cs);
 
   public abstract CharsetDecoder newDecoder();
 
   public abstract CharsetEncoder newEncoder();
 
-  public ByteBuffer encode(String str) {
-    byte[] bytes;
+  public boolean canEncode() {
+    return true;
+  }
+
+  public final CharBuffer decode(ByteBuffer bb) {
     try {
-      bytes = str.getBytes(canonicalName);
-    } catch (UnsupportedEncodingException e) {
-      bytes = str.getBytes();
+      return newDecoder().onMalformedInput(CodingErrorAction.REPLACE)
+          .onUnmappableCharacter(CodingErrorAction.REPLACE).decode(bb);
+    } catch (CharacterCodingException x) {
+      throw new Error(x);
     }
-    return ByteBuffer.wrap(bytes);
   }
 
-  public ByteBuffer encode(CharBuffer cb) {
-    return encode(cb.toString());
-  }
-
-  public CharBuffer decode(ByteBuffer bb) {
-    byte[] b = new byte[bb.remaining()];
-    bb.get(b);
-    String s;
+  public final ByteBuffer encode(CharBuffer cb) {
     try {
-      s = new String(b, canonicalName);
-    } catch (UnsupportedEncodingException e) {
-      s = new String(b);
+      return newEncoder().onMalformedInput(CodingErrorAction.REPLACE)
+          .onUnmappableCharacter(CodingErrorAction.REPLACE).encode(cb);
+    } catch (CharacterCodingException x) {
+      throw new Error(x);
     }
-    return CharBuffer.wrap(s);
   }
 
-  @Override
-  public int compareTo(Charset other) {
-    return canonicalName.compareToIgnoreCase(other.canonicalName);
+  public final ByteBuffer encode(String str) {
+    return encode(CharBuffer.wrap(str));
   }
 
-  @Override
-  public boolean equals(Object other) {
-    if (this == other) return true;
-    if (other instanceof Charset) {
-      return canonicalName.equalsIgnoreCase(((Charset) other).canonicalName);
+  public final int compareTo(Charset that) {
+    return name().compareToIgnoreCase(that.name());
+  }
+
+  public final int hashCode() {
+    return name().hashCode();
+  }
+
+  public final boolean equals(Object ob) {
+    if (this == ob) {
+      return true;
     }
-    return false;
+    if (!(ob instanceof Charset)) {
+      return false;
+    }
+    return name.equals(((Charset) ob).name());
   }
 
-  @Override
-  public int hashCode() {
-    return canonicalName.toUpperCase(Locale.ROOT).hashCode();
-  }
-
-  @Override
-  public String toString() {
-    return canonicalName;
+  public final String toString() {
+    return name();
   }
 }
