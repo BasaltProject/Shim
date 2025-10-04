@@ -25,7 +25,7 @@ package java.util.zip;
 
 import java.nio.ByteBuffer;
 
-public class Deflater {
+public class Deflater implements AutoCloseable {
   public static final int DEFLATED = 8;
   public static final int NO_COMPRESSION = 0;
   public static final int BEST_SPEED = 1;

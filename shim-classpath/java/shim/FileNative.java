@@ -19,6 +19,8 @@ public final class FileNative {
   public static final int TRUNCATE = 32;
   public static final int SYNC = 64;
   public static final int DSYNC = 128;
+  public static final int NOFOLLOW = 256;
+  public static final int ALLOW_DIR = 512;
 
   public static final int ENOENT = 2;
   public static final int EACCES = 13;

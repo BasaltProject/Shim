@@ -25,7 +25,7 @@ package java.util.zip;
 
 import java.nio.ByteBuffer;
 
-public class Inflater {
+public class Inflater implements AutoCloseable {
   private static final int Z_STREAM_END = 1;
   private static final int Z_NEED_DICT = 2;
   private static final int Z_DATA_ERROR = -3;
