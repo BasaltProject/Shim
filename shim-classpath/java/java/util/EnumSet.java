@@ -223,6 +223,18 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
     return (T) object;
   }
 
+  @Override
+  @SuppressWarnings("unchecked")
+  public EnumSet<T> clone() {
+    try {
+      EnumSet<T> result = (EnumSet<T>) super.clone();
+      result.bitset = (BitSet) bitset.clone();
+      return result;
+    } catch (CloneNotSupportedException e) {
+      throw new AssertionError(e);
+    }
+  }
+
   private class EnumSetIterator implements Iterator<T> {
     private int currentIndex = 0;
     private boolean removeAllowed = false;

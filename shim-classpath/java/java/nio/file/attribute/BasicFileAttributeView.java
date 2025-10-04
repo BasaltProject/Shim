@@ -10,7 +10,8 @@ package java.nio.file.attribute;
 
 import java.io.IOException;
 
-public interface BasicFileAttributeView {
+public interface BasicFileAttributeView extends FileAttributeView {
+  @Override
   String name();
 
   BasicFileAttributes readAttributes() throws IOException;

@@ -28,7 +28,8 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.HashSet;
 
-public class Permissions extends PermissionCollection {
+public class Permissions extends PermissionCollection implements java.io.Serializable {
+
   private static final long serialVersionUID = 4858622370623524688L;
 
   private final Map<Class,PermissionCollection> collections = new HashMap();

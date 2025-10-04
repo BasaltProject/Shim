@@ -23,7 +23,8 @@
 
 package java.security;
 
-public abstract class Permission {
+public abstract class Permission implements Guard, java.io.Serializable {
+
   private static final long serialVersionUID = -5636570222231596674L;
 
   

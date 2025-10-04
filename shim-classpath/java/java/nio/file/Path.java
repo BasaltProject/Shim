@@ -21,7 +21,19 @@ public interface Path extends Comparable<Path>, Iterable<Path>, Watchable {
   }
 
   public static Path of(URI uri) {
-    return Paths.get(uri);
+    String scheme = uri.getScheme();
+    if (scheme == null) {
+      throw new IllegalArgumentException("Missing scheme");
+    }
+    if (scheme.equalsIgnoreCase("file")) {
+      return FileSystems.getDefault().provider().getPath(uri);
+    }
+    for (java.nio.file.spi.FileSystemProvider provider : java.nio.file.spi.FileSystemProvider.installedProviders()) {
+      if (provider.getScheme().equalsIgnoreCase(scheme)) {
+        return provider.getPath(uri);
+      }
+    }
+    throw new FileSystemNotFoundException("Provider \"" + scheme + "\" not installed");
   }
 
   FileSystem getFileSystem();
@@ -60,22 +72,6 @@ public interface Path extends Comparable<Path>, Iterable<Path>, Watchable {
     return resolve(getFileSystem().getPath(other));
   }
 
-  default Path resolve(String first, String... more) {
-    Path result = resolve(getFileSystem().getPath(first));
-    for (String segment : more) {
-      result = result.resolve(segment);
-    }
-    return result;
-  }
-
-  default Path resolve(Path first, Path... more) {
-    Path result = resolve(first);
-    for (Path segment : more) {
-      result = result.resolve(segment);
-    }
-    return result;
-  }
-
   default Path resolveSibling(Path other) {
     Objects.requireNonNull(other, "other");
     Path parent = getParent();
@@ -95,7 +91,11 @@ public interface Path extends Comparable<Path>, Iterable<Path>, Watchable {
   Path toRealPath(LinkOption... options) throws IOException;
 
   default File toFile() {
-    return new File(toString());
+    if (getFileSystem() == FileSystems.getDefault()) {
+      return new File(toString());
+    } else {
+      throw new UnsupportedOperationException("Path not associated with default file system.");
+    }
   }
 
   @Override
@@ -133,9 +133,8 @@ public interface Path extends Comparable<Path>, Iterable<Path>, Watchable {
   }
 
   @Override
-  default WatchKey register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers) throws IOException {
-    throw new UnsupportedOperationException();
-  }
+  WatchKey register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers)
+      throws IOException;
 
   @Override
   default WatchKey register(WatchService watcher, WatchEvent.Kind<?>... events) throws IOException {

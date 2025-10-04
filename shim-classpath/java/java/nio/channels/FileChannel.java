@@ -1,80 +1,53 @@
 /*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  *
- * SPDX-License-Identifier: ISC AND MIT
+ * SPDX-License-Identifier: MIT
  */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.nio.channels;
 
 import java.io.IOException;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.spi.AbstractInterruptibleChannel;
+import java.nio.file.FileSystem;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.spi.FileSystemProvider;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-public abstract class FileChannel
-    implements SeekableByteChannel, GatheringByteChannel, ScatteringByteChannel, Channel
-{
-  protected FileChannel() {}
-
-  public static class MapMode {
-    public static final MapMode READ_ONLY = new MapMode("READ_ONLY");
-    public static final MapMode READ_WRITE = new MapMode("READ_WRITE");
-    public static final MapMode PRIVATE = new MapMode("PRIVATE");
-
-    private final String name;
-
-    private MapMode(String name) {
-      this.name = name;
-    }
-
-    @Override
-    public String toString() {
-      return name;
-    }
-  }
-
-  public static FileChannel open(Path path, OpenOption... options) throws IOException {
-    Set<OpenOption> set = new HashSet<OpenOption>();
-    if (options != null) {
-      for (OpenOption opt : options) {
-        set.add(opt);
-      }
-    }
-    return open(path, set);
-  }
+public abstract class FileChannel extends AbstractInterruptibleChannel
+    implements SeekableByteChannel, GatheringByteChannel, ScatteringByteChannel {
+  protected FileChannel() { }
 
   public static FileChannel open(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs)
-      throws IOException
-  {
-    return FileChannelImpl.open(path, options, attrs);
+      throws IOException {
+    FileSystemProvider provider = path.getFileSystem().provider();
+    return provider.newFileChannel(path, options, attrs);
+  }
+
+  private static final FileAttribute<?>[] NO_ATTRIBUTES = new FileAttribute[0];
+
+  public static FileChannel open(Path path, OpenOption... options) throws IOException {
+    Set<OpenOption> set;
+    if (options.length == 0) {
+      set = Collections.emptySet();
+    } else {
+      set = new HashSet<OpenOption>();
+      Collections.addAll(set, options);
+    }
+    return open(path, set, NO_ATTRIBUTES);
   }
 
   @Override
   public abstract int read(ByteBuffer dst) throws IOException;
-
-  public abstract int read(ByteBuffer dst, long position) throws IOException;
 
   @Override
   public abstract long read(ByteBuffer[] dsts, int offset, int length) throws IOException;
@@ -86,8 +59,6 @@ public abstract class FileChannel
 
   @Override
   public abstract int write(ByteBuffer src) throws IOException;
-
-  public abstract int write(ByteBuffer src, long position) throws IOException;
 
   @Override
   public abstract long write(ByteBuffer[] srcs, int offset, int length) throws IOException;
@@ -115,7 +86,32 @@ public abstract class FileChannel
 
   public abstract long transferFrom(ReadableByteChannel src, long position, long count) throws IOException;
 
+  public abstract int read(ByteBuffer dst, long position) throws IOException;
+
+  public abstract int write(ByteBuffer src, long position) throws IOException;
+
+  public static class MapMode {
+    public static final MapMode READ_ONLY = new MapMode("READ_ONLY");
+    public static final MapMode READ_WRITE = new MapMode("READ_WRITE");
+    public static final MapMode PRIVATE = new MapMode("PRIVATE");
+
+    private final String name;
+
+    private MapMode(String name) {
+      this.name = name;
+    }
+
+    @Override
+    public String toString() {
+      return name;
+    }
+  }
+
   public abstract MappedByteBuffer map(MapMode mode, long position, long size) throws IOException;
+
+  public MemorySegment map(MapMode mode, long offset, long size, Arena arena) throws IOException {
+    throw new UnsupportedOperationException();
+  }
 
   public abstract FileLock lock(long position, long size, boolean shared) throws IOException;
 

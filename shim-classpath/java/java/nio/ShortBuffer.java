@@ -1,60 +1,82 @@
 /*
- * Copyright (c) 2026 BasaltMC.
+ * Based on Avian (https://github.com/ReadyTalk/avian).
+ * Original work Copyright (c) 2008-2015, Avian Contributors.
+ * Original work licensed under ISC; see LICENSE.txt:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
  *
- * Licensed under the MIT License; see LICENSE:
+ * Modifications Copyright (c) 2026 BasaltMC.
+ * Modifications licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: ISC AND MIT
  */
+
 
 package java.nio;
 
 import java.util.Objects;
 
 public abstract class ShortBuffer extends Buffer implements Comparable<ShortBuffer> {
+  final short[] hb;
+  final int offset;
+  boolean isReadOnly;
 
-  private final boolean readOnly;
+  ShortBuffer(int mark, int pos, int lim, int cap, short[] hb, int offset) {
+    super(mark, pos, lim, cap);
+    this.hb = hb;
+    this.offset = offset;
+  }
 
-  protected ShortBuffer(boolean readOnly) {
-    this.readOnly = readOnly;
-    this.readonly = readOnly;
+  ShortBuffer(int mark, int pos, int lim, int cap) {
+    this(mark, pos, lim, cap, null, 0);
   }
 
   public static ShortBuffer allocate(int capacity) {
-    if (capacity < 0) throw new IllegalArgumentException("capacity < 0: " + capacity);
-    return new ArrayShortBuffer(new short[capacity], 0, capacity, false);
+    if (capacity < 0) {
+      throw createCapacityException(capacity);
+    }
+    return new HeapShortBuffer(capacity, capacity);
   }
 
   public static ShortBuffer wrap(short[] array, int offset, int length) {
-    Objects.checkFromIndexSize(offset, length, array.length);
-    return new ArrayShortBuffer(array, offset, length, false);
+    try {
+      return new HeapShortBuffer(array, offset, length);
+    } catch (IllegalArgumentException x) {
+      throw new IndexOutOfBoundsException();
+    }
   }
 
   public static ShortBuffer wrap(short[] array) {
     return wrap(array, 0, array.length);
   }
 
+  @Override
   public abstract ShortBuffer slice();
 
+  @Override
   public abstract ShortBuffer slice(int index, int length);
 
+  @Override
   public abstract ShortBuffer duplicate();
 
   public abstract ShortBuffer asReadOnlyBuffer();
 
   public abstract short get();
 
-  public abstract ShortBuffer put(short s);
+  public abstract ShortBuffer put(short x);
 
   public abstract short get(int index);
 
-  public abstract ShortBuffer put(int index, short s);
+  public abstract ShortBuffer put(int index, short x);
 
   public ShortBuffer get(short[] dst, int offset, int length) {
     Objects.checkFromIndexSize(offset, length, dst.length);
-    checkGet(position, length, false);
-    for (int i = 0; i < length; i++) {
-      dst[offset + i] = get();
+    int pos = position();
+    if (length > limit() - pos) {
+      throw new BufferUnderflowException();
+    }
+    for (int i = offset; i < offset + length; i++) {
+      dst[i] = get();
     }
     return this;
   }
@@ -63,22 +85,74 @@ public abstract class ShortBuffer extends Buffer implements Comparable<ShortBuff
     return get(dst, 0, dst.length);
   }
 
+  public ShortBuffer get(int index, short[] dst, int offset, int length) {
+    Objects.checkFromIndexSize(index, length, limit());
+    Objects.checkFromIndexSize(offset, length, dst.length);
+    for (int i = offset, j = index; i < offset + length; i++, j++) {
+      dst[i] = get(j);
+    }
+    return this;
+  }
+
+  public ShortBuffer get(int index, short[] dst) {
+    return get(index, dst, 0, dst.length);
+  }
+
   public ShortBuffer put(ShortBuffer src) {
-    if (src == this) throw new IllegalArgumentException();
-    if (readOnly) throw new ReadOnlyBufferException();
-    int n = src.remaining();
-    checkPut(position, n, false);
-    for (int i = 0; i < n; i++) {
-      put(src.get());
+    if (src == this) {
+      throw createSameBufferException();
+    }
+    if (isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    int srcPos = src.position();
+    int srcLim = src.limit();
+    int srcRem = srcPos <= srcLim ? srcLim - srcPos : 0;
+    int pos = position();
+    int lim = limit();
+    int rem = pos <= lim ? lim - pos : 0;
+    if (srcRem > rem) {
+      throw new BufferOverflowException();
+    }
+    short[] tmp = new short[srcRem];
+    for (int i = 0; i < srcRem; i++) {
+      tmp[i] = src.get(srcPos + i);
+    }
+    for (int i = 0; i < srcRem; i++) {
+      put(pos + i, tmp[i]);
+    }
+    src.position(srcPos + srcRem);
+    position(pos + srcRem);
+    return this;
+  }
+
+  public ShortBuffer put(int index, ShortBuffer src, int offset, int length) {
+    Objects.checkFromIndexSize(index, length, limit());
+    Objects.checkFromIndexSize(offset, length, src.limit());
+    if (isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    short[] tmp = new short[length];
+    for (int i = 0; i < length; i++) {
+      tmp[i] = src.get(offset + i);
+    }
+    for (int i = 0; i < length; i++) {
+      put(index + i, tmp[i]);
     }
     return this;
   }
 
   public ShortBuffer put(short[] src, int offset, int length) {
+    if (isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
     Objects.checkFromIndexSize(offset, length, src.length);
-    checkPut(position, length, false);
-    for (int i = 0; i < length; i++) {
-      put(src[offset + i]);
+    int pos = position();
+    if (length > limit() - pos) {
+      throw new BufferOverflowException();
+    }
+    for (int i = offset; i < offset + length; i++) {
+      put(src[i]);
     }
     return this;
   }
@@ -87,86 +161,97 @@ public abstract class ShortBuffer extends Buffer implements Comparable<ShortBuff
     return put(src, 0, src.length);
   }
 
-  public boolean hasArray() {
-    return false;
-  }
-
-  public short[] array() {
-    throw new UnsupportedOperationException();
-  }
-
-  public int arrayOffset() {
-    throw new UnsupportedOperationException();
-  }
-
-  public abstract ShortBuffer compact();
-
-  public abstract boolean isDirect();
-
-  public boolean isReadOnly() {
-    return readOnly;
-  }
-
-  public ByteOrder order() {
-    return ByteOrder.BIG_ENDIAN;
-  }
-
-  protected void checkPut(int pos, int amount, boolean absolute) {
-    if (readOnly) {
+  public ShortBuffer put(int index, short[] src, int offset, int length) {
+    if (isReadOnly()) {
       throw new ReadOnlyBufferException();
     }
-    if (pos < 0 || pos + amount > limit) {
-      throw absolute ? new IndexOutOfBoundsException() : new BufferOverflowException();
+    Objects.checkFromIndexSize(index, length, limit());
+    Objects.checkFromIndexSize(offset, length, src.length);
+    for (int i = offset, j = index; i < offset + length; i++, j++) {
+      put(j, src[i]);
     }
+    return this;
   }
 
-  protected void checkGet(int pos, int amount, boolean absolute) {
-    if (amount > limit - pos || pos < 0) {
-      throw absolute ? new IndexOutOfBoundsException() : new BufferUnderflowException();
-    }
+  public ShortBuffer put(int index, short[] src) {
+    return put(index, src, 0, src.length);
   }
 
   @Override
-  public ShortBuffer position(int newPosition) {
+  public final boolean hasArray() {
+    return hb != null && !isReadOnly;
+  }
+
+  @Override
+  public final short[] array() {
+    if (hb == null) {
+      throw new UnsupportedOperationException();
+    }
+    if (isReadOnly) {
+      throw new ReadOnlyBufferException();
+    }
+    return hb;
+  }
+
+  @Override
+  public final int arrayOffset() {
+    if (hb == null) {
+      throw new UnsupportedOperationException();
+    }
+    if (isReadOnly) {
+      throw new ReadOnlyBufferException();
+    }
+    return offset;
+  }
+
+  @Override
+  public final ShortBuffer position(int newPosition) {
     super.position(newPosition);
     return this;
   }
 
   @Override
-  public ShortBuffer limit(int newLimit) {
+  public final ShortBuffer limit(int newLimit) {
     super.limit(newLimit);
     return this;
   }
 
   @Override
-  public ShortBuffer mark() {
+  public final ShortBuffer mark() {
     super.mark();
     return this;
   }
 
   @Override
-  public ShortBuffer reset() {
+  public final ShortBuffer reset() {
     super.reset();
     return this;
   }
 
   @Override
-  public ShortBuffer clear() {
+  public final ShortBuffer clear() {
     super.clear();
     return this;
   }
 
   @Override
-  public ShortBuffer flip() {
+  public final ShortBuffer flip() {
     super.flip();
     return this;
   }
 
   @Override
-  public ShortBuffer rewind() {
+  public final ShortBuffer rewind() {
     super.rewind();
     return this;
   }
+
+  public abstract ShortBuffer compact();
+
+  @Override
+  public abstract boolean isDirect();
+
+  public abstract ByteOrder order();
 
   @Override
   public int hashCode() {
@@ -178,144 +263,74 @@ public abstract class ShortBuffer extends Buffer implements Comparable<ShortBuff
     return h;
   }
 
+  private static boolean same(short x, short y) {
+    return x == y;
+  }
+
+  private static int compare(short x, short y) {
+    return Short.compare(x, y);
+  }
+
+  private static int mismatch(ShortBuffer a, int aPos, ShortBuffer b, int bPos, int length) {
+    for (int i = 0; i < length; i++) {
+      if (!same(a.get(aPos + i), b.get(bPos + i))) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
   @Override
   public boolean equals(Object ob) {
-    if (this == ob) return true;
-    if (!(ob instanceof ShortBuffer)) return false;
-    ShortBuffer that = (ShortBuffer) ob;
-    if (this.remaining() != that.remaining()) return false;
-    int p = this.position();
-    for (int i = this.limit() - 1, j = that.limit() - 1; i >= p; i--, j--) {
-      if (this.get(i) != that.get(j)) return false;
+    if (this == ob) {
+      return true;
     }
-    return true;
+    if (!(ob instanceof ShortBuffer)) {
+      return false;
+    }
+    ShortBuffer that = (ShortBuffer) ob;
+    int thisPos = this.position();
+    int thisRem = this.limit() - thisPos;
+    int thatPos = that.position();
+    int thatRem = that.limit() - thatPos;
+    if (thisRem < 0 || thisRem != thatRem) {
+      return false;
+    }
+    return mismatch(this, thisPos, that, thatPos, thisRem) < 0;
   }
 
   @Override
   public int compareTo(ShortBuffer that) {
-    int n = this.position() + Math.min(this.remaining(), that.remaining());
-    for (int i = this.position(), j = that.position(); i < n; i++, j++) {
-      int cmp = Short.compare(this.get(i), that.get(j));
-      if (cmp != 0) return cmp;
+    int thisPos = this.position();
+    int thisRem = this.limit() - thisPos;
+    int thatPos = that.position();
+    int thatRem = that.limit() - thatPos;
+    int length = Math.min(thisRem, thatRem);
+    if (length < 0) {
+      return -1;
     }
-    return this.remaining() - that.remaining();
+    int i = mismatch(this, thisPos, that, thatPos, length);
+    if (i >= 0) {
+      return compare(this.get(thisPos + i), that.get(thatPos + i));
+    }
+    return thisRem - thatRem;
   }
 
   public int mismatch(ShortBuffer that) {
-    int length = Math.min(this.remaining(), that.remaining());
-    int pThis = this.position();
-    int pThat = that.position();
-    for (int i = 0; i < length; i++) {
-      if (this.get(pThis + i) != that.get(pThat + i)) {
-        return i;
-      }
+    int thisPos = this.position();
+    int thisRem = this.limit() - thisPos;
+    int thatPos = that.position();
+    int thatRem = that.limit() - thatPos;
+    int length = Math.min(thisRem, thatRem);
+    if (length < 0) {
+      return -1;
     }
-    return (this.remaining() != that.remaining()) ? length : -1;
+    int r = mismatch(this, thisPos, that, thatPos, length);
+    return (r == -1 && thisRem != thatRem) ? length : r;
   }
 
   @Override
   public String toString() {
-    return getClass().getName() + "[pos=" + position() + " lim=" + limit() + " cap=" + capacity() + "]";
-  }
-
-  private static class ArrayShortBuffer extends ShortBuffer {
-    private final short[] array;
-    private final int offset;
-
-    ArrayShortBuffer(short[] array, int offset, int length, boolean readOnly) {
-      super(readOnly);
-      this.array = array;
-      this.offset = offset;
-      this.capacity = length;
-      this.limit = length;
-      this.position = 0;
-    }
-
-    @Override
-    public boolean hasArray() {
-      return true;
-    }
-
-    @Override
-    public short[] array() {
-      if (isReadOnly()) throw new ReadOnlyBufferException();
-      return array;
-    }
-
-    @Override
-    public int arrayOffset() {
-      if (isReadOnly()) throw new ReadOnlyBufferException();
-      return offset;
-    }
-
-    @Override
-    public boolean isDirect() {
-      return false;
-    }
-
-    @Override
-    public short get() {
-      checkGet(position, 1, false);
-      return array[offset + position++];
-    }
-
-    @Override
-    public ShortBuffer put(short s) {
-      checkPut(position, 1, false);
-      array[offset + position++] = s;
-      return this;
-    }
-
-    @Override
-    public short get(int index) {
-      checkGet(index, 1, true);
-      return array[offset + index];
-    }
-
-    @Override
-    public ShortBuffer put(int index, short s) {
-      checkPut(index, 1, true);
-      array[offset + index] = s;
-      return this;
-    }
-
-    @Override
-    public ShortBuffer slice() {
-      return new ArrayShortBuffer(array, offset + position, remaining(), isReadOnly());
-    }
-
-    @Override
-    public ShortBuffer slice(int index, int length) {
-      Objects.checkFromIndexSize(index, length, limit);
-      return new ArrayShortBuffer(array, offset + index, length, isReadOnly());
-    }
-
-    @Override
-    public ShortBuffer duplicate() {
-      ArrayShortBuffer b = new ArrayShortBuffer(array, offset, capacity, isReadOnly());
-      b.limit = this.limit;
-      b.position = this.position;
-      b.mark = this.mark;
-      return b;
-    }
-
-    @Override
-    public ShortBuffer asReadOnlyBuffer() {
-      ArrayShortBuffer b = new ArrayShortBuffer(array, offset, capacity, true);
-      b.limit = this.limit;
-      b.position = this.position;
-      b.mark = this.mark;
-      return b;
-    }
-
-    @Override
-    public ShortBuffer compact() {
-      if (isReadOnly()) throw new ReadOnlyBufferException();
-      System.arraycopy(array, offset + position, array, offset, remaining());
-      position = remaining();
-      limit = capacity;
-      mark = -1;
-      return this;
-    }
+    return bufferName() + "[pos=" + position() + " lim=" + limit() + " cap=" + capacity() + "]";
   }
 }
