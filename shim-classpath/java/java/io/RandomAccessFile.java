@@ -24,7 +24,6 @@
 package java.io;
 
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileChannelImpl;
 import java.util.Objects;
 import shim.FileNative;
 
@@ -90,7 +89,7 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
   public final FileChannel getChannel() {
     synchronized (this) {
       if (channel == null) {
-        channel = new FileChannelImpl(this, readable, rw, false);
+        channel = sun.nio.ch.FileChannelImpl.open(fd, path, readable, rw, false, this);
       }
       return channel;
     }

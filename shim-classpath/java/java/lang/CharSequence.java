@@ -32,6 +32,14 @@ public interface CharSequence {
         
   String toString();
 
+  default void getChars(int start, int end, char[] dst, int dstBegin) {
+    java.util.Objects.checkFromToIndex(start, end, length());
+    java.util.Objects.checkFromIndexSize(dstBegin, end - start, dst.length);
+    for (int i = start, j = dstBegin; i < end; i++, j++) {
+      dst[j] = charAt(i);
+    }
+  }
+
   default boolean isEmpty() {
     return length() == 0;
   }

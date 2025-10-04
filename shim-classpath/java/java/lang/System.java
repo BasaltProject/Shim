@@ -144,7 +144,76 @@ public abstract class System {
       properties.put(p.substring(0, index), p.substring(index + 1));
     }
 
+    fillDefaultProperties(properties);
     return properties;
+  }
+
+  private static String nativeEncoding() {
+    String locale = getenv("LC_ALL");
+    if (locale == null || locale.isEmpty()) {
+      locale = getenv("LC_CTYPE");
+    }
+    if (locale == null || locale.isEmpty()) {
+      locale = getenv("LANG");
+    }
+    if (locale != null) {
+      int dot = locale.indexOf('.');
+      if (dot >= 0) {
+        String codeset = locale.substring(dot + 1);
+        int at = codeset.indexOf('@');
+        if (at >= 0) {
+          codeset = codeset.substring(0, at);
+        }
+        String upper = codeset.toUpperCase();
+        if (upper.equals("UTF8") || upper.equals("UTF-8")) {
+          return "UTF-8";
+        }
+        if (!codeset.isEmpty()) {
+          return codeset;
+        }
+      }
+    }
+    return "ANSI_X3.4-1968";
+  }
+
+  private static void putIfAbsent(Properties p, String key, String value) {
+    if (value != null && !p.containsKey(key)) {
+      p.put(key, value);
+    }
+  }
+
+  private static void fillDefaultProperties(Properties p) {
+    String version = (String) p.get("shim.version");
+    String encoding = nativeEncoding();
+    putIfAbsent(p, "native.encoding", encoding);
+    putIfAbsent(p, "stdin.encoding", encoding);
+    putIfAbsent(p, "stdout.encoding", encoding);
+    putIfAbsent(p, "stderr.encoding", encoding);
+    putIfAbsent(p, "sun.jnu.encoding", encoding);
+    putIfAbsent(p, "user.country", (String) p.get("user.region"));
+    String user = getenv("USER");
+    if (user == null) {
+      user = getenv("LOGNAME");
+    }
+    putIfAbsent(p, "user.name", user != null ? user : "unknown");
+    putIfAbsent(p, "java.vendor", "BasaltMC");
+    putIfAbsent(p, "java.vendor.url", "https://github.com/BasaltProject/Shim");
+    putIfAbsent(p, "java.vendor.url.bug", "https://github.com/BasaltProject/Shim/issues");
+    putIfAbsent(p, "java.version.date", "2025-09-16");
+    putIfAbsent(p, "java.runtime.name", "Shim Runtime Environment");
+    putIfAbsent(p, "java.specification.name", "Java Platform API Specification");
+    putIfAbsent(p, "java.specification.vendor", "Oracle Corporation");
+    putIfAbsent(p, "java.vm.name", "Shim VM");
+    putIfAbsent(p, "java.vm.vendor", "BasaltMC");
+    putIfAbsent(p, "java.vm.version", version != null ? version : "25");
+    putIfAbsent(p, "java.vm.info", "");
+    putIfAbsent(p, "java.vm.specification.name", "Java Virtual Machine Specification");
+    putIfAbsent(p, "java.vm.specification.vendor", "Oracle Corporation");
+    putIfAbsent(p, "jdk.debug", "release");
+    putIfAbsent(p, "sun.arch.data.model", "64");
+    putIfAbsent(p, "sun.cpu.endian", "little");
+    putIfAbsent(p, "sun.io.unicode.encoding", "UnicodeLittle");
+    putIfAbsent(p, "java.library.path", getenv("LD_LIBRARY_PATH") != null ? getenv("LD_LIBRARY_PATH") : "");
   }
   
   private static native String[] getNativeProperties();

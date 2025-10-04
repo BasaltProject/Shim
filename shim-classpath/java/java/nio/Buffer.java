@@ -11,57 +11,80 @@
  * SPDX-License-Identifier: ISC AND MIT
  */
 
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.nio;
 
 public abstract class Buffer {
-  protected int capacity;
-  protected int position;
-  protected int limit;
-  protected int mark = -1;
-  protected boolean readonly;
+  int mark = -1;
+  int position;
+  int limit;
+  int capacity;
 
-  public final int limit() {
-    return limit;
+  Buffer(int mark, int pos, int lim, int cap) {
+    if (cap < 0) {
+      throw createCapacityException(cap);
+    }
+    this.capacity = cap;
+    limit(lim);
+    position(pos);
+    if (mark >= 0) {
+      if (mark > pos) {
+        throw new IllegalArgumentException("mark > position: (" + mark + " > " + pos + ")");
+      }
+      this.mark = mark;
+    }
   }
 
-  public final int remaining() {
-    return limit - position;
+  static IllegalArgumentException createSameBufferException() {
+    return new IllegalArgumentException("The source buffer is this buffer");
   }
 
-  public final int position() {
-    return position;
+  static IllegalArgumentException createCapacityException(int capacity) {
+    return new IllegalArgumentException("capacity < 0: (" + capacity + " < 0)");
+  }
+
+  String bufferName() {
+    return getClass().getName();
   }
 
   public final int capacity() {
     return capacity;
   }
 
-  public Buffer limit(int newLimit) {
-    if (newLimit < 0 || newLimit > capacity) {
-      throw new IllegalArgumentException();
-    }
-    limit = newLimit;
-    if (position > limit) position = limit;
-    if (mark > limit) mark = -1;
-    return this;
+  public final int position() {
+    return position;
   }
 
   public Buffer position(int newPosition) {
-    if (newPosition < 0 || newPosition > limit) {
-      throw new IllegalArgumentException();
+    if (newPosition > limit | newPosition < 0) {
+      throw new IllegalArgumentException(newPosition > limit
+          ? "newPosition > limit: (" + newPosition + " > " + limit + ")"
+          : "newPosition < 0: (" + newPosition + " < 0)");
+    }
+    if (mark > newPosition) {
+      mark = -1;
     }
     position = newPosition;
-    if (mark > position) mark = -1;
+    return this;
+  }
+
+  public final int limit() {
+    return limit;
+  }
+
+  public Buffer limit(int newLimit) {
+    if (newLimit > capacity | newLimit < 0) {
+      throw new IllegalArgumentException(newLimit > capacity
+          ? "newLimit > capacity: (" + newLimit + " > " + capacity + ")"
+          : "newLimit < 0: (" + newLimit + " < 0)");
+    }
+    limit = newLimit;
+    if (position > newLimit) {
+      position = newLimit;
+    }
+    if (mark > newLimit) {
+      mark = -1;
+    }
     return this;
   }
 
@@ -77,10 +100,6 @@ public abstract class Buffer {
     }
     position = m;
     return this;
-  }
-
-  public final boolean hasRemaining() {
-    return remaining() > 0;
   }
 
   public Buffer clear() {
@@ -103,21 +122,22 @@ public abstract class Buffer {
     return this;
   }
 
-  public boolean isReadOnly() {
-    return readonly;
+  public final int remaining() {
+    int rem = limit - position;
+    return rem > 0 ? rem : 0;
   }
 
-  public boolean hasArray() {
-    return false;
+  public final boolean hasRemaining() {
+    return position < limit;
   }
 
-  public Object array() {
-    throw new UnsupportedOperationException();
-  }
+  public abstract boolean isReadOnly();
 
-  public int arrayOffset() {
-    throw new UnsupportedOperationException();
-  }
+  public abstract boolean hasArray();
+
+  public abstract Object array();
+
+  public abstract int arrayOffset();
 
   public abstract boolean isDirect();
 
@@ -126,5 +146,62 @@ public abstract class Buffer {
   public abstract Buffer slice(int index, int length);
 
   public abstract Buffer duplicate();
-}
 
+  final int nextGetIndex() {
+    int p = position;
+    if (p >= limit) {
+      throw new BufferUnderflowException();
+    }
+    position = p + 1;
+    return p;
+  }
+
+  final int nextGetIndex(int nb) {
+    int p = position;
+    if (limit - p < nb) {
+      throw new BufferUnderflowException();
+    }
+    position = p + nb;
+    return p;
+  }
+
+  final int nextPutIndex() {
+    int p = position;
+    if (p >= limit) {
+      throw new BufferOverflowException();
+    }
+    position = p + 1;
+    return p;
+  }
+
+  final int nextPutIndex(int nb) {
+    int p = position;
+    if (limit - p < nb) {
+      throw new BufferOverflowException();
+    }
+    position = p + nb;
+    return p;
+  }
+
+  final int checkIndex(int i) {
+    if (i < 0 || i >= limit) {
+      throw new IndexOutOfBoundsException();
+    }
+    return i;
+  }
+
+  final int checkIndex(int i, int nb) {
+    if (i < 0 || nb > limit - i) {
+      throw new IndexOutOfBoundsException();
+    }
+    return i;
+  }
+
+  final int markValue() {
+    return mark;
+  }
+
+  final void discardMark() {
+    mark = -1;
+  }
+}
