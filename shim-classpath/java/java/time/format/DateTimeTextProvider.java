@@ -78,6 +78,13 @@ final class DateTimeTextProvider {
 
   String getText(java.time.chrono.Chronology chrono, TemporalField field, long value, TextStyle style,
       Locale locale) {
+    if (field == ChronoField.ERA && chrono != null && chrono != java.time.chrono.IsoChronology.INSTANCE) {
+      try {
+        return chrono.eraOf((int) value).getDisplayName(style, locale);
+      } catch (java.time.DateTimeException e) {
+        return null;
+      }
+    }
     return getText(field, value, style, locale);
   }
 
@@ -89,6 +96,13 @@ final class DateTimeTextProvider {
     boolean any = false;
     for (TextStyle s : styles) {
       String[] names = table(field, s);
+      if (field == ChronoField.ERA && chrono != null && chrono != java.time.chrono.IsoChronology.INSTANCE) {
+        List<java.time.chrono.Era> eras = chrono.eras();
+        names = new String[eras.size()];
+        for (int i = 0; i < names.length; i++) {
+          names[i] = eras.get(i).getDisplayName(s, locale);
+        }
+      }
       if (names == null) {
         continue;
       }

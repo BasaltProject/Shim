@@ -38,21 +38,31 @@ public interface Chronology extends Comparable<Chronology> {
 
   static Chronology ofLocale(Locale locale) {
     Objects.requireNonNull(locale, "locale");
-    return IsoChronology.INSTANCE;
+    String type = locale.getUnicodeLocaleType("ca");
+    if (type == null || "iso".equals(type) || "iso8601".equals(type)) {
+      return IsoChronology.INSTANCE;
+    }
+    Chronology chrono = AbstractChronology.byType(type);
+    if (chrono == null) {
+      throw new DateTimeException("Unknown calendar system: " + type);
+    }
+    return chrono;
   }
 
   static Chronology of(String id) {
     Objects.requireNonNull(id, "id");
-    if ("ISO".equals(id) || "iso8601".equals(id)) {
-      return IsoChronology.INSTANCE;
+    Chronology chrono = AbstractChronology.byId(id);
+    if (chrono == null) {
+      chrono = AbstractChronology.byType(id);
     }
-    throw new DateTimeException("Unknown chronology: " + id);
+    if (chrono == null) {
+      throw new DateTimeException("Unknown chronology: " + id);
+    }
+    return chrono;
   }
 
   static Set<Chronology> getAvailableChronologies() {
-    Set<Chronology> all = new HashSet<Chronology>();
-    all.add(IsoChronology.INSTANCE);
-    return Collections.unmodifiableSet(all);
+    return new HashSet<Chronology>(AbstractChronology.all());
   }
 
   String getId();

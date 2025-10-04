@@ -86,7 +86,7 @@ public interface ChronoLocalDate extends Temporal, TemporalAdjuster, Comparable<
 
   @Override
   default ChronoLocalDate with(TemporalField field, long newValue) {
-    throw new UnsupportedOperationException();
+    return ChronoLocalDateOps.ensureValid(getChronology(), field.adjustInto(this, newValue));
   }
 
   @Override
@@ -96,7 +96,10 @@ public interface ChronoLocalDate extends Temporal, TemporalAdjuster, Comparable<
 
   @Override
   default ChronoLocalDate plus(long amountToAdd, TemporalUnit unit) {
-    throw new UnsupportedOperationException();
+    if (unit instanceof ChronoUnit) {
+      throw new java.time.temporal.UnsupportedTemporalTypeException("Unsupported unit: " + unit);
+    }
+    return ChronoLocalDateOps.ensureValid(getChronology(), unit.addTo(this, amountToAdd));
   }
 
   @Override
@@ -141,7 +144,7 @@ public interface ChronoLocalDate extends Temporal, TemporalAdjuster, Comparable<
 
   @SuppressWarnings("unchecked")
   default ChronoLocalDateTime<?> atTime(LocalTime localTime) {
-    return (ChronoLocalDateTime<?>) java.time.LocalDateTime.of(LocalDate.from(this), localTime);
+    return ChronoLocalDateTimeImpl.of(this, localTime);
   }
 
   default long toEpochDay() {

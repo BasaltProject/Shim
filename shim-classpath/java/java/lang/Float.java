@@ -138,6 +138,9 @@ public final class Float extends Number implements Comparable<Float>,
   }
 
   public static float parseFloat(String s) {
+    if (s == null) {
+      throw new NullPointerException();
+    }
     int[] numRead = new int[1];
     float f = floatFromString(s, numRead);
     if (numRead[0] == 1) {

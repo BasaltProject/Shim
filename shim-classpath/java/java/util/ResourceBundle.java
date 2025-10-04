@@ -26,7 +26,6 @@ package java.util;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 
 public abstract class ResourceBundle {
   private static final ResourceBundle NONEXISTENT = new ResourceBundle() {
@@ -141,7 +140,8 @@ public abstract class ResourceBundle {
   }
 
   private static ClassLoader callerLoader() {
-    return Method.getCaller().class_.loader;
+    ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    return loader != null ? loader : ClassLoader.getSystemClassLoader();
   }
 
   public static final ResourceBundle getBundle(String baseName) {
@@ -534,6 +534,9 @@ public abstract class ResourceBundle {
             throw new IllegalAccessException("Bundle class is not public: " + c.getName());
           }
           Constructor<?> ctor = c.getConstructor();
+          if (!java.lang.reflect.Modifier.isPublic(ctor.getModifiers())) {
+            throw new IllegalAccessException("Bundle constructor is not public: " + c.getName());
+          }
           bundle = (ResourceBundle) ctor.newInstance();
         } catch (ClassNotFoundException e) {
           // bundle class not present

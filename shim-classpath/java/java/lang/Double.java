@@ -134,6 +134,9 @@ public final class Double extends Number implements Comparable<Double>,
   }
 
   public static double parseDouble(String s) {
+    if (s == null) {
+      throw new NullPointerException();
+    }
     int[] numRead = new int[1];
     double d = doubleFromString(s, numRead);
     if (numRead[0] == 1) {

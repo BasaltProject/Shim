@@ -23,27 +23,26 @@
 
 package java.net;
 
-import java.io.File;
-
-import java.io.InputStream;
-import java.io.IOException;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 
-public class URLClassLoader extends ClassLoader {
+public class URLClassLoader extends ClassLoader implements Closeable {
 
-  private final File jarFile;
+  private final List<URL> urls = new ArrayList<URL>();
+  private final List<File> roots = new ArrayList<File>();
 
   public URLClassLoader(String name, URL[] urls, ClassLoader parent) {
     super(name, parent);
-    if(urls.length != 1) {
-      throw new UnsupportedOperationException();
+    for (URL u : urls) {
+      addURL(u);
     }
-    if(!urls[0].getProtocol().equals("file")) {
-      throw new UnsupportedOperationException(urls[0].getProtocol());
-    }
-    this.jarFile = new File(urls[0].getFile());
   }
 
   public URLClassLoader(URL[] urls, ClassLoader parent) {
@@ -62,6 +61,22 @@ public class URLClassLoader extends ClassLoader {
     return new URLClassLoader(urls);
   }
 
+  protected void addURL(URL url) {
+    if (url == null) {
+      throw new NullPointerException();
+    }
+    if (!url.getProtocol().equals("file")) {
+      throw new UnsupportedOperationException(url.getProtocol());
+    }
+    urls.add(url);
+    roots.add(new File(url.getFile()));
+  }
+
+  public URL[] getURLs() {
+    return urls.toArray(new URL[0]);
+  }
+
+  public void close() throws IOException { }
 
   protected Class findClass(String name) throws ClassNotFoundException {
     try {
@@ -86,14 +101,31 @@ public class URLClassLoader extends ClassLoader {
     }
   }
 
+  private URL find(File root, String path) {
+    try {
+      if (root.isDirectory()) {
+        File f = new File(root, path);
+        if (f.exists()) {
+          return f.toURI().toURL();
+        }
+      } else if (root.exists()) {
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(root)) {
+          if (zf.getEntry(path) != null) {
+            return new URL("jar:file:" + root.getAbsolutePath() + "!/" + path);
+          }
+        }
+      }
+    } catch (IOException ignored) {
+    }
+    return null;
+  }
+
   @Override
   protected URL findResource(String path) {
-    if (jarFile.exists()) {
-      try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(jarFile)) {
-        if (zf.getEntry(path) != null) {
-          return new URL("jar:file:" + jarFile.getAbsolutePath() + "!/" + path);
-        }
-      } catch (IOException ignored) {
+    for (File root : roots) {
+      URL u = find(root, path);
+      if (u != null) {
+        return u;
       }
     }
     return null;
@@ -101,10 +133,13 @@ public class URLClassLoader extends ClassLoader {
 
   @Override
   protected Enumeration<URL> findResources(String path) throws IOException {
-    URL u = findResource(path);
-    if (u != null) {
-      return Collections.enumeration(Collections.singletonList(u));
+    List<URL> found = new ArrayList<URL>();
+    for (File root : roots) {
+      URL u = find(root, path);
+      if (u != null) {
+        found.add(u);
+      }
     }
-    return Collections.emptyEnumeration();
+    return Collections.enumeration(found);
   }
 }
