@@ -634,7 +634,63 @@ public abstract class Provider extends Properties {
 
     @Deprecated
     public boolean supportsParameter(Object parameter) {
+      if (parameter != null && !(parameter instanceof Key)) {
+        return true;
+      }
+      switch (type) {
+      case "Cipher":
+      case "Signature":
+      case "Mac":
+      case "KeyAgreement":
+      case "KEM":
+        break;
+      default:
+        return true;
+      }
+      Key key = (Key) parameter;
+      String classes = attributes.get("SupportedKeyClasses");
+      if (key == null) {
+        return classes == null && attributes.get("SupportedKeyFormats") == null;
+      }
+      if (classes != null) {
+        boolean ok = false;
+        for (String name : classes.split("\\|")) {
+          if (keyHasClassName(key.getClass(), name)) {
+            ok = true;
+            break;
+          }
+        }
+        if (!ok) {
+          return false;
+        }
+      }
+      String formats = attributes.get("SupportedKeyFormats");
+      if (formats != null) {
+        String format = key.getFormat();
+        boolean ok = false;
+        for (String f : formats.split("\\|")) {
+          if (f.equals(format)) {
+            ok = true;
+            break;
+          }
+        }
+        return ok;
+      }
       return true;
+    }
+
+    private static boolean keyHasClassName(Class<?> clazz, String name) {
+      for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
+        if (c.getName().equals(name)) {
+          return true;
+        }
+        for (Class<?> i : c.getInterfaces()) {
+          if (keyHasClassName(i, name)) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
 
     @Override

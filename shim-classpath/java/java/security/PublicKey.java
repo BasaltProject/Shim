@@ -8,6 +8,7 @@
 
 package java.security;
 
-public interface PublicKey extends Key {
-  long serialVersionUID = 7182634900443835147L;
+public interface PublicKey extends AsymmetricKey {
+  @Deprecated
+  long serialVersionUID = 7187392471159151072L;
 }
