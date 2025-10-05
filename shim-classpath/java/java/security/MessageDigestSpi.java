@@ -11,6 +11,9 @@ package java.security;
 import java.nio.ByteBuffer;
 
 public abstract class MessageDigestSpi {
+  public MessageDigestSpi() {
+  }
+
   protected int engineGetDigestLength() {
     return 0;
   }
@@ -20,7 +23,10 @@ public abstract class MessageDigestSpi {
   protected abstract void engineUpdate(byte[] input, int offset, int len);
 
   protected void engineUpdate(ByteBuffer input) {
-    if (!input.hasRemaining()) return;
+    if (!input.hasRemaining()) {
+      return;
+    }
+    byte[] tmp;
     if (input.hasArray()) {
       byte[] b = input.array();
       int ofs = input.arrayOffset();
@@ -30,11 +36,13 @@ public abstract class MessageDigestSpi {
       input.position(lim);
     } else {
       int len = input.remaining();
-      byte[] b = new byte[Math.min(len, 4096)];
-      while (input.hasRemaining()) {
-        int n = Math.min(input.remaining(), b.length);
-        input.get(b, 0, n);
-        engineUpdate(b, 0, n);
+      int n = len > 4096 ? 4096 : len;
+      tmp = new byte[n];
+      while (len > 0) {
+        int chunk = Math.min(len, tmp.length);
+        input.get(tmp, 0, chunk);
+        engineUpdate(tmp, 0, chunk);
+        len -= chunk;
       }
     }
   }
@@ -44,10 +52,10 @@ public abstract class MessageDigestSpi {
   protected int engineDigest(byte[] buf, int offset, int len) throws DigestException {
     byte[] digest = engineDigest();
     if (len < digest.length) {
-      throw new DigestException("insufficient space in the output buffer");
+      throw new DigestException("partial digests not returned");
     }
     if (buf.length - offset < digest.length) {
-      throw new DigestException("insufficient space in the output buffer");
+      throw new DigestException("insufficient space in the output buffer to store the digest");
     }
     System.arraycopy(digest, 0, buf, offset, digest.length);
     return digest.length;

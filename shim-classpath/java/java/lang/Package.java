@@ -25,7 +25,7 @@ package java.lang;
 
 import java.net.URL;
 
-public class Package {
+public class Package implements java.lang.reflect.AnnotatedElement {
   private final String name;
   private final String implementationTitle;
   private final String implementationVendor;
@@ -91,5 +91,35 @@ public class Package {
 
   public boolean isSealed(URL url) {
     return sealed.equals(url);
+  }
+
+  private java.lang.annotation.Annotation[] packageAnnotations() {
+    try {
+      return Class.forName(name + ".package-info", false, loader).getDeclaredAnnotations();
+    } catch (ClassNotFoundException | LinkageError e) {
+      return new java.lang.annotation.Annotation[0];
+    }
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <A extends java.lang.annotation.Annotation> A getAnnotation(Class<A> annotationClass) {
+    java.util.Objects.requireNonNull(annotationClass);
+    for (java.lang.annotation.Annotation a : packageAnnotations()) {
+      if (a.annotationType() == annotationClass) {
+        return (A) a;
+      }
+    }
+    return null;
+  }
+
+  @Override
+  public java.lang.annotation.Annotation[] getAnnotations() {
+    return packageAnnotations();
+  }
+
+  @Override
+  public java.lang.annotation.Annotation[] getDeclaredAnnotations() {
+    return packageAnnotations();
   }
 }

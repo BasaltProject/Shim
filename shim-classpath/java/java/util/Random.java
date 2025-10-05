@@ -66,7 +66,7 @@ public class Random implements RandomGenerator, Serializable {
 
   public int nextInt(int limit) {
     if (limit <= 0) {
-      throw new IllegalArgumentException();
+      throw new IllegalArgumentException("bound must be positive");
     }
     
     if ((limit & -limit) == limit) {
