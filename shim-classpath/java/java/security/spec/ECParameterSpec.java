@@ -1,0 +1,70 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package java.security.spec;
+
+import java.math.BigInteger;
+
+public class ECParameterSpec implements AlgorithmParameterSpec {
+  private final EllipticCurve curve;
+  private final ECPoint g;
+  private final BigInteger n;
+  private final int h;
+  private String name;
+
+  public ECParameterSpec(EllipticCurve curve, ECPoint g, BigInteger n, int h) {
+    if (curve == null) {
+      throw new NullPointerException("curve is null");
+    }
+    if (g == null) {
+      throw new NullPointerException("g is null");
+    }
+    if (n == null) {
+      throw new NullPointerException("n is null");
+    }
+    if (n.signum() != 1) {
+      throw new IllegalArgumentException("n is not positive");
+    }
+    if (h <= 0) {
+      throw new IllegalArgumentException("h is not positive");
+    }
+    this.curve = curve;
+    this.g = g;
+    this.n = n;
+    this.h = h;
+  }
+
+  public EllipticCurve getCurve() {
+    return curve;
+  }
+
+  public ECPoint getGenerator() {
+    return g;
+  }
+
+  public BigInteger getOrder() {
+    return n;
+  }
+
+  public int getCofactor() {
+    return h;
+  }
+
+  public void setCurveName(String name) {
+    this.name = name;
+  }
+
+  public String getCurveName() {
+    return name;
+  }
+
+  @Override
+  public String toString() {
+    return name != null ? name : super.toString();
+  }
+}
