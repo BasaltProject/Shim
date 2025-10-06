@@ -650,7 +650,7 @@ public abstract class Provider extends Properties {
       Key key = (Key) parameter;
       String classes = attributes.get("SupportedKeyClasses");
       if (key == null) {
-        return classes == null && attributes.get("SupportedKeyFormats") == null;
+        return attributes.get("SupportedKeyFormats") == null;
       }
       if (classes != null) {
         boolean ok = false;

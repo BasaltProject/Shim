@@ -73,7 +73,7 @@ public final class ObjectIdentifier implements Serializable {
         }
         v = 0;
       } else if (i == encoded.length - 1) {
-        throw new IOException("ObjectIdentifier() -- unterminated component");
+        throw new IOException("ObjectIdentifier() -- Invalid DER encoding, not ended");
       }
     }
     return new ObjectIdentifier(sb.toString());
