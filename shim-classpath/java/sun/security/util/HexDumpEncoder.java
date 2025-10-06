@@ -30,7 +30,7 @@ public class HexDumpEncoder {
       sb.append(' ');
       for (int i = 0; i < n; i++) {
         byte b = data[offset + i];
-        sb.append((b >= ' ' && b <= '~') ? (char) b : '.');
+        sb.append((b >= ' ' && b <= 'z') ? (char) b : '.');
       }
       sb.append('\n');
     }

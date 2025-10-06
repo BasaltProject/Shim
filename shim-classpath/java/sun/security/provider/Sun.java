@@ -44,6 +44,21 @@ public final class Sun extends Provider {
     addDigest("SHA3-512", "sun.security.provider.SHA3$SHA512", "OID.2.16.840.1.101.3.4.2.10", "2.16.840.1.101.3.4.2.10");
     addDigest("SHAKE128-256", "sun.security.provider.SHA3$SHAKE128Hash", "OID.2.16.840.1.101.3.4.2.11", "2.16.840.1.101.3.4.2.11", "SHAKE128");
     addDigest("SHAKE256-512", "sun.security.provider.SHA3$SHAKE256Hash", "OID.2.16.840.1.101.3.4.2.12", "2.16.840.1.101.3.4.2.12", "SHAKE256");
+    addSoftware("CertificateFactory", "X.509", "sun.security.provider.X509Factory", "X509");
+    addSoftware("CertStore", "Collection", "sun.security.provider.certpath.CollectionCertStore");
+    Map<String, String> pkix = new HashMap<String, String>();
+    pkix.put("ImplementedIn", "Software");
+    pkix.put("ValidationAlgorithm", "RFC5280");
+    putService(new Provider.Service(this, "CertPathBuilder", "PKIX", "sun.security.provider.certpath.SunCertPathBuilder",
+        Collections.<String>emptyList(), pkix));
+    putService(new Provider.Service(this, "CertPathValidator", "PKIX",
+        "sun.security.provider.certpath.PKIXCertPathValidator", Collections.<String>emptyList(), pkix));
+  }
+
+  private void addSoftware(String type, String algorithm, String className, String... aliases) {
+    Map<String, String> attrs = new HashMap<String, String>();
+    attrs.put("ImplementedIn", "Software");
+    putService(new Provider.Service(this, type, algorithm, className, Arrays.asList(aliases), attrs));
   }
 
   private void addDigest(String algorithm, String className, String... aliases) {
