@@ -16,28 +16,30 @@ package java.net;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
+import java.security.AllPermission;
+import java.security.Permission;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.Date;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import sun.net.www.MessageHeader;
 
 public abstract class URLConnection {
-  protected final URL url;
+  protected URL url;
   protected boolean doInput = true;
   protected boolean doOutput = false;
-  protected boolean useCaches = true;
-  protected boolean connected = false;
-  protected boolean allowUserInteraction = false;
-  protected long ifModifiedSince = 0;
-
   private static boolean defaultAllowUserInteraction = false;
-  private static boolean defaultUseCaches = true;
-
-  private int connectTimeout = 0;
-  private int readTimeout = 0;
-  private final Map<String, List<String>> requestProperties = new HashMap<String, List<String>>();
+  protected boolean allowUserInteraction = defaultAllowUserInteraction;
+  private static volatile boolean defaultUseCaches = true;
+  private static final ConcurrentHashMap<String, Boolean> defaultCaching = new ConcurrentHashMap<String, Boolean>();
+  protected boolean useCaches = defaultUseCaches;
+  protected long ifModifiedSince = 0;
+  protected boolean connected = false;
+  private int connectTimeout;
+  private int readTimeout;
+  private MessageHeader requests;
 
   protected URLConnection(URL url) {
     this.url = url;
@@ -47,96 +49,38 @@ public abstract class URLConnection {
     return url;
   }
 
+  public void setConnectTimeout(int timeout) {
+    if (timeout < 0) {
+      throw new IllegalArgumentException("timeouts can't be negative");
+    }
+    connectTimeout = timeout;
+  }
+
   public int getConnectTimeout() {
     return connectTimeout;
   }
 
-  public void setConnectTimeout(int timeout) {
+  public void setReadTimeout(int timeout) {
     if (timeout < 0) {
-      throw new IllegalArgumentException("timeout < 0");
+      throw new IllegalArgumentException("timeouts can't be negative");
     }
-    this.connectTimeout = timeout;
+    readTimeout = timeout;
   }
 
   public int getReadTimeout() {
     return readTimeout;
   }
 
-  public void setReadTimeout(int timeout) {
-    if (timeout < 0) {
-      throw new IllegalArgumentException("timeout < 0");
-    }
-    this.readTimeout = timeout;
-  }
-
-  public void setRequestProperty(String key, String value) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    Objects.requireNonNull(key, "key");
-    List<String> list = new ArrayList<String>();
-    if (value != null) {
-      list.add(value);
-    }
-    requestProperties.put(key, list);
-  }
-
-  public void addRequestProperty(String key, String value) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    Objects.requireNonNull(key, "key");
-    List<String> list = requestProperties.get(key);
-    if (list == null) {
-      list = new ArrayList<String>();
-      requestProperties.put(key, list);
-    }
-    if (value != null) {
-      list.add(value);
-    }
-  }
-
-  public String getRequestProperty(String key) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    if (key == null) return null;
-    List<String> list = requestProperties.get(key);
-    return (list != null && !list.isEmpty()) ? list.get(list.size() - 1) : null;
-  }
-
-  public Map<String, List<String>> getRequestProperties() {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    Map<String, List<String>> copy = new HashMap<String, List<String>>();
-    for (Map.Entry<String, List<String>> entry : requestProperties.entrySet()) {
-      copy.put(entry.getKey(), Collections.unmodifiableList(new ArrayList<String>(entry.getValue())));
-    }
-    return Collections.unmodifiableMap(copy);
-  }
-
-  public Object getContent() throws IOException {
-    return getInputStream();
-  }
-
-  public Object getContent(Class<?>[] classes) throws IOException {
-    Object content = getContent();
-    for (Class<?> c : classes) {
-      if (c.isInstance(content)) {
-        return content;
-      }
-    }
-    return null;
-  }
-
   public int getContentLength() {
-    long len = getContentLengthLong();
-    return len > Integer.MAX_VALUE ? -1 : (int) len;
+    long l = getContentLengthLong();
+    if (l > Integer.MAX_VALUE) {
+      return -1;
+    }
+    return (int) l;
   }
 
   public long getContentLengthLong() {
-    return getHeaderFieldLong("content-length", -1L);
+    return getHeaderFieldLong("content-length", -1);
   }
 
   public String getContentType() {
@@ -159,54 +103,129 @@ public abstract class URLConnection {
     return getHeaderFieldDate("last-modified", 0);
   }
 
+  public String getHeaderField(String name) {
+    return null;
+  }
+
+  public Map<String, List<String>> getHeaderFields() {
+    return Collections.emptyMap();
+  }
+
+  public int getHeaderFieldInt(String name, int Default) {
+    String value = getHeaderField(name);
+    try {
+      return Integer.parseInt(value);
+    } catch (Exception e) {
+      // not a number, use the default
+    }
+    return Default;
+  }
+
+  public long getHeaderFieldLong(String name, long Default) {
+    String value = getHeaderField(name);
+    try {
+      return Long.parseLong(value);
+    } catch (Exception e) {
+      // not a number, use the default
+    }
+    return Default;
+  }
+
+  @SuppressWarnings("deprecation")
+  public long getHeaderFieldDate(String name, long Default) {
+    String value = getHeaderField(name);
+    try {
+      return Date.parse(value);
+    } catch (Exception e) {
+      // not a date, use the default
+    }
+    return Default;
+  }
+
+  public String getHeaderFieldKey(int n) {
+    return null;
+  }
+
+  public String getHeaderField(int n) {
+    return null;
+  }
+
+  public Object getContent() throws IOException {
+    getInputStream();
+    return getContentHandler().getContent(this);
+  }
+
+  public Object getContent(Class<?>[] classes) throws IOException {
+    getInputStream();
+    return getContentHandler().getContent(this, classes);
+  }
+
+  public Permission getPermission() throws IOException {
+    return new AllPermission();
+  }
+
   public abstract void connect() throws IOException;
 
   public InputStream getInputStream() throws IOException {
-    throw new UnknownServiceException();
+    throw new UnknownServiceException("protocol doesn't support input");
   }
 
   public OutputStream getOutputStream() throws IOException {
-    throw new UnknownServiceException();
+    throw new UnknownServiceException("protocol doesn't support output");
+  }
+
+  @Override
+  public String toString() {
+    return this.getClass().getName() + ":" + url;
+  }
+
+  public void setDoInput(boolean doinput) {
+    checkConnected();
+    doInput = doinput;
   }
 
   public boolean getDoInput() {
     return doInput;
   }
 
+  public void setDoOutput(boolean dooutput) {
+    checkConnected();
+    doOutput = dooutput;
+  }
+
   public boolean getDoOutput() {
     return doOutput;
   }
 
-  public void setDoInput(boolean v) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    doInput = v;
+  public void setAllowUserInteraction(boolean allowuserinteraction) {
+    checkConnected();
+    allowUserInteraction = allowuserinteraction;
   }
 
-  public void setDoOutput(boolean v) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    doOutput = v;
+  public boolean getAllowUserInteraction() {
+    return allowUserInteraction;
   }
 
-  public void setUseCaches(boolean v) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    useCaches = v;
+  public static void setDefaultAllowUserInteraction(boolean defaultallowuserinteraction) {
+    defaultAllowUserInteraction = defaultallowuserinteraction;
+  }
+
+  public static boolean getDefaultAllowUserInteraction() {
+    return defaultAllowUserInteraction;
+  }
+
+  public void setUseCaches(boolean usecaches) {
+    checkConnected();
+    useCaches = usecaches;
   }
 
   public boolean getUseCaches() {
     return useCaches;
   }
 
-  public void setIfModifiedSince(long ifModifiedSince) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    this.ifModifiedSince = ifModifiedSince;
+  public void setIfModifiedSince(long ifmodifiedsince) {
+    checkConnected();
+    ifModifiedSince = ifmodifiedsince;
   }
 
   public long getIfModifiedSince() {
@@ -217,70 +236,174 @@ public abstract class URLConnection {
     return defaultUseCaches;
   }
 
-  public void setDefaultUseCaches(boolean defaultVal) {
-    defaultUseCaches = defaultVal;
+  public void setDefaultUseCaches(boolean defaultusecaches) {
+    defaultUseCaches = defaultusecaches;
   }
 
-  public void setAllowUserInteraction(boolean allowUserInteraction) {
+  public static void setDefaultUseCaches(String protocol, boolean defaultVal) {
+    if (protocol == null) {
+      throw new NullPointerException("protocol is null");
+    }
+    if (protocol.isEmpty()) {
+      throw new IllegalArgumentException("protocol is empty");
+    }
+    defaultCaching.put(protocol.toLowerCase(java.util.Locale.ROOT), Boolean.valueOf(defaultVal));
+  }
+
+  public static boolean getDefaultUseCaches(String protocol) {
+    Boolean protoDefault = defaultCaching.get(protocol.toLowerCase(java.util.Locale.ROOT));
+    if (protoDefault != null) {
+      return protoDefault.booleanValue();
+    }
+    return defaultUseCaches;
+  }
+
+  public void setRequestProperty(String key, String value) {
+    checkConnected();
+    if (key == null) {
+      throw new NullPointerException("key is null");
+    }
+    if (requests == null) {
+      requests = new MessageHeader();
+    }
+    requests.set(key, value);
+  }
+
+  public void addRequestProperty(String key, String value) {
+    checkConnected();
+    if (key == null) {
+      throw new NullPointerException("key is null");
+    }
+    if (requests == null) {
+      requests = new MessageHeader();
+    }
+    requests.add(key, value);
+  }
+
+  public String getRequestProperty(String key) {
+    checkConnected();
+    if (requests == null) {
+      return null;
+    }
+    return requests.findValue(key);
+  }
+
+  public Map<String, List<String>> getRequestProperties() {
+    checkConnected();
+    if (requests == null) {
+      return Collections.emptyMap();
+    }
+    return requests.getHeaders(null);
+  }
+
+  private static Hashtable<String, ContentHandler> handlers = new Hashtable<String, ContentHandler>();
+  private static volatile ContentHandlerFactory factory;
+
+  public static synchronized void setContentHandlerFactory(ContentHandlerFactory fac) {
+    if (factory != null) {
+      throw new Error("factory already defined");
+    }
+    factory = fac;
+  }
+
+  private ContentHandler getContentHandler() throws UnknownServiceException {
+    String contentType = stripOffParameters(getContentType());
+    ContentHandler handler = null;
+    if (contentType == null) {
+      throw new UnknownServiceException("no content-type");
+    }
+    try {
+      handler = handlers.get(contentType);
+      if (handler != null) {
+        return handler;
+      }
+    } catch (Exception e) {
+      // fall through to a fresh lookup
+    }
+    if (factory != null) {
+      handler = factory.createContentHandler(contentType);
+    }
+    if (handler == null) {
+      try {
+        handler = lookupContentHandlerClassFor(contentType);
+      } catch (Exception e) {
+        handler = UnknownContentHandler.kInstance;
+      }
+      handlers.put(contentType, handler);
+    }
+    return handler;
+  }
+
+  private String stripOffParameters(String contentType) {
+    if (contentType == null) {
+      return null;
+    }
+    int index = contentType.indexOf(';');
+    if (index > 0) {
+      return contentType.substring(0, index);
+    }
+    return contentType;
+  }
+
+  private ContentHandler lookupContentHandlerClassFor(String contentType) {
+    String contentHandlerClassName = typeToPackageName(contentType);
+    String packagePrefixList = getContentHandlerPkgPrefixes();
+    java.util.StringTokenizer packagePrefixIter = new java.util.StringTokenizer(packagePrefixList, "|");
+    while (packagePrefixIter.hasMoreTokens()) {
+      String packagePrefix = packagePrefixIter.nextToken().trim();
+      try {
+        String clsName = packagePrefix + "." + contentHandlerClassName;
+        Class<?> cls = null;
+        try {
+          cls = Class.forName(clsName);
+        } catch (ClassNotFoundException e) {
+          ClassLoader cl = ClassLoader.getSystemClassLoader();
+          if (cl != null) {
+            cls = cl.loadClass(clsName);
+          }
+        }
+        if (cls != null) {
+          return (ContentHandler) cls.getDeclaredConstructor().newInstance();
+        }
+      } catch (Exception e) {
+        // try the next prefix
+      }
+    }
+    return UnknownContentHandler.kInstance;
+  }
+
+  private String typeToPackageName(String contentType) {
+    contentType = contentType.toLowerCase();
+    int len = contentType.length();
+    char[] nm = new char[len];
+    contentType.getChars(0, len, nm, 0);
+    for (int i = 0; i < len; i++) {
+      char c = nm[i];
+      if (c == '/') {
+        nm[i] = '.';
+      } else if (!('A' <= c && c <= 'Z' || 'a' <= c && c <= 'z' || '0' <= c && c <= '9')) {
+        nm[i] = '_';
+      }
+    }
+    return new String(nm);
+  }
+
+  private String getContentHandlerPkgPrefixes() {
+    String packagePrefixList = System.getProperty("java.content.handler.pkgs", "");
+    if (!packagePrefixList.isEmpty()) {
+      packagePrefixList += "|";
+    }
+    return packagePrefixList + "sun.net.www.content";
+  }
+
+  public static String guessContentTypeFromName(String fname) {
+    return getFileNameMap().getContentTypeFor(fname);
+  }
+
+  private void checkConnected() {
     if (connected) {
       throw new IllegalStateException("Already connected");
     }
-    this.allowUserInteraction = allowUserInteraction;
-  }
-
-  public boolean getAllowUserInteraction() {
-    return allowUserInteraction;
-  }
-
-  public static void setDefaultAllowUserInteraction(boolean defaultVal) {
-    defaultAllowUserInteraction = defaultVal;
-  }
-
-  public static boolean getDefaultAllowUserInteraction() {
-    return defaultAllowUserInteraction;
-  }
-
-  public String getHeaderField(String name) {
-    String result = null;
-    if (name != null) {
-      List<String> values = getHeaderFields().get(name.toLowerCase());
-      if (values != null && !values.isEmpty()) {
-        result = values.get(values.size() - 1);
-      }
-    }
-    return result;
-  }
-
-  public String getHeaderField(int n) {
-    return null;
-  }
-
-  public String getHeaderFieldKey(int n) {
-    return null;
-  }
-
-  public int getHeaderFieldInt(String name, int Default) {
-    return (int) getHeaderFieldLong(name, Default);
-  }
-
-  public long getHeaderFieldLong(String name, long Default) {
-    long result = Default;
-    try {
-      String val = getHeaderField(name);
-      if (val != null) {
-        result = Long.parseLong(val.trim());
-      }
-    } catch (Exception ignored) {
-    }
-    return result;
-  }
-
-  public long getHeaderFieldDate(String name, long Default) {
-    return Default;
-  }
-
-  public Map<String, List<String>> getHeaderFields() {
-    return Collections.emptyMap();
   }
 
   private static volatile FileNameMap fileNameMap;
@@ -317,10 +440,6 @@ public abstract class URLConnection {
 
   public static void setFileNameMap(FileNameMap map) {
     fileNameMap = map;
-  }
-
-  public static String guessContentTypeFromName(String fname) {
-    return getFileNameMap().getContentTypeFor(fname);
   }
 
   public static String guessContentTypeFromStream(InputStream is) throws IOException {

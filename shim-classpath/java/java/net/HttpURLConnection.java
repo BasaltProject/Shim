@@ -10,18 +10,20 @@ package java.net;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Locale;
+import java.security.Permission;
+import java.util.Date;
 
 public abstract class HttpURLConnection extends URLConnection {
   protected String method = "GET";
+  protected int chunkLength = -1;
+  protected int fixedContentLength = -1;
+  protected long fixedContentLengthLong = -1;
+  private static final int DEFAULT_CHUNK_SIZE = 4096;
   protected int responseCode = -1;
   protected String responseMessage = null;
-  protected boolean instanceFollowRedirects = true;
   private static boolean followRedirects = true;
-
-  private static final String[] VALID_METHODS = {
-    "GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE"
-  };
+  protected boolean instanceFollowRedirects = followRedirects;
+  private static final String[] methods = {"GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE"};
 
   public static final int HTTP_OK = 200;
   public static final int HTTP_CREATED = 201;
@@ -67,6 +69,56 @@ public abstract class HttpURLConnection extends URLConnection {
     super(u);
   }
 
+  public void setAuthenticator(Authenticator auth) {
+    throw new UnsupportedOperationException("Supplying an authenticator is not supported by " + this.getClass());
+  }
+
+  @Override
+  public String getHeaderFieldKey(int n) {
+    return null;
+  }
+
+  public void setFixedLengthStreamingMode(int contentLength) {
+    if (connected) {
+      throw new IllegalStateException("Already connected");
+    }
+    if (chunkLength != -1) {
+      throw new IllegalStateException("Chunked encoding streaming mode set");
+    }
+    if (contentLength < 0) {
+      throw new IllegalArgumentException("invalid content length");
+    }
+    fixedContentLength = contentLength;
+  }
+
+  public void setFixedLengthStreamingMode(long contentLength) {
+    if (connected) {
+      throw new IllegalStateException("Already connected");
+    }
+    if (chunkLength != -1) {
+      throw new IllegalStateException("Chunked encoding streaming mode set");
+    }
+    if (contentLength < 0) {
+      throw new IllegalArgumentException("invalid content length");
+    }
+    fixedContentLengthLong = contentLength;
+  }
+
+  public void setChunkedStreamingMode(int chunklen) {
+    if (connected) {
+      throw new IllegalStateException("Can't set streaming mode: already connected");
+    }
+    if (fixedContentLength != -1 || fixedContentLengthLong != -1) {
+      throw new IllegalStateException("Fixed length streaming mode set");
+    }
+    chunkLength = chunklen <= 0 ? DEFAULT_CHUNK_SIZE : chunklen;
+  }
+
+  @Override
+  public String getHeaderField(int n) {
+    return null;
+  }
+
   public static void setFollowRedirects(boolean set) {
     followRedirects = set;
   }
@@ -76,7 +128,7 @@ public abstract class HttpURLConnection extends URLConnection {
   }
 
   public void setInstanceFollowRedirects(boolean followRedirects) {
-    this.instanceFollowRedirects = followRedirects;
+    instanceFollowRedirects = followRedirects;
   }
 
   public boolean getInstanceFollowRedirects() {
@@ -85,12 +137,11 @@ public abstract class HttpURLConnection extends URLConnection {
 
   public void setRequestMethod(String method) throws ProtocolException {
     if (connected) {
-      throw new ProtocolException("Already connected");
+      throw new ProtocolException("Can't reset method: already connected");
     }
-    String m = method.toUpperCase(Locale.ROOT);
-    for (String valid : VALID_METHODS) {
-      if (valid.equals(m)) {
-        this.method = m;
+    for (int i = 0; i < methods.length; i++) {
+      if (methods[i].equals(method)) {
+        this.method = method;
         return;
       }
     }
@@ -105,25 +156,42 @@ public abstract class HttpURLConnection extends URLConnection {
     if (responseCode != -1) {
       return responseCode;
     }
-    getInputStream();
-    String status = getHeaderField(0);
-    if (status != null && status.startsWith("HTTP/1.")) {
-      int space = status.indexOf(' ');
-      if (space > 0) {
-        int nextSpace = status.indexOf(' ', space + 1);
+    Exception exc = null;
+    try {
+      getInputStream();
+    } catch (Exception e) {
+      exc = e;
+    }
+    String statusLine = getHeaderField(0);
+    if (statusLine == null) {
+      if (exc != null) {
+        if (exc instanceof RuntimeException) {
+          throw (RuntimeException) exc;
+        } else {
+          throw (IOException) exc;
+        }
+      }
+      return -1;
+    }
+    if (statusLine.startsWith("HTTP/1.")) {
+      int codePos = statusLine.indexOf(' ');
+      if (codePos > 0) {
+        int phrasePos = statusLine.indexOf(' ', codePos + 1);
+        if (phrasePos > 0 && phrasePos < statusLine.length()) {
+          responseMessage = statusLine.substring(phrasePos + 1);
+        }
+        if (phrasePos < 0) {
+          phrasePos = statusLine.length();
+        }
         try {
-          if (nextSpace > 0) {
-            responseCode = Integer.parseInt(status.substring(space + 1, nextSpace));
-            responseMessage = status.substring(nextSpace + 1);
-          } else {
-            responseCode = Integer.parseInt(status.substring(space + 1));
-            responseMessage = "";
-          }
-        } catch (NumberFormatException ignored) {
+          responseCode = Integer.parseInt(statusLine.substring(codePos + 1, phrasePos));
+          return responseCode;
+        } catch (NumberFormatException e) {
+          // the status line is malformed
         }
       }
     }
-    return responseCode;
+    return -1;
   }
 
   public String getResponseMessage() throws IOException {
@@ -131,27 +199,32 @@ public abstract class HttpURLConnection extends URLConnection {
     return responseMessage;
   }
 
+  @SuppressWarnings("deprecation")
+  @Override
+  public long getHeaderFieldDate(String name, long Default) {
+    String dateString = getHeaderField(name);
+    try {
+      if (dateString.indexOf("GMT") == -1) {
+        dateString = dateString + " GMT";
+      }
+      return Date.parse(dateString);
+    } catch (Exception e) {
+      // not a date, use the default
+    }
+    return Default;
+  }
+
   public abstract void disconnect();
 
   public abstract boolean usingProxy();
 
-  public void setFixedLengthStreamingMode(int contentLength) {
-    setFixedLengthStreamingMode((long) contentLength);
-  }
-
-  public void setFixedLengthStreamingMode(long contentLength) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
-    if (contentLength < 0) {
-      throw new IllegalArgumentException("contentLength < 0");
-    }
-  }
-
-  public void setChunkedStreamingMode(int chunklen) {
-    if (connected) {
-      throw new IllegalStateException("Already connected");
-    }
+  @Override
+  public Permission getPermission() throws IOException {
+    int port = url.getPort();
+    port = port < 0 ? 80 : port;
+    String host = url.getHost() + ":" + port;
+    Permission permission = new SocketPermission(host, "connect");
+    return permission;
   }
 
   public InputStream getErrorStream() {
