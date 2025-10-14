@@ -45,6 +45,10 @@ public final class Sun extends Provider {
     addDigest("SHAKE128-256", "sun.security.provider.SHA3$SHAKE128Hash", "OID.2.16.840.1.101.3.4.2.11", "2.16.840.1.101.3.4.2.11", "SHAKE128");
     addDigest("SHAKE256-512", "sun.security.provider.SHA3$SHAKE256Hash", "OID.2.16.840.1.101.3.4.2.12", "2.16.840.1.101.3.4.2.12", "SHAKE256");
     addSoftware("CertificateFactory", "X.509", "sun.security.provider.X509Factory", "X509");
+    addSoftware("KeyStore", "JKS", "sun.security.provider.JavaKeyStore$DualFormatJKS");
+    putService(new Provider.Service(this, "KeyStore", "PKCS12", "sun.security.pkcs12.PKCS12KeyStore$DualFormatPKCS12",
+        Collections.<String>emptyList(), new HashMap<String, String>()));
+    addSoftware("KeyStore", "CaseExactJKS", "sun.security.provider.JavaKeyStore$CaseExactJKS");
     addSoftware("CertStore", "Collection", "sun.security.provider.certpath.CollectionCertStore");
     Map<String, String> pkix = new HashMap<String, String>();
     pkix.put("ImplementedIn", "Software");

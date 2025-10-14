@@ -1,0 +1,136 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package com.sun.crypto.provider;
+
+import java.security.InvalidKeyException;
+
+final class RC2Crypt extends SymmetricCipher {
+  private static final byte[] kPi = {
+    (byte) 0xd9, (byte) 0x78, (byte) 0xf9, (byte) 0xc4, (byte) 0x19, (byte) 0xdd, (byte) 0xb5, (byte) 0xed, (byte) 0x28, (byte) 0xe9, (byte) 0xfd, (byte) 0x79, (byte) 0x4a, (byte) 0xa0, (byte) 0xd8, (byte) 0x9d,
+    (byte) 0xc6, (byte) 0x7e, (byte) 0x37, (byte) 0x83, (byte) 0x2b, (byte) 0x76, (byte) 0x53, (byte) 0x8e, (byte) 0x62, (byte) 0x4c, (byte) 0x64, (byte) 0x88, (byte) 0x44, (byte) 0x8b, (byte) 0xfb, (byte) 0xa2,
+    (byte) 0x17, (byte) 0x9a, (byte) 0x59, (byte) 0xf5, (byte) 0x87, (byte) 0xb3, (byte) 0x4f, (byte) 0x13, (byte) 0x61, (byte) 0x45, (byte) 0x6d, (byte) 0x8d, (byte) 0x09, (byte) 0x81, (byte) 0x7d, (byte) 0x32,
+    (byte) 0xbd, (byte) 0x8f, (byte) 0x40, (byte) 0xeb, (byte) 0x86, (byte) 0xb7, (byte) 0x7b, (byte) 0x0b, (byte) 0xf0, (byte) 0x95, (byte) 0x21, (byte) 0x22, (byte) 0x5c, (byte) 0x6b, (byte) 0x4e, (byte) 0x82,
+    (byte) 0x54, (byte) 0xd6, (byte) 0x65, (byte) 0x93, (byte) 0xce, (byte) 0x60, (byte) 0xb2, (byte) 0x1c, (byte) 0x73, (byte) 0x56, (byte) 0xc0, (byte) 0x14, (byte) 0xa7, (byte) 0x8c, (byte) 0xf1, (byte) 0xdc,
+    (byte) 0x12, (byte) 0x75, (byte) 0xca, (byte) 0x1f, (byte) 0x3b, (byte) 0xbe, (byte) 0xe4, (byte) 0xd1, (byte) 0x42, (byte) 0x3d, (byte) 0xd4, (byte) 0x30, (byte) 0xa3, (byte) 0x3c, (byte) 0xb6, (byte) 0x26,
+    (byte) 0x6f, (byte) 0xbf, (byte) 0x0e, (byte) 0xda, (byte) 0x46, (byte) 0x69, (byte) 0x07, (byte) 0x57, (byte) 0x27, (byte) 0xf2, (byte) 0x1d, (byte) 0x9b, (byte) 0xbc, (byte) 0x94, (byte) 0x43, (byte) 0x03,
+    (byte) 0xf8, (byte) 0x11, (byte) 0xc7, (byte) 0xf6, (byte) 0x90, (byte) 0xef, (byte) 0x3e, (byte) 0xe7, (byte) 0x06, (byte) 0xc3, (byte) 0xd5, (byte) 0x2f, (byte) 0xc8, (byte) 0x66, (byte) 0x1e, (byte) 0xd7,
+    (byte) 0x08, (byte) 0xe8, (byte) 0xea, (byte) 0xde, (byte) 0x80, (byte) 0x52, (byte) 0xee, (byte) 0xf7, (byte) 0x84, (byte) 0xaa, (byte) 0x72, (byte) 0xac, (byte) 0x35, (byte) 0x4d, (byte) 0x6a, (byte) 0x2a,
+    (byte) 0x96, (byte) 0x1a, (byte) 0xd2, (byte) 0x71, (byte) 0x5a, (byte) 0x15, (byte) 0x49, (byte) 0x74, (byte) 0x4b, (byte) 0x9f, (byte) 0xd0, (byte) 0x5e, (byte) 0x04, (byte) 0x18, (byte) 0xa4, (byte) 0xec,
+    (byte) 0xc2, (byte) 0xe0, (byte) 0x41, (byte) 0x6e, (byte) 0x0f, (byte) 0x51, (byte) 0xcb, (byte) 0xcc, (byte) 0x24, (byte) 0x91, (byte) 0xaf, (byte) 0x50, (byte) 0xa1, (byte) 0xf4, (byte) 0x70, (byte) 0x39,
+    (byte) 0x99, (byte) 0x7c, (byte) 0x3a, (byte) 0x85, (byte) 0x23, (byte) 0xb8, (byte) 0xb4, (byte) 0x7a, (byte) 0xfc, (byte) 0x02, (byte) 0x36, (byte) 0x5b, (byte) 0x25, (byte) 0x55, (byte) 0x97, (byte) 0x31,
+    (byte) 0x2d, (byte) 0x5d, (byte) 0xfa, (byte) 0x98, (byte) 0xe3, (byte) 0x8a, (byte) 0x92, (byte) 0xae, (byte) 0x05, (byte) 0xdf, (byte) 0x29, (byte) 0x10, (byte) 0x67, (byte) 0x6c, (byte) 0xba, (byte) 0xc9,
+    (byte) 0xd3, (byte) 0x00, (byte) 0xe6, (byte) 0xcf, (byte) 0xe1, (byte) 0x9e, (byte) 0xa8, (byte) 0x2c, (byte) 0x63, (byte) 0x16, (byte) 0x01, (byte) 0x3f, (byte) 0x58, (byte) 0xe2, (byte) 0x89, (byte) 0xa9,
+    (byte) 0x0d, (byte) 0x38, (byte) 0x34, (byte) 0x1b, (byte) 0xab, (byte) 0x33, (byte) 0xff, (byte) 0xb0, (byte) 0xbb, (byte) 0x48, (byte) 0x0c, (byte) 0x5f, (byte) 0xb9, (byte) 0xb1, (byte) 0xcd, (byte) 0x2e,
+    (byte) 0xc5, (byte) 0xf3, (byte) 0xdb, (byte) 0x47, (byte) 0xe5, (byte) 0xa5, (byte) 0x9c, (byte) 0x77, (byte) 0x0a, (byte) 0xa6, (byte) 0x20, (byte) 0x68, (byte) 0xfe, (byte) 0x7f, (byte) 0xc1, (byte) 0xad,
+  };
+
+  private final int[] expandedKey = new int[64];
+  private int effectiveBits;
+  private boolean decrypting;
+
+  void setEffectiveBits(int bits) {
+    effectiveBits = bits;
+  }
+
+  @Override
+  int getBlockSize() {
+    return 8;
+  }
+
+  @Override
+  void init(boolean decrypting, String algorithm, byte[] key) throws InvalidKeyException {
+    if (!algorithm.equalsIgnoreCase("RC2")) {
+      throw new InvalidKeyException("Key algorithm must be RC2");
+    }
+    if (key.length < 5 || key.length > 128) {
+      throw new InvalidKeyException("RC2 key length must be between 40 and 1024 bit");
+    }
+    this.decrypting = decrypting;
+    int bits = effectiveBits == 0 ? key.length * 8 : effectiveBits;
+    int t8 = (bits + 7) / 8;
+    int tm = 255 % (1 << (8 + bits - 8 * t8));
+    int[] l = new int[128];
+    for (int i = 0; i < key.length; i++) {
+      l[i] = key[i] & 0xff;
+    }
+    for (int i = key.length; i < 128; i++) {
+      l[i] = kPi[(l[i - 1] + l[i - key.length]) & 0xff] & 0xff;
+    }
+    l[128 - t8] = kPi[l[128 - t8] & tm] & 0xff;
+    for (int i = 127 - t8; i >= 0; i--) {
+      l[i] = kPi[l[i + 1] ^ l[i + t8]] & 0xff;
+    }
+    for (int i = 0; i < 64; i++) {
+      expandedKey[i] = l[2 * i] | (l[2 * i + 1] << 8);
+    }
+  }
+
+  private static int rol(int v, int n) {
+    return ((v << n) | (v >>> (16 - n))) & 0xffff;
+  }
+
+  private static int ror(int v, int n) {
+    return ((v >>> n) | (v << (16 - n))) & 0xffff;
+  }
+
+  @Override
+  void encryptBlock(byte[] plain, int po, byte[] cipher, int co) {
+    int r0 = (plain[po] & 0xff) | ((plain[po + 1] & 0xff) << 8);
+    int r1 = (plain[po + 2] & 0xff) | ((plain[po + 3] & 0xff) << 8);
+    int r2 = (plain[po + 4] & 0xff) | ((plain[po + 5] & 0xff) << 8);
+    int r3 = (plain[po + 6] & 0xff) | ((plain[po + 7] & 0xff) << 8);
+    int j = 0;
+    for (int round = 0; round < 16; round++) {
+      r0 = rol((r0 + expandedKey[j++] + (r3 & r2) + (~r3 & r1 & 0xffff)) & 0xffff, 1);
+      r1 = rol((r1 + expandedKey[j++] + (r0 & r3) + (~r0 & r2 & 0xffff)) & 0xffff, 2);
+      r2 = rol((r2 + expandedKey[j++] + (r1 & r0) + (~r1 & r3 & 0xffff)) & 0xffff, 3);
+      r3 = rol((r3 + expandedKey[j++] + (r2 & r1) + (~r2 & r0 & 0xffff)) & 0xffff, 5);
+      if (round == 4 || round == 10) {
+        r0 = (r0 + expandedKey[r3 & 63]) & 0xffff;
+        r1 = (r1 + expandedKey[r0 & 63]) & 0xffff;
+        r2 = (r2 + expandedKey[r1 & 63]) & 0xffff;
+        r3 = (r3 + expandedKey[r2 & 63]) & 0xffff;
+      }
+    }
+    store(cipher, co, r0, r1, r2, r3);
+  }
+
+  @Override
+  void decryptBlock(byte[] cipher, int co, byte[] plain, int po) {
+    int r0 = (cipher[co] & 0xff) | ((cipher[co + 1] & 0xff) << 8);
+    int r1 = (cipher[co + 2] & 0xff) | ((cipher[co + 3] & 0xff) << 8);
+    int r2 = (cipher[co + 4] & 0xff) | ((cipher[co + 5] & 0xff) << 8);
+    int r3 = (cipher[co + 6] & 0xff) | ((cipher[co + 7] & 0xff) << 8);
+    int j = 63;
+    for (int round = 15; round >= 0; round--) {
+      r3 = (ror(r3, 5) - expandedKey[j--] - (r2 & r1) - (~r2 & r0 & 0xffff)) & 0xffff;
+      r2 = (ror(r2, 3) - expandedKey[j--] - (r1 & r0) - (~r1 & r3 & 0xffff)) & 0xffff;
+      r1 = (ror(r1, 2) - expandedKey[j--] - (r0 & r3) - (~r0 & r2 & 0xffff)) & 0xffff;
+      r0 = (ror(r0, 1) - expandedKey[j--] - (r3 & r2) - (~r3 & r1 & 0xffff)) & 0xffff;
+      if (round == 5 || round == 11) {
+        r3 = (r3 - expandedKey[r2 & 63]) & 0xffff;
+        r2 = (r2 - expandedKey[r1 & 63]) & 0xffff;
+        r1 = (r1 - expandedKey[r0 & 63]) & 0xffff;
+        r0 = (r0 - expandedKey[r3 & 63]) & 0xffff;
+      }
+    }
+    store(plain, po, r0, r1, r2, r3);
+  }
+
+  private static void store(byte[] out, int o, int r0, int r1, int r2, int r3) {
+    out[o] = (byte) r0;
+    out[o + 1] = (byte) (r0 >> 8);
+    out[o + 2] = (byte) r1;
+    out[o + 3] = (byte) (r1 >> 8);
+    out[o + 4] = (byte) r2;
+    out[o + 5] = (byte) (r2 >> 8);
+    out[o + 6] = (byte) r3;
+    out[o + 7] = (byte) (r3 >> 8);
+  }
+}
