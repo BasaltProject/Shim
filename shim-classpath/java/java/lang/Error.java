@@ -38,6 +38,10 @@ public class Error extends Throwable {
     this(cause == null ? null : cause.toString(), cause);
   }
 
+  protected Error(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+    super(message, cause, enableSuppression, writableStackTrace);
+  }
+
   public Error() {
     this(null, null);
   }
