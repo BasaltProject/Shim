@@ -64,8 +64,8 @@ public final class FormatterSpec {
     if (width != -1) builder.append(width);
     if (precision != -1) builder.append('.').append(precision);
     if (dateTime) builder.append(has(UPPER) ? 'T' : 't');
-    builder.append(has(UPPER) ? Character.toUpperCase(conversion) : conversion);
-    if (dateTime) builder.append(dateTimeConversion);
+    char shown = dateTime ? dateTimeConversion : conversion;
+    builder.append(has(UPPER) ? Character.toUpperCase(shown) : shown);
     return builder.toString();
   }
 
@@ -169,7 +169,7 @@ public final class FormatterSpec {
   }
 
   private void failMismatch(int flag) {
-    throw new FormatFlagsConversionMismatchException(flagsToString(flag), conversion);
+    throw new FormatFlagsConversionMismatchException(flagsToString(flag), dateTime ? dateTimeConversion : conversion);
   }
 
   private void checkBadFlags(int... bad) {
@@ -186,8 +186,8 @@ public final class FormatterSpec {
 
   private void checkDateTime() {
     if (precision != -1) throw new IllegalFormatPrecisionException(precision);
-    if (width == -1 && has(LEFT)) throw new MissingFormatWidthException(toString());
     checkBadFlags(ALTERNATE, PLUS, SPACE, ZERO, GROUP, PARENTHESES);
+    if (width == -1 && has(LEFT)) throw new MissingFormatWidthException(toString());
   }
 
   private void checkCharacter() {

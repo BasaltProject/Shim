@@ -60,7 +60,7 @@ public final class MethodType implements java.io.Serializable, TypeDescriptor.Of
   }
 
   public String toMethodDescriptorString() {
-    return Classes.makeString(spec, 0, spec.length - 1);
+    return new String(Utf8.decode16(spec, 0, spec.length - 1));
   }
 
   private static String spec(Class c) {

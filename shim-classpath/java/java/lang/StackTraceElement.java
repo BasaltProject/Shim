@@ -36,8 +36,11 @@ public class StackTraceElement implements java.io.Serializable {
     new java.io.ObjectStreamField("format", byte.class)
   };
 
-  private static int NativeLine = -1;
+  private static final int NativeLine = -2;
 
+  private String loader;
+  private String module;
+  private String moduleVersion;
   private String class_;
   private String method;
   private String file;
@@ -48,6 +51,11 @@ public class StackTraceElement implements java.io.Serializable {
                            int lineNumber)
   {
     this(declaringClass, methodName, fileName, lineNumber);
+    if (declaringClass == null) throw new NullPointerException("Declaring class is null");
+    if (methodName == null) throw new NullPointerException("Method name is null");
+    this.loader = classLoaderName;
+    this.module = moduleName;
+    this.moduleVersion = moduleVersion;
   }
 
   public StackTraceElement(String class_, String method, String file,
@@ -61,9 +69,9 @@ public class StackTraceElement implements java.io.Serializable {
 
   private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
     java.io.ObjectOutputStream.PutField fields = s.putFields();
-    fields.put("classLoaderName", (Object) null);
-    fields.put("moduleName", (Object) null);
-    fields.put("moduleVersion", (Object) null);
+    fields.put("classLoaderName", loader);
+    fields.put("moduleName", module);
+    fields.put("moduleVersion", moduleVersion);
     fields.put("declaringClass", class_);
     fields.put("methodName", method);
     fields.put("fileName", file);
@@ -74,6 +82,9 @@ public class StackTraceElement implements java.io.Serializable {
 
   private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
     java.io.ObjectInputStream.GetField fields = s.readFields();
+    loader = (String) fields.get("classLoaderName", null);
+    module = (String) fields.get("moduleName", null);
+    moduleVersion = (String) fields.get("moduleVersion", null);
     class_ = (String) fields.get("declaringClass", null);
     method = (String) fields.get("methodName", null);
     file = (String) fields.get("fileName", null);
@@ -81,31 +92,43 @@ public class StackTraceElement implements java.io.Serializable {
   }
 
   public int hashCode() {
-    return class_.hashCode() ^ method.hashCode() ^ line;
+    int result = 31 * class_.hashCode() + method.hashCode();
+    result = 31 * result + java.util.Objects.hashCode(loader);
+    result = 31 * result + java.util.Objects.hashCode(module);
+    result = 31 * result + java.util.Objects.hashCode(moduleVersion);
+    result = 31 * result + java.util.Objects.hashCode(file);
+    return 31 * result + line;
   }
 
   public boolean equals(Object o) {
-    if (o instanceof StackTraceElement) {
-      StackTraceElement e = (StackTraceElement) o;
-      return class_.equals(e.class_)
-        && method.equals(e.method)
-        && line == e.line;
-    } else {
-      return false;
-    }
+    if (o == this) return true;
+    if (!(o instanceof StackTraceElement)) return false;
+    StackTraceElement e = (StackTraceElement) o;
+    return java.util.Objects.equals(loader, e.loader) && java.util.Objects.equals(module, e.module)
+        && java.util.Objects.equals(moduleVersion, e.moduleVersion) && class_.equals(e.class_)
+        && method.equals(e.method) && java.util.Objects.equals(file, e.file) && line == e.line;
   }
 
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(class_).append(".").append(method);
-
-    if (line == NativeLine) {
-      sb.append(" (native)");
-    } else if (line >= 0) {
-      sb.append(" (line ").append(line).append(")");
+    if (loader != null && !loader.isEmpty() && !loader.equals("app")) sb.append(loader).append('/');
+    if (module != null && !module.isEmpty()) {
+      sb.append(module);
+      if (moduleVersion != null && !moduleVersion.isEmpty() && !module.startsWith("java.")) {
+        sb.append('@').append(moduleVersion);
+      }
     }
-
-    return sb.toString();
+    if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '/') sb.append('/');
+    sb.append(class_).append('.').append(method).append('(');
+    if (line == NativeLine) {
+      sb.append("Native Method");
+    } else if (file == null) {
+      sb.append("Unknown Source");
+    } else {
+      sb.append(file);
+      if (line >= 0) sb.append(':').append(line);
+    }
+    return sb.append(')').toString();
   }
 
   public String getClassName() {
@@ -129,14 +152,14 @@ public class StackTraceElement implements java.io.Serializable {
   }
 
   public String getClassLoaderName() {
-    return null;
+    return loader;
   }
 
   public String getModuleName() {
-    return null;
+    return module;
   }
 
   public String getModuleVersion() {
-    return null;
+    return moduleVersion;
   }
 }

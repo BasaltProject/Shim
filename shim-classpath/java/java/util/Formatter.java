@@ -48,6 +48,7 @@ public final class Formatter implements Closeable, Flushable {
   private Appendable a;
 
   private final Locale l;
+  private Locale callLocale;
 
   private IOException lastException;
 
@@ -177,50 +178,64 @@ public final class Formatter implements Closeable, Flushable {
 
   public Formatter format(Locale l, String format, Object... args) {
     ensureOpen();
-    int lastOrdinary = -1;
-    int last = -1;
     int length = format.length();
     int[] end = new int[1];
     int i = 0;
+    List<Object> pieces = new ArrayList<Object>();
     while (i < length) {
       int percent = format.indexOf('%', i);
       int stop = percent < 0 ? length : percent;
       if (stop > i) {
-        append(format.substring(i, stop));
+        pieces.add(format.substring(i, stop));
       }
       if (percent < 0) {
         break;
       }
-      FormatterSpec spec = FormatterSpec.parse(format, percent, end);
+      pieces.add(FormatterSpec.parse(format, percent, end));
       i = end[0];
-      if (spec.conversion == 'n') {
-        append(System.lineSeparator());
-        continue;
-      }
-      if (spec.conversion == '%') {
-        justify("%", spec);
-        continue;
-      }
-      int argument;
-      if (spec.has(FormatterSpec.PREVIOUS)) {
-        if (last < 0 || (args != null && last > args.length - 1)) {
-          throw new MissingFormatArgumentException(spec.toString());
+    }
+    Locale previous = callLocale;
+    callLocale = l;
+    try {
+      int lastOrdinary = -1;
+      int last = -1;
+      for (Object piece : pieces) {
+        if (piece instanceof String) {
+          append((String) piece);
+          continue;
         }
-        argument = last;
-      } else if (spec.index == 0) {
-        argument = ++lastOrdinary;
-        last = argument;
-        if (args != null && argument > args.length - 1) {
-          throw new MissingFormatArgumentException(spec.toString());
+        FormatterSpec spec = (FormatterSpec) piece;
+        if (spec.conversion == 'n') {
+          append(System.lineSeparator());
+          continue;
         }
-      } else {
-        argument = spec.index - 1;
-        last = argument;
-        if (args != null && argument > args.length - 1) {
-          throw new MissingFormatArgumentException(spec.toString());
+        if (spec.conversion == '%') {
+          justify("%", spec);
+          continue;
         }
+        int argument;
+        if (spec.has(FormatterSpec.PREVIOUS)) {
+          if (last < 0 || (args != null && last > args.length - 1)) {
+            throw new MissingFormatArgumentException(spec.toString());
+          }
+          argument = last;
+        } else if (spec.index == 0) {
+          argument = ++lastOrdinary;
+          last = argument;
+          if (args != null && argument > args.length - 1) {
+            throw new MissingFormatArgumentException(spec.toString());
+          }
+        } else {
+          argument = spec.index - 1;
+          last = argument;
+          if (args != null && argument > args.length - 1) {
+            throw new MissingFormatArgumentException(spec.toString());
+          }
+        }
+        print(spec, args == null ? null : args[argument]);
       }
-      print(spec, args == null ? null : args[argument]);
+    } finally {
+      callLocale = previous;
     }
     return this;
   }
@@ -258,7 +273,8 @@ public final class Formatter implements Closeable, Flushable {
   }
 
   private void failConversion(FormatterSpec spec, Object arg) {
-    throw new IllegalFormatConversionException(spec.conversion, arg.getClass());
+    throw new IllegalFormatConversionException(spec.dateTime ? spec.dateTimeConversion : spec.conversion,
+        arg.getClass());
   }
 
   private void print(FormatterSpec spec, Object arg) {
@@ -310,19 +326,19 @@ public final class Formatter implements Closeable, Flushable {
       printString(spec, "null");
       return;
     }
-    long millis;
-    if (arg instanceof Long) {
-      millis = ((Long) arg).longValue();
-    } else if (arg instanceof Date) {
-      millis = ((Date) arg).getTime();
-    } else if (arg instanceof Calendar) {
-      millis = ((Calendar) arg).getTime().getTime();
-    } else {
+    if (!(arg instanceof Long || arg instanceof Date || arg instanceof Calendar
+        || arg instanceof java.time.temporal.TemporalAccessor)) {
       failConversion(spec, arg);
       return;
     }
-    String text = FormatterDates.format(spec.dateTimeConversion, millis);
-    justify(spec.has(FormatterSpec.UPPER) ? text.toUpperCase() : text, spec);
+    String text;
+    try {
+      text = FormatterDates.format(spec.dateTimeConversion, arg, callLocale);
+    } catch (IllegalFormatConversionException e) {
+      throw e;
+    }
+    justify(spec.has(FormatterSpec.UPPER) ? text.toUpperCase(callLocale == null ? Locale.US : callLocale) : text,
+        spec);
   }
 
   private void printCharacter(FormatterSpec spec, Object arg) {

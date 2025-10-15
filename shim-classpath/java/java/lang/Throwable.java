@@ -154,14 +154,14 @@ public class Throwable implements Serializable {
 
   public void printStackTrace(PrintStream out) {
     StringBuilder sb = new StringBuilder();
-    printStackTrace(sb, System.getProperty("line.separator"));
+    printStackTrace(sb, System.lineSeparator());
     out.print(sb.toString());
     out.flush();
   }
 
   public void printStackTrace(PrintWriter out) {
     StringBuilder sb = new StringBuilder();
-    printStackTrace(sb, System.getProperty("line.separator"));
+    printStackTrace(sb, System.lineSeparator());
     out.print(sb.toString());
     out.flush();
   }
@@ -171,24 +171,50 @@ public class Throwable implements Serializable {
   }
 
   private void printStackTrace(StringBuilder sb, String nl) {
-    sb.append(toString()).append(nl);
-
+    java.util.Set<Throwable> dejaVu = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+    dejaVu.add(this);
+    sb.append(this).append(nl);
     StackTraceElement[] trace = resolveTrace();
-    for (int i = 0; i < trace.length; ++i) {
-      sb.append("  at ").append(trace[i].toString()).append(nl);
+    for (StackTraceElement e : trace) {
+      sb.append("\tat ").append(e).append(nl);
     }
-
-    if (suppressedExceptions != null) {
-      for (Throwable se : suppressedExceptions) {
-        sb.append("Suppressed: ");
-        se.printStackTrace(sb, nl);
-      }
+    for (Throwable se : getSuppressed()) {
+      se.printEnclosed(sb, nl, trace, "Suppressed: ", "\t", dejaVu);
     }
+    Throwable ourCause = getCause();
+    if (ourCause != null) {
+      ourCause.printEnclosed(sb, nl, trace, "Caused by: ", "", dejaVu);
+    }
+  }
 
-    Throwable printCause = getCause();
-    if (printCause != null) {
-      sb.append("caused by: ");
-      printCause.printStackTrace(sb, nl);
+  private void printEnclosed(StringBuilder sb, String nl, StackTraceElement[] enclosingTrace, String caption,
+                             String prefix, java.util.Set<Throwable> dejaVu) {
+    if (dejaVu.contains(this)) {
+      sb.append(prefix).append(caption).append("[CIRCULAR REFERENCE: ").append(this).append(']').append(nl);
+      return;
+    }
+    dejaVu.add(this);
+    StackTraceElement[] trace = resolveTrace();
+    int m = trace.length - 1;
+    int n = enclosingTrace.length - 1;
+    while (m >= 0 && n >= 0 && trace[m].equals(enclosingTrace[n])) {
+      m--;
+      n--;
+    }
+    int framesInCommon = trace.length - 1 - m;
+    sb.append(prefix).append(caption).append(this).append(nl);
+    for (int i = 0; i <= m; i++) {
+      sb.append(prefix).append("\tat ").append(trace[i]).append(nl);
+    }
+    if (framesInCommon != 0) {
+      sb.append(prefix).append("\t... ").append(framesInCommon).append(" more").append(nl);
+    }
+    for (Throwable se : getSuppressed()) {
+      se.printEnclosed(sb, nl, trace, "Suppressed: ", prefix + "\t", dejaVu);
+    }
+    Throwable ourCause = getCause();
+    if (ourCause != null) {
+      ourCause.printEnclosed(sb, nl, trace, "Caused by: ", prefix, dejaVu);
     }
   }
 

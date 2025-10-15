@@ -9,11 +9,9 @@
 
 package java.util.logging;
 
-import java.text.MessageFormat;
-import java.util.ResourceBundle;
-
 public abstract class Formatter {
-  protected Formatter() {}
+  protected Formatter() {
+  }
 
   public abstract String format(LogRecord record);
 
@@ -27,28 +25,33 @@ public abstract class Formatter {
 
   public String formatMessage(LogRecord record) {
     String format = record.getMessage();
-    ResourceBundle bundle = record.getResourceBundle();
-    if (bundle != null && format != null) {
+    java.util.ResourceBundle catalog = record.getResourceBundle();
+    if (catalog != null) {
       try {
-        format = bundle.getString(format);
-      } catch (Exception ignored) {
+        format = catalog.getString(format);
+      } catch (java.util.MissingResourceException ex) {
+        format = record.getMessage();
       }
     }
-    if (format == null) {
-      return "";
-    }
-    Object[] params = record.getParameters();
-    if (params == null || params.length == 0) {
-      return format;
-    }
-    if (format.indexOf("{0") >= 0 || format.indexOf("{1") >= 0 ||
-        format.indexOf("{2") >= 0 || format.indexOf("{3") >= 0) {
-      try {
-        return MessageFormat.format(format, params);
-      } catch (Exception e) {
+    try {
+      Object[] parameters = record.getParameters();
+      if (parameters == null || parameters.length == 0) {
         return format;
       }
+      int index = -1;
+      int fence = format.length() - 1;
+      while ((index = format.indexOf('{', index + 1)) > -1) {
+        if (index >= fence) {
+          break;
+        }
+        char digit = format.charAt(index + 1);
+        if (digit >= '0' && digit <= '9') {
+          return java.text.MessageFormat.format(format, parameters);
+        }
+      }
+      return format;
+    } catch (Exception ex) {
+      return format;
     }
-    return format;
   }
 }

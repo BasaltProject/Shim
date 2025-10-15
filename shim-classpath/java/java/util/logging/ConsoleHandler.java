@@ -11,16 +11,17 @@ package java.util.logging;
 
 public class ConsoleHandler extends StreamHandler {
   public ConsoleHandler() {
-    setFormatter(new SimpleFormatter());
-    setLevel(Level.INFO);
+    super(Level.INFO, new SimpleFormatter(), null);
     setOutputStream(System.err);
   }
 
+  @Override
   public void publish(LogRecord record) {
     super.publish(record);
     flush();
   }
 
+  @Override
   public void close() {
     flush();
   }

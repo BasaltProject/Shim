@@ -13,71 +13,87 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.util.Objects;
 
 public class StreamHandler extends Handler {
   private OutputStream output;
   private boolean doneHeader;
-  private Writer writer;
+  private volatile Writer writer;
 
   public StreamHandler() {
-    this(null, null);
+    this(Level.INFO, new SimpleFormatter(), null);
   }
 
   public StreamHandler(OutputStream out, Formatter formatter) {
-    if (formatter != null) {
-      setFormatter(formatter);
-    }
+    this(Level.INFO, formatter, Objects.requireNonNull(formatter));
     setOutputStream(out);
+  }
+
+  StreamHandler(Level defaultLevel, Formatter defaultFormatter, Formatter specifiedFormatter) {
+    super(defaultLevel, defaultFormatter, specifiedFormatter);
   }
 
   protected synchronized void setOutputStream(OutputStream out) throws SecurityException {
     if (out == null) {
-      return;
+      throw new NullPointerException();
     }
     flushAndClose();
-    this.output = out;
-    this.doneHeader = false;
+    output = out;
+    doneHeader = false;
     String encoding = getEncoding();
     if (encoding == null) {
-      this.writer = new OutputStreamWriter(output);
+      writer = new OutputStreamWriter(output);
     } else {
       try {
-        this.writer = new OutputStreamWriter(output, encoding);
-      } catch (UnsupportedEncodingException e) {
-        this.writer = new OutputStreamWriter(output);
+        writer = new OutputStreamWriter(output, encoding);
+      } catch (UnsupportedEncodingException ex) {
+        throw new Error("Unexpected exception " + ex);
       }
     }
   }
 
+  @Override
+  public synchronized void setEncoding(String encoding) throws SecurityException, UnsupportedEncodingException {
+    super.setEncoding(encoding);
+    if (output == null) {
+      return;
+    }
+    flush();
+    if (encoding == null) {
+      writer = new OutputStreamWriter(output);
+    } else {
+      writer = new OutputStreamWriter(output, encoding);
+    }
+  }
+
+  @Override
   public synchronized void publish(LogRecord record) {
     if (!isLoggable(record)) {
       return;
     }
     String msg;
     try {
-      Formatter formatter = getFormatter();
-      if (formatter == null) {
-        formatter = new SimpleFormatter();
-      }
-      msg = formatter.format(record);
+      msg = getFormatter().format(record);
     } catch (Exception ex) {
       reportError(null, ex, ErrorManager.FORMAT_FAILURE);
       return;
     }
     try {
       if (!doneHeader) {
-        Formatter formatter = getFormatter();
-        if (formatter != null) {
-          writer.write(formatter.getHead(this));
-        }
+        writer.write(getFormatter().getHead(this));
         doneHeader = true;
       }
       writer.write(msg);
+      synchronousPostWriteHook();
     } catch (Exception ex) {
       reportError(null, ex, ErrorManager.WRITE_FAILURE);
     }
   }
 
+  void synchronousPostWriteHook() {
+  }
+
+  @Override
   public boolean isLoggable(LogRecord record) {
     if (writer == null || record == null) {
       return false;
@@ -85,6 +101,7 @@ public class StreamHandler extends Handler {
     return super.isLoggable(record);
   }
 
+  @Override
   public synchronized void flush() {
     if (writer != null) {
       try {
@@ -96,19 +113,14 @@ public class StreamHandler extends Handler {
   }
 
   private synchronized void flushAndClose() throws SecurityException {
+    checkPermission();
     if (writer != null) {
       try {
         if (!doneHeader) {
-          Formatter formatter = getFormatter();
-          if (formatter != null) {
-            writer.write(formatter.getHead(this));
-          }
+          writer.write(getFormatter().getHead(this));
           doneHeader = true;
         }
-        Formatter formatter = getFormatter();
-        if (formatter != null) {
-          writer.write(formatter.getTail(this));
-        }
+        writer.write(getFormatter().getTail(this));
         writer.flush();
         writer.close();
       } catch (Exception ex) {
@@ -119,6 +131,7 @@ public class StreamHandler extends Handler {
     }
   }
 
+  @Override
   public synchronized void close() throws SecurityException {
     flushAndClose();
   }

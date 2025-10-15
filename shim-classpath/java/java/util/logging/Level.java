@@ -24,78 +24,204 @@
 package java.util.logging;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.ResourceBundle;
 
 public class Level implements Serializable {
-  public static final Level OFF = new Level("OFF", Integer.MAX_VALUE);
-  public static final Level SEVERE = new Level("SEVERE", 1000);
-  public static final Level WARNING = new Level("WARNING", 900);
-  public static final Level INFO = new Level("INFO", 800);
-  public static final Level CONFIG = new Level("CONFIG", 700);
-  public static final Level FINE = new Level("FINE", 500);
-  public static final Level FINER = new Level("FINER", 400);
-  public static final Level FINEST = new Level("FINEST", 300);
-  public static final Level ALL = new Level("ALL", Integer.MIN_VALUE);
+  private static final String kDefaultBundle = "sun.util.logging.resources.logging";
 
-  private final int value;
+  private static final List<Level> kKnownLevels = new ArrayList<Level>();
+
   private final String name;
+  private final int value;
+  private final String resourceBundleName;
+  private transient String localizedLevelName;
+  private transient Locale cachedLocale;
+
+  public static final Level OFF = new Level("OFF", Integer.MAX_VALUE, kDefaultBundle);
+  public static final Level SEVERE = new Level("SEVERE", 1000, kDefaultBundle);
+  public static final Level WARNING = new Level("WARNING", 900, kDefaultBundle);
+  public static final Level INFO = new Level("INFO", 800, kDefaultBundle);
+  public static final Level CONFIG = new Level("CONFIG", 700, kDefaultBundle);
+  public static final Level FINE = new Level("FINE", 500, kDefaultBundle);
+  public static final Level FINER = new Level("FINER", 400, kDefaultBundle);
+  public static final Level FINEST = new Level("FINEST", 300, kDefaultBundle);
+  public static final Level ALL = new Level("ALL", Integer.MIN_VALUE, kDefaultBundle);
+
+  private static final long serialVersionUID = -8176160795706313070L;
 
   protected Level(String name, int value) {
+    this(name, value, null);
+  }
+
+  protected Level(String name, int value, String resourceBundleName) {
+    this(name, value, resourceBundleName, true);
+  }
+
+  private Level(String name, int value, String resourceBundleName, boolean visible) {
     if (name == null) {
       throw new NullPointerException();
     }
     this.name = name;
     this.value = value;
+    this.resourceBundleName = resourceBundleName;
+    this.localizedLevelName = resourceBundleName == null ? name : null;
+    this.cachedLocale = null;
+    if (visible) {
+      synchronized (Level.class) {
+        kKnownLevels.add(this);
+      }
+    }
   }
 
-  public int intValue() {
-    return value;
+  public String getResourceBundleName() {
+    return resourceBundleName;
   }
 
   public String getName() {
     return name;
   }
 
-  public String getResourceBundleName() {
+  public String getLocalizedName() {
+    return getLocalizedLevelName();
+  }
+
+  final String getLevelName() {
+    return this.name;
+  }
+
+  private String computeLocalizedLevelName(Locale newLocale) {
+    ResourceBundle rb = ResourceBundle.getBundle(resourceBundleName, newLocale);
+    final String localizedName = rb.getString(name);
+    final boolean isDefaultBundle = kDefaultBundle.equals(resourceBundleName);
+    if (!isDefaultBundle) {
+      return localizedName;
+    }
+    final Locale rbLocale = rb.getLocale();
+    final Locale locale = Locale.ROOT.equals(rbLocale) || name.equals(localizedName.toUpperCase(Locale.ROOT))
+        ? Locale.ROOT : rbLocale;
+    return localizedName.toUpperCase(locale);
+  }
+
+  final String getCachedLocalizedLevelName() {
+    if (localizedLevelName != null) {
+      if (cachedLocale != null) {
+        if (cachedLocale.equals(Locale.getDefault())) {
+          return localizedLevelName;
+        }
+      }
+    }
+    if (resourceBundleName == null) {
+      return name;
+    }
     return null;
   }
 
-  public String getLocalizedName() {
-    return name;
+  final synchronized String getLocalizedLevelName() {
+    final String cachedLocalizedName = getCachedLocalizedLevelName();
+    if (cachedLocalizedName != null) {
+      return cachedLocalizedName;
+    }
+    final Locale newLocale = Locale.getDefault();
+    try {
+      localizedLevelName = computeLocalizedLevelName(newLocale);
+    } catch (Exception ex) {
+      localizedLevelName = name;
+    }
+    cachedLocale = newLocale;
+    return localizedLevelName;
   }
 
-  public static Level parse(String name) throws IllegalArgumentException {
+  static synchronized Level findLevel(String name) {
     if (name == null) {
       throw new NullPointerException();
     }
+    for (Level l : kKnownLevels) {
+      if (name.equals(l.name)) {
+        return l;
+      }
+    }
     try {
-      int val = Integer.parseInt(name);
-      return new Level(name, val);
-    } catch (NumberFormatException ignored) {
+      int x = Integer.parseInt(name);
+      for (Level l : kKnownLevels) {
+        if (l.value == x) {
+          return l;
+        }
+      }
+      return new Level(name, x);
+    } catch (NumberFormatException ex) {
+      // not an integer value
     }
-    if (name.equalsIgnoreCase("OFF")) return OFF;
-    if (name.equalsIgnoreCase("SEVERE")) return SEVERE;
-    if (name.equalsIgnoreCase("WARNING")) return WARNING;
-    if (name.equalsIgnoreCase("INFO")) return INFO;
-    if (name.equalsIgnoreCase("CONFIG")) return CONFIG;
-    if (name.equalsIgnoreCase("FINE")) return FINE;
-    if (name.equalsIgnoreCase("FINER")) return FINER;
-    if (name.equalsIgnoreCase("FINEST")) return FINEST;
-    if (name.equalsIgnoreCase("ALL")) return ALL;
-    throw new IllegalArgumentException("Unknown level: " + name);
+    for (Level l : kKnownLevels) {
+      if (name.equals(l.getLocalizedLevelName())) {
+        return l;
+      }
+    }
+    return null;
   }
 
-  public boolean equals(Object o) {
-    if (o instanceof Level) {
-      return ((Level) o).value == this.value;
-    }
-    return false;
+  @Override
+  public final String toString() {
+    return name;
   }
 
+  public final int intValue() {
+    return value;
+  }
+
+  private Object readResolve() {
+    synchronized (Level.class) {
+      for (Level l : kKnownLevels) {
+        if (this.value == l.value && this.name.equals(l.name) && Objects.equals(this.resourceBundleName,
+            l.resourceBundleName)) {
+          return l;
+        }
+      }
+    }
+    return new Level(this.name, this.value, this.resourceBundleName);
+  }
+
+  public static synchronized Level parse(String name) throws IllegalArgumentException {
+    name.length();
+    for (Level l : kKnownLevels) {
+      if (name.equals(l.name)) {
+        return l;
+      }
+    }
+    try {
+      int x = Integer.parseInt(name);
+      for (Level l : kKnownLevels) {
+        if (l.value == x) {
+          return l;
+        }
+      }
+      return new Level(name, x);
+    } catch (NumberFormatException ex) {
+      // not an integer value
+    }
+    for (Level l : kKnownLevels) {
+      if (name.equals(l.getLocalizedLevelName())) {
+        return l;
+      }
+    }
+    throw new IllegalArgumentException("Bad level \"" + name + "\"");
+  }
+
+  @Override
+  public boolean equals(Object ox) {
+    try {
+      Level lx = (Level) ox;
+      return lx.value == this.value;
+    } catch (Exception ex) {
+      return false;
+    }
+  }
+
+  @Override
   public int hashCode() {
     return this.value;
-  }
-
-  public String toString() {
-    return name;
   }
 }

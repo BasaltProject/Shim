@@ -1,172 +1,98 @@
 /*
  * Copyright (c) 2026 BasaltMC.
- *
- * Licensed under the MIT License; see LICENSE:
+ * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
  * SPDX-License-Identifier: MIT
+ * Minimum release: 21
  */
 
-// Minimum release: 17
-
-import java.io.ByteArrayOutputStream;
-import java.util.Enumeration;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Filter;
-import java.util.logging.Formatter;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
-import java.util.logging.StreamHandler;
-
+import java.io.*; import java.util.*; import java.util.logging.*; import java.util.logging.Formatter; import java.nio.file.*; import java.util.regex.*;
 public class LoggingModern {
-  public static void main(String[] args) throws Exception {
-    testLevels();
-    testLogRecord();
-    testLogManager();
-    testLoggerHierarchyAndHandlers();
-    testLazySuppliers();
-    testFormattingAndStreamHandler();
-    System.out.println("LoggingModern OK");
+  interface Body { Object get() throws Exception; }
+  static void p(String n, Body b) { String o; try { Object r = b.get(); o = String.valueOf(r); } catch (Throwable t) { o = "!" + t.getClass().getName() + (t instanceof NullPointerException ? "" : ":" + t.getMessage()); } System.out.println(n + "=" + o); }
+  public static class Collect extends Handler {
+    public final List<LogRecord> records = new ArrayList<>();
+    public void publish(LogRecord r) { if (isLoggable(r)) records.add(r); }
+    public void flush() {} public void close() {}
   }
-
-  private static void testLevels() {
-    Level[] levels = {
-      Level.OFF, Level.SEVERE, Level.WARNING, Level.INFO,
-      Level.CONFIG, Level.FINE, Level.FINER, Level.FINEST, Level.ALL
-    };
-    for (Level l : levels) {
-      System.out.println("level " + l.getName() + "=" + l.intValue());
-    }
-
-    Level parsedInfo = Level.parse("INFO");
-    System.out.println("parsed info equals=" + parsedInfo.equals(Level.INFO));
-
-    Level parsedNumeric = Level.parse("850");
-    System.out.println("parsed numeric value=" + parsedNumeric.intValue());
-    System.out.println("parsed numeric equals=" + parsedNumeric.equals(new CustomLevel("CUSTOM_850", 850)));
-  }
-
-  private static void testLogRecord() {
-    LogRecord r1 = new LogRecord(Level.WARNING, "first message");
-    LogRecord r2 = new LogRecord(Level.SEVERE, "second message");
-    System.out.println("record sequence order=" + (r2.getSequenceNumber() > r1.getSequenceNumber()));
-    System.out.println("record instant nonnull=" + (r1.getInstant() != null));
-    System.out.println("record millis valid=" + (r1.getMillis() > 0));
-
-    r1.setSourceClassName("com.example.Test");
-    r1.setSourceMethodName("doWork");
-    r1.setParameters(new Object[] { "arg1", 42 });
-    System.out.println("record source=" + r1.getSourceClassName() + "." + r1.getSourceMethodName());
-    System.out.println("record param count=" + r1.getParameters().length);
-  }
-
-  private static void testLogManager() {
-    LogManager manager = LogManager.getLogManager();
-    System.out.println("logmanager exists=" + (manager != null));
-
-    Logger custom = Logger.getLogger("org.basaltmc.test.CustomLogger");
-    Logger retrieved = manager.getLogger("org.basaltmc.test.CustomLogger");
-    System.out.println("retrieved logger same=" + (custom == retrieved));
-
-    boolean found = false;
-    Enumeration<String> names = manager.getLoggerNames();
-    while (names.hasMoreElements()) {
-      if ("org.basaltmc.test.CustomLogger".equals(names.nextElement())) {
-        found = true;
-        break;
-      }
-    }
-    System.out.println("logger found in names=" + found);
-  }
-
-  private static void testLoggerHierarchyAndHandlers() {
-    Logger parent = Logger.getLogger("org.basaltmc.parent");
-    Logger child = Logger.getLogger("org.basaltmc.parent.child");
-    child.setParent(parent);
-
-    parent.setLevel(Level.WARNING);
-    child.setLevel(null);
-
-    System.out.println("child loggable info=" + child.isLoggable(Level.INFO));
-    System.out.println("child loggable warning=" + child.isLoggable(Level.WARNING));
-    System.out.println("child loggable severe=" + child.isLoggable(Level.SEVERE));
-
-    AtomicInteger parentPublishes = new AtomicInteger(0);
-    parent.addHandler(new Handler() {
-      public void publish(LogRecord r) { parentPublishes.incrementAndGet(); }
-      public void flush() {}
-      public void close() {}
-    });
-
-    child.warning("warning to child");
-    System.out.println("parent received child warning=" + (parentPublishes.get() == 1));
-
-    child.setUseParentHandlers(false);
-    child.warning("another warning to child");
-    System.out.println("parent received after disable=" + (parentPublishes.get() == 1));
-
-    Filter filter = r -> r.getMessage().contains("allow");
-    child.setFilter(filter);
-    AtomicInteger childPublishes = new AtomicInteger(0);
-    child.addHandler(new Handler() {
-      public void publish(LogRecord r) { childPublishes.incrementAndGet(); }
-      public void flush() {}
-      public void close() {}
-    });
-
-    child.warning("drop this");
-    child.warning("allow this");
-    System.out.println("child filtered count=" + childPublishes.get());
-  }
-
-  private static void testLazySuppliers() {
-    Logger logger = Logger.getLogger("org.basaltmc.lazy");
-    logger.setLevel(Level.WARNING);
-    logger.setUseParentHandlers(false);
-
-    AtomicBoolean evaluated = new AtomicBoolean(false);
-    logger.info(() -> {
-      evaluated.set(true);
-      return "expensive message";
-    });
-    System.out.println("supplier evaluated below level=" + evaluated.get());
-
-    logger.warning(() -> {
-      evaluated.set(true);
-      return "necessary message";
-    });
-    System.out.println("supplier evaluated at level=" + evaluated.get());
-  }
-
-  private static void testFormattingAndStreamHandler() {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    StreamHandler sh = new StreamHandler(baos, new Formatter() {
-      public String format(LogRecord r) {
-        return r.getLevel() + ": " + formatMessage(r) + "\n";
-      }
-    });
-    sh.setLevel(Level.INFO);
-
-    Logger logger = Logger.getLogger("org.basaltmc.streamtest");
-    logger.setUseParentHandlers(false);
-    logger.addHandler(sh);
-
-    logger.log(Level.INFO, "hello {0}, count is {1}", new Object[] { "world", 99 });
-    sh.flush();
-
-    String output = baos.toString();
-    System.out.println("stream output contains hello world=" + output.contains("hello world, count is 99"));
-  }
-
-  private static class CustomLevel extends Level {
-    public CustomLevel(String name, int value) {
-      super(name, value);
-    }
+  public static class MyBundle extends ListResourceBundle { protected Object[][] getContents() { return new Object[][]{{"k", "localized"}, {"k2", "second"}}; } }
+  public static class UpperFilter implements Filter { public boolean isLoggable(LogRecord r) { return !String.valueOf(r.getMessage()).contains("drop"); } }
+  public static class FixedFormatter extends Formatter { public String format(LogRecord r) { return "[" + r.getLevel() + "] " + formatMessage(r) + "\n"; } public String getHead(Handler h) { return "<head>\n"; } public String getTail(Handler h) { return "<tail>\n"; } }
+  static String describe(LogRecord r) { return r.getLevel() + "|" + r.getLoggerName() + "|" + r.getMessage() + "|" + Arrays.toString(r.getParameters()) + "|" + r.getSourceClassName() + "." + r.getSourceMethodName() + "|" + (r.getThrown() == null ? "-" : r.getThrown().getClass().getSimpleName()) + "|" + r.getResourceBundleName(); }
+  static String mask(String s) { return s.replaceAll("(?m)^\\p{L}+ \\d+, \\d+ \\d+:\\d+:\\d+ [AP]M ", "<time> ").replaceAll("<date>[^<]*</date>", "<date>D</date>").replaceAll("<millis>\\d+</millis>", "<millis>M</millis>").replaceAll("<nanos>\\d+</nanos>\n  ", "").replaceAll("<sequence>\\d+</sequence>", "<sequence>S</sequence>").replaceAll("<thread>\\d+</thread>", "<thread>T</thread>").replaceAll("<line>\\d+</line>", "<line>L</line>"); }
+  static LogManager lm = LogManager.getLogManager();
+  static void resetAll() { lm.reset(); }
+  public static void main(String[] a) throws Exception {
+    Locale.setDefault(Locale.ENGLISH); TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+    final PrintStream origErr = System.err; final ByteArrayOutputStream errBuf = new ByteArrayOutputStream(); System.setErr(new PrintStream(errBuf, true));
+    p("level consts", () -> Level.OFF.intValue() + " " + Level.SEVERE.intValue() + " " + Level.WARNING + " " + Level.INFO.getName() + " " + Level.CONFIG.getLocalizedName() + " " + Level.FINE.getResourceBundleName() + " " + Level.ALL.intValue());
+    p("level parse", () -> Level.parse("INFO") + " " + Level.parse("800") + " " + (Level.parse("800") == Level.INFO) + " " + Level.parse("123").getName() + " " + Level.parse("123").intValue() + " " + (Level.parse("123") == Level.parse("123")) + " " + Level.parse("Info"));
+    p("level parse bad", () -> Level.parse("nope"));
+    p("level parse null", () -> Level.parse(null));
+    p("level custom", () -> { Level l = new Level("MYLEVEL", 850, null) {}; return Level.parse("MYLEVEL") == l; });
+    p("level eq", () -> new Level("X1", 800) {}.equals(Level.INFO) + " " + Level.INFO.equals(null) + " " + Level.INFO.equals("x") + " " + Level.INFO.hashCode());
+    p("level ser", () -> { ByteArrayOutputStream bo = new ByteArrayOutputStream(); new ObjectOutputStream(bo).writeObject(Level.WARNING); Object o = new ObjectInputStream(new ByteArrayInputStream(bo.toByteArray())).readObject(); return (o == Level.WARNING) + " " + o; });
+    p("level ctor null", () -> new Level(null, 1) {});
+    p("logger names", () -> { Logger l = Logger.getLogger("a.b.c"); return l.getName() + " " + l.getParent().getName() + "|" + (l.getParent().getParent() == null) + " " + (Logger.getLogger("a.b.c") == l) + " " + Logger.getGlobal().getName() + " " + Logger.getLogger("").getName() + " " + Logger.getLogger("").getLevel() + " " + l.getLevel() + " " + l.getUseParentHandlers() + " " + Logger.getLogger("").getHandlers().length + " " + Logger.getLogger("").getHandlers()[0].getClass().getSimpleName() + " " + Logger.getLogger("").getHandlers()[0].getLevel() + " " + Logger.getLogger("").getHandlers()[0].getFormatter().getClass().getSimpleName() + " " + Logger.getLogger("").getHandlers()[0].getEncoding() + " " + Logger.getLogger("").getHandlers()[0].getFilter(); });
+    p("parent relink", () -> { Logger c = Logger.getLogger("p1.p2.p3"); Logger mid = Logger.getLogger("p1.p2"); Logger top = Logger.getLogger("p1"); return c.getParent().getName() + " " + mid.getParent().getName() + " " + top.getParent().getName(); });
+    p("level inherit", () -> { Logger parent = Logger.getLogger("lv"); Logger child = Logger.getLogger("lv.child"); Logger gchild = Logger.getLogger("lv.child.g"); parent.setLevel(Level.FINE); String r = child.isLoggable(Level.FINE) + " " + child.isLoggable(Level.FINER) + " " + child.getLevel(); child.setLevel(Level.WARNING); r += " " + gchild.isLoggable(Level.INFO) + " " + gchild.isLoggable(Level.SEVERE); child.setLevel(null); r += " " + gchild.isLoggable(Level.FINE); parent.setLevel(Level.OFF); r += " " + gchild.isLoggable(Level.SEVERE); return r; });
+    p("records", () -> { Logger l = Logger.getAnonymousLogger(); Collect c = new Collect(); l.setUseParentHandlers(false); l.addHandler(c); l.setLevel(Level.ALL); l.info("i"); l.warning("w"); l.log(Level.SEVERE, "s {0}", "p0"); l.log(Level.FINE, "f", new Object[]{1, 2}); l.log(Level.CONFIG, "t", new IllegalStateException("x")); l.fine(() -> "supplied"); l.log(Level.FINER, new RuntimeException(), () -> "sup2"); l.logp(Level.INFO, "C", "m", "logp"); l.logp(Level.INFO, "C", "m", "logp {0}", "x"); l.logp(Level.INFO, "C", "m", "logp", new Error()); l.entering("C", "m"); l.entering("C", "m", "arg"); l.entering("C", "m", new Object[]{"a", "b"}); l.exiting("C", "m"); l.exiting("C", "m", "res"); l.throwing("C", "m", new Exception("e")); StringBuilder sb = new StringBuilder(); for (LogRecord r : c.records) sb.append(describe(r)).append('\n'); return "\n" + sb; });
+    p("record infer", () -> { Logger l = Logger.getLogger("infer"); Collect c = new Collect(); l.setUseParentHandlers(false); l.addHandler(c); l.info("x"); LogRecord r = c.records.get(0); return r.getSourceClassName() + " " + r.getSourceMethodName() + " " + (r.getThreadID() >= 0) + " " + (r.getLongThreadID() == Thread.currentThread().threadId()) + " " + (r.getInstant() != null) + " " + (r.getMillis() > 0) + " " + (r.getSequenceNumber() >= 0); });
+    p("record api", () -> { LogRecord r = new LogRecord(Level.INFO, "m"); r.setLoggerName("n"); r.setSourceClassName("sc"); r.setSourceMethodName("sm"); r.setMessage("m2"); r.setLevel(Level.FINE); r.setMillis(5000); r.setSequenceNumber(7); r.setThreadID(9); r.setParameters(new Object[]{1}); r.setResourceBundleName("rb"); return describe(r) + " " + r.getMillis() + " " + r.getInstant() + " " + r.getSequenceNumber() + " " + r.getThreadID() + " " + r.getLongThreadID(); });
+    p("record nulls", () -> { LogRecord r = new LogRecord(Level.INFO, "m"); try { r.setLevel(null); } catch (NullPointerException e) { return "npe " + new LogRecord(null, "x"); } return "x"; });
+    p("record ser", () -> { LogRecord r = new LogRecord(Level.WARNING, "ser {0}"); r.setLoggerName("L"); r.setSourceClassName("S"); r.setSourceMethodName("M"); r.setParameters(new Object[]{42, null}); r.setThrown(new RuntimeException("boom")); ByteArrayOutputStream bo = new ByteArrayOutputStream(); new ObjectOutputStream(bo).writeObject(r); LogRecord o = (LogRecord) new ObjectInputStream(new ByteArrayInputStream(bo.toByteArray())).readObject(); return describe(o) + " " + o.getThrown().getMessage() + " " + Arrays.toString(o.getParameters()) + " " + (o.getMillis() == r.getMillis()) + " " + o.getSequenceNumber() + "=" + r.getSequenceNumber(); });
+    p("filter", () -> { Logger l = Logger.getAnonymousLogger(); Collect c = new Collect(); l.setUseParentHandlers(false); l.addHandler(c); l.setFilter(new UpperFilter()); l.info("keep"); l.info("drop me"); c.setFilter(r -> r.getMessage().startsWith("k")); l.info("kk"); l.info("other"); StringBuilder sb = new StringBuilder(); for (LogRecord r : c.records) sb.append(r.getMessage()).append(','); return sb + " " + (l.getFilter() instanceof UpperFilter); });
+    p("handlers mgmt", () -> { Logger l = Logger.getAnonymousLogger(); Collect c1 = new Collect(), c2 = new Collect(); l.addHandler(c1); l.addHandler(c2); l.removeHandler(c1); l.removeHandler(null); l.removeHandler(new Collect()); int n = l.getHandlers().length; try { l.addHandler(null); } catch (NullPointerException e) { n += 100; } return n + " " + (l.getHandlers()[0] == c2); });
+    p("parent handlers", () -> { Logger par = Logger.getLogger("ph"); Logger ch = Logger.getLogger("ph.child"); Collect cp = new Collect(), cc = new Collect(); par.setUseParentHandlers(false); par.addHandler(cp); ch.addHandler(cc); ch.setLevel(Level.ALL); par.setLevel(Level.ALL); ch.info("up"); ch.setUseParentHandlers(false); ch.info("local"); return cp.records.size() + " " + cc.records.size(); });
+    p("stream handler", () -> { ByteArrayOutputStream bo = new ByteArrayOutputStream(); StreamHandler h = new StreamHandler(bo, new FixedFormatter()); h.setLevel(Level.ALL); Logger l = Logger.getAnonymousLogger(); l.setUseParentHandlers(false); l.addHandler(h); l.warning("one"); l.log(Level.INFO, "two {0}", "x"); String before = bo.toString(); h.flush(); String mid = bo.toString(); h.close(); return before.length() + "|" + mid + "|" + bo.toString() + "|" + h.isLoggable(new LogRecord(Level.INFO, "x")); });
+    p("stream handler null", () -> new StreamHandler(null, new SimpleFormatter()));
+    p("stream handler nofmt", () -> new StreamHandler(new ByteArrayOutputStream(), null));
+    p("handler setters", () -> { Handler h = new StreamHandler(new ByteArrayOutputStream(), new SimpleFormatter()); StringBuilder sb = new StringBuilder(); try { h.setLevel(null); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { h.setFormatter(null); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { h.setErrorManager(null); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { h.setEncoding("nope-enc"); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } h.setEncoding("UTF-8"); return sb + " " + h.getEncoding() + " " + h.getLevel() + " " + h.isLoggable(null); });
+    p("console handler", () -> { errBuf.reset(); Logger l = Logger.getLogger("console.test"); l.info("to stderr"); l.fine("hidden"); l.warning("warn"); String out = mask(errBuf.toString()); errBuf.reset(); return "\n" + out; });
+    p("console throwable", () -> { errBuf.reset(); Logger l = Logger.getLogger("console.exc"); l.log(Level.SEVERE, "failed", new IllegalArgumentException("bad")); String out = errBuf.toString(); errBuf.reset(); String[] lines = out.split("\n"); return mask(lines[0]) + "|" + lines[1] + "|" + lines[2] + "|" + lines[3].startsWith("\tat "); });
+    p("simple format prop", () -> { System.setProperty("java.util.logging.SimpleFormatter.format", "%4$s|%3$s|%2$s|%5$s%6$s%n"); try { SimpleFormatter f = new SimpleFormatter(); LogRecord r = new LogRecord(Level.WARNING, "msg {0}"); r.setLoggerName("ln"); r.setSourceClassName("SC"); r.setSourceMethodName("sm"); r.setParameters(new Object[]{"P"}); return f.format(r); } finally { System.clearProperty("java.util.logging.SimpleFormatter.format"); } });
+    p("simple format bad", () -> { System.setProperty("java.util.logging.SimpleFormatter.format", "%9$s"); try { SimpleFormatter f = new SimpleFormatter(); LogRecord r = new LogRecord(Level.WARNING, "msg"); r.setLoggerName("ln"); r.setSourceClassName("SC"); r.setSourceMethodName("sm"); return mask(f.format(r)); } finally { System.clearProperty("java.util.logging.SimpleFormatter.format"); } });
+    p("simple format no source", () -> { System.setProperty("java.util.logging.SimpleFormatter.format", "%2$s|%3$s|%4$s|%5$s%n"); try { SimpleFormatter f = new SimpleFormatter(); LogRecord r = new LogRecord(Level.INFO, "m"); r.setLoggerName("ln"); r.setSourceClassName(null); return f.format(r); } finally { System.clearProperty("java.util.logging.SimpleFormatter.format"); } });
+    p("simple format time", () -> { System.setProperty("java.util.logging.SimpleFormatter.format", "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS.%1$tL %1$tZ%n"); try { SimpleFormatter f = new SimpleFormatter(); LogRecord r = new LogRecord(Level.INFO, "m"); r.setInstant(java.time.Instant.parse("2024-03-05T06:07:08.123Z")); return f.format(r); } finally { System.clearProperty("java.util.logging.SimpleFormatter.format"); } });
+    p("default format", () -> { SimpleFormatter f = new SimpleFormatter(); LogRecord r = new LogRecord(Level.INFO, "hello"); r.setInstant(java.time.Instant.parse("2024-03-05T16:07:08.123Z")); r.setLoggerName("ln"); r.setSourceClassName("SC"); r.setSourceMethodName("sm"); return f.format(r); });
+    p("format message", () -> { Formatter f = new SimpleFormatter(); LogRecord r = new LogRecord(Level.INFO, "a {0} b {1} {0}"); r.setParameters(new Object[]{"x", 2}); String s1 = f.formatMessage(r); r.setMessage("no params"); String s2 = f.formatMessage(r); r.setMessage("bad {0,xx}"); String s3 = f.formatMessage(r); r.setMessage("brace {"); r.setParameters(new Object[]{1}); String s4 = f.formatMessage(r); r.setMessage("{a}"); String s5 = f.formatMessage(r); r.setParameters(new Object[0]); r.setMessage("{0}"); String s6 = f.formatMessage(r); return s1 + "|" + s2 + "|" + s3 + "|" + s4 + "|" + s5 + "|" + s6; });
+    p("format bundle", () -> { ResourceBundle rb = new ListResourceBundle() { protected Object[][] getContents() { return new Object[][]{{"hi", "hello {0}"}}; } }; Formatter f = new SimpleFormatter(); LogRecord r = new LogRecord(Level.INFO, "hi"); r.setResourceBundle(rb); r.setParameters(new Object[]{"w"}); String s1 = f.formatMessage(r); r.setMessage("missing"); return s1 + "|" + f.formatMessage(r); });
+    p("xml formatter", () -> { XMLFormatter f = new XMLFormatter(); LogRecord r = new LogRecord(Level.INFO, "msg <b> & {0}"); r.setLoggerName("l&n"); r.setSourceClassName("SC"); r.setSourceMethodName("sm"); r.setParameters(new Object[]{"P"}); IllegalStateException ex = new IllegalStateException("oops"); ex.setStackTrace(new StackTraceElement[]{new StackTraceElement("C", "m", "F.java", 12), new StackTraceElement("D", "n", null, -1)}); r.setThrown(ex); r.setInstant(java.time.Instant.parse("2024-03-05T16:07:08.123456789Z")); return "\n" + mask(f.getHead(null)) + mask(f.format(r)) + f.getTail(null); });
+    p("xml formatter params", () -> { XMLFormatter f = new XMLFormatter(); LogRecord r = new LogRecord(Level.FINE, "plain"); r.setParameters(new Object[]{"A", null, 3}); r.setInstant(java.time.Instant.EPOCH); return mask(f.format(r)); });
+    p("xml head", () -> { Handler h = new StreamHandler(new ByteArrayOutputStream(), new XMLFormatter()); h.setEncoding("ISO-8859-1"); return new XMLFormatter().getHead(h); });
+    p("memory handler", () -> { Collect target = new Collect(); target.setLevel(Level.ALL); MemoryHandler m = new MemoryHandler(target, 3, Level.SEVERE); m.setLevel(Level.ALL); for (int i = 0; i < 5; i++) m.publish(new LogRecord(Level.INFO, "r" + i)); int before = target.records.size(); m.publish(new LogRecord(Level.SEVERE, "sev")); StringBuilder sb = new StringBuilder(); for (LogRecord r : target.records) sb.append(r.getMessage()).append(','); m.push(); int after = target.records.size(); m.close(); return before + " " + sb + " " + after + " " + m.getPushLevel() + " " + m.getLevel(); });
+    p("memory handler errors", () -> { Collect t = new Collect(); StringBuilder sb = new StringBuilder(); try { new MemoryHandler(null, 1, Level.INFO); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { new MemoryHandler(t, 0, Level.INFO); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { new MemoryHandler(t, 1, null); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { new MemoryHandler(); } catch (Exception e) { sb.append(e.getClass().getSimpleName() + ":" + e.getMessage()); } return sb; });
+    p("file handler", () -> { Path dir = Files.createTempDirectory("logt"); String pat = dir.resolve("app%g.log").toString().replace("\\", "/"); FileHandler fh = new FileHandler(pat, 200, 3, false); fh.setFormatter(new FixedFormatter()); Logger l = Logger.getAnonymousLogger(); l.setUseParentHandlers(false); l.addHandler(fh); l.setLevel(Level.ALL); for (int i = 0; i < 20; i++) l.info("message number " + i); fh.close(); List<String> names = new ArrayList<>(); try (var s = Files.list(dir)) { s.forEach(f -> names.add(f.getFileName().toString())); } Collections.sort(names); StringBuilder sb = new StringBuilder(names.toString()); for (String n : names) { if (n.endsWith(".log")) sb.append(" ").append(n).append(":").append(Files.readString(dir.resolve(n)).split("\n").length); } try (var s = Files.list(dir)) { s.forEach(f -> f.toFile().delete()); } dir.toFile().delete(); return sb; });
+    p("file handler append", () -> { Path dir = Files.createTempDirectory("logt"); String pat = dir.resolve("a.log").toString().replace("\\", "/"); for (int k = 0; k < 2; k++) { FileHandler fh = new FileHandler(pat, true); fh.setFormatter(new FixedFormatter()); fh.publish(new LogRecord(Level.INFO, "run" + k)); fh.close(); } String content = Files.readString(dir.resolve("a.log")); try (var s = Files.list(dir)) { s.forEach(f -> f.toFile().delete()); } dir.toFile().delete(); return content.replace("\n", "/"); });
+    p("file handler xml", () -> { Path dir = Files.createTempDirectory("logt"); String pat = dir.resolve("x%u.log").toString().replace("\\", "/"); FileHandler fh = new FileHandler(pat); FileHandler fh2 = new FileHandler(pat); LogRecord r = new LogRecord(Level.INFO, "xmlmsg"); r.setInstant(java.time.Instant.EPOCH); fh.publish(r); fh.close(); fh2.close(); List<String> names = new ArrayList<>(); try (var s = Files.list(dir)) { s.forEach(f -> names.add(f.getFileName().toString())); } Collections.sort(names); String content = mask(Files.readString(dir.resolve("x0.log"))).replaceAll("(?s)<record>.*</record>", "<record>..</record>"); try (var s = Files.list(dir)) { s.forEach(f -> f.toFile().delete()); } dir.toFile().delete(); return names + " " + content.replace("\n", "/"); });
+    p("file handler errors", () -> { StringBuilder sb = new StringBuilder(); try { new FileHandler(""); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { new FileHandler("x", -1, 1); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { new FileHandler("x", 1, 0); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } try { new FileHandler("/nonexistent-dir-xyz/a.log"); } catch (Exception e) { sb.append(e.getClass().getSimpleName()); } return sb; });
+    p("socket handler", () -> { java.net.ServerSocket ss = new java.net.ServerSocket(0); int port = ss.getLocalPort(); final String[] got = new String[1]; Thread t = new Thread(() -> { try (java.net.Socket s = ss.accept()) { got[0] = new String(s.getInputStream().readAllBytes()); } catch (Exception e) { got[0] = "err " + e; } }); t.start(); SocketHandler sh = new SocketHandler("127.0.0.1", port); LogRecord r = new LogRecord(Level.INFO, "over socket"); r.setInstant(java.time.Instant.EPOCH); sh.publish(r); sh.close(); t.join(5000); ss.close(); return mask(got[0]).replaceAll("(?s)<record>.*</record>", "<record>..</record>").replace("\n", "/"); });
+    p("socket handler errors", () -> { StringBuilder sb = new StringBuilder(); try { new SocketHandler(null, 5); } catch (Exception e) { sb.append(e.getClass().getSimpleName() + ":" + e.getMessage() + ";"); } try { new SocketHandler("127.0.0.1", 0); } catch (Exception e) { sb.append(e.getClass().getSimpleName() + ":" + e.getMessage() + ";"); } return sb; });
+    p("manager config", () -> { resetAll(); String cfg = "handlers=" + Collect.class.getName() + "\n.level=WARNING\ncfg.child.level=FINE\ncfg.noparent.useParentHandlers=false\n" + Collect.class.getName() + ".level=ALL\ncustom.key=value 1\nint.key= 42 \nbool.key=TRUE\n"; lm.readConfiguration(new ByteArrayInputStream(cfg.getBytes())); Logger root = Logger.getLogger(""); Handler[] hs = root.getHandlers(); Logger child = Logger.getLogger("cfg.child"); Logger np = Logger.getLogger("cfg.noparent"); return hs.length + " " + hs[0].getClass().getSimpleName() + " " + hs[0].getLevel() + " " + root.getLevel() + " " + child.getLevel() + " " + child.getParent().getName() + " " + np.getUseParentHandlers() + " " + lm.getProperty("custom.key") + " " + lm.getProperty("nope") + " " + lm.getProperty("int.key"); });
+    p("manager config bad", () -> { resetAll(); String cfg = "handlers=no.such.Handler\n.level=NOPE\nbad.level=ZZZ\n"; ByteArrayOutputStream eb = new ByteArrayOutputStream(); PrintStream old = System.err; System.setErr(new PrintStream(eb, true)); try { lm.readConfiguration(new ByteArrayInputStream(cfg.getBytes())); Logger.getLogger("").getHandlers(); Logger.getLogger("bad"); } finally { System.setErr(old); } String[] lines = eb.toString().split("\n"); return lines.length > 0 ? lines[0] + "|" + lines[1] + "|" + lines[2] : "none"; });
+    p("manager reset", () -> { resetAll(); Logger l = Logger.getLogger("rs.test"); l.setLevel(Level.FINE); Collect c = new Collect(); l.addHandler(c); lm.reset(); return l.getLevel() + " " + l.getHandlers().length + " " + Logger.getLogger("").getLevel() + " " + Logger.getLogger("").getHandlers().length; });
+    p("manager add logger", () -> { resetAll(); Logger custom = new Logger("custom.added", null) {}; boolean first = lm.addLogger(custom); boolean second = lm.addLogger(new Logger("custom.added", null) {}); try { lm.addLogger(new Logger(null, null) {}); } catch (NullPointerException e) { second |= false; return first + " " + second + " npe " + (lm.getLogger("custom.added") == custom) + " " + custom.getParent().getName(); } return "x"; });
+    p("manager names", () -> { resetAll(); Logger.getLogger("zz.a"); Logger.getLogger("zz.b"); Enumeration<String> e = lm.getLoggerNames(); List<String> l = new ArrayList<>(); while (e.hasMoreElements()) { String n = e.nextElement(); if (n.startsWith("zz") || n.isEmpty() || n.equals("global")) l.add(n); } Collections.sort(l); return l; });
+    p("manager listener", () -> { resetAll(); final int[] n = new int[1]; Runnable r = () -> n[0]++; lm.addConfigurationListener(r); lm.readConfiguration(new ByteArrayInputStream("a=1".getBytes())); lm.removeConfigurationListener(r); lm.readConfiguration(new ByteArrayInputStream("a=2".getBytes())); return n[0] + " " + lm.getProperty("a"); });
+    p("manager update", () -> { resetAll(); lm.readConfiguration(new ByteArrayInputStream("k1=a\nk2=b\nupd.level=SEVERE\n".getBytes())); Logger u = Logger.getLogger("upd"); String before = String.valueOf(u.getLevel()); lm.updateConfiguration(new ByteArrayInputStream("k2=c\nk3=d\nupd.level=FINE\n".getBytes()), k -> k.equals("k1") ? (o, n) -> null : (o, n) -> n); return before + " " + u.getLevel() + " " + lm.getProperty("k1") + " " + lm.getProperty("k2") + " " + lm.getProperty("k3"); });
+    p("manager update merge", () -> { resetAll(); lm.readConfiguration(new ByteArrayInputStream("m1=old\nm2=keep\n".getBytes())); lm.updateConfiguration(new ByteArrayInputStream("m1=new\n".getBytes()), k -> (o, n) -> n == null ? o : n); return lm.getProperty("m1") + " " + lm.getProperty("m2"); });
+    p("mxbean", () -> { resetAll(); Logger l = Logger.getLogger("mx.test"); l.setLevel(Level.FINE); LoggingMXBean mx = LogManager.getLoggingMXBean(); return mx.getLoggerLevel("mx.test") + " " + mx.getLoggerLevel("mx") + " " + mx.getLoggerLevel("nope") + " " + mx.getParentLoggerName("mx.test") + " [" + mx.getParentLoggerName("") + "] " + mx.getParentLoggerName("nope") + " " + mx.getLoggerNames().contains("mx.test"); });
+    p("mxbean set", () -> { resetAll(); Logger l = Logger.getLogger("mx.set"); LoggingMXBean mx = LogManager.getLoggingMXBean(); mx.setLoggerLevel("mx.set", "WARNING"); String s = String.valueOf(l.getLevel()); mx.setLoggerLevel("mx.set", null); StringBuilder sb = new StringBuilder(s + " " + l.getLevel()); try { mx.setLoggerLevel("nope", "INFO"); } catch (Exception e) { sb.append(" " + e.getMessage()); } try { mx.setLoggerLevel("mx.set", "BAD"); } catch (Exception e) { sb.append(" " + e.getMessage()); } return sb; });
+    p("permission", () -> new LoggingPermission("control", null).getName() + " " + new LoggingPermission("monitor", "").getName());
+    p("permission bad", () -> new LoggingPermission("nope", null));
+    p("permission bad2", () -> new LoggingPermission("control", "x"));
+    p("error manager", () -> { ByteArrayOutputStream eb = new ByteArrayOutputStream(); PrintStream old = System.err; System.setErr(new PrintStream(eb, true)); try { ErrorManager em = new ErrorManager(); em.error("first", null, ErrorManager.WRITE_FAILURE); em.error("second", new RuntimeException("x"), ErrorManager.CLOSE_FAILURE); } finally { System.setErr(old); } return eb.toString().replace("\n", "/") + ErrorManager.GENERIC_FAILURE + ErrorManager.WRITE_FAILURE + ErrorManager.FLUSH_FAILURE + ErrorManager.CLOSE_FAILURE + ErrorManager.OPEN_FAILURE + ErrorManager.FORMAT_FAILURE; });
+    p("bad formatter", () -> { ByteArrayOutputStream eb = new ByteArrayOutputStream(); PrintStream old = System.err; System.setErr(new PrintStream(eb, true)); try { StreamHandler h = new StreamHandler(new ByteArrayOutputStream(), new Formatter() { public String format(LogRecord r) { throw new IllegalStateException("fmt fail"); } }); h.setLevel(Level.ALL); h.publish(new LogRecord(Level.INFO, "x")); } finally { System.setErr(old); } return eb.toString().split("\n")[0]; });
+    p("logger bundle", () -> { ResourceBundle rb = ResourceBundle.getBundle("LoggingModern$MyBundle"); Logger l = Logger.getAnonymousLogger(); Collect c = new Collect(); l.setUseParentHandlers(false); l.addHandler(c); l.setResourceBundle(rb); StringBuilder sb = new StringBuilder(); try { l.setResourceBundle(rb); } catch (Exception e) { sb.append(e.getClass().getSimpleName()).append(":").append(e.getMessage()); } l.info("k"); l.logrb(Level.INFO, rb, "k2"); LogRecord r = c.records.get(0); return sb + " " + (l.getResourceBundle() == rb) + " " + l.getResourceBundleName() + " " + r.getResourceBundleName() + " " + (r.getResourceBundle() == rb) + " " + new SimpleFormatter().formatMessage(r); });
+    p("logger bundle name", () -> { Logger l = Logger.getLogger("bn.test", "sun.util.logging.resources.logging"); return l.getResourceBundleName(); });
+    p("logger bundle missing", () -> Logger.getLogger("bn.missing", "no.such.Bundle"));
+    p("logger bundle mismatch", () -> { Logger.getLogger("bn.mm", "sun.util.logging.resources.logging"); return Logger.getLogger("bn.mm", "other.bundle"); });
+    p("logger null", () -> Logger.getLogger(null));
+    p("logger log null level", () -> { Logger.getAnonymousLogger().log((Level) null, "x"); return "x"; });
+    p("anonymous", () -> { Logger l = Logger.getAnonymousLogger(); return l.getName() + " " + l.getParent().getName() + " " + l.getLevel() + " " + l.isLoggable(Level.INFO) + " " + l.isLoggable(Level.FINE); });
+    p("global logger", () -> { Logger g = Logger.getGlobal(); return g.getName() + " " + g.getParent().getName() + " " + (g == Logger.getLogger("global")) + " " + (g == Logger.global); });
+    p("log level OFF", () -> { Logger l = Logger.getAnonymousLogger(); Collect c = new Collect(); l.setUseParentHandlers(false); l.addHandler(c); l.setLevel(Level.OFF); l.severe("x"); l.log(Level.OFF, "off"); return c.records.size() + " " + l.isLoggable(Level.OFF); });
+    p("log level ALL", () -> { Logger l = Logger.getAnonymousLogger(); Collect c = new Collect(); l.setUseParentHandlers(false); l.addHandler(c); l.setLevel(Level.ALL); l.log(Level.ALL, "all"); l.finest("fin"); return c.records.size(); });
+    System.setErr(origErr);
   }
 }
