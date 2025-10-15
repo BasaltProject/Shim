@@ -23,90 +23,87 @@
 
 package java.util;
 
-public class StringTokenizer implements Enumeration {
-  private final String in;
+public class StringTokenizer implements Enumeration<Object> {
+  private int currentPosition;
+  private int newPosition;
+  private final int maxPosition;
+  private final String str;
   private String delimiters;
-  private final boolean includeDelimiters;
-  private int position;
+  private final boolean retDelims;
+  private boolean delimsChanged;
 
-  public StringTokenizer(String in, String delimiters,
-                         boolean includeDelimiters)
-  {
-    this.in = in;
-    this.delimiters = delimiters;
-    this.includeDelimiters = includeDelimiters;
+  public StringTokenizer(String str, String delim, boolean returnDelims) {
+    currentPosition = 0;
+    newPosition = -1;
+    delimsChanged = false;
+    this.str = str;
+    maxPosition = str.length();
+    delimiters = delim;
+    retDelims = returnDelims;
   }
 
-  public StringTokenizer(String in, String delimiters) {
-    this(in, delimiters, false);
+  public StringTokenizer(String str, String delim) {
+    this(str, delim, false);
   }
 
-  public StringTokenizer(String in) {
-    this(in, " \t\r\n\f");
+  public StringTokenizer(String str) {
+    this(str, " \t\n\r\f", false);
   }
 
   private boolean isDelimiter(char c) {
     return delimiters.indexOf(c) >= 0;
   }
 
-  public int countTokens() {
-    int count = 0;
-    boolean sawNonDelimiter = false;
-    for (int i = position; i < in.length(); ++i) {
-      if (isDelimiter(in.charAt(i))) {
-        if (sawNonDelimiter) {
-          sawNonDelimiter = false;
-          ++ count;
-        }
+  private int skipDelimiters(int startPos) {
+    if (delimiters == null) {
+      throw new NullPointerException();
+    }
+    int position = startPos;
+    while (!retDelims && position < maxPosition) {
+      if (!isDelimiter(str.charAt(position))) {
+        break;
+      }
+      position++;
+    }
+    return position;
+  }
 
-        if (includeDelimiters) {
-          ++ count;
-        }
-      } else {
-        sawNonDelimiter = true;
+  private int scanToken(int startPos) {
+    int position = startPos;
+    while (position < maxPosition) {
+      if (isDelimiter(str.charAt(position))) {
+        break;
+      }
+      position++;
+    }
+    if (retDelims && startPos == position) {
+      if (isDelimiter(str.charAt(position))) {
+        position++;
       }
     }
-
-    if (sawNonDelimiter) {
-      ++ count;
-    }
-
-    return count;
+    return position;
   }
 
   public boolean hasMoreTokens() {
-    for (int i = position; i < in.length(); ++i) {
-      if (isDelimiter(in.charAt(i))) {
-        if (includeDelimiters) {
-          return true;
-        }
-      } else {
-        position = i;
-        return true;
-      }
-    }
-    return false;
+    newPosition = skipDelimiters(currentPosition);
+    return newPosition < maxPosition;
   }
 
   public String nextToken() {
-    for (int i = position; i < in.length(); ++i) {
-      if (isDelimiter(in.charAt(i))) {
-        if (includeDelimiters) {
-          return in.substring(i, i + 1);
-        }
-      } else {
-        position = i;
-        while (position < in.length() && ! isDelimiter(in.charAt(position))) {
-          ++ position;
-        }
-        return in.substring(i, position);
-      }
+    currentPosition = (newPosition >= 0 && !delimsChanged) ? newPosition : skipDelimiters(currentPosition);
+    delimsChanged = false;
+    newPosition = -1;
+    if (currentPosition >= maxPosition) {
+      throw new NoSuchElementException();
     }
-    throw new NoSuchElementException();
+    int start = currentPosition;
+    currentPosition = scanToken(currentPosition);
+    return str.substring(start, currentPosition);
   }
 
-  public String nextToken(String delimiters) {
-    this.delimiters = delimiters;
+  public String nextToken(String delim) {
+    delimiters = delim;
+    delimsChanged = true;
     return nextToken();
   }
 
@@ -118,4 +115,17 @@ public class StringTokenizer implements Enumeration {
     return nextToken();
   }
 
+  public int countTokens() {
+    int count = 0;
+    int currpos = currentPosition;
+    while (currpos < maxPosition) {
+      currpos = skipDelimiters(currpos);
+      if (currpos >= maxPosition) {
+        break;
+      }
+      currpos = scanToken(currpos);
+      count++;
+    }
+    return count;
+  }
 }
