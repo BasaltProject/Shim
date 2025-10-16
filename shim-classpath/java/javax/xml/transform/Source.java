@@ -15,6 +15,5 @@ public interface Source {
 
   default boolean isEmpty() {
     throw new UnsupportedOperationException("The isEmpty method is not supported.");
-
   }
 }
