@@ -57,6 +57,8 @@ public class SaxReader implements XMLReader, Locator2 {
   private boolean lexicalParameterEntities = true;
   private final Map<String, Object> properties = new HashMap<String, Object>();
 
+  private String actualEncoding;
+  private String documentSystemId;
   private boolean parsing;
   private XmlPullParser parser;
 
@@ -282,6 +284,8 @@ public class SaxReader implements XMLReader, Locator2 {
           return resolveEntity(name, publicId, systemId, baseUri);
         }
       });
+      actualEncoding = input.encodingName;
+      documentSystemId = input.systemId;
       p.namespaceAware = namespaces;
       p.loadExternalDtd = loadExternalDtd && externalParameterEntities;
       p.externalGeneralEntities = externalGeneralEntities;
@@ -525,6 +529,22 @@ public class SaxReader implements XMLReader, Locator2 {
     } else {
       contentHandler.endElement("", "", ev.a);
     }
+  }
+
+  public String literalSystemId() {
+    return parser == null || parser.current() == null ? null : parser.current().literal;
+  }
+
+  public boolean isStandalone() {
+    return parser != null && parser.standalone;
+  }
+
+  public String getActualEncoding() {
+    return actualEncoding;
+  }
+
+  public String getParsedSystemId() {
+    return documentSystemId;
   }
 
   public String getPublicId() {
