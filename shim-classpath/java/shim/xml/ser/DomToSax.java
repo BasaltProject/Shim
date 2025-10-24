@@ -26,6 +26,15 @@ public final class DomToSax {
   private final boolean fixup;
   private final List<Map<String, String>> scopes = new ArrayList<Map<String, String>>();
   private int nextPrefix = 1;
+  public boolean lsMode;
+  public boolean comments = true;
+  public boolean cdataSections = true;
+  public boolean entities = true;
+  public boolean namespaceDeclarations = true;
+  public boolean attributeFixup = true;
+  public boolean discardDefaults = true;
+  public boolean splitCdata = true;
+  public org.w3c.dom.ls.LSSerializerFilter filter;
 
   public DomToSax(ContentHandler handler, LexicalHandler lexical, boolean fixup) {
     this.handler = handler;
@@ -62,7 +71,37 @@ public final class DomToSax {
     return null;
   }
 
+  private static void checkChars(String s) {
+    for (int i = 0; i < s.length(); i++) {
+      char ch = s.charAt(i);
+      if (ch < 0x20 && ch != '\t' && ch != '\n' && ch != '\r') {
+        throw new RuntimeException("com.sun.org.apache.xml.internal.serializer.utils.WrappedRuntimeException: An "
+            + "invalid XML character (Unicode: 0x" + Integer.toHexString(ch)
+            + ") was found in the node's character data content.");
+      }
+    }
+  }
+
+  private boolean shown(Node node) {
+    if (filter == null) {
+      return true;
+    }
+    int bit = 1 << (node.getNodeType() - 1);
+    if ((filter.getWhatToShow() & bit) == 0) {
+      return true;
+    }
+    return filter.acceptNode(node) == org.w3c.dom.ls.LSSerializerFilter.FILTER_ACCEPT;
+  }
+
   private void visit(Node node) throws SAXException {
+    if (lsMode && node.getNodeType() != Node.DOCUMENT_NODE && !shown(node)) {
+      if (node.getNodeType() == Node.ELEMENT_NODE) {
+        for (Node c = node.getFirstChild(); c != null; c = c.getNextSibling()) {
+          visit(c);
+        }
+      }
+      return;
+    }
     switch (node.getNodeType()) {
     case Node.DOCUMENT_NODE:
       handler.startDocument();
@@ -81,11 +120,28 @@ public final class DomToSax {
       break;
     case Node.TEXT_NODE: {
       char[] c = node.getNodeValue().toCharArray();
+      if (lsMode) {
+        checkChars(node.getNodeValue());
+      }
       handler.characters(c, 0, c.length);
+      break;
+    }
+    case Node.ATTRIBUTE_NODE: {
+      if (lsMode) {
+        char[] c = node.getNodeValue().toCharArray();
+        handler.characters(c, 0, c.length);
+      }
       break;
     }
     case Node.CDATA_SECTION_NODE: {
       char[] c = node.getNodeValue().toCharArray();
+      if (lsMode && !cdataSections) {
+        handler.characters(c, 0, c.length);
+        break;
+      }
+      if (lsMode && !splitCdata && node.getNodeValue().contains("]]>")) {
+        break;
+      }
       if (lexical != null) {
         lexical.startCDATA();
       }
@@ -96,7 +152,10 @@ public final class DomToSax {
       break;
     }
     case Node.COMMENT_NODE: {
-      char[] c = node.getNodeValue().toCharArray();
+      if (lsMode && !comments) {
+        break;
+      }
+      char[] c = (lsMode ? node.getNodeValue().replace("--", "- -") : node.getNodeValue()).toCharArray();
       if (lexical != null) {
         lexical.comment(c, 0, c.length);
       }
@@ -106,6 +165,10 @@ public final class DomToSax {
       handler.processingInstruction(node.getNodeName(), node.getNodeValue());
       break;
     case Node.ENTITY_REFERENCE_NODE:
+      if (lsMode && entities) {
+        handler.skippedEntity(node.getNodeName());
+        break;
+      }
       if (lexical != null) {
         lexical.startEntity(node.getNodeName());
       }
@@ -149,8 +212,13 @@ public final class DomToSax {
     for (int i = 0; i < map.getLength(); i++) {
       Attr a = (Attr) map.item(i);
       String name = a.getNodeName();
+      if (lsMode && discardDefaults && !a.getSpecified()) {
+        continue;
+      }
       if (name.equals("xmlns") || name.startsWith("xmlns:")) {
-        declarations.add(a);
+        if (!lsMode || namespaceDeclarations) {
+          declarations.add(a);
+        }
       } else {
         regular.add(a);
       }
@@ -169,7 +237,7 @@ public final class DomToSax {
         ownDecl = true;
       }
     }
-    boolean ownFirst = !declarations.isEmpty();
+    boolean ownFirst = !declarations.isEmpty() || lsMode;
     AttributesImpl atts = new AttributesImpl();
     if (ownDecl && ownFirst) {
       if (declare(scope, declared, p, ownUri)) {
@@ -200,7 +268,7 @@ public final class DomToSax {
         }
         continue;
       }
-      if (ans != null && ans.length() > 0) {
+      if (ans != null && ans.length() > 0 && (!lsMode || attributeFixup)) {
         String ap = a.getPrefix();
         String use = ap;
         if (ap == null) {

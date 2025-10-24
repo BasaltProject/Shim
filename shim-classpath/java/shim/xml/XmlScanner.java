@@ -43,6 +43,22 @@ final class XmlScanner {
 
   private final ArrayList<Frame> stack = new ArrayList<Frame>();
   private Frame cur;
+  private int consumed;
+  private StringBuilder recorder;
+
+  int offset() {
+    return consumed;
+  }
+
+  void beginRecording() {
+    recorder = new StringBuilder();
+  }
+
+  String endRecording() {
+    String s = recorder == null ? null : recorder.toString();
+    recorder = null;
+    return s;
+  }
 
   Frame current() {
     return cur;
@@ -189,6 +205,12 @@ final class XmlScanner {
     }
     Frame f = cur;
     f.pos++;
+    if (stack.isEmpty()) {
+      consumed++;
+      if (recorder != null) {
+        recorder.append((char) c);
+      }
+    }
     if (c == '\n') {
       f.line++;
       f.col = 1;
