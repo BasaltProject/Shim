@@ -295,7 +295,7 @@ public abstract class TimeZone implements Serializable, Cloneable {
     }
     int gmtOffset = (hours * 60 + minutes) * 60 * 1000;
     if (gmtOffset == 0) {
-      return ZoneInfoTimeZone.find("UTC") == null ? null : zoneWithId("GMT", 0);
+      return ZoneInfoTimeZone.find("UTC") == null ? null : zoneWithId(sign < 0 ? "GMT-00:00" : "GMT+00:00", 0);
     }
     return zoneWithId(String.format("GMT%c%02d:%02d", sign < 0 ? '-' : '+', hours, minutes), sign * gmtOffset);
   }
