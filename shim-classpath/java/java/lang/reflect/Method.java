@@ -83,32 +83,98 @@ public class Method extends Executable {
   public Object invoke(Object instance, Object ... arguments)
     throws InvocationTargetException, IllegalAccessException
   {
-    if ((vmMethod.flags & Modifier.STATIC) != 0
-        || Class.isInstance(vmMethod.class_, instance))
-    {
-      if ((vmMethod.flags & Modifier.STATIC) != 0) {
-        instance = null;
-      }
-
-      if (arguments == null) {
-        if (vmMethod.parameterCount > 0) {
-          throw new NullPointerException();
-        }
-        arguments = new Object[0];
-      }
-
-      if (arguments.length == vmMethod.parameterCount) {
-        Classes.initialize(vmMethod.class_);
-
-        return invoke(vmMethod, instance, arguments);        
-      } else {
-        throw new ArrayIndexOutOfBoundsException();
-      }
+    if ((vmMethod.flags & Modifier.STATIC) != 0) {
+      instance = null;
     } else {
-//       System.out.println
-//         (getDeclaringClass() + "." + getName() + " flags: " + vmMethod.flags + " vm flags: " + vmMethod.vmFlags + " return code: " + vmMethod.returnCode);
-      throw new IllegalArgumentException();
+      if (instance == null) {
+        throw new NullPointerException("Cannot invoke \"Object.getClass()\" because \"obj\" is null");
+      }
+      if (!Class.isInstance(vmMethod.class_, instance)) {
+        throw new IllegalArgumentException("object of type " + instance.getClass().getName()
+                                           + " is not an instance of " + getDeclaringClass().getName());
+      }
     }
+    arguments = checkArguments(arguments);
+    Classes.initialize(vmMethod.class_);
+    return invoke(vmMethod, instance, arguments);
+  }
+
+  private Object[] checkArguments(Object[] arguments) {
+    int count = vmMethod.parameterCount;
+    if (arguments == null) {
+      if (count > 0) {
+        throw new IllegalArgumentException("wrong number of arguments: 0 expected: " + count);
+      }
+      return new Object[0];
+    }
+    if (arguments.length != count) {
+      throw new IllegalArgumentException("wrong number of arguments: " + arguments.length + " expected: " + count);
+    }
+    if (count == 0) {
+      return arguments;
+    }
+    Class[] types = getParameterTypes();
+    Object[] converted = null;
+    for (int i = 0; i < count; ++i) {
+      Object argument = arguments[i];
+      Class type = types[i];
+      if (type.isPrimitive()) {
+        if (argument == null) {
+          throw new IllegalArgumentException(new NullPointerException());
+        }
+        Object value = widen(type, argument);
+        if (value == null) {
+          throw new IllegalArgumentException("argument type mismatch");
+        }
+        if (value != argument) {
+          if (converted == null) {
+            converted = arguments.clone();
+          }
+          converted[i] = value;
+        }
+      } else if (argument != null && !type.isInstance(argument)) {
+        throw new IllegalArgumentException("argument type mismatch");
+      }
+    }
+    return converted == null ? arguments : converted;
+  }
+
+  private static Object widen(Class type, Object a) {
+    if (type == Boolean.TYPE) {
+      return a instanceof Boolean ? a : null;
+    }
+    if (type == Character.TYPE) {
+      return a instanceof Character ? a : null;
+    }
+    if (type == Byte.TYPE) {
+      return a instanceof Byte ? a : null;
+    }
+    boolean integral = a instanceof Byte || a instanceof Short || a instanceof Integer || a instanceof Character;
+    long bits = 0;
+    if (integral) {
+      bits = a instanceof Character ? (long) ((Character) a).charValue() : ((Number) a).longValue();
+    }
+    if (type == Short.TYPE) {
+      return a instanceof Short ? a : a instanceof Byte ? (Object) Short.valueOf((short) bits) : null;
+    }
+    if (type == Integer.TYPE) {
+      return a instanceof Integer ? a : integral ? (Object) Integer.valueOf((int) bits) : null;
+    }
+    boolean wide = integral || a instanceof Long;
+    if (a instanceof Long) {
+      bits = ((Long) a).longValue();
+    }
+    if (type == Long.TYPE) {
+      return a instanceof Long ? a : integral ? (Object) Long.valueOf(bits) : null;
+    }
+    if (type == Float.TYPE) {
+      return a instanceof Float ? a : wide ? (Object) Float.valueOf((float) bits) : null;
+    }
+    if (type == Double.TYPE) {
+      return a instanceof Double ? a : wide ? (Object) Double.valueOf((double) bits)
+        : a instanceof Float ? (Object) Double.valueOf(((Float) a).doubleValue()) : null;
+    }
+    return null;
   }
 
   private static native Object invoke(VMMethod method, Object instance,

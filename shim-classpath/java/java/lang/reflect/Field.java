@@ -53,8 +53,11 @@ public class Field<T> extends AccessibleObject implements Member {
     return accessible;
   }
 
+  private boolean overridden;
+
   public void setAccessible(boolean v) {
     accessible = v;
+    overridden = v;
   }
 
   public Class<T> getDeclaringClass() {
@@ -100,18 +103,27 @@ public class Field<T> extends AccessibleObject implements Member {
     return new AnnotatedTypeImpl(getGenericType());
   }
 
-  private Object target(Object instance) {
+  private String describe() {
+    return getType().getName() + " field " + getDeclaringClass().getName() + "." + getName();
+  }
+
+  private Object target(Object instance, boolean setting) {
     if ((vmField.flags & Modifier.STATIC) != 0) {
       Classes.initialize(vmField.class_);
       return vmField.class_.staticTable;
     }
-    if (instance == null) throw new NullPointerException();
-    if (!Class.isInstance(vmField.class_, instance)) throw new IllegalArgumentException();
+    if (instance == null) {
+      throw new NullPointerException("Cannot invoke \"Object.getClass()\" because \"obj\" is null");
+    }
+    if (!Class.isInstance(vmField.class_, instance)) {
+      throw new IllegalArgumentException("Can not " + (setting ? "set " : "get ") + describe()
+                                         + (setting ? " to " : " on ") + instance.getClass().getName());
+    }
     return instance;
   }
 
   public Object get(Object instance) throws IllegalAccessException {
-    Object target = target(instance);
+    Object target = target(instance, false);
 
     switch (vmField.code) {
     case ByteField:
@@ -168,6 +180,18 @@ public class Field<T> extends AccessibleObject implements Member {
     throw new IllegalArgumentException();
   }
 
+  private static int wrapperCode(Object value) {
+    if (value instanceof Boolean) return BooleanField;
+    if (value instanceof Byte) return ByteField;
+    if (value instanceof Character) return CharField;
+    if (value instanceof Short) return ShortField;
+    if (value instanceof Integer) return IntField;
+    if (value instanceof Long) return LongField;
+    if (value instanceof Float) return FloatField;
+    if (value instanceof Double) return DoubleField;
+    return -1;
+  }
+
   private static boolean widens(int source, int destination) {
     if (source == destination) return true;
     switch (source) {
@@ -189,7 +213,7 @@ public class Field<T> extends AccessibleObject implements Member {
 
   private static Object convert(Object value, int destination) {
     int source = valueCode(value);
-    if (!widens(source, destination)) throw new IllegalArgumentException();
+    if (!widens(source, destination)) throw new IllegalArgumentException("argument type mismatch");
     if (source == destination) return value;
     Number number = source == CharField ? Integer.valueOf((Character) value) : (Number) value;
     switch (destination) {
@@ -202,9 +226,27 @@ public class Field<T> extends AccessibleObject implements Member {
     }
   }
 
+  private static String codeName(int code) {
+    switch (code) {
+    case BooleanField: return "boolean";
+    case ByteField: return "byte";
+    case CharField: return "char";
+    case ShortField: return "short";
+    case IntField: return "int";
+    case LongField: return "long";
+    case FloatField: return "float";
+    case DoubleField: return "double";
+    default: return "object";
+    }
+  }
+
   private Object getConverted(Object instance, int destination) throws IllegalAccessException {
     Object value = get(instance);
-    if (vmField.code == ObjectField) throw new IllegalArgumentException();
+    if (vmField.code == ObjectField || !widens(vmField.code, destination)) {
+      throw new IllegalArgumentException("Attempt to get " + getType().getName() + " field \""
+                                         + getDeclaringClass().getName() + "." + getName()
+                                         + "\" with illegal data type conversion to " + codeName(destination));
+    }
     return convert(value, destination);
   }
 
@@ -244,12 +286,29 @@ public class Field<T> extends AccessibleObject implements Member {
     setValue(instance, value, false);
   }
 
+  private String valueText(Object value, boolean primitiveOnly) {
+    if (value == null) return "null value";
+    if (!primitiveOnly) return value.getClass().getName();
+    String name = codeName(wrapperCode(value));
+    return "(" + name + ")" + value;
+  }
+
   private void setValue(Object instance, Object value, boolean primitiveOnly) throws IllegalAccessException {
-    Object target = target(instance);
+    Object target = target(instance, true);
+    if ((vmField.flags & Modifier.FINAL) != 0 && ((vmField.flags & Modifier.STATIC) != 0 || !overridden)
+        && !getDeclaringClass().getName().equals("java.lang.System")) {
+      throw new IllegalAccessException("Can not set " + ((vmField.flags & Modifier.STATIC) != 0 ? "static " : "")
+                                       + "final " + describe() + " to " + valueText(value, primitiveOnly));
+    }
     if (vmField.code == ObjectField) {
-      if (primitiveOnly || (value != null && !getType().isInstance(value))) throw new IllegalArgumentException();
+      if (primitiveOnly || (value != null && !getType().isInstance(value))) {
+        throw new IllegalArgumentException("Can not set " + describe() + " to " + valueText(value, primitiveOnly));
+      }
       setObject(target, vmField.offset, value);
       return;
+    }
+    if (value == null || wrapperCode(value) < 0 || !widens(wrapperCode(value), vmField.code)) {
+      throw new IllegalArgumentException("Can not set " + describe() + " to " + valueText(value, primitiveOnly));
     }
     value = convert(value, vmField.code);
     long bits;
