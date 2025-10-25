@@ -23,9 +23,50 @@
 
 package java.security;
 
-public abstract class PermissionCollection implements java.io.Serializable {
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.stream.Stream;
 
+public abstract class PermissionCollection implements java.io.Serializable {
   private static final long serialVersionUID = -6727011328946861783L;
- 
-  public abstract void add(Permission p);
+
+  private volatile boolean readOnly;
+
+  public PermissionCollection() {
+  }
+
+  public abstract void add(Permission permission);
+
+  public abstract boolean implies(Permission permission);
+
+  public abstract Enumeration<Permission> elements();
+
+  public Stream<Permission> elementsAsStream() {
+    return Collections.list(elements()).stream();
+  }
+
+  public void setReadOnly() {
+    readOnly = true;
+  }
+
+  public boolean isReadOnly() {
+    return readOnly;
+  }
+
+  @Override
+  public String toString() {
+    Enumeration<Permission> enum_ = elements();
+    StringBuilder sb = new StringBuilder();
+    sb.append(super.toString()).append(" (\n");
+    while (enum_.hasMoreElements()) {
+      try {
+        Permission p = enum_.nextElement();
+        sb.append(' ').append(p).append('\n');
+      } catch (java.util.NoSuchElementException e) {
+        // ignored
+      }
+    }
+    sb.append(')').append('\n');
+    return sb.toString();
+  }
 }

@@ -255,11 +255,11 @@ public abstract class System {
   }
   
   public static SecurityManager getSecurityManager() {
-    return securityManager;
+    return null;
   }
-  
+
   public static void setSecurityManager(SecurityManager securityManager) {
-    System.securityManager = securityManager;
+    throw new UnsupportedOperationException("Setting a Security Manager is not supported");
   }
 
   public static String getenv(String name) throws NullPointerException,

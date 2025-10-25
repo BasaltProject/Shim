@@ -399,7 +399,18 @@ public class Classes {
       }
       if (!valid) throw new ClassNotFoundException(name);
     }
-    VMClass vmc = resolveNamedVMClass(loader, name);
+    VMClass vmc;
+    try {
+      vmc = resolveNamedVMClass(loader, name);
+    } catch (ClassNotFoundException e) {
+      String message = e.getMessage();
+      if (message != null && message.indexOf('/') >= 0) {
+        ClassNotFoundException fixed = new ClassNotFoundException(name);
+        fixed.initCause(e.getCause());
+        throw fixed;
+      }
+      throw e;
+    }
     Class c = SystemClassLoader.getClass(vmc);
     if (initialize) {
       initialize(vmc);
@@ -689,10 +700,13 @@ public class Classes {
       } catch (MalformedURLException ignored) { }
     }
 
-    Permissions p = new Permissions();
-    p.add(new AllPermission());
-
-    return new ProtectionDomain(source, p);
+    ClassLoader loader = SystemClassLoader.getClass(c).getClassLoader();
+    if (loader == null) {
+      Permissions p = new Permissions();
+      p.add(new AllPermission());
+      return new ProtectionDomain(source, p);
+    }
+    return new ProtectionDomain(source, null, loader, null);
   }
 
   public static native Method makeMethod(Class c, int slot);
