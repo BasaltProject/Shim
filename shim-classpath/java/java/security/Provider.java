@@ -588,6 +588,8 @@ public abstract class Provider extends Properties {
         return "java.security.Policy$Parameters";
       case "Configuration":
         return "javax.security.auth.login.Configuration$Parameters";
+      case "KDF":
+        return "javax.crypto.KDFParameters";
       default:
         return null;
       }

@@ -85,6 +85,10 @@ public final class SunJCE extends Provider {
     add("KeyGenerator", "DESede", "com.sun.crypto.provider.DESedeKeyGenerator", new String[] {"TripleDES"}, new String[] {});
     add("AlgorithmParameters", "GCM", "com.sun.crypto.provider.GCMParameters", new String[] {}, new String[] {});
     add("Cipher", "AES/CTR/NoPadding", "com.sun.crypto.provider.AESCipher$AES_CTR_NoPadding", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("KEM", "DHKEM", "com.sun.crypto.provider.DHKEM", new String[] {}, new String[] {"SupportedKeyClasses", "java.security.interfaces.ECKey|java.security.interfaces.XECKey"});
+    add("KDF", "HKDF-SHA256", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA256", new String[] {}, new String[] {});
+    add("KDF", "HKDF-SHA384", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA384", new String[] {}, new String[] {});
+    add("KDF", "HKDF-SHA512", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA512", new String[] {}, new String[] {});
   }
 
   private void add(String type, String algorithm, String className, String[] aliases, String[] attrs) {
