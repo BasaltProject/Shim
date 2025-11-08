@@ -33,10 +33,12 @@ public enum AccessFlag {
   INTERFACE(0x0200, false, Location.CLASS, Location.INNER_CLASS),
   ABSTRACT(0x0400, true, Location.CLASS, Location.METHOD, Location.INNER_CLASS),
   STRICT(0x0800, true, Location.METHOD),
-  SYNTHETIC(0x1000, false, Location.CLASS, Location.FIELD, Location.METHOD, Location.INNER_CLASS, Location.METHOD_PARAMETER, Location.MODULE, Location.MODULE_REQUIRES, Location.MODULE_EXPORTS, Location.MODULE_OPENS),
+  SYNTHETIC(0x1000, false, Location.CLASS, Location.FIELD, Location.METHOD, Location.INNER_CLASS,
+      Location.METHOD_PARAMETER, Location.MODULE, Location.MODULE_REQUIRES, Location.MODULE_EXPORTS, Location.MODULE_OPENS),
   ANNOTATION(0x2000, false, Location.CLASS, Location.INNER_CLASS),
   ENUM(0x4000, false, Location.CLASS, Location.FIELD, Location.INNER_CLASS),
-  MANDATED(0x8000, false, Location.METHOD_PARAMETER, Location.MODULE, Location.MODULE_REQUIRES, Location.MODULE_EXPORTS, Location.MODULE_OPENS),
+  MANDATED(0x8000, false, Location.METHOD_PARAMETER, Location.MODULE, Location.MODULE_REQUIRES,
+      Location.MODULE_EXPORTS, Location.MODULE_OPENS),
   MODULE(0x8000, false, Location.CLASS);
 
   public enum Location {
@@ -127,7 +129,8 @@ public enum AccessFlag {
     Objects.requireNonNull(location);
     int unmatched = mask & ~location.flagsMask();
     if (unmatched != 0) {
-      throw new IllegalArgumentException("Unmatched bit position 0x" + Integer.toHexString(unmatched) + " for location " + location);
+      throw new IllegalArgumentException("Unmatched bit position 0x" + Integer.toHexString(unmatched)
+          + " for location " + location);
     }
     Set<AccessFlag> flags = EnumSet.noneOf(AccessFlag.class);
     for (AccessFlag flag : values()) {

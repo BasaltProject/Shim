@@ -357,7 +357,6 @@ public final class DateTimeFormatter {
         try {
           return (TemporalAccessor) resolved.query(query);
         } catch (RuntimeException ex) {
-          // try next
         }
       }
       throw new DateTimeException("Unable to convert parsed text using any of the specified queries");

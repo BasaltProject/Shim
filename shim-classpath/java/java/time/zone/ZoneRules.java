@@ -163,7 +163,8 @@ public final class ZoneRules implements Serializable {
       return wallOffsets[0];
     }
     if (lastRules.length > 0
-        && (savingsLocalTransitions.length == 0 || dt.isAfter(savingsLocalTransitions[savingsLocalTransitions.length - 1]))) {
+        && (savingsLocalTransitions.length == 0
+            || dt.isAfter(savingsLocalTransitions[savingsLocalTransitions.length - 1]))) {
       ZoneOffsetTransition[] transArray = findTransitionArray(dt.getYear());
       Object info = null;
       for (ZoneOffsetTransition trans : transArray) {

@@ -33,27 +33,32 @@ public class SQLClientInfoException extends SQLException {
     this.failedProperties = failedProperties;
   }
 
-  public SQLClientInfoException(String reason, java.util.Map<String, ClientInfoStatus> failedProperties, Throwable cause) {
+  public SQLClientInfoException(String reason, java.util.Map<String, ClientInfoStatus> failedProperties,
+      Throwable cause) {
     super(reason, cause);
     this.failedProperties = failedProperties;
   }
 
-  public SQLClientInfoException(String reason, String SQLState, java.util.Map<String, ClientInfoStatus> failedProperties) {
+  public SQLClientInfoException(String reason, String SQLState, java.util.Map<String,
+      ClientInfoStatus> failedProperties) {
     super(reason, SQLState);
     this.failedProperties = failedProperties;
   }
 
-  public SQLClientInfoException(String reason, String SQLState, java.util.Map<String, ClientInfoStatus> failedProperties, Throwable cause) {
+  public SQLClientInfoException(String reason, String SQLState, java.util.Map<String,
+      ClientInfoStatus> failedProperties, Throwable cause) {
     super(reason, SQLState, cause);
     this.failedProperties = failedProperties;
   }
 
-  public SQLClientInfoException(String reason, String SQLState, int vendorCode, java.util.Map<String, ClientInfoStatus> failedProperties) {
+  public SQLClientInfoException(String reason, String SQLState, int vendorCode, java.util.Map<String,
+      ClientInfoStatus> failedProperties) {
     super(reason, SQLState, vendorCode);
     this.failedProperties = failedProperties;
   }
 
-  public SQLClientInfoException(String reason, String SQLState, int vendorCode, java.util.Map<String, ClientInfoStatus> failedProperties, Throwable cause) {
+  public SQLClientInfoException(String reason, String SQLState, int vendorCode, java.util.Map<String,
+      ClientInfoStatus> failedProperties, Throwable cause) {
     super(reason, SQLState, vendorCode, cause);
     this.failedProperties = failedProperties;
   }

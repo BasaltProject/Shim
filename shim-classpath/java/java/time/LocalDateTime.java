@@ -396,7 +396,8 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
   }
 
   public LocalDateTime minusMonths(long monthsToSubtract) {
-    return (monthsToSubtract == Long.MIN_VALUE ? plusMonths(Long.MAX_VALUE).plusMonths(1) : plusMonths(-monthsToSubtract));
+    return (monthsToSubtract == Long.MIN_VALUE ? plusMonths(Long.MAX_VALUE).plusMonths(1)
+        : plusMonths(-monthsToSubtract));
   }
 
   public LocalDateTime minusWeeks(long weeksToSubtract) {

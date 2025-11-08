@@ -217,7 +217,8 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
   }
 
   public final void acquireSharedInterruptibly(int arg) throws InterruptedException {
-    if (Thread.interrupted() || (tryAcquireShared(arg) < 0 && doAcquire(arg, true, true, false, 0L, false) != kAcquired)) {
+    if (Thread.interrupted() || (tryAcquireShared(arg) < 0 && doAcquire(arg, true, true, false, 0L,
+        false) != kAcquired)) {
       throw new InterruptedException();
     }
   }

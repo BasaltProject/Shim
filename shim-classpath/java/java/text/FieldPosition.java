@@ -86,7 +86,8 @@ public class FieldPosition {
 
   @Override
   public String toString() {
-    return getClass().getName() + "[field=" + field + ",attribute=" + attribute + ",beginIndex=" + beginIndex + ",endIndex="
+    return getClass().getName() + "[field=" + field + ",attribute=" + attribute + ",beginIndex=" + beginIndex
+        + ",endIndex="
         + endIndex + ']';
   }
 }

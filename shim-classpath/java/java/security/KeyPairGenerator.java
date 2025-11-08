@@ -167,7 +167,6 @@ public abstract class KeyPairGenerator extends KeyPairGeneratorSpi {
             this.spi = spi;
             return spi;
           } catch (Exception e) {
-            // try the next provider
           }
         }
         disableFailover();

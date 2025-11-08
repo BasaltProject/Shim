@@ -554,7 +554,8 @@ public abstract class VarHandle implements java.lang.constant.Constable {
     return new ByteBufferViewVarHandle(viewArrayClass, byteOrder);
   }
 
-  public static VarHandle makeFilterValue(VarHandle target, MethodHandle filterToTarget, MethodHandle filterFromTarget) {
+  public static VarHandle makeFilterValue(VarHandle target, MethodHandle filterToTarget,
+      MethodHandle filterFromTarget) {
     return new FilterValueVarHandle(target, filterToTarget, filterFromTarget);
   }
 

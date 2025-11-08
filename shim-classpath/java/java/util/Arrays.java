@@ -1970,7 +1970,8 @@ public class Arrays {
     }
   }
 
-  public static <T> void parallelPrefix(T[] array, int fromIndex, int toIndex, java.util.function.BinaryOperator<T> op) {
+  public static <T> void parallelPrefix(T[] array, int fromIndex, int toIndex,
+      java.util.function.BinaryOperator<T> op) {
     Objects.requireNonNull(op);
     rangeCheck(array.length, fromIndex, toIndex);
     for (int i = fromIndex + 1; i < toIndex; i++) {
@@ -2000,7 +2001,8 @@ public class Arrays {
     }
   }
 
-  public static void parallelPrefix(long[] array, int fromIndex, int toIndex, java.util.function.LongBinaryOperator op) {
+  public static void parallelPrefix(long[] array, int fromIndex, int toIndex,
+      java.util.function.LongBinaryOperator op) {
     Objects.requireNonNull(op);
     rangeCheck(array.length, fromIndex, toIndex);
     for (int i = fromIndex + 1; i < toIndex; i++) {
@@ -2015,7 +2017,8 @@ public class Arrays {
     }
   }
 
-  public static void parallelPrefix(double[] array, int fromIndex, int toIndex, java.util.function.DoubleBinaryOperator op) {
+  public static void parallelPrefix(double[] array, int fromIndex, int toIndex,
+      java.util.function.DoubleBinaryOperator op) {
     Objects.requireNonNull(op);
     rangeCheck(array.length, fromIndex, toIndex);
     for (int i = fromIndex + 1; i < toIndex; i++) {

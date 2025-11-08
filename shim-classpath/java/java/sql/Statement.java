@@ -156,7 +156,8 @@ public interface Statement extends Wrapper, AutoCloseable {
 
   default boolean isSimpleIdentifier(String p0) throws SQLException {
     int len = p0.length();
-    return len >= 1 && len <= 128 && java.util.regex.Pattern.compile("[\\p{Alpha}][\\p{Alnum}_]*").matcher(p0).matches();
+    return len >= 1 && len <= 128
+        && java.util.regex.Pattern.compile("[\\p{Alpha}][\\p{Alnum}_]*").matcher(p0).matches();
   }
 
   default String enquoteNCharLiteral(String p0) throws SQLException {

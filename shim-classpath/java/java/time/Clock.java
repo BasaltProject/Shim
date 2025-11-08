@@ -52,9 +52,7 @@ public abstract class Clock implements InstantSource {
     }
     long tickNanos = tickDuration.toNanos();
     if (tickNanos % 1000_000 == 0) {
-      // millisecond multiple
     } else if (1000_000_000 % tickNanos == 0) {
-      // divides a second
     } else {
       throw new IllegalArgumentException("Invalid tick duration");
     }

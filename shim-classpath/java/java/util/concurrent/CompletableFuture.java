@@ -790,7 +790,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     return d;
   }
 
-  private <V> CompletableFuture<V> uniHandleStage(final Executor e, final BiFunction<? super T, Throwable, ? extends V> f) {
+  private <V> CompletableFuture<V> uniHandleStage(final Executor e, final BiFunction<? super T, Throwable,
+      ? extends V> f) {
     if (f == null) {
       throw new NullPointerException();
     }
@@ -814,7 +815,8 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
     return d;
   }
 
-  private CompletableFuture<T> uniWhenCompleteStage(final Executor e, final BiConsumer<? super T, ? super Throwable> f) {
+  private CompletableFuture<T> uniWhenCompleteStage(final Executor e, final BiConsumer<? super T,
+      ? super Throwable> f) {
     if (f == null) {
       throw new NullPointerException();
     }

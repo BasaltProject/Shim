@@ -46,7 +46,8 @@ public class Time extends java.util.Date {
     int hour = super.getHours();
     int minute = super.getMinutes();
     int second = super.getSeconds();
-    return (hour < 10 ? "0" + hour : Integer.toString(hour)) + ":" + (minute < 10 ? "0" + minute : Integer.toString(minute))
+    return (hour < 10 ? "0" + hour : Integer.toString(hour)) + ":" + (minute < 10 ? "0" + minute
+        : Integer.toString(minute))
         + ":" + (second < 10 ? "0" + second : Integer.toString(second));
   }
 

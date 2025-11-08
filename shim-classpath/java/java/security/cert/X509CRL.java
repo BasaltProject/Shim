@@ -54,7 +54,6 @@ public abstract class X509CRL extends CRL implements X509Extension, DEREncodable
         retval += crlData[i] * i;
       }
     } catch (CRLException e) {
-      // ignore
     }
     return retval;
   }

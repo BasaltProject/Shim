@@ -809,7 +809,8 @@ public class MethodHandle implements java.lang.constant.Constable {
 
     @Override
     public Object invokeWithArguments(Object... arguments) throws Throwable {
-      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount()))
+          : defaultValue(varType);
       while (true) {
         Object[] predArgs = packArgs(state, arguments, pred.type().parameterCount(), varType);
         boolean cond = (Boolean) pred.invokeWithArguments(predArgs);
@@ -843,7 +844,8 @@ public class MethodHandle implements java.lang.constant.Constable {
     private final MethodHandle pred;
     private final Class<?> varType;
 
-    DoWhileLoopMethodHandle(MethodType type, MethodHandle init, MethodHandle body, MethodHandle pred, Class<?> varType) {
+    DoWhileLoopMethodHandle(MethodType type, MethodHandle init, MethodHandle body, MethodHandle pred,
+        Class<?> varType) {
       super(type);
       this.init = init;
       this.body = body;
@@ -853,7 +855,8 @@ public class MethodHandle implements java.lang.constant.Constable {
 
     @Override
     public Object invokeWithArguments(Object... arguments) throws Throwable {
-      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount()))
+          : defaultValue(varType);
       do {
         Object[] bodyArgs = WhileLoopMethodHandle.packArgs(state, arguments, body.type().parameterCount(), varType);
         Object res = body.invokeWithArguments(bodyArgs);
@@ -875,7 +878,8 @@ public class MethodHandle implements java.lang.constant.Constable {
     private final MethodHandle body;
     private final Class<?> varType;
 
-    CountedLoopMethodHandle(MethodType type, MethodHandle start, MethodHandle end, MethodHandle init, MethodHandle body, Class<?> varType) {
+    CountedLoopMethodHandle(MethodType type, MethodHandle start, MethodHandle end, MethodHandle init,
+        MethodHandle body, Class<?> varType) {
       super(type);
       this.start = start;
       this.end = end;
@@ -886,9 +890,11 @@ public class MethodHandle implements java.lang.constant.Constable {
 
     @Override
     public Object invokeWithArguments(Object... arguments) throws Throwable {
-      int s = (start != null) ? ((Number) start.invokeWithArguments(slice(arguments, start.type().parameterCount()))).intValue() : 0;
+      int s = (start != null) ? ((Number) start.invokeWithArguments(slice(arguments,
+          start.type().parameterCount()))).intValue() : 0;
       int e = ((Number) end.invokeWithArguments(slice(arguments, end.type().parameterCount()))).intValue();
-      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount()))
+          : defaultValue(varType);
       for (int i = s; i < e; i++) {
         Object[] bodyArgs = packCountedArgs(state, i, arguments, body.type().parameterCount(), varType);
         Object res = body.invokeWithArguments(bodyArgs);
@@ -922,7 +928,8 @@ public class MethodHandle implements java.lang.constant.Constable {
     private final MethodHandle body;
     private final Class<?> varType;
 
-    IteratedLoopMethodHandle(MethodType type, MethodHandle iterator, MethodHandle init, MethodHandle body, Class<?> varType) {
+    IteratedLoopMethodHandle(MethodType type, MethodHandle iterator, MethodHandle init, MethodHandle body,
+        Class<?> varType) {
       super(type);
       this.iterator = iterator;
       this.init = init;
@@ -939,7 +946,8 @@ public class MethodHandle implements java.lang.constant.Constable {
       } else {
         iter = toIterator(arguments[0]);
       }
-      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount()))
+          : defaultValue(varType);
       while (iter.hasNext()) {
         Object elem = iter.next();
         Object[] bodyArgs = packIteratedArgs(state, elem, arguments, body.type().parameterCount(), varType);
@@ -961,7 +969,8 @@ public class MethodHandle implements java.lang.constant.Constable {
       throw new IllegalArgumentException("Cannot iterate over: " + obj);
     }
 
-    private static Object[] packIteratedArgs(Object state, Object elem, Object[] args, int targetCount, Class<?> vtype) {
+    private static Object[] packIteratedArgs(Object state, Object elem, Object[] args, int targetCount,
+        Class<?> vtype) {
       if (targetCount <= 0) return new Object[0];
       Object[] res = new Object[targetCount];
       int idx = 0;

@@ -60,7 +60,8 @@ public final class URLPermission extends Permission implements Serializable {
     if (!scheme.equals(that.scheme) || !authority.equalsIgnoreCase(that.authority)) {
       return false;
     }
-    boolean pathOk = path.equals(that.path) || (path.endsWith("/*") && that.path.startsWith(path.substring(0, path.length() - 1)))
+    boolean pathOk = path.equals(that.path) || (path.endsWith("/*") && that.path.startsWith(path.substring(0,
+        path.length() - 1)))
         || (path.endsWith("/-") && that.path.startsWith(path.substring(0, path.length() - 1)));
     if (!pathOk) {
       return false;

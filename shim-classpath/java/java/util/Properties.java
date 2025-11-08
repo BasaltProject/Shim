@@ -433,7 +433,8 @@ public class Properties extends Hashtable<Object, Object> {
   }
 
   public void store(OutputStream out, String comments) throws IOException {
-    store0(new BufferedWriter(new OutputStreamWriter(out, java.nio.charset.StandardCharsets.ISO_8859_1)), comments, true);
+    store0(new BufferedWriter(new OutputStreamWriter(out, java.nio.charset.StandardCharsets.ISO_8859_1)), comments,
+        true);
   }
 
   private void store0(BufferedWriter bw, String comments, boolean escUnicode) throws IOException {
@@ -534,7 +535,8 @@ public class Properties extends Hashtable<Object, Object> {
     return hexDigit[(nibble & 0xF)];
   }
 
-  private static final char[] hexDigit = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+  private static final char[] hexDigit = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+      'F'};
 
   @Override
   public int size() {
@@ -667,7 +669,8 @@ public class Properties extends Hashtable<Object, Object> {
   }
 
   @Override
-  public synchronized Object computeIfPresent(Object key, BiFunction<? super Object, ? super Object, ?> remappingFunction) {
+  public synchronized Object computeIfPresent(Object key, BiFunction<? super Object, ? super Object,
+      ?> remappingFunction) {
     return map.computeIfPresent(key, remappingFunction);
   }
 
@@ -677,7 +680,8 @@ public class Properties extends Hashtable<Object, Object> {
   }
 
   @Override
-  public synchronized Object merge(Object key, Object value, BiFunction<? super Object, ? super Object, ?> remappingFunction) {
+  public synchronized Object merge(Object key, Object value, BiFunction<? super Object, ? super Object,
+      ?> remappingFunction) {
     return map.merge(key, value, remappingFunction);
   }
 

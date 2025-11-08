@@ -469,7 +469,8 @@ public class StringBuilder implements java.io.Serializable, CharSequence, Append
 
   public StringBuilder insert(int i, char[] chars, int offset, int length) {
     if (offset < 0 || length < 0 || offset > chars.length - length) {
-      throw new StringIndexOutOfBoundsException("offset " + offset + ", len " + length + ", str.length " + chars.length);
+      throw new StringIndexOutOfBoundsException("offset " + offset + ", len " + length + ", str.length "
+          + chars.length);
     }
     return insert(i, new String(chars, offset, length));
   }

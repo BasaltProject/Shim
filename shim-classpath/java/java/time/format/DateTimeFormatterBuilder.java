@@ -379,7 +379,6 @@ public final class DateTimeFormatterBuilder {
       if ((cur >= 'A' && cur <= 'Z') || (cur >= 'a' && cur <= 'z')) {
         int start = pos++;
         for (; pos < pattern.length() && pattern.charAt(pos) == cur; pos++) {
-          // run of the same letter
         }
         int count = pos - start;
         if (cur == 'p') {
@@ -390,7 +389,6 @@ public final class DateTimeFormatterBuilder {
               pad = count;
               start = pos++;
               for (; pos < pattern.length() && pattern.charAt(pos) == cur; pos++) {
-                // run of the same letter
               }
               count = pos - start;
             }
@@ -1718,7 +1716,8 @@ public final class DateTimeFormatterBuilder {
       if ((fractionalDigits < 0 && inNano > 0) || fractionalDigits > 0) {
         buf.append('.');
         int div = 100_000_000;
-        for (int i = 0; ((fractionalDigits == -1 && inNano > 0) || (fractionalDigits == -2 && (inNano > 0 || (i % 3) != 0))
+        for (int i = 0; ((fractionalDigits == -1 && inNano > 0) || (fractionalDigits == -2 && (inNano > 0
+            || (i % 3) != 0))
             || i < fractionalDigits); i++) {
           int digit = inNano / div;
           buf.append((char) (digit + '0'));
@@ -1736,7 +1735,8 @@ public final class DateTimeFormatterBuilder {
       int maxDigits = (fractionalDigits < 0 ? 9 : fractionalDigits);
       CompositePrinterParser parser = new DateTimeFormatterBuilder().append(DateTimeFormatter.ISO_LOCAL_DATE)
           .appendLiteral('T').appendValue(HOUR_OF_DAY, 2).appendLiteral(':').appendValue(MINUTE_OF_HOUR, 2)
-          .appendLiteral(':').appendValue(SECOND_OF_MINUTE, 2).appendFraction(NANO_OF_SECOND, minDigits, maxDigits, true)
+          .appendLiteral(':').appendValue(SECOND_OF_MINUTE, 2).appendFraction(NANO_OF_SECOND, minDigits, maxDigits,
+              true)
           .appendOffsetId().toFormatter().toPrinterParser(false);
       DateTimeParseContext newContext = context.copy();
       int pos = parser.parse(newContext, text, position);
@@ -2348,7 +2348,8 @@ public final class DateTimeFormatterBuilder {
       if (best < 0) {
         return ~position;
       }
-      return context.setParsedField(ChronoField.MINUTE_OF_DAY, minutes[best], position, position + names[best].length());
+      return context.setParsedField(ChronoField.MINUTE_OF_DAY, minutes[best], position, position
+          + names[best].length());
     }
 
     @Override

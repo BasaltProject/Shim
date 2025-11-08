@@ -659,7 +659,6 @@ public final class URI implements Comparable<URI>, Serializable {
     }
   }
 
-  // ---- normalization, resolution and relativization ----
 
   private static int needsNormalization(String path) {
     boolean normal = true;
@@ -963,7 +962,6 @@ public final class URI implements Comparable<URI>, Serializable {
     return v;
   }
 
-  // ---- encoding and decoding ----
 
   private static final String kLowerHex = "0123456789abcdef";
 
@@ -1117,7 +1115,6 @@ public final class URI implements Comparable<URI>, Serializable {
     return sb.toString();
   }
 
-  // ---- character classes ----
 
   private static long lowMask(String chars) {
     int n = chars.length();
@@ -1216,7 +1213,6 @@ public final class URI implements Comparable<URI>, Serializable {
   private static final long kLServerPercent = kLServer | lowMask("%");
   private static final long kHServerPercent = kHServer | highMask("%");
 
-  // ---- parser ----
 
   private final class Parser {
     private final String input;

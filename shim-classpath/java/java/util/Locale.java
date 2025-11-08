@@ -370,7 +370,8 @@ public final class Locale implements Cloneable, Serializable {
   }
 
   public Set<String> getUnicodeLocaleKeys() {
-    return extensions == null ? Collections.<String>emptySet() : Collections.unmodifiableSet(extensions.keywords.keySet());
+    return extensions == null ? Collections.<String>emptySet()
+        : Collections.unmodifiableSet(extensions.keywords.keySet());
   }
 
   @Override

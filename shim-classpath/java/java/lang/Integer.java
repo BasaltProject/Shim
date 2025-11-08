@@ -293,7 +293,8 @@ public final class Integer extends Number implements Comparable<Integer>,
     }
     char firstChar = s.charAt(beginIndex);
     if (firstChar == '-') {
-      throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s.subSequence(beginIndex, endIndex)));
+      throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.",
+          s.subSequence(beginIndex, endIndex)));
     }
     if (firstChar == '+') {
       beginIndex++;
@@ -309,7 +310,8 @@ public final class Integer extends Number implements Comparable<Integer>,
       if ((ell & 0xFFFFFFFF00000000L) == 0) {
         return (int) ell;
       } else {
-        throw new NumberFormatException(String.format("String value %s exceeds range of unsigned integer.", s.subSequence(beginIndex, endIndex)));
+        throw new NumberFormatException(String.format("String value %s exceeds range of unsigned integer.",
+            s.subSequence(beginIndex, endIndex)));
       }
     }
   }

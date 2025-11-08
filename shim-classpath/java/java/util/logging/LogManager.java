@@ -248,7 +248,8 @@ public class LogManager {
 
   private void setLoggerHandlers(final Logger logger, final String name, final String handlersPropertyName,
       List<Handler> handlers) {
-    final boolean ensureCloseOnReset = !handlers.isEmpty() && getBooleanProperty(handlersPropertyName + ".ensureCloseOnReset", true);
+    final boolean ensureCloseOnReset = !handlers.isEmpty() && getBooleanProperty(handlersPropertyName
+        + ".ensureCloseOnReset", true);
     int count = 0;
     for (Handler hdl : handlers) {
       logger.addHandler(hdl);
@@ -825,7 +826,6 @@ public class LogManager {
         return (Filter) o;
       }
     } catch (Exception ex) {
-      // drop through
     }
     return defaultValue;
   }
@@ -840,7 +840,6 @@ public class LogManager {
         return (Formatter) o;
       }
     } catch (Exception ex) {
-      // drop through
     }
     return defaultValue;
   }

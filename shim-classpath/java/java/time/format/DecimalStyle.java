@@ -17,7 +17,8 @@ import java.util.concurrent.ConcurrentMap;
 public final class DecimalStyle {
   public static final DecimalStyle STANDARD = new DecimalStyle('0', '+', '-', '.');
 
-  private static final ConcurrentMap<Locale, DecimalStyle> CACHE = new ConcurrentHashMap<Locale, DecimalStyle>(16, 0.75f, 2);
+  private static final ConcurrentMap<Locale, DecimalStyle> CACHE = new ConcurrentHashMap<Locale, DecimalStyle>(16,
+      0.75f, 2);
 
   private final char zeroDigit;
   private final char positiveSign;
