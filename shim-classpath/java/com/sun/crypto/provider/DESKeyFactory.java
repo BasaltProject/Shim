@@ -38,7 +38,8 @@ public final class DESKeyFactory extends SecretKeyFactorySpi {
   @Override
   protected KeySpec engineGetKeySpec(SecretKey key, Class<?> keySpec) throws InvalidKeySpecException {
     try {
-      if ((key instanceof SecretKey) && key.getAlgorithm().equalsIgnoreCase("DES") && (key.getFormat().equalsIgnoreCase("RAW"))) {
+      if ((key instanceof SecretKey) && key.getAlgorithm().equalsIgnoreCase("DES")
+          && (key.getFormat().equalsIgnoreCase("RAW"))) {
         if ((keySpec != null) && DESKeySpec.class.isAssignableFrom(keySpec)) {
           return new DESKeySpec(key.getEncoded());
         }

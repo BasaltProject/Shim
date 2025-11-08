@@ -31,7 +31,8 @@ abstract class HKDFKeyDerivation extends KDFSpi {
       throws InvalidAlgorithmParameterException {
     super(kdfParameters);
     if (kdfParameters != null) {
-      throw new InvalidAlgorithmParameterException(macAlgorithm.replace("Hmac", "HKDF-") + " does not support parameters");
+      throw new InvalidAlgorithmParameterException(macAlgorithm.replace("Hmac", "HKDF-")
+          + " does not support parameters");
     }
     this.macAlgorithm = macAlgorithm;
     this.hashLength = hashLength;

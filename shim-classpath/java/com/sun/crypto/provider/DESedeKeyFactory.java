@@ -38,7 +38,8 @@ public final class DESedeKeyFactory extends SecretKeyFactorySpi {
   @Override
   protected KeySpec engineGetKeySpec(SecretKey key, Class<?> keySpec) throws InvalidKeySpecException {
     try {
-      if ((key instanceof SecretKey) && (key.getAlgorithm().equalsIgnoreCase("DESede") || key.getAlgorithm().equalsIgnoreCase("TripleDES")) && (key.getFormat().equalsIgnoreCase("RAW"))) {
+      if ((key instanceof SecretKey) && (key.getAlgorithm().equalsIgnoreCase("DESede")
+          || key.getAlgorithm().equalsIgnoreCase("TripleDES")) && (key.getFormat().equalsIgnoreCase("RAW"))) {
         if ((keySpec != null) && DESedeKeySpec.class.isAssignableFrom(keySpec)) {
           return new DESedeKeySpec(key.getEncoded());
         }
@@ -53,7 +54,8 @@ public final class DESedeKeyFactory extends SecretKeyFactorySpi {
   @Override
   protected SecretKey engineTranslateKey(SecretKey key) throws InvalidKeyException {
     try {
-      if ((key != null) && (key.getAlgorithm().equalsIgnoreCase("DESede") || key.getAlgorithm().equalsIgnoreCase("TripleDES")) && (key.getFormat().equalsIgnoreCase("RAW"))) {
+      if ((key != null) && (key.getAlgorithm().equalsIgnoreCase("DESede")
+          || key.getAlgorithm().equalsIgnoreCase("TripleDES")) && (key.getFormat().equalsIgnoreCase("RAW"))) {
         if (key instanceof DESedeKey) {
           return key;
         }
