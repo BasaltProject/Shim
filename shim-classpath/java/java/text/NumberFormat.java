@@ -154,6 +154,28 @@ public abstract class NumberFormat extends Format {
     return new DecimalFormat(spaced ? "#,##0 %" : "#,##0%", DecimalFormatSymbols.getInstance(inLocale));
   }
 
+  public enum Style {
+    SHORT,
+    LONG
+  }
+
+  private static final String[] kShortPatterns = {"", "", "", "0K", "00K", "000K", "0M", "00M", "000M", "0B", "00B",
+      "000B", "0T", "00T", "000T"};
+  private static final String[] kLongPatterns = {"", "", "", "0 thousand", "00 thousand", "000 thousand",
+      "0 million", "00 million", "000 million", "0 billion", "00 billion", "000 billion", "0 trillion",
+      "00 trillion", "000 trillion"};
+
+  public static NumberFormat getCompactNumberInstance() {
+    return getCompactNumberInstance(Locale.getDefault(Locale.Category.FORMAT), Style.SHORT);
+  }
+
+  public static NumberFormat getCompactNumberInstance(Locale locale, Style formatStyle) {
+    Objects.requireNonNull(locale);
+    Objects.requireNonNull(formatStyle);
+    return new CompactNumberFormat("#,##0.###", DecimalFormatSymbols.getInstance(locale),
+        formatStyle == Style.SHORT ? kShortPatterns : kLongPatterns);
+  }
+
   public static Locale[] getAvailableLocales() {
     return new Locale[] {Locale.ROOT, Locale.US};
   }
