@@ -9,12 +9,34 @@
 
 package java.net;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.StringTokenizer;
+import java.util.TimeZone;
 
 public final class HttpCookie implements Cloneable {
+  private static final long MAX_AGE_UNSPECIFIED = -1;
+
+  private static final String[] COOKIE_DATE_FORMATS = {
+      "EEE',' dd-MMM-yyyy HH:mm:ss 'GMT'",
+      "EEE',' dd MMM yyyy HH:mm:ss 'GMT'",
+      "EEE MMM dd yyyy HH:mm:ss 'GMT'Z",
+      "EEE',' dd-MMM-yy HH:mm:ss 'GMT'",
+      "EEE',' dd MMM yy HH:mm:ss 'GMT'",
+      "EEE MMM dd yy HH:mm:ss 'GMT'Z"
+  };
+
+  private static final String SET_COOKIE = "set-cookie:";
+  private static final String SET_COOKIE2 = "set-cookie2:";
+  private static final String tspecials = ",; ";
 
   private final String name;
   private String value;
@@ -22,104 +44,160 @@ public final class HttpCookie implements Cloneable {
   private String commentURL;
   private boolean toDiscard;
   private String domain;
-  private long maxAge = -1;
+  private long maxAge = MAX_AGE_UNSPECIFIED;
   private String path;
   private String portlist;
   private boolean secure;
   private boolean httpOnly;
   private int version = 1;
+  private final long whenCreated;
+  private final String header;
 
   public HttpCookie(String name, String value) {
-    String trimmed = name.trim();
-    if (trimmed.isEmpty() || trimmed.charAt(0) == '$') {
-      throw new IllegalArgumentException("Illegal cookie name: " + name);
+    this(name, value, null);
+  }
+
+  private HttpCookie(String name, String value, String header) {
+    name = name.trim();
+    if (name.length() == 0 || !isToken(name) || name.charAt(0) == '$') {
+      throw new IllegalArgumentException("Illegal cookie name");
     }
-    this.name = trimmed;
+    this.name = name;
     this.value = value;
+    this.toDiscard = false;
+    this.secure = false;
+    this.whenCreated = System.currentTimeMillis();
+    this.portlist = null;
+    this.header = header;
   }
 
   public static List<HttpCookie> parse(String header) {
-    if (header == null) {
-      throw new NullPointerException("header");
+    return parse(header, false);
+  }
+
+  private static List<HttpCookie> parse(String header, boolean retainHeader) {
+    int version = guessCookieVersion(header);
+    if (startsWithIgnoreCase(header, SET_COOKIE2)) {
+      header = header.substring(SET_COOKIE2.length());
+    } else if (startsWithIgnoreCase(header, SET_COOKIE)) {
+      header = header.substring(SET_COOKIE.length());
     }
     List<HttpCookie> cookies = new ArrayList<HttpCookie>();
-    String[] parts = header.split(";");
-    if (parts.length == 0) {
-      return cookies;
-    }
-    String[] first = parts[0].trim().split("=", 2);
-    if (first.length != 2) {
-      return cookies;
-    }
-    HttpCookie cookie = new HttpCookie(first[0].trim(), first[1].trim());
-    for (int i = 1; i < parts.length; i++) {
-      String[] pair = parts[i].trim().split("=", 2);
-      String k = pair[0].trim();
-      String v = pair.length > 1 ? pair[1].trim() : "";
-      if (k.equalsIgnoreCase("Path")) {
-        cookie.setPath(v);
-      } else if (k.equalsIgnoreCase("Domain")) {
-        cookie.setDomain(v);
-      } else if (k.equalsIgnoreCase("Max-Age")) {
-        try {
-          cookie.setMaxAge(Long.parseLong(v));
-        } catch (Exception ignored) {}
-      } else if (k.equalsIgnoreCase("Secure")) {
-        cookie.setSecure(true);
-      } else if (k.equalsIgnoreCase("HttpOnly")) {
-        cookie.setHttpOnly(true);
-      } else if (k.equalsIgnoreCase("Version")) {
-        try {
-          cookie.setVersion(Integer.parseInt(v));
-        } catch (Exception ignored) {}
+    if (version == 0) {
+      HttpCookie cookie = parseInternal(header, retainHeader);
+      cookie.setVersion(0);
+      cookies.add(cookie);
+    } else {
+      List<String> cookieStrings = splitMultiCookies(header);
+      for (String cookieStr : cookieStrings) {
+        HttpCookie cookie = parseInternal(cookieStr, retainHeader);
+        cookie.setVersion(1);
+        cookies.add(cookie);
       }
     }
-    cookies.add(cookie);
     return cookies;
   }
 
-  public String getName() {
-    return name;
+  public boolean hasExpired() {
+    if (maxAge == 0) {
+      return true;
+    }
+    if (maxAge < 0) {
+      return false;
+    }
+    long deltaSecond = (System.currentTimeMillis() - whenCreated) / 1000;
+    return deltaSecond > maxAge;
   }
 
-  public String getValue() {
-    return value;
+  public void setComment(String purpose) {
+    comment = purpose;
   }
 
-  public void setValue(String value) {
-    this.value = value;
+  public String getComment() {
+    return comment;
+  }
+
+  public void setCommentURL(String purpose) {
+    commentURL = purpose;
+  }
+
+  public String getCommentURL() {
+    return commentURL;
+  }
+
+  public void setDiscard(boolean discard) {
+    toDiscard = discard;
+  }
+
+  public boolean getDiscard() {
+    return toDiscard;
+  }
+
+  public void setPortlist(String ports) {
+    portlist = ports;
+  }
+
+  public String getPortlist() {
+    return portlist;
+  }
+
+  public void setDomain(String pattern) {
+    if (pattern != null) {
+      domain = pattern.toLowerCase();
+    } else {
+      domain = pattern;
+    }
   }
 
   public String getDomain() {
     return domain;
   }
 
-  public void setDomain(String pattern) {
-    this.domain = pattern != null ? pattern.toLowerCase() : null;
+  public void setMaxAge(long expiry) {
+    maxAge = expiry;
   }
 
   public long getMaxAge() {
     return maxAge;
   }
 
-  public void setMaxAge(long expiry) {
-    this.maxAge = expiry;
+  public void setPath(String uri) {
+    path = uri;
   }
 
   public String getPath() {
     return path;
   }
 
-  public void setPath(String uri) {
-    this.path = uri;
+  public void setSecure(boolean flag) {
+    secure = flag;
   }
 
   public boolean getSecure() {
     return secure;
   }
 
-  public void setSecure(boolean flag) {
-    this.secure = flag;
+  public String getName() {
+    return name;
+  }
+
+  public void setValue(String newValue) {
+    value = newValue;
+  }
+
+  public String getValue() {
+    return value;
+  }
+
+  public int getVersion() {
+    return version;
+  }
+
+  public void setVersion(int v) {
+    if (v != 0 && v != 1) {
+      throw new IllegalArgumentException("cookie version should be 0 or 1");
+    }
+    version = v;
   }
 
   public boolean isHttpOnly() {
@@ -130,29 +208,63 @@ public final class HttpCookie implements Cloneable {
     this.httpOnly = httpOnly;
   }
 
-  public int getVersion() {
-    return version;
+  public static boolean domainMatches(String domain, String host) {
+    if (domain == null || host == null) {
+      return false;
+    }
+    boolean isLocalDomain = ".local".equalsIgnoreCase(domain);
+    int embeddedDotInDomain = domain.indexOf('.');
+    if (embeddedDotInDomain == 0) {
+      embeddedDotInDomain = domain.indexOf('.', 1);
+    }
+    if (!isLocalDomain && (embeddedDotInDomain == -1 || embeddedDotInDomain == domain.length() - 1)) {
+      return false;
+    }
+    int firstDotInHost = host.indexOf('.');
+    if (firstDotInHost == -1 && (isLocalDomain || domain.equalsIgnoreCase(host + ".local"))) {
+      return true;
+    }
+    int domainLength = domain.length();
+    int lengthDiff = host.length() - domainLength;
+    if (lengthDiff == 0) {
+      return host.equalsIgnoreCase(domain);
+    } else if (lengthDiff > 0) {
+      String h = host.substring(0, lengthDiff);
+      String d = host.substring(lengthDiff);
+      return h.indexOf('.') == -1 && d.equalsIgnoreCase(domain);
+    } else if (lengthDiff == -1) {
+      return domain.charAt(0) == '.' && host.equalsIgnoreCase(domain.substring(1));
+    }
+    return false;
   }
 
-  public void setVersion(int v) {
-    this.version = v;
-  }
-
-  public boolean hasExpired() {
-    return maxAge == 0;
+  @Override
+  public String toString() {
+    if (getVersion() > 0) {
+      return toRFC2965HeaderString();
+    }
+    return toNetscapeHeaderString();
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (obj == this) return true;
-    if (!(obj instanceof HttpCookie)) return false;
+    if (obj == this) {
+      return true;
+    }
+    if (!(obj instanceof HttpCookie)) {
+      return false;
+    }
     HttpCookie other = (HttpCookie) obj;
-    return Objects.equals(name, other.name) && Objects.equals(domain, other.domain) && Objects.equals(path, other.path);
+    return equalsIgnoreCase(getName(), other.getName()) && equalsIgnoreCase(getDomain(), other.getDomain())
+        && Objects.equals(getPath(), other.getPath());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, domain, path);
+    int h1 = name.toLowerCase().hashCode();
+    int h2 = domain != null ? domain.toLowerCase().hashCode() : 0;
+    int h3 = path != null ? path.hashCode() : 0;
+    return h1 + h2 + h3;
   }
 
   @Override
@@ -160,12 +272,230 @@ public final class HttpCookie implements Cloneable {
     try {
       return super.clone();
     } catch (CloneNotSupportedException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException(e.getMessage());
     }
   }
 
-  @Override
-  public String toString() {
-    return name + "=" + value;
+  private static boolean isToken(String value) {
+    int len = value.length();
+    for (int i = 0; i < len; i++) {
+      char c = value.charAt(i);
+      if (c < 0x20 || c >= 0x7f || tspecials.indexOf(c) != -1) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static HttpCookie parseInternal(String header, boolean retainHeader) {
+    HttpCookie cookie = null;
+    String namevaluePair = null;
+    StringTokenizer tokenizer = new StringTokenizer(header, ";");
+    try {
+      namevaluePair = tokenizer.nextToken();
+      int index = namevaluePair.indexOf('=');
+      if (index != -1) {
+        String name = namevaluePair.substring(0, index).trim();
+        String value = namevaluePair.substring(index + 1).trim();
+        if (retainHeader) {
+          cookie = new HttpCookie(name, stripOffSurroundingQuote(value), header);
+        } else {
+          cookie = new HttpCookie(name, stripOffSurroundingQuote(value));
+        }
+      } else {
+        throw new IllegalArgumentException("Invalid cookie name-value pair");
+      }
+    } catch (NoSuchElementException ignored) {
+      throw new IllegalArgumentException("Empty cookie header string");
+    }
+    while (tokenizer.hasMoreTokens()) {
+      namevaluePair = tokenizer.nextToken();
+      int index = namevaluePair.indexOf('=');
+      String name;
+      String value;
+      if (index != -1) {
+        name = namevaluePair.substring(0, index).trim();
+        value = namevaluePair.substring(index + 1).trim();
+      } else {
+        name = namevaluePair.trim();
+        value = null;
+      }
+      assignAttribute(cookie, name, value);
+    }
+    return cookie;
+  }
+
+  private static void assignAttribute(HttpCookie cookie, String attrName, String attrValue) {
+    attrValue = stripOffSurroundingQuote(attrValue);
+    String key = attrName.toLowerCase();
+    switch (key) {
+    case "comment":
+      if (cookie.getComment() == null) {
+        cookie.setComment(attrValue);
+      }
+      break;
+    case "commenturl":
+      if (cookie.getCommentURL() == null) {
+        cookie.setCommentURL(attrValue);
+      }
+      break;
+    case "discard":
+      cookie.setDiscard(true);
+      break;
+    case "domain":
+      if (cookie.getDomain() == null) {
+        cookie.setDomain(attrValue);
+      }
+      break;
+    case "max-age":
+      try {
+        long maxage = Long.parseLong(attrValue);
+        if (cookie.getMaxAge() == MAX_AGE_UNSPECIFIED) {
+          cookie.setMaxAge(maxage);
+        }
+      } catch (NumberFormatException ignored) {
+        throw new IllegalArgumentException("Illegal cookie max-age attribute");
+      }
+      break;
+    case "path":
+      if (cookie.getPath() == null) {
+        cookie.setPath(attrValue);
+      }
+      break;
+    case "port":
+      if (cookie.getPortlist() == null) {
+        cookie.setPortlist(attrValue == null ? "" : attrValue);
+      }
+      break;
+    case "secure":
+      cookie.setSecure(true);
+      break;
+    case "httponly":
+      cookie.setHttpOnly(true);
+      break;
+    case "version":
+      try {
+        cookie.setVersion(Integer.parseInt(attrValue));
+      } catch (NumberFormatException ignored) {
+      }
+      break;
+    case "expires":
+      if (cookie.getMaxAge() == MAX_AGE_UNSPECIFIED) {
+        long delta = cookie.expiryDate2DeltaSeconds(attrValue);
+        cookie.setMaxAge(delta > 0 ? delta : 0);
+      }
+      break;
+    default:
+      break;
+    }
+  }
+
+  private long expiryDate2DeltaSeconds(String dateString) {
+    TimeZone gmt = TimeZone.getTimeZone("GMT");
+    Calendar cal = new GregorianCalendar(gmt);
+    for (int i = 0; i < COOKIE_DATE_FORMATS.length; i++) {
+      SimpleDateFormat df = new SimpleDateFormat(COOKIE_DATE_FORMATS[i], Locale.US);
+      cal.set(1970, 0, 1, 0, 0, 0);
+      df.setTimeZone(gmt);
+      df.setLenient(false);
+      df.set2DigitYearStart(cal.getTime());
+      try {
+        cal.setTime(df.parse(dateString));
+        if (!COOKIE_DATE_FORMATS[i].contains("yyyy")) {
+          int year = cal.get(Calendar.YEAR);
+          year %= 100;
+          if (year < 70) {
+            year += 2000;
+          } else {
+            year += 1900;
+          }
+          cal.set(Calendar.YEAR, year);
+        }
+        return (cal.getTimeInMillis() - whenCreated) / 1000;
+      } catch (Exception e) {
+        continue;
+      }
+    }
+    return 0;
+  }
+
+  private static int guessCookieVersion(String header) {
+    int version = 0;
+    header = header.toLowerCase();
+    if (header.indexOf("expires=") != -1) {
+      version = 0;
+    } else if (header.indexOf("version=") != -1) {
+      version = 1;
+    } else if (header.indexOf("max-age") != -1) {
+      version = 1;
+    } else if (startsWithIgnoreCase(header, SET_COOKIE2)) {
+      version = 1;
+    }
+    return version;
+  }
+
+  private static String stripOffSurroundingQuote(String str) {
+    if (str != null && str.length() > 2 && str.charAt(0) == '"' && str.charAt(str.length() - 1) == '"') {
+      return str.substring(1, str.length() - 1);
+    }
+    if (str != null && str.length() > 2 && str.charAt(0) == '\'' && str.charAt(str.length() - 1) == '\'') {
+      return str.substring(1, str.length() - 1);
+    }
+    return str;
+  }
+
+  private static boolean equalsIgnoreCase(String s, String t) {
+    if (s == t) {
+      return true;
+    }
+    if (s != null && t != null) {
+      return s.equalsIgnoreCase(t);
+    }
+    return false;
+  }
+
+  private static boolean startsWithIgnoreCase(String s, String start) {
+    if (s == null || start == null) {
+      return false;
+    }
+    return s.length() >= start.length() && start.equalsIgnoreCase(s.substring(0, start.length()));
+  }
+
+  private static List<String> splitMultiCookies(String header) {
+    List<String> cookies = new ArrayList<String>();
+    int quoteCount = 0;
+    int p;
+    int q;
+    for (p = 0, q = 0; p < header.length(); p++) {
+      char c = header.charAt(p);
+      if (c == '"') {
+        quoteCount++;
+      }
+      if (c == ',' && (quoteCount % 2 == 0)) {
+        cookies.add(header.substring(q, p));
+        q = p + 1;
+      }
+    }
+    cookies.add(header.substring(q));
+    return cookies;
+  }
+
+  private String toNetscapeHeaderString() {
+    return getName() + "=" + getValue();
+  }
+
+  private String toRFC2965HeaderString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getName()).append("=\"").append(getValue()).append('"');
+    if (getPath() != null) {
+      sb.append(";$Path=\"").append(getPath()).append('"');
+    }
+    if (getDomain() != null) {
+      sb.append(";$Domain=\"").append(getDomain()).append('"');
+    }
+    if (getPortlist() != null) {
+      sb.append(";$Port=\"").append(getPortlist()).append('"');
+    }
+    return sb.toString();
   }
 }

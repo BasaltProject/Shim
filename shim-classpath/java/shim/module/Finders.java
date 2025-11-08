@@ -169,12 +169,20 @@ public final class Finders {
       ModuleDescriptor d;
       if (Files.exists(mi)) {
         try (InputStream in = Files.newInputStream(mi)) {
-          d = ModuleInfoReader.read(in, explodedPackages(dir));
+          d = ModuleDescriptor.read(in, () -> explodedPackagesUnchecked(dir));
         }
       } else {
         d = automatic(dir.getFileName().toString(), null, explodedPackages(dir));
       }
       return new Ref(d, dir.toUri(), dir, null);
+    }
+
+    private Set<String> explodedPackagesUnchecked(Path dir) {
+      try {
+        return explodedPackages(dir);
+      } catch (IOException e) {
+        throw new java.io.UncheckedIOException(e);
+      }
     }
 
     private Set<String> explodedPackages(Path dir) throws IOException {
@@ -206,7 +214,7 @@ public final class Finders {
         ModuleDescriptor d;
         if (mi != null) {
           try (InputStream in = jf.getInputStream(mi)) {
-            d = ModuleInfoReader.read(in, pkgs);
+            d = ModuleDescriptor.read(in, () -> pkgs);
           }
         } else {
           d = automatic(autoName(file.getFileName().toString()), autoVersion(file.getFileName().toString()), pkgs);
