@@ -74,6 +74,15 @@ public final class PolymorphicStubs {
     case "getAndAdd": return handle.getAndAdd(arguments);
     case "getAndAddAcquire": return handle.getAndAddAcquire(arguments);
     case "getAndAddRelease": return handle.getAndAddRelease(arguments);
+    case "getAndBitwiseOr": return handle.getAndBitwiseOr(arguments);
+    case "getAndBitwiseOrAcquire": return handle.getAndBitwiseOrAcquire(arguments);
+    case "getAndBitwiseOrRelease": return handle.getAndBitwiseOrRelease(arguments);
+    case "getAndBitwiseAnd": return handle.getAndBitwiseAnd(arguments);
+    case "getAndBitwiseAndAcquire": return handle.getAndBitwiseAndAcquire(arguments);
+    case "getAndBitwiseAndRelease": return handle.getAndBitwiseAndRelease(arguments);
+    case "getAndBitwiseXor": return handle.getAndBitwiseXor(arguments);
+    case "getAndBitwiseXorAcquire": return handle.getAndBitwiseXorAcquire(arguments);
+    case "getAndBitwiseXorRelease": return handle.getAndBitwiseXorRelease(arguments);
     default: throw new UnsupportedOperationException(mode);
     }
   }

@@ -337,7 +337,7 @@ public class ZipFile implements Closeable {
     public final int pointer;
 
     public MyZipEntry(Window window, int pointer) {
-      super((String) null);
+      super((String) null, true);
       this.window = window;
       this.pointer = pointer;
     }

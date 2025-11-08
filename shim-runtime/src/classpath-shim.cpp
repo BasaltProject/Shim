@@ -58,7 +58,7 @@ class MyClasspath : public Classpath {
     if (parent) {
       group = parent->javaThread->group();
     } else {
-      group = makeThreadGroup(t, 0, 0, 0);
+      group = makeThreadGroup(t, 0, 0, 0, 10, false);
     }
 
     const unsigned NewState = 0;

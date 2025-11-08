@@ -116,7 +116,53 @@ public class Proxy implements java.io.Serializable {
     if (!isProxyClass(proxy.getClass())) {
       throw new IllegalArgumentException("not a proxy instance");
     }
-    return ((Proxy) proxy).h;
+    InvocationHandler h = ((Proxy) proxy).h;
+    return h instanceof Guard ? ((Guard) h).inner : h;
+  }
+
+  private static final class Guard implements InvocationHandler, java.io.Serializable {
+    final InvocationHandler inner;
+
+    Guard(InvocationHandler inner) {
+      this.inner = inner;
+    }
+
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+      try {
+        return inner.invoke(proxy, method, args);
+      } catch (RuntimeException e) {
+        throw e;
+      } catch (Error e) {
+        throw e;
+      } catch (Throwable t) {
+        if (declares(proxy.getClass(), method, t) || declares(method.getDeclaringClass(), method, t)) {
+          throw t;
+        }
+        throw new UndeclaredThrowableException(t);
+      }
+    }
+
+    private static boolean declares(Class<?> c, Method m, Throwable t) {
+      for (Class<?> i : c.getInterfaces()) {
+        try {
+          for (Class<?> declared : i.getMethod(m.getName(), m.getParameterTypes()).getExceptionTypes()) {
+            if (declared.isInstance(t)) {
+              return true;
+            }
+          }
+        } catch (NoSuchMethodException e) {
+        }
+        if (declares(i, m, t)) {
+          return true;
+        }
+      }
+      for (Class<?> declared : m.getExceptionTypes()) {
+        if (declared.isInstance(t)) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   private static byte[] makeInvokeCode(List<PoolEntry> pool,
@@ -478,10 +524,13 @@ public class Proxy implements java.io.Serializable {
                                         Class[] interfaces,
                                         InvocationHandler handler)
   {
+    if (handler == null) {
+      throw new NullPointerException();
+    }
     try {
       return Proxy.getProxyClass(loader, interfaces)
         .getConstructor(new Class[] { InvocationHandler.class })
-        .newInstance(new Object[] { handler });
+        .newInstance(new Object[] { new Guard(handler) });
     } catch (Exception e) {
       AssertionError error = new AssertionError();
       error.initCause(e);

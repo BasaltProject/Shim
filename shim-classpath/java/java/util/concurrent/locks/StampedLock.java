@@ -45,6 +45,56 @@ public class StampedLock implements Serializable {
     }
   }
 
+  public long writeLockInterruptibly() throws InterruptedException {
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
+    synchronized (sync) {
+      while (writer != null || readers > 0) {
+        sync.wait();
+      }
+      sequence++;
+      writer = Thread.currentThread();
+      return (sequence << SEQUENCE_SHIFT) | WRITE_BIT;
+    }
+  }
+
+  public long readLockInterruptibly() throws InterruptedException {
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
+    synchronized (sync) {
+      while (writer != null) {
+        sync.wait();
+      }
+      readers++;
+      return (sequence << SEQUENCE_SHIFT) | READ_BIT;
+    }
+  }
+
+  public boolean tryUnlockWrite() {
+    synchronized (sync) {
+      if (writer == null) {
+        return false;
+      }
+      writer = null;
+      sequence++;
+      sync.notifyAll();
+      return true;
+    }
+  }
+
+  public boolean tryUnlockRead() {
+    synchronized (sync) {
+      if (readers <= 0) {
+        return false;
+      }
+      readers--;
+      sync.notifyAll();
+      return true;
+    }
+  }
+
   public long tryWriteLock() {
     synchronized (sync) {
       if (writer == null && readers == 0) {

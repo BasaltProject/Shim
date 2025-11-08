@@ -247,7 +247,6 @@ public final class Finders {
         try {
           b.version(version);
         } catch (IllegalArgumentException e) {
-          // unparsable versions are ignored
         }
       }
       return b.build();

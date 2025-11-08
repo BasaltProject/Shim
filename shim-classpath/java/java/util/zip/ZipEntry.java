@@ -23,249 +23,255 @@
 
 package java.util.zip;
 
-/**
- * Class ZipEntry:
- *
- * Class to store and retrieve information for entries in a zip file
- * Contains variables for all standard zip format field as well as
- * setter and accessor methods
- *
- * "name" is used to store the string name of the entrys
- * "reqVersion" stores a byte encoded minimum required version to open the zip
- * "compressionMethod" stores the method used to compress the zip
- * "modTimeDate" stores an MSDOS time field "millisTime" stores time in long format
- * "crc" stores crc data for the zip entry
- * "compSize" and "uncompSize" store compressed and uncompressed sizes
- * "offset" stores data regarding the offset from the start of the zip file
- *
- * @author Christopher Jordan
- * @author David Chau
- * @author Aaron Davis
- * @author Riley Moses
- */
-
-import java.util.Calendar;
-import java.util.Date;
-
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 public class ZipEntry implements Cloneable {
   public static final int STORED = 0;
   public static final int DEFLATED = 8;
 
+  static final long DOSTIME_BEFORE_1980 = (1 << 21) | (1 << 16);
+  static final long UPPER_DOSTIME_BOUND = 128L * 365 * 24 * 60 * 60 * 1000;
+  static final long UPPER_UNIXTIME_BOUND = 0x7fffffffL;
+
   String name;
-  short reqVersion = -1;
-  short compressionMethod = -1;
-  int modTimeDate = -1;
-  long millisTime = -1;
+  long xdostime = -1;
+  FileTime mtime;
+  FileTime atime;
+  FileTime ctime;
   long crc = -1;
-  long compSize = 0;
-  long uncompSize = 0;
-  int offset = -1;
+  long size = -1;
+  long csize = -1;
+  int method = -1;
+  int flag = 0;
   byte[] extra;
   String comment;
-  
-  ZipEntry() {
-    this((String) null);
-  }
 
   public ZipEntry(String name) {
+    Objects.requireNonNull(name, "name");
+    if (name.length() > 0xFFFF / 3 && utf8Length(name) > 0xFFFF) {
+      throw new IllegalArgumentException("entry name too long");
+    }
     this.name = name;
-    setTime(System.currentTimeMillis());
+  }
+
+  ZipEntry(String name, boolean unchecked) {
+    this.name = name;
   }
 
   public ZipEntry(ZipEntry e) {
-    if (e == null) {
-      throw new NullPointerException("e");
-    }
-    this.name = e.name;
-    this.reqVersion = e.reqVersion;
-    this.compressionMethod = e.compressionMethod;
-    this.modTimeDate = e.modTimeDate;
-    this.millisTime = e.millisTime;
-    this.crc = e.crc;
-    this.compSize = e.compSize;
-    this.uncompSize = e.uncompSize;
-    this.offset = e.offset;
-    this.extra = e.extra != null ? e.extra.clone() : null;
-    this.comment = e.comment;
+    Objects.requireNonNull(e, "entry");
+    name = e.name;
+    xdostime = e.xdostime;
+    mtime = e.mtime;
+    atime = e.atime;
+    ctime = e.ctime;
+    crc = e.crc;
+    size = e.size;
+    csize = e.csize;
+    method = e.method;
+    flag = e.flag;
+    extra = e.extra;
+    comment = e.comment;
   }
 
-  @Override
-  public Object clone() {
-    return new ZipEntry(this);
+  private static int utf8Length(String s) {
+    return s.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
   }
 
-  //Method to return name of the file
   public String getName() {
     return name;
   }
-  
-  //Method to check if file is a directory
-  public boolean isDirectory() {
-    return getName().endsWith("/");
-  }
 
-  /**
-   * Method setRequiredVersion:
-   *
-   * Method to set the minimum version required to open the zip file
-   * Valid values for the compression method are the numbers 1.0 to 10.0
-   *
-   * @author Christopher Jordan
-   */
-  private boolean setRequiredVersion(float versionFloat){
-    //Check for valid version numbers
-    if (versionFloat < 1 || versionFloat > 100){
-      return false;
-    }
-    
-    //Convert to short value for storage
-    versionFloat = versionFloat * 10;
-    short versionShort = (short)versionFloat;
-    
-    //Set value of version
-    reqVersion = versionShort;
-    return true;
-  }
-  
-  //Method to set the compression method for the file
-  //Valid methods are "stored" = 0 or "deflated" = 8
-  public void setMethod(int compMethod){
-    if (compMethod == STORED || compMethod == DEFLATED){
-      this.compressionMethod = (short) compMethod;
+  public void setTime(long time) {
+    this.xdostime = javaToExtendedDosTime(time);
+    if (xdostime != DOSTIME_BEFORE_1980 && time <= UPPER_DOSTIME_BOUND) {
+      this.mtime = null;
     } else {
-      throw new IllegalArgumentException("invalid compression method");
+      this.mtime = FileTime.from(time, TimeUnit.MILLISECONDS);
     }
   }
 
-  public void setMethod(short compMethod){
-    setMethod((int) compMethod);
+  public long getTime() {
+    if (mtime != null) {
+      return mtime.toMillis();
+    }
+    return xdostime != -1 ? extendedDosToJavaTime(xdostime) : -1;
   }
 
-  public int getMethod(){
-    return this.compressionMethod;
+  public void setTimeLocal(LocalDateTime time) {
+    int year = time.getYear() - 1980;
+    if (year < 0) {
+      this.xdostime = DOSTIME_BEFORE_1980;
+    } else {
+      this.xdostime = ((year << 25 | time.getMonthValue() << 21 | time.getDayOfMonth() << 16
+          | time.getHour() << 11 | time.getMinute() << 5 | time.getSecond() >> 1) & 0xffffffffL)
+          + ((long) (((time.getSecond() & 1) * 1000) + time.getNano() / 1000_000) << 32);
+    }
+    if (xdostime != DOSTIME_BEFORE_1980 && year <= 0x7f) {
+      this.mtime = null;
+    } else {
+      this.mtime = FileTime.from(ZonedDateTimeHolder.toInstant(time));
+    }
   }
 
-  //Methods to set and get the crc for the entry
-  public void setCrc(long crc){
-    if (crc < 0 || crc > 0xffffffffL){
+  public LocalDateTime getTimeLocal() {
+    if (mtime != null) {
+      return LocalDateTime.ofInstant(mtime.toInstant(), ZoneId.systemDefault());
+    }
+    int ms = (int) (xdostime >> 32);
+    return LocalDateTime.of(((int) (xdostime >> 25) & 0x7f) + 1980, (int) (xdostime >> 21) & 0x0f,
+        (int) (xdostime >> 16) & 0x1f, (int) (xdostime >> 11) & 0x1f, (int) (xdostime >> 5) & 0x3f,
+        (int) (xdostime << 1) & 0x3e).plusNanos(ms * 1_000_000L);
+  }
+
+  private static final class ZonedDateTimeHolder {
+    static Instant toInstant(LocalDateTime t) {
+      return t.atZone(ZoneId.systemDefault()).toInstant();
+    }
+  }
+
+  public ZipEntry setLastModifiedTime(FileTime time) {
+    this.mtime = Objects.requireNonNull(time, "lastModifiedTime");
+    this.xdostime = javaToExtendedDosTime(time.to(TimeUnit.MILLISECONDS));
+    return this;
+  }
+
+  public FileTime getLastModifiedTime() {
+    if (mtime != null) {
+      return mtime;
+    }
+    if (xdostime == -1) {
+      return null;
+    }
+    return FileTime.from(getTime(), TimeUnit.MILLISECONDS);
+  }
+
+  public ZipEntry setLastAccessTime(FileTime time) {
+    this.atime = Objects.requireNonNull(time, "lastAccessTime");
+    return this;
+  }
+
+  public FileTime getLastAccessTime() {
+    return atime;
+  }
+
+  public ZipEntry setCreationTime(FileTime time) {
+    this.ctime = Objects.requireNonNull(time, "creationTime");
+    return this;
+  }
+
+  public FileTime getCreationTime() {
+    return ctime;
+  }
+
+  public void setSize(long size) {
+    if (size < 0) {
+      throw new IllegalArgumentException("invalid entry size");
+    }
+    this.size = size;
+  }
+
+  public long getSize() {
+    return size;
+  }
+
+  public long getCompressedSize() {
+    return csize;
+  }
+
+  public void setCompressedSize(long csize) {
+    this.csize = csize;
+  }
+
+  public void setCrc(long crc) {
+    if (crc < 0 || crc > 0xFFFFFFFFL) {
       throw new IllegalArgumentException("invalid entry crc-32");
     }
     this.crc = crc;
   }
 
-  public void setCrc(int crc){
-    setCrc((long) crc & 0xffffffffL);
+  public long getCrc() {
+    return crc;
   }
 
-  public long getCrc(){
-    return this.crc;
-  }
-
-  //Methods to set and get the time and date
-  public void setTime(long currentTime){
-    modTimeDate = computeDOSDateTime(currentTime);
-    millisTime = currentTime;
-  }
-
-  public long getTime(){
-    return millisTime;
-  }
-
-  /**
-   * Method computeDOSDateTime():
-   * 
-   * Takes the time from a long and converts to a Calendar object
-   * 
-   * Time is stored in the MSDOS format 5 bits for hour, 6 bits for min, 5 bits for seconds
-   * Hours are in military time and must be adjusted to time zone
-   * Seconds are divided by two before storing and must be multiplied by two to retrieve
-   *
-   * Date is stored in the MSDOS format 7 bit for year, 4 bit for month, 5 bits for day of month
-   * Year is the number of years since 1980 per, the month is stored starting at 0
-   * for January. Day of month is stored with nature numbering
-   * 
-   * Bit masks and shifting are used to build the time and date bytes
-   * 
-   * @author Christopher Jordan
-   * @author Aaron Davis
-   **/
-  private static int computeDOSDateTime(long currentTime){
-	  final int DAY_OF_MONTH = 5;
-	  final int HOUR_OF_DAY = 11;
-	  final int MINUTE = 12;
-	  final int MONTH = 2;
-	  final int SECOND = 13;
-	  final int YEAR = 1;
-
-    //Create calendar object, then set time to value passed in
-	  Calendar modCalendar = Calendar.getInstance();
-    modCalendar.setTime(new Date(currentTime));
-
-	  //Hour
-	  int timeBits = modCalendar.get(HOUR_OF_DAY);
-    timeBits = timeBits - 6;
-	  timeBits = timeBits << 6;
-	  
-	  //Minutes
-	  int minBits = 0x3f & (modCalendar.get(MINUTE));;
-	  timeBits = timeBits ^ minBits;
-	  timeBits = timeBits << 5;
-	  
-	  //Seconds
-	  int secBits = 0x1f & (modCalendar.get(SECOND));
-	  secBits = secBits >> 1;                  //Divide by 2
-	  timeBits = timeBits ^ secBits;
-	  
-	  //Year
-	  int dateBits = (modCalendar.get(YEAR) -1980);
-	  dateBits = dateBits << 4;
-
-	  //Month
-    int month = 0xf & ((modCalendar.get(MONTH)) + 1);
-	  dateBits = dateBits ^ month;
-	  dateBits = dateBits << 5;
-	  
-	  //Day of month
-	  int dayBits = 0x1f & modCalendar.get(DAY_OF_MONTH);
-	  dateBits = dateBits ^ dayBits;
-	  
-	  //Store Date
-    int storeDate = ((dateBits << 16) ^ (timeBits));
-    return storeDate;
-  }
-
-  //Methods to set and get the uncompressed size of the entry
-  public void setSize(long size){
-    if (size < 0){
-      throw new IllegalArgumentException("invalid entry size");
+  public void setMethod(int method) {
+    if (method != STORED && method != DEFLATED) {
+      throw new IllegalArgumentException("invalid compression method");
     }
-    uncompSize = size;
+    this.method = method;
   }
 
-  public void setSize(int size){
-    setSize((long) size);
-  }
-
-  public long getSize() {
-    return uncompSize;
-  }
-
-  //Methods to set and get the compressed size of the entry
-  public void setCompressedSize(long size){
-    if (size < 0){
-      compSize = -1;
-    }
-    else
-      compSize = size;
-  }
-
-  public long getCompressedSize() {
-    return compSize;
+  public int getMethod() {
+    return method;
   }
 
   public void setExtra(byte[] extra) {
+    setExtra0(extra, false);
+  }
+
+  void setExtra0(byte[] extra, boolean doZIP64) {
+    if (extra != null) {
+      if (extra.length > 0xFFFF) {
+        throw new IllegalArgumentException("invalid extra field length");
+      }
+      int off = 0;
+      int len = extra.length;
+      while (off + 4 < len) {
+        int tag = get16(extra, off);
+        int sz = get16(extra, off + 2);
+        off += 4;
+        int end = off + sz;
+        if (end > len) {
+          break;
+        }
+        if (tag == 0x5455) {
+          int flags = extra[off] & 0xff;
+          int pos = off + 1;
+          if ((flags & 1) != 0 && pos + 4 <= end) {
+            mtime = FileTime.from(get32(extra, pos), TimeUnit.SECONDS);
+            pos += 4;
+          }
+          if ((flags & 2) != 0 && pos + 4 <= end) {
+            atime = FileTime.from(get32(extra, pos), TimeUnit.SECONDS);
+            pos += 4;
+          }
+          if ((flags & 4) != 0 && pos + 4 <= end) {
+            ctime = FileTime.from(get32(extra, pos), TimeUnit.SECONDS);
+          }
+        } else if (tag == 0x000a && sz >= 32) {
+          int pos = off + 4;
+          if (get16(extra, pos) == 1 && get16(extra, pos + 2) == 24) {
+            mtime = winTimeToFileTime(get64(extra, pos + 4));
+            atime = winTimeToFileTime(get64(extra, pos + 12));
+            ctime = winTimeToFileTime(get64(extra, pos + 20));
+          }
+        }
+        off = end;
+      }
+    }
     this.extra = extra;
+  }
+
+  static int get16(byte[] b, int off) {
+    return (b[off] & 0xff) | ((b[off + 1] & 0xff) << 8);
+  }
+
+  static long get32(byte[] b, int off) {
+    return (get16(b, off) | ((long) get16(b, off + 2) << 16)) & 0xffffffffL;
+  }
+
+  static long get64(byte[] b, int off) {
+    return get32(b, off) | (get32(b, off + 4) << 32);
+  }
+
+  static FileTime winTimeToFileTime(long wtime) {
+    return FileTime.from(wtime / 10 + -11644473600000000L, TimeUnit.MICROSECONDS);
   }
 
   public byte[] getExtra() {
@@ -273,6 +279,9 @@ public class ZipEntry implements Cloneable {
   }
 
   public void setComment(String comment) {
+    if (comment != null && comment.length() > 0xFFFF / 3 && utf8Length(comment) > 0xFFFF) {
+      throw new IllegalArgumentException("entry comment too long");
+    }
     this.comment = comment;
   }
 
@@ -280,8 +289,59 @@ public class ZipEntry implements Cloneable {
     return comment;
   }
 
+  public boolean isDirectory() {
+    return getName().endsWith("/");
+  }
+
   @Override
   public String toString() {
     return getName();
+  }
+
+  @Override
+  public int hashCode() {
+    return name.hashCode();
+  }
+
+  @Override
+  public Object clone() {
+    try {
+      ZipEntry e = (ZipEntry) super.clone();
+      e.extra = extra == null ? null : extra.clone();
+      return e;
+    } catch (CloneNotSupportedException e) {
+      throw new InternalError(e);
+    }
+  }
+
+  static long javaToExtendedDosTime(long time) {
+    if (time < 0) {
+      return DOSTIME_BEFORE_1980;
+    }
+    long dostime = javaToDosTime(time);
+    return dostime != DOSTIME_BEFORE_1980 ? dostime + ((time % 2000) << 32) : DOSTIME_BEFORE_1980;
+  }
+
+  static long javaToDosTime(long time) {
+    LocalDateTime ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(time), ZoneId.systemDefault());
+    int year = ldt.getYear() - 1980;
+    if (year < 0) {
+      return DOSTIME_BEFORE_1980;
+    }
+    return (year << 25 | ldt.getMonthValue() << 21 | ldt.getDayOfMonth() << 16 | ldt.getHour() << 11
+        | ldt.getMinute() << 5 | ldt.getSecond() >> 1) & 0xffffffffL;
+  }
+
+  static long extendedDosToJavaTime(long xdostime) {
+    long time = dosToJavaTime(xdostime);
+    return time + (xdostime >> 32);
+  }
+
+  static long dosToJavaTime(long dtime) {
+    LocalDateTime ldt = LocalDateTime.of(((int) (dtime >> 25) & 0x7f) + 1980, (int) (dtime >> 21) & 0x0f,
+        (int) (dtime >> 16) & 0x1f, (int) (dtime >> 11) & 0x1f, (int) (dtime >> 5) & 0x3f,
+        (int) (dtime << 1) & 0x3e);
+    ZoneOffset off = ZoneId.systemDefault().getRules().getOffset(ldt);
+    return TimeUnit.SECONDS.toMillis(ldt.toEpochSecond(off));
   }
 }

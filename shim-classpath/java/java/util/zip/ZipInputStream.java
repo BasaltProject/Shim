@@ -112,11 +112,13 @@ public class ZipInputStream extends InflaterInputStream {
     String name = (charset != null) ? new String(fnBytes, charset) : new String(fnBytes, "UTF-8");
 
     ZipEntry entry = createZipEntry(name);
-    entry.setMethod(method);
+    entry.method = method;
+    entry.flag = flag;
+    entry.xdostime = time;
     if (extraLen > 0) {
       byte[] extra = new byte[extraLen];
       readFully(extra, 0, extraLen);
-      entry.setExtra(extra);
+      entry.setExtra0(extra, false);
     }
     if ((flag & 8) == 0) {
       entry.setCrc(crcVal);

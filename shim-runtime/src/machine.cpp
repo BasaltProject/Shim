@@ -5781,7 +5781,9 @@ static bool isPolymorphicCall(Thread* t, GcClass* class_, GcByteArray* name, GcC
       "getAcquire", "setRelease", "compareAndSet", "compareAndExchange", "compareAndExchangeAcquire",
       "compareAndExchangeRelease", "weakCompareAndSetPlain", "weakCompareAndSet", "weakCompareAndSetAcquire",
       "weakCompareAndSetRelease", "getAndSet", "getAndSetAcquire", "getAndSetRelease", "getAndAdd",
-      "getAndAddAcquire", "getAndAddRelease"};
+      "getAndAddAcquire", "getAndAddRelease", "getAndBitwiseOr", "getAndBitwiseOrAcquire", "getAndBitwiseOrRelease",
+      "getAndBitwiseAnd", "getAndBitwiseAndAcquire", "getAndBitwiseAndRelease", "getAndBitwiseXor",
+      "getAndBitwiseXorAcquire", "getAndBitwiseXorRelease"};
   for (const char* mode : modes) {
     if (bytesEqual(name, mode)) return true;
   }
