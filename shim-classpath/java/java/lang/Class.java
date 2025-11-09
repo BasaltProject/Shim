@@ -1088,4 +1088,34 @@ public final class Class <T>
     Class<?> sup = getSuperclass();
     return sup == null ? null : java.lang.reflect.AnnotatedType.of(sup);
   }
+
+  public boolean isSynthetic() {
+    return (getModifiers() & 0x1000) != 0;
+  }
+
+  public Object[] getSigners() {
+    return null;
+  }
+
+  public Class<?>[] getClasses() {
+    java.util.List<Class<?>> out = new java.util.ArrayList<Class<?>>();
+    for (Class<?> c = this; c != null; c = c.getSuperclass()) {
+      for (Class<?> member : c.getDeclaredClasses()) {
+        if (Modifier.isPublic(member.getModifiers())) {
+          out.add(member);
+        }
+      }
+    }
+    return out.toArray(new Class<?>[0]);
+  }
+
+  public static Class<?> forName(Module module, String name) {
+    java.util.Objects.requireNonNull(module);
+    java.util.Objects.requireNonNull(name);
+    try {
+      return Class.forName(name, false, module.getClassLoader());
+    } catch (ClassNotFoundException | LinkageError e) {
+      return null;
+    }
+  }
 }

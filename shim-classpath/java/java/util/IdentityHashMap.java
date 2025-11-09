@@ -57,6 +57,11 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V
     }
   }
 
+  public IdentityHashMap(Map<? extends K, ? extends V> m) {
+    this(Math.max(m.size(), 0));
+    putAll(m);
+  }
+
   public IdentityHashMap(int capacity) {
     map = new HelperHashMap(capacity, new MyHelper());
   }

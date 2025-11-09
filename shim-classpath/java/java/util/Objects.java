@@ -165,4 +165,9 @@ public final class Objects {
       return defaultValue;
     return value.toString();
   }
+
+  public static String toIdentityString(Object o) {
+    requireNonNull(o);
+    return o.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(o));
+  }
 }

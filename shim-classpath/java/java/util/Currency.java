@@ -13,50 +13,6 @@ import java.io.Serializable;
 public final class Currency implements Serializable {
   private static final long serialVersionUID = -158308464356906721L;
 
-  private static final String[][] kTable = {
-      {"USD", "840", "2", "$", "US Dollar", "US"},
-      {"EUR", "978", "2", "€", "Euro", ""},
-      {"GBP", "826", "2", "£", "British Pound", "GB"},
-      {"JPY", "392", "0", "¥", "Japanese Yen", "JP"},
-      {"CNY", "156", "2", "CN¥", "Chinese Yuan", "CN"},
-      {"CHF", "756", "2", "CHF", "Swiss Franc", "CH"},
-      {"CAD", "124", "2", "CA$", "Canadian Dollar", "CA"},
-      {"AUD", "36", "2", "A$", "Australian Dollar", "AU"},
-      {"NZD", "554", "2", "NZ$", "New Zealand Dollar", "NZ"},
-      {"INR", "356", "2", "₹", "Indian Rupee", "IN"},
-      {"KRW", "410", "0", "₩", "South Korean Won", "KR"},
-      {"BRL", "986", "2", "R$", "Brazilian Real", "BR"},
-      {"MXN", "484", "2", "MX$", "Mexican Peso", "MX"},
-      {"RUB", "643", "2", "RUB", "Russian Ruble", "RU"},
-      {"SEK", "752", "2", "SEK", "Swedish Krona", "SE"},
-      {"NOK", "578", "2", "NOK", "Norwegian Krone", "NO"},
-      {"DKK", "208", "2", "DKK", "Danish Krone", "DK"},
-      {"PLN", "985", "2", "PLN", "Polish Zloty", "PL"},
-      {"CZK", "203", "2", "CZK", "Czech Koruna", "CZ"},
-      {"HUF", "348", "2", "HUF", "Hungarian Forint", "HU"},
-      {"TRY", "949", "2", "TRY", "Turkish Lira", "TR"},
-      {"ZAR", "710", "2", "ZAR", "South African Rand", "ZA"},
-      {"SGD", "702", "2", "SGD", "Singapore Dollar", "SG"},
-      {"HKD", "344", "2", "HK$", "Hong Kong Dollar", "HK"},
-      {"ILS", "376", "2", "₪", "Israeli New Shekel", "IL"},
-      {"THB", "764", "2", "THB", "Thai Baht", "TH"},
-      {"IDR", "360", "2", "IDR", "Indonesian Rupiah", "ID"},
-      {"ARS", "32", "2", "ARS", "Argentine Peso", "AR"},
-      {"CLP", "152", "0", "CLP", "Chilean Peso", "CL"},
-      {"COP", "170", "2", "COP", "Colombian Peso", "CO"},
-      {"EGP", "818", "2", "EGP", "Egyptian Pound", "EG"},
-      {"SAR", "682", "2", "SAR", "Saudi Riyal", "SA"},
-      {"AED", "784", "2", "AED", "United Arab Emirates Dirham", "AE"},
-      {"KWD", "414", "3", "KWD", "Kuwaiti Dinar", "KW"},
-      {"BHD", "48", "3", "BHD", "Bahraini Dinar", "BH"},
-      {"VND", "704", "0", "₫", "Vietnamese Dong", "VN"},
-      {"UAH", "980", "2", "UAH", "Ukrainian Hryvnia", "UA"},
-      {"RON", "946", "2", "RON", "Romanian Leu", "RO"},
-      {"BGN", "975", "2", "BGN", "Bulgarian Lev", "BG"},
-      {"ISK", "352", "0", "ISK", "Icelandic Króna", "IS"},
-      {"PHP", "608", "2", "₱", "Philippine Peso", "PH"},
-      {"MYR", "458", "2", "MYR", "Malaysian Ringgit", "MY"},
-      {"XXX", "999", "-1", "¤", "Unknown Currency", ""}};
   private static final Map<String, Currency> kInstances = new HashMap<String, Currency>();
 
   private final String currencyCode;
@@ -86,7 +42,7 @@ public final class Currency implements Serializable {
       if (existing != null) {
         return existing;
       }
-      for (String[] row : kTable) {
+      for (String[] row : CurrencyData.kRows) {
         if (row[0].equals(currencyCode)) {
           Currency created = new Currency(row);
           kInstances.put(currencyCode, created);
@@ -94,24 +50,21 @@ public final class Currency implements Serializable {
         }
       }
     }
-    throw new IllegalArgumentException();
+    throw new IllegalArgumentException("The input currency code: \"" + currencyCode
+        + "\" is not a valid ISO 4217 code");
   }
 
   public static Currency getInstance(Locale locale) {
     String country = locale.getCountry();
-    if (country == null || country.length() != 2) {
-      throw new IllegalArgumentException();
+    if (country == null || !country.matches("^[a-zA-Z]{2}$")
+        || !Arrays.asList(Locale.getISOCountries()).contains(country.toUpperCase(Locale.ROOT))) {
+      throw new IllegalArgumentException("The country of the input locale: \"" + locale
+          + "\" is not a valid ISO 3166 country code");
     }
-    String[] euro = {"AT", "BE", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT", "LT", "LU", "LV", "MT",
-        "NL", "PT", "SI", "SK"};
-    for (String code : euro) {
-      if (code.equals(country)) {
-        return getInstance("EUR");
-      }
-    }
-    for (String[] row : kTable) {
-      if (row[5].equals(country)) {
-        return getInstance(row[0]);
+    country = country.toUpperCase(Locale.ROOT);
+    for (String pair : CurrencyData.kCountries) {
+      if (pair.startsWith(country)) {
+        return getInstance(pair.substring(2));
       }
     }
     return null;
@@ -119,10 +72,8 @@ public final class Currency implements Serializable {
 
   public static Set<Currency> getAvailableCurrencies() {
     Set<Currency> all = new HashSet<Currency>();
-    for (String[] row : kTable) {
-      if (!row[0].equals("XXX")) {
-        all.add(getInstance(row[0]));
-      }
+    for (String[] row : CurrencyData.kRows) {
+      all.add(getInstance(row[0]));
     }
     return all;
   }
@@ -175,5 +126,9 @@ public final class Currency implements Serializable {
   @Override
   public String toString() {
     return currencyCode;
+  }
+
+  public static java.util.stream.Stream<Currency> availableCurrencies() {
+    return getAvailableCurrencies().stream();
   }
 }

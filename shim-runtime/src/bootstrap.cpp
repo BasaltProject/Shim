@@ -178,7 +178,7 @@ static object invokeBootstrap(Thread* t, GcInvocation* invocation, object typeAr
     }
     GcArray* arguments = makeArray(t, parameters);
     PROTECT(t, arguments);
-    GcLookup* lookup = makeLookup(t, caller, 0x5f);
+    GcLookup* lookup = makeLookup(t, caller, 0x5f, 0);
     arguments->setBodyElement(t, 0, lookup);
     GcByteArray* name = invocation->template_()->name();
     GcString* string = t->m->classpath->makeString(t, name, 0, name->length() - 1);

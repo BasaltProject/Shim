@@ -433,4 +433,8 @@ public class Field<T> extends AccessibleObject implements Member {
 
   private static native void setObject
     (Object instance, int offset, Object value);
+
+  public boolean isEnumConstant() {
+    return (getModifiers() & 0x4000) != 0;
+  }
 }

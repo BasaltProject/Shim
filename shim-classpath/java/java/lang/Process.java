@@ -145,4 +145,15 @@ public abstract class Process {
   public ProcessHandle.Info info() {
     return toHandle().info();
   }
+
+  public boolean waitFor(java.time.Duration duration) throws InterruptedException {
+    java.util.Objects.requireNonNull(duration, "duration");
+    long nanos;
+    try {
+      nanos = duration.toNanos();
+    } catch (ArithmeticException e) {
+      nanos = duration.isNegative() ? Long.MIN_VALUE : Long.MAX_VALUE;
+    }
+    return waitFor(nanos, TimeUnit.NANOSECONDS);
+  }
 }

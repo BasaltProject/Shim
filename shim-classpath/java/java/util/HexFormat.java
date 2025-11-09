@@ -115,6 +115,33 @@ public final class HexFormat {
     return new String(buf);
   }
 
+  public String toHexDigits(long value, int count) {
+    if (count < 0 || count > 16) {
+      throw new IllegalArgumentException("number of digits: " + count);
+    }
+    if (count == 0) {
+      return "";
+    }
+    char[] buf = new char[count];
+    long v = value;
+    for (int i = count - 1; i >= 0; i--) {
+      buf[i] = this.digits[(int) (v & 0xFL)];
+      v >>>= 4;
+    }
+    return new String(buf);
+  }
+
+  public <A extends Appendable> A toHexDigits(A out, byte value) {
+    Objects.requireNonNull(out, "out");
+    try {
+      out.append(toHighHexDigit(value));
+      out.append(toLowHexDigit(value));
+      return out;
+    } catch (java.io.IOException e) {
+      throw new java.io.UncheckedIOException(value + ": " + e.getMessage(), e);
+    }
+  }
+
   public String formatHex(byte[] bytes) {
     return formatHex(bytes, 0, bytes.length);
   }

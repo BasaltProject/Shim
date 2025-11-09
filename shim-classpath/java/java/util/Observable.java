@@ -43,6 +43,10 @@ public class Observable {
     return observers.size();
   }
 
+  public synchronized void deleteObservers() {
+    observers.clear();
+  }
+
   public void deleteObserver(Observer o) {
     if(o == null) {
       throw new NullPointerException();

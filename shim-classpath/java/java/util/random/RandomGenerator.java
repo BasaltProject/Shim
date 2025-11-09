@@ -184,6 +184,20 @@ public interface RandomGenerator {
     return -Math.log(1.0 - nextDouble());
   }
 
+  default java.util.stream.DoubleStream equiDoubles(double left, double right, boolean isLeftIncluded,
+      boolean isRightIncluded) {
+    if (!(left < right) || Double.isInfinite(right - left) || Double.isNaN(left) || Double.isNaN(right)) {
+      throw new IllegalArgumentException("bounds must be finite and left < right");
+    }
+    return java.util.stream.DoubleStream.generate(() -> {
+      double v;
+      do {
+        v = left + nextDouble() * (right - left);
+      } while ((!isLeftIncluded && v == left) || (!isRightIncluded && v == right) || v > right);
+      return v;
+    });
+  }
+
   default IntStream ints() {
     return IntStream.generate(this::nextInt);
   }

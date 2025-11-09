@@ -22,6 +22,7 @@ public class ReentrantLock implements Lock, Serializable {
   private transient Thread owner;
   private transient int holdCount;
   private transient int waiters;
+  private transient final java.util.Set<Thread> queued = new java.util.LinkedHashSet<Thread>();
 
   private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
     s.defaultReadObject();
@@ -44,6 +45,7 @@ public class ReentrantLock implements Lock, Serializable {
         return;
       }
       waiters++;
+      queued.add(Thread.currentThread());
       boolean interrupted = false;
       try {
         while (owner != null) {
@@ -57,6 +59,7 @@ public class ReentrantLock implements Lock, Serializable {
         holdCount = 1;
       } finally {
         waiters--;
+      queued.remove(Thread.currentThread());
         if (interrupted) {
           current.interrupt();
         }
@@ -75,6 +78,7 @@ public class ReentrantLock implements Lock, Serializable {
         return;
       }
       waiters++;
+      queued.add(Thread.currentThread());
       try {
         while (owner != null) {
           sync.wait();
@@ -83,6 +87,7 @@ public class ReentrantLock implements Lock, Serializable {
         holdCount = 1;
       } finally {
         waiters--;
+      queued.remove(Thread.currentThread());
       }
     }
   }
@@ -122,6 +127,7 @@ public class ReentrantLock implements Lock, Serializable {
         return true;
       }
       waiters++;
+      queued.add(Thread.currentThread());
       try {
         while (owner != null) {
           long remaining = deadline - System.nanoTime();
@@ -137,6 +143,7 @@ public class ReentrantLock implements Lock, Serializable {
         return true;
       } finally {
         waiters--;
+      queued.remove(Thread.currentThread());
       }
     }
   }
@@ -174,6 +181,7 @@ public class ReentrantLock implements Lock, Serializable {
       Thread current = Thread.currentThread();
       boolean interrupted = false;
       waiters++;
+      queued.add(Thread.currentThread());
       try {
         while (owner != null) {
           try {
@@ -186,6 +194,7 @@ public class ReentrantLock implements Lock, Serializable {
         holdCount = count;
       } finally {
         waiters--;
+      queued.remove(Thread.currentThread());
         if (interrupted) {
           current.interrupt();
         }
@@ -228,6 +237,13 @@ public class ReentrantLock implements Lock, Serializable {
   public boolean hasQueuedThreads() {
     synchronized (sync) {
       return waiters > 0;
+    }
+  }
+
+  public final boolean hasQueuedThread(Thread thread) {
+    java.util.Objects.requireNonNull(thread);
+    synchronized (sync) {
+      return queued.contains(thread);
     }
   }
 

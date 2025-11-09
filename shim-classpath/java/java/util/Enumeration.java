@@ -27,4 +27,18 @@ public interface Enumeration<T> {
   public T nextElement();
 
   public boolean hasMoreElements();
+
+  default Iterator<T> asIterator() {
+    return new Iterator<T>() {
+      @Override
+      public boolean hasNext() {
+        return hasMoreElements();
+      }
+
+      @Override
+      public T next() {
+        return nextElement();
+      }
+    };
+  }
 }

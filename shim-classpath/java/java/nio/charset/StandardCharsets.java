@@ -16,5 +16,8 @@ public final class StandardCharsets {
   public static final Charset UTF_8 = sun.nio.cs.UTF_8.INSTANCE;
   public static final Charset UTF_16BE = sun.nio.cs.UnicodeCharset.UTF_16BE;
   public static final Charset UTF_16LE = sun.nio.cs.UnicodeCharset.UTF_16LE;
+  public static final Charset UTF_32 = sun.nio.cs.UnicodeCharset.UTF_32;
+  public static final Charset UTF_32BE = sun.nio.cs.UnicodeCharset.UTF_32BE;
+  public static final Charset UTF_32LE = sun.nio.cs.UnicodeCharset.UTF_32LE;
   public static final Charset UTF_16 = sun.nio.cs.UnicodeCharset.UTF_16;
 }

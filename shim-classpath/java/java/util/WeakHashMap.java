@@ -36,6 +36,28 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
     queue = new ReferenceQueue();
   }
 
+  public WeakHashMap(int capacity, float loadFactor) {
+    this(capacity);
+    if (capacity < 0) {
+      throw new IllegalArgumentException("Illegal Initial Capacity: " + capacity);
+    }
+    if (loadFactor <= 0 || Float.isNaN(loadFactor)) {
+      throw new IllegalArgumentException("Illegal Load factor: " + loadFactor);
+    }
+  }
+
+  public WeakHashMap(Map<? extends K, ? extends V> m) {
+    this(Math.max(m.size(), 0));
+    putAll(m);
+  }
+
+  public static <K, V> WeakHashMap<K, V> newWeakHashMap(int numMappings) {
+    if (numMappings < 0) {
+      throw new IllegalArgumentException("Negative number of mappings: " + numMappings);
+    }
+    return new WeakHashMap<K, V>(numMappings);
+  }
+
   public WeakHashMap() {
     this(0);
   }
