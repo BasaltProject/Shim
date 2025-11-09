@@ -533,7 +533,8 @@ public final class X500Name implements Principal {
   }
 
   private static String normalize(String s) {
-    String lower = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFKD).toUpperCase(Locale.US).toLowerCase(Locale.US);
+    String lower = java.text.Normalizer.normalize(s,
+        java.text.Normalizer.Form.NFKD).toUpperCase(Locale.US).toLowerCase(Locale.US);
     StringBuilder sb = new StringBuilder();
     boolean space = false;
     for (int i = 0; i < lower.length(); i++) {

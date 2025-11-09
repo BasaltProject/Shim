@@ -29,5 +29,6 @@ public interface MouseEvent extends UIEvent {
 
   EventTarget getRelatedTarget();
 
-  void initMouseEvent(String p0, boolean p1, boolean p2, org.w3c.dom.views.AbstractView p3, int p4, int p5, int p6, int p7, int p8, boolean p9, boolean p10, boolean p11, boolean p12, short p13, EventTarget p14);
+  void initMouseEvent(String p0, boolean p1, boolean p2, org.w3c.dom.views.AbstractView p3, int p4, int p5, int p6,
+      int p7, int p8, boolean p9, boolean p10, boolean p11, boolean p12, short p13, EventTarget p14);
 }

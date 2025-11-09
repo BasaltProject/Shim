@@ -53,7 +53,6 @@ static class L1 {
     s.getDomConfig().setParameter("format-pretty-print", true); s.setNewLine("\r\n");
     System.out.println("pretty crlf " + q(s.writeToString(d)));
     s.setNewLine("\n"); s.setNewLine(null); System.out.println("newline null " + q(s.getNewLine()) + " " + q(s.writeToString(d)));
-    // output variants
     LSOutput out = ls.createLSOutput(); System.out.println("output defaults " + out.getEncoding() + " " + out.getSystemId() + " " + out.getByteStream() + " " + out.getCharacterStream());
     ByteArrayOutputStream bos;
     bos = new ByteArrayOutputStream(); out = ls.createLSOutput(); out.setByteStream(bos); out.setEncoding("ISO-8859-1"); Document d2 = parse("<a>\u00e9\u4e2d</a>", true); LSSerializer s2 = ls.createLSSerializer(); System.out.println("write latin1 " + s2.write(d2, out) + " " + q(bos.toString("ISO-8859-1")));
@@ -64,22 +63,18 @@ static class L1 {
     try { s2.writeToString(null); } catch (Throwable t) { System.out.println("writeToString null " + fail(t)); }
     File tmp = File.createTempFile("lsx", ".xml"); tmp.deleteOnExit();
     try { System.out.println("writeToURI " + s2.writeToURI(d2, tmp.toURI().toString()) + " " + q(new String(java.nio.file.Files.readAllBytes(tmp.toPath()), "UTF-8"))); } catch (Throwable t) { System.out.println("writeToURI " + fail(t)); }
-    // filters
     LSSerializer sf = ls.createLSSerializer();
     sf.setFilter(new LSSerializerFilter() { public short acceptNode(Node n) { return n.getNodeType() == Node.COMMENT_NODE || (n.getNodeType() == Node.ELEMENT_NODE && n.getNodeName().equals("skip")) ? FILTER_REJECT : FILTER_ACCEPT; } public int getWhatToShow() { return NodeFilter.SHOW_ALL; } });
     System.out.println("filter " + q(sf.writeToString(parse("<a><!--c--><skip><x/></skip><b/></a>", true))));
     sf.setFilter(new LSSerializerFilter() { public short acceptNode(Node n) { return n.getNodeName().equals("skip") ? FILTER_SKIP : FILTER_ACCEPT; } public int getWhatToShow() { return NodeFilter.SHOW_ELEMENT; } });
     System.out.println("filter skip " + q(sf.writeToString(parse("<a><skip><x/></skip><b/></a>", true))));
-    // namespace fixup
     Document nd = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument(); Element r = nd.createElementNS("u", "p:r"); nd.appendChild(r); r.setAttributeNS("v", "q:x", "1"); r.appendChild(nd.createElementNS(null, "c")); r.appendChild(nd.createElementNS("u", "d")); r.appendChild(nd.createElement("l1"));
     LSSerializer sn = ls.createLSSerializer(); System.out.println("nsfixup " + q(sn.writeToString(nd)));
     sn.getDomConfig().setParameter("namespaces", false); System.out.println("nsfixup off " + q(sn.writeToString(nd)));
-    // other node types
     Document od = parse("<a x='1'/>", true);
     Attr at = od.getDocumentElement().getAttributeNode("x"); LSSerializer so = ls.createLSSerializer();
     for (Node n : new Node[]{at, od.createTextNode("t<&>"), od.createComment("c"), od.createCDATASection("x"), od.createProcessingInstruction("t", "d"), od.createDocumentFragment(), od.createEntityReference("e"), od.getDoctype() == null ? od.createTextNode("nodoctype") : od.getDoctype()}) { try { System.out.println("node " + n.getNodeType() + " " + q(so.writeToString(n))); } catch (Throwable t) { System.out.println("node " + n.getNodeType() + " " + fail(t)); } }
     DocumentFragment fr = od.createDocumentFragment(); fr.appendChild(od.createElement("f1")); fr.appendChild(od.createTextNode("t")); fr.appendChild(od.createElement("f2")); System.out.println("fragment " + q(so.writeToString(fr)));
-    // bad chars, split cdata
     Document bd = parse("<a/>", true); bd.getDocumentElement().appendChild(bd.createCDATASection("a]]>b")); System.out.println("cdata split " + q(so.writeToString(bd)));
     LSSerializer sc = ls.createLSSerializer(); sc.getDomConfig().setParameter("split-cdata-sections", false); try { System.out.println("cdata nosplit " + q(sc.writeToString(bd))); } catch (Throwable t) { System.out.println("cdata nosplit " + fail(t)); }
     Document cd = parse("<a/>", true); cd.getDocumentElement().appendChild(cd.createComment("a--b")); System.out.println("comment dashes " + q(so.writeToString(cd)));
@@ -138,7 +133,6 @@ static class L2 {
         if (mode >= 2) continue;
       }
     }
-    // error handler
     LSParser pe = ls.createLSParser(DOMImplementationLS.MODE_SYNCHRONOUS, null);
     final List<String> errs = new ArrayList<String>();
     pe.getDomConfig().setParameter("error-handler", new DOMErrorHandler() { public boolean handleError(DOMError e) { errs.add(e.getSeverity() + ":" + e.getMessage() + ":" + e.getLocation().getLineNumber() + ":" + e.getLocation().getColumnNumber()); return true; } });
@@ -146,7 +140,6 @@ static class L2 {
     errs.clear(); in = ls.createLSInput(); in.setStringData("<a>\n<b x='1' x='2'/></a>"); try { System.out.println("err doc " + pe.parse(in)); } catch (Throwable t) { System.out.println("err " + fail(t)); } System.out.println("errs " + errs);
     pe.getDomConfig().setParameter("error-handler", new DOMErrorHandler() { public boolean handleError(DOMError e) { return false; } });
     in = ls.createLSInput(); in.setStringData("<a><b></a>"); try { System.out.println("err2 doc " + pe.parse(in)); } catch (Throwable t) { System.out.println("err2 " + fail(t)); }
-    // inputs
     in = ls.createLSInput(); System.out.println("input defaults " + in.getStringData() + " " + in.getSystemId() + " " + in.getEncoding() + " " + in.getCertifiedText() + " " + in.getBaseURI() + " " + in.getByteStream() + " " + in.getCharacterStream());
     try { p.parse(in); } catch (Throwable t) { System.out.println("parse empty input " + fail(t)); }
     in = ls.createLSInput(); in.setByteStream(new ByteArrayInputStream("<?xml version='1.0' encoding='ISO-8859-1'?><a>\u00e9</a>".getBytes("ISO-8859-1"))); try { Document d = p.parse(in); System.out.println("bytes " + dump(d)); } catch (Throwable t) { System.out.println("bytes " + fail(t)); }
@@ -160,11 +153,9 @@ static class L2 {
     try { Document tgt = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument(); p.parseWithContext(in, tgt, LSParser.ACTION_APPEND_AS_CHILDREN); } catch (Throwable t) { System.out.println("parseWithContext " + fail(t)); }
     p.abort(); System.out.println("abort ok");
     System.out.println("consts " + LSParser.ACTION_APPEND_AS_CHILDREN + " " + LSParser.ACTION_REPLACE_CHILDREN + " " + LSParser.ACTION_INSERT_BEFORE + " " + LSParser.ACTION_INSERT_AFTER + " " + LSParser.ACTION_REPLACE);
-    // filter
     LSParser pf = ls.createLSParser(DOMImplementationLS.MODE_SYNCHRONOUS, null);
     pf.setFilter(new LSParserFilter() { public short startElement(Element e) { return e.getNodeName().equals("skip") ? FILTER_SKIP : e.getNodeName().equals("rej") ? FILTER_REJECT : FILTER_ACCEPT; } public short acceptNode(Node n) { return n.getNodeType() == Node.COMMENT_NODE ? FILTER_REJECT : FILTER_ACCEPT; } public int getWhatToShow() { return org.w3c.dom.traversal.NodeFilter.SHOW_ALL; } });
     in = ls.createLSInput(); in.setStringData("<a><!--c--><skip><x/></skip><rej><y/></rej><b/></a>"); try { System.out.println("filter " + dump(pf.parse(in))); } catch (Throwable t) { System.out.println("filter " + fail(t)); }
-    // resolver
     LSParser pr = ls.createLSParser(DOMImplementationLS.MODE_SYNCHRONOUS, null);
     pr.getDomConfig().setParameter("resource-resolver", new LSResourceResolver() { public LSInput resolveResource(String type, String ns, String pub, String sys, String base) { System.out.println("resolve " + type + "|" + ns + "|" + pub + "|" + sys + "|" + (base == null ? null : "base")); LSInput li = ls.createLSInput(); li.setStringData("<!ENTITY e2 'from resolver'>"); return li; } });
     in = ls.createLSInput(); in.setStringData("<!DOCTYPE a SYSTEM 'x.dtd'><a>&e2;</a>"); try { System.out.println("resolver " + dump(pr.parse(in))); } catch (Throwable t) { System.out.println("resolver " + fail(t)); }

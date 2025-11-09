@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 17
 
 import java.lang.constant.ClassDesc;
 import java.lang.constant.ConstantDesc;
@@ -53,7 +52,6 @@ public class ConstantDescsAndDynamicDescModern {
   }
 
   private static void testCanonicalDynamicConstants() {
-    // 1. BSM_NULL_CONSTANT canonicalization to ConstantDescs.NULL
     ConstantDesc nullDesc = DynamicConstantDesc.ofCanonical(
         ConstantDescs.BSM_NULL_CONSTANT,
         ConstantDescs.DEFAULT_NAME,
@@ -63,7 +61,6 @@ public class ConstantDescsAndDynamicDescModern {
       throw new AssertionError("Expected identity equality with ConstantDescs.NULL, got: " + nullDesc);
     }
 
-    // 2. BSM_PRIMITIVE_CLASS canonicalization to ClassDesc
     ConstantDesc intDesc = DynamicConstantDesc.ofCanonical(
         ConstantDescs.BSM_PRIMITIVE_CLASS,
         "I",
@@ -73,7 +70,6 @@ public class ConstantDescsAndDynamicDescModern {
       throw new AssertionError("Expected CD_int ClassDesc, got: " + intDesc);
     }
 
-    // 3. BSM_ENUM_CONSTANT canonicalization to Enum.EnumDesc
     ClassDesc sampleEnumDesc = ClassDesc.of(SampleState.class.getName());
     ConstantDesc enumDesc = DynamicConstantDesc.ofCanonical(
         ConstantDescs.BSM_ENUM_CONSTANT,
@@ -84,7 +80,6 @@ public class ConstantDescsAndDynamicDescModern {
       throw new AssertionError("Unexpected EnumDesc toString: " + enumDesc);
     }
 
-    // 4. BSM_VARHANDLE_ARRAY canonicalization to VarHandle.VarHandleDesc
     ClassDesc intArrayDesc = ConstantDescs.CD_int.arrayType();
     ConstantDesc arrayVhDesc = DynamicConstantDesc.ofCanonical(
         ConstantDescs.BSM_VARHANDLE_ARRAY,
@@ -99,7 +94,6 @@ public class ConstantDescsAndDynamicDescModern {
       throw new AssertionError("Expected varType CD_int, got: " + vhDesc.varType());
     }
 
-    // 5. Non-canonical fallback returns DynamicConstantDesc
     ConstantDesc customDesc = DynamicConstantDesc.ofCanonical(
         ConstantDescs.BSM_INVOKE,
         "custom",
@@ -126,7 +120,6 @@ public class ConstantDescsAndDynamicDescModern {
       throw new AssertionError("expected 0 bootstrap args");
     }
 
-    // withArgs transformation
     DynamicCallSiteDesc callSiteWithArgs = callSite1.withArgs(ConstantDescs.TRUE, ConstantDescs.CD_String);
     if (callSite1.bootstrapArgs().length != 0) {
       throw new AssertionError("original callSite1 was mutated by withArgs");
@@ -137,7 +130,6 @@ public class ConstantDescsAndDynamicDescModern {
       throw new AssertionError("withArgs contents mismatch: " + java.util.Arrays.toString(callSiteWithArgs.bootstrapArgs()));
     }
 
-    // withNameAndType transformation
     MethodTypeDesc mtd2 = MethodTypeDesc.of(ConstantDescs.CD_int, ConstantDescs.CD_String);
     DynamicCallSiteDesc callSiteRenamed = callSiteWithArgs.withNameAndType("methodTwo", mtd2);
     if (!"methodTwo".equals(callSiteRenamed.invocationName()) || !mtd2.equals(callSiteRenamed.invocationType())) {
@@ -147,7 +139,6 @@ public class ConstantDescsAndDynamicDescModern {
       throw new AssertionError("withNameAndType failed to preserve bootstrapArgs");
     }
 
-    // equals and hash code
     DynamicCallSiteDesc duplicate = DynamicCallSiteDesc.of(
         bsm, "methodTwo", mtd2, ConstantDescs.TRUE, ConstantDescs.CD_String);
     if (!callSiteRenamed.equals(duplicate) || callSiteRenamed.hashCode() != duplicate.hashCode()) {

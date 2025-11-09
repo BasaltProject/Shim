@@ -99,7 +99,6 @@ public class SecretKeyFactory {
           this.spi = spi;
           return spi;
         } catch (NoSuchAlgorithmException e) {
-          // try the next provider
         }
       }
       serviceIterator = null;

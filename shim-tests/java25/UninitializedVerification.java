@@ -220,7 +220,6 @@ public class UninitializedVerification {
         map(0,1,255,0,12,0,1,8,0,0,0,1,7,0,14), new int[][] {{4,6,12,0}});
     constructorCode = new int[] {42,183,0,12,177,191};
     constructorMaps = map(0,1,255,0,5,0,0,0,1,7,0,14);
-    // The constructor's handler is supplied separately from the value method.
     constructorHandlers = new int[][] {{1,4,5,0}};
     bad("super-handler-cannot-erase-flag", 1, 0, new int[] {3,172}, null);
     constructorMaps = map(0,1,255,0,5,0,1,6,0,1,7,0,14);

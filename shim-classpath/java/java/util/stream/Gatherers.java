@@ -40,7 +40,8 @@ public final class Gatherers {
             return true;
           }
         });
-    BiConsumer<Object[], Gatherer.Downstream<? super R>> fin = new BiConsumer<Object[], Gatherer.Downstream<? super R>>() {
+    BiConsumer<Object[], Gatherer.Downstream<? super R>> fin = new BiConsumer<Object[],
+        Gatherer.Downstream<? super R>>() {
       @SuppressWarnings("unchecked")
       public void accept(Object[] state, Gatherer.Downstream<? super R> downstream) {
         downstream.push((R) state[0]);
@@ -172,7 +173,8 @@ public final class Gatherers {
         }
       }
     };
-    BiConsumer<Object[], Gatherer.Downstream<? super R>> fin = new BiConsumer<Object[], Gatherer.Downstream<? super R>>() {
+    BiConsumer<Object[], Gatherer.Downstream<? super R>> fin = new BiConsumer<Object[],
+        Gatherer.Downstream<? super R>>() {
       @SuppressWarnings("unchecked")
       public void accept(Object[] state, Gatherer.Downstream<? super R> downstream) {
         ArrayDeque<Future<R>> pending = (ArrayDeque<Future<R>>) state[1];

@@ -9,15 +9,20 @@
 package javax.management;
 
 public interface MBeanServer extends MBeanServerConnection {
-  ObjectInstance createMBean(String p0, ObjectName p1) throws ReflectionException, InstanceAlreadyExistsException, MBeanRegistrationException, MBeanException, NotCompliantMBeanException;
+  ObjectInstance createMBean(String p0, ObjectName p1) throws ReflectionException, InstanceAlreadyExistsException,
+      MBeanRegistrationException, MBeanException, NotCompliantMBeanException;
 
-  ObjectInstance createMBean(String p0, ObjectName p1, ObjectName p2) throws ReflectionException, InstanceAlreadyExistsException, MBeanRegistrationException, MBeanException, NotCompliantMBeanException, InstanceNotFoundException;
+  ObjectInstance createMBean(String p0, ObjectName p1, ObjectName p2) throws ReflectionException,
+      InstanceAlreadyExistsException, MBeanRegistrationException, MBeanException, NotCompliantMBeanException, InstanceNotFoundException;
 
-  ObjectInstance createMBean(String p0, ObjectName p1, Object[] p2, String[] p3) throws ReflectionException, InstanceAlreadyExistsException, MBeanRegistrationException, MBeanException, NotCompliantMBeanException;
+  ObjectInstance createMBean(String p0, ObjectName p1, Object[] p2, String[] p3) throws ReflectionException,
+      InstanceAlreadyExistsException, MBeanRegistrationException, MBeanException, NotCompliantMBeanException;
 
-  ObjectInstance createMBean(String p0, ObjectName p1, ObjectName p2, Object[] p3, String[] p4) throws ReflectionException, InstanceAlreadyExistsException, MBeanRegistrationException, MBeanException, NotCompliantMBeanException, InstanceNotFoundException;
+  ObjectInstance createMBean(String p0, ObjectName p1, ObjectName p2, Object[] p3, String[] p4)
+      throws ReflectionException, InstanceAlreadyExistsException, MBeanRegistrationException, MBeanException, NotCompliantMBeanException, InstanceNotFoundException;
 
-  ObjectInstance registerMBean(Object p0, ObjectName p1) throws InstanceAlreadyExistsException, MBeanRegistrationException, NotCompliantMBeanException;
+  ObjectInstance registerMBean(Object p0, ObjectName p1) throws InstanceAlreadyExistsException,
+      MBeanRegistrationException, NotCompliantMBeanException;
 
   void unregisterMBean(ObjectName p0) throws InstanceNotFoundException, MBeanRegistrationException;
 
@@ -31,31 +36,40 @@ public interface MBeanServer extends MBeanServerConnection {
 
   Integer getMBeanCount();
 
-  Object getAttribute(ObjectName p0, String p1) throws MBeanException, AttributeNotFoundException, InstanceNotFoundException, ReflectionException;
+  Object getAttribute(ObjectName p0, String p1) throws MBeanException, AttributeNotFoundException,
+      InstanceNotFoundException, ReflectionException;
 
   AttributeList getAttributes(ObjectName p0, String[] p1) throws InstanceNotFoundException, ReflectionException;
 
-  void setAttribute(ObjectName p0, Attribute p1) throws InstanceNotFoundException, AttributeNotFoundException, InvalidAttributeValueException, MBeanException, ReflectionException;
+  void setAttribute(ObjectName p0, Attribute p1) throws InstanceNotFoundException, AttributeNotFoundException,
+      InvalidAttributeValueException, MBeanException, ReflectionException;
 
   AttributeList setAttributes(ObjectName p0, AttributeList p1) throws InstanceNotFoundException, ReflectionException;
 
-  Object invoke(ObjectName p0, String p1, Object[] p2, String[] p3) throws InstanceNotFoundException, MBeanException, ReflectionException;
+  Object invoke(ObjectName p0, String p1, Object[] p2, String[] p3) throws InstanceNotFoundException, MBeanException,
+      ReflectionException;
 
   String getDefaultDomain();
 
   String[] getDomains();
 
-  void addNotificationListener(ObjectName p0, NotificationListener p1, NotificationFilter p2, Object p3) throws InstanceNotFoundException;
+  void addNotificationListener(ObjectName p0, NotificationListener p1, NotificationFilter p2, Object p3)
+      throws InstanceNotFoundException;
 
-  void addNotificationListener(ObjectName p0, ObjectName p1, NotificationFilter p2, Object p3) throws InstanceNotFoundException;
+  void addNotificationListener(ObjectName p0, ObjectName p1, NotificationFilter p2, Object p3)
+      throws InstanceNotFoundException;
 
-  void removeNotificationListener(ObjectName p0, ObjectName p1) throws InstanceNotFoundException, ListenerNotFoundException;
+  void removeNotificationListener(ObjectName p0, ObjectName p1) throws InstanceNotFoundException,
+      ListenerNotFoundException;
 
-  void removeNotificationListener(ObjectName p0, ObjectName p1, NotificationFilter p2, Object p3) throws InstanceNotFoundException, ListenerNotFoundException;
+  void removeNotificationListener(ObjectName p0, ObjectName p1, NotificationFilter p2, Object p3)
+      throws InstanceNotFoundException, ListenerNotFoundException;
 
-  void removeNotificationListener(ObjectName p0, NotificationListener p1) throws InstanceNotFoundException, ListenerNotFoundException;
+  void removeNotificationListener(ObjectName p0, NotificationListener p1) throws InstanceNotFoundException,
+      ListenerNotFoundException;
 
-  void removeNotificationListener(ObjectName p0, NotificationListener p1, NotificationFilter p2, Object p3) throws InstanceNotFoundException, ListenerNotFoundException;
+  void removeNotificationListener(ObjectName p0, NotificationListener p1, NotificationFilter p2, Object p3)
+      throws InstanceNotFoundException, ListenerNotFoundException;
 
   MBeanInfo getMBeanInfo(ObjectName p0) throws InstanceNotFoundException, IntrospectionException, ReflectionException;
 
@@ -67,9 +81,11 @@ public interface MBeanServer extends MBeanServerConnection {
 
   Object instantiate(String p0, Object[] p1, String[] p2) throws ReflectionException, MBeanException;
 
-  Object instantiate(String p0, ObjectName p1, Object[] p2, String[] p3) throws ReflectionException, MBeanException, InstanceNotFoundException;
+  Object instantiate(String p0, ObjectName p1, Object[] p2, String[] p3) throws ReflectionException, MBeanException,
+      InstanceNotFoundException;
 
-  default java.io.ObjectInputStream deserialize(ObjectName p0, byte[] p1) throws InstanceNotFoundException, OperationsException {
+  default java.io.ObjectInputStream deserialize(ObjectName p0, byte[] p1) throws InstanceNotFoundException,
+      OperationsException {
     throw new UnsupportedOperationException();
   }
 
@@ -77,7 +93,8 @@ public interface MBeanServer extends MBeanServerConnection {
     throw new UnsupportedOperationException();
   }
 
-  default java.io.ObjectInputStream deserialize(String p0, ObjectName p1, byte[] p2) throws InstanceNotFoundException, OperationsException, ReflectionException {
+  default java.io.ObjectInputStream deserialize(String p0, ObjectName p1, byte[] p2)
+      throws InstanceNotFoundException, OperationsException, ReflectionException {
     throw new UnsupportedOperationException();
   }
 

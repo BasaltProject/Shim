@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 21
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -101,7 +100,6 @@ public class ChecksumsAndCheckedStreamsModern {
       byte[] readBuf = new byte[16];
       int n;
       while ((n = cis.read(readBuf)) != -1) {
-        // read until EOF
       }
       assertEquals(outCrc.getValue(), cis.getChecksum().getValue());
     }

@@ -335,7 +335,8 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
     return StreamSupport.stream(spliterator, false).onClose(this::close);
   }
 
-  default <R> Stream<R> mapMulti(java.util.function.BiConsumer<? super T, ? super java.util.function.Consumer<R>> mapper) {
+  default <R> Stream<R> mapMulti(java.util.function.BiConsumer<? super T,
+      ? super java.util.function.Consumer<R>> mapper) {
     java.util.Objects.requireNonNull(mapper);
     return flatMap(e -> {
       Stream.Builder<R> buffer = Stream.builder();
@@ -344,7 +345,8 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
     });
   }
 
-  default IntStream mapMultiToInt(java.util.function.BiConsumer<? super T, ? super java.util.function.IntConsumer> mapper) {
+  default IntStream mapMultiToInt(java.util.function.BiConsumer<? super T,
+      ? super java.util.function.IntConsumer> mapper) {
     java.util.Objects.requireNonNull(mapper);
     return flatMapToInt(e -> {
       IntStream.Builder buffer = IntStream.builder();
@@ -353,7 +355,8 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
     });
   }
 
-  default LongStream mapMultiToLong(java.util.function.BiConsumer<? super T, ? super java.util.function.LongConsumer> mapper) {
+  default LongStream mapMultiToLong(java.util.function.BiConsumer<? super T,
+      ? super java.util.function.LongConsumer> mapper) {
     java.util.Objects.requireNonNull(mapper);
     return flatMapToLong(e -> {
       LongStream.Builder buffer = LongStream.builder();
@@ -362,7 +365,8 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
     });
   }
 
-  default DoubleStream mapMultiToDouble(java.util.function.BiConsumer<? super T, ? super java.util.function.DoubleConsumer> mapper) {
+  default DoubleStream mapMultiToDouble(java.util.function.BiConsumer<? super T,
+      ? super java.util.function.DoubleConsumer> mapper) {
     java.util.Objects.requireNonNull(mapper);
     return flatMapToDouble(e -> {
       DoubleStream.Builder buffer = DoubleStream.builder();

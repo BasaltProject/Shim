@@ -129,7 +129,8 @@ public final class XmlInput {
   }
 
   static Reader decode(InputStream raw, String forced) throws IOException, XmlException {
-    BufferedInputStream in = raw instanceof BufferedInputStream ? (BufferedInputStream) raw : new BufferedInputStream(raw);
+    BufferedInputStream in = raw instanceof BufferedInputStream ? (BufferedInputStream) raw
+        : new BufferedInputStream(raw);
     in.mark(256);
     byte[] head = new byte[4];
     int n = 0;
@@ -246,14 +247,16 @@ public final class XmlInput {
       return null;
     }
     int i = at + 8;
-    while (i < decl.length() && (decl.charAt(i) == ' ' || decl.charAt(i) == '\t' || decl.charAt(i) == '\n' || decl.charAt(i) == '\r')) {
+    while (i < decl.length() && (decl.charAt(i) == ' ' || decl.charAt(i) == '\t' || decl.charAt(i) == '\n'
+        || decl.charAt(i) == '\r')) {
       i++;
     }
     if (i >= decl.length() || decl.charAt(i) != '=') {
       return null;
     }
     i++;
-    while (i < decl.length() && (decl.charAt(i) == ' ' || decl.charAt(i) == '\t' || decl.charAt(i) == '\n' || decl.charAt(i) == '\r')) {
+    while (i < decl.length() && (decl.charAt(i) == ' ' || decl.charAt(i) == '\t' || decl.charAt(i) == '\n'
+        || decl.charAt(i) == '\r')) {
       i++;
     }
     if (i >= decl.length() || (decl.charAt(i) != '"' && decl.charAt(i) != '\'')) {

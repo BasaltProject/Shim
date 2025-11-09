@@ -27,7 +27,8 @@ final class DomNames {
     if (colon < 0) {
       return new String[] {null, qualifiedName};
     }
-    return new String[] {qualifiedName.substring(0, colon), qualifiedName.substring(qualifiedName.lastIndexOf(':') + 1)};
+    return new String[] {qualifiedName.substring(0, colon), qualifiedName.substring(qualifiedName.lastIndexOf(':')
+        + 1)};
   }
 
   static String normalizeNamespace(String uri) {

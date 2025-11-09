@@ -49,7 +49,8 @@ public interface Gatherer<T, A, R> {
   }
 
   static <T, R> Gatherer<T, Void, R> of(Integrator<Void, T, R> integrator) {
-    return new GatherImpl<T, Void, R>(null, Objects.requireNonNull(integrator), GatherImpl.<Void>failingCombiner(), null);
+    return new GatherImpl<T, Void, R>(null, Objects.requireNonNull(integrator), GatherImpl.<Void>failingCombiner(),
+        null);
   }
 
   static <T, R> Gatherer<T, Void, R> of(

@@ -69,7 +69,8 @@ public final class XDH {
   static final Curve kX25519 = new Curve("X25519", "1.3.101.110",
       BigInteger.ONE.shiftLeft(255).subtract(BigInteger.valueOf(19)), 121665, 255, 32, 9);
   static final Curve kX448 = new Curve("X448", "1.3.101.111",
-      BigInteger.ONE.shiftLeft(448).subtract(BigInteger.ONE.shiftLeft(224)).subtract(BigInteger.ONE), 39081, 448, 56, 5);
+      BigInteger.ONE.shiftLeft(448).subtract(BigInteger.ONE.shiftLeft(224)).subtract(BigInteger.ONE), 39081, 448, 56,
+          5);
 
   static Curve curveOf(AlgorithmParameterSpec spec) throws InvalidAlgorithmParameterException {
     if (spec instanceof NamedParameterSpec) {
@@ -299,7 +300,8 @@ public final class XDH {
     }
 
     @Override
-    public void initialize(AlgorithmParameterSpec params, SecureRandom random) throws InvalidAlgorithmParameterException {
+    public void initialize(AlgorithmParameterSpec params, SecureRandom random)
+        throws InvalidAlgorithmParameterException {
       Curve c = curveOf(params);
       if (fixed && c != curve) {
         throw new InvalidAlgorithmParameterException("Parameters must be " + curve.name);

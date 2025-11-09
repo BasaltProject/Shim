@@ -31,7 +31,8 @@ public final class X509CertPath extends CertPath {
   private static final String kCertType = "X.509";
   private static final String kPkiPath = "PkiPath";
   private static final String kPkcs7 = "PKCS7";
-  private static final List<String> kEncodingList = Collections.unmodifiableList(java.util.Arrays.asList(kPkiPath, kPkcs7));
+  private static final List<String> kEncodingList = Collections.unmodifiableList(java.util.Arrays.asList(kPkiPath,
+      kPkcs7));
 
   private final List<X509Certificate> certs;
 

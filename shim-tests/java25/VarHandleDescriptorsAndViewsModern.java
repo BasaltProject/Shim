@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 21
 
 import java.lang.constant.ClassDesc;
 import java.lang.invoke.MethodHandle;

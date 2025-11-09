@@ -138,7 +138,6 @@ public class ArrayTypeVerification {
   }
 
   public static void main(String[] args) throws Exception {
-    // newarray type, load, store, constant-one, optional conversion to int.
     int[][] types = {{4,51,84,4,0},{8,51,84,4,0},{5,52,85,4,0},{9,53,86,4,0},
         {10,46,79,4,0},{11,47,80,10,136},{6,48,81,12,139},{7,49,82,15,142}};
     for (int i = 0; i < types.length; ++i) {

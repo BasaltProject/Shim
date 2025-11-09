@@ -29,7 +29,6 @@ public class JceEcModern {
     p("alg params der bad", () -> { AlgorithmParameters ap = AlgorithmParameters.getInstance("EC"); ap.init(HexFormat.of().parseHex("06052b81040099")); return ap.toString(); });
     p("alg params bad spec", () -> { AlgorithmParameters ap = AlgorithmParameters.getInstance("EC"); ap.init(new IvParameterSpec(new byte[8])); return ap.toString(); });
     p("alg params unknown name", () -> { AlgorithmParameters ap = AlgorithmParameters.getInstance("EC"); ap.init(new ECGenParameterSpec("nope")); return ap.toString(); });
-    // fixed key material from JDK
     KeyFactory kf = KeyFactory.getInstance("EC");
     PrivateKey priv = kf.generatePrivate(new PKCS8EncodedKeySpec(HexFormat.of().parseHex("3041020100301306072a8648ce3d020106082a8648ce3d030107042730250201010420c30bcff4ed5a4461ad0933c6d124aac9f7417a3db5c46af99a4b65c21e83c1e7")));
     PublicKey pub = kf.generatePublic(new X509EncodedKeySpec(HexFormat.of().parseHex("3059301306072a8648ce3d020106082a8648ce3d03010703420004b58dd3904a24e8f83168060956a976263afc05991e338ccf474a4e516396945cd8e1ed9edf43c626fe3f75c93f746a734dd9969ae93ae8fbca53a580838fea04")));
@@ -73,7 +72,6 @@ public class JceEcModern {
     p("sign alias", () -> Signature.getInstance("1.2.840.10045.4.3.2").getAlgorithm());
     p("sign alias2", () -> Signature.getInstance("SHA256WithECDSA").getAlgorithm());
     p("sign alias3", () -> Signature.getInstance("ECDSA").getAlgorithm());
-    // ECDH
     p("ecdh", () -> { KeyPairGenerator k = KeyPairGenerator.getInstance("EC"); k.initialize(256); KeyPair other = k.generateKeyPair(); KeyAgreement a1 = KeyAgreement.getInstance("ECDH"); a1.init(priv); a1.doPhase(other.getPublic(), true); byte[] s1 = a1.generateSecret(); KeyAgreement a2 = KeyAgreement.getInstance("ECDH"); a2.init(other.getPrivate()); a2.doPhase(pub, true); byte[] s2 = a2.generateSecret(); return s1.length + " " + Arrays.equals(s1, s2) + " " + a1.getProvider().getName() + " " + a1.getAlgorithm(); });
     p("ecdh jdk fixed", () -> { KeyAgreement a1 = KeyAgreement.getInstance("ECDH"); a1.init(priv); a1.doPhase(pub, true); return hx(a1.generateSecret()); });
     p("ecdh genSecret alg", () -> { KeyAgreement a1 = KeyAgreement.getInstance("ECDH"); a1.init(priv); a1.doPhase(pub, true); SecretKey s = a1.generateSecret("AES"); return s.getAlgorithm() + " " + s.getEncoded().length; });

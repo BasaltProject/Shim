@@ -112,7 +112,8 @@ public abstract class AuthenticationInfo implements Cloneable {
     }
     for (Iterator<AuthenticationInfo> it = list.iterator(); it.hasNext();) {
       AuthenticationInfo old = it.next();
-      if (Objects.equals(old.path, info.path) && old.realm.equals(info.realm) && old.authScheme.equals(info.authScheme)) {
+      if (Objects.equals(old.path, info.path) && old.realm.equals(info.realm)
+          && old.authScheme.equals(info.authScheme)) {
         it.remove();
       }
     }

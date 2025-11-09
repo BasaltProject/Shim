@@ -206,7 +206,6 @@ static class G4 {
     gcs[3] = new GregorianCalendar(TimeZone.getTimeZone("GMT-14:00"), Locale.US); gcs[3].clear(); gcs[3].set(1900, 0, 1, 0, 0, 0);
     for (GregorianCalendar g : gcs) { try { XMLGregorianCalendar c = f.newXMLGregorianCalendar(g); System.out.println("from gc: " + c + " tz=" + c.getTimezone() + " fs=" + c.getFractionalSecond() + " type=" + c.getXMLSchemaType().getLocalPart()); } catch (Throwable t) { System.out.println("from gc" + fail(t)); } }
     try { f.newXMLGregorianCalendar((GregorianCalendar) null); } catch (Throwable t) { System.out.println("gc null " + t.getClass().getName()); }
-    // duration calendar ops
     GregorianCalendar base = new GregorianCalendar(TimeZone.getTimeZone("UTC"), Locale.US); base.clear(); base.set(2004, 0, 31, 10, 0, 0);
     String[] durs = {"P1Y", "P1M", "P1D", "PT1H", "-P1M", "P1Y2M3DT4H5M6.789S", "-P1Y2M3DT4H5M6.789S", "PT0.5S", "-PT0.5S", "PT0S", "P1M1D", "P12M", "P365D", "P366D"};
     for (String d : durs) {
@@ -228,10 +227,8 @@ static class G4 {
     try { f.newXMLGregorianCalendar("2004-01-01").compare(null); } catch (Throwable t) { System.out.println("xgc compare null " + t.getClass().getName()); }
     try { f.newXMLGregorianCalendar("2004-01-01").add(null); } catch (Throwable t) { System.out.println("xgc add null " + t.getClass().getName()); }
     try { System.out.println("xgc equals " + f.newXMLGregorianCalendar("2004-01-01").equals(null) + " " + f.newXMLGregorianCalendar("2004-01-01").equals("x")); } catch (Throwable t) { System.out.println("xgc equals " + fail(t)); }
-    // mul
     for (String d : new String[]{"P1Y2M3DT4H5M6.789S", "P1M", "P1D", "PT1S", "P1Y", "-P1D", "PT0S", "P1DT1S"}) for (String m : new String[]{"0", "1", "2", "0.5", "-1", "-0.5", "1.5", "0.25", "10", "0.000001", "3.3"}) { try { System.out.println("mul " + d + " x " + m + " = " + f.newDuration(d).multiply(new BigDecimal(m))); } catch (Throwable t) { System.out.println("mul " + d + " x " + m + fail(t)); } }
     for (int m : new int[]{0, 1, -1, 3}) System.out.println("mulint " + f.newDuration("P1Y2M3DT4H5M6S").multiply(m));
-    // eon / big
     XMLGregorianCalendar big = f.newXMLGregorianCalendar("99999999999-12-31T23:59:59Z"); big.add(f.newDuration("PT1S")); System.out.println("big add " + big + " eon=" + big.getEon());
     big = f.newXMLGregorianCalendar("-99999999999-01-01T00:00:00Z"); big.add(f.newDuration("-PT1S")); System.out.println("big sub " + big);
     System.out.println("clone " + big.clone().equals(big) + " " + (big.clone() != big));

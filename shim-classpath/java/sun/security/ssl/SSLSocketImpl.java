@@ -167,7 +167,6 @@ final class SSLSocketImpl extends SSLSocket {
         raw.close();
       }
     } catch (IOException ignored) {
-      // best effort
     }
   }
 

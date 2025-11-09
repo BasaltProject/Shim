@@ -74,7 +74,6 @@ public class AnnotationInvocationHandler implements InvocationHandler {
         try {
           value = convert(type().getDeclaredMethod(name).getReturnType(), value);
         } catch (NoSuchMethodException e) {
-          // keep raw value
         }
         map.put(name, value);
       }

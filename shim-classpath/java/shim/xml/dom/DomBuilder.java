@@ -279,7 +279,8 @@ public final class DomBuilder extends DefaultHandler2 implements DeclHandler {
     if (name.startsWith("%")) {
       return;
     }
-    if (entityRefDepth > 0 && !entityRefs.isEmpty() && entityRefs.get(entityRefs.size() - 1).getNodeName().equals(name)) {
+    if (entityRefDepth > 0 && !entityRefs.isEmpty()
+        && entityRefs.get(entityRefs.size() - 1).getNodeName().equals(name)) {
       EntityReferenceImpl ref = entityRefs.remove(entityRefs.size() - 1);
       entityRefDepth--;
       ref.setReadOnlyRecursive(true);

@@ -19,7 +19,8 @@ public final class US_ASCII extends Charset implements HistoricallyNamedCharset 
   public static final US_ASCII INSTANCE = new US_ASCII();
 
   private US_ASCII() {
-    super("US-ASCII", new String[] {"iso-ir-6", "ANSI_X3.4-1986", "ISO_646.irv:1991", "ASCII", "ISO646-US", "us", "IBM367",
+    super("US-ASCII", new String[] {"iso-ir-6", "ANSI_X3.4-1986", "ISO_646.irv:1991", "ASCII", "ISO646-US", "us",
+        "IBM367",
         "cp367", "csASCII", "646", "iso_646.irv:1983", "ANSI_X3.4-1968", "ascii7"});
   }
 

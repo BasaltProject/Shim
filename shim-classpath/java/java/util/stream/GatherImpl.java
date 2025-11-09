@@ -81,7 +81,8 @@ final class GatherImpl<T, A, R> implements Gatherer<T, A, R> {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  static <T, R, RR> Gatherer<T, ?, RR> compose(final Gatherer<T, ?, R> first, final Gatherer<? super R, ?, ? extends RR> second) {
+  static <T, R, RR> Gatherer<T, ?, RR> compose(final Gatherer<T, ?, R> first, final Gatherer<? super R, ?,
+      ? extends RR> second) {
     final Gatherer<T, Object, R> g1 = (Gatherer) first;
     final Gatherer<R, Object, RR> g2 = (Gatherer) second;
     Supplier<Object[]> init = new Supplier<Object[]>() {
@@ -112,7 +113,8 @@ final class GatherImpl<T, A, R> implements Gatherer<T, A, R> {
         return new Object[] {g1.combiner().apply(a[0], b[0]), g2.combiner().apply(a[1], b[1])};
       }
     };
-    BiConsumer<Object[], Gatherer.Downstream<? super RR>> fin = new BiConsumer<Object[], Gatherer.Downstream<? super RR>>() {
+    BiConsumer<Object[], Gatherer.Downstream<? super RR>> fin = new BiConsumer<Object[],
+        Gatherer.Downstream<? super RR>>() {
       public void accept(final Object[] state, final Gatherer.Downstream<? super RR> downstream) {
         g1.finisher().accept(state[0], new Gatherer.Downstream<R>() {
           public boolean push(R r) {

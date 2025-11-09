@@ -214,7 +214,8 @@ final class XPathFunctions {
       String u = n.getNamespaceURI();
       return u == null ? "" : u;
     }
-    if (t != Node.ELEMENT_NODE && t != Node.ATTRIBUTE_NODE && (t != Node.PROCESSING_INSTRUCTION_NODE || fn.equals("name"))) {
+    if (t != Node.ELEMENT_NODE && t != Node.ATTRIBUTE_NODE && (t != Node.PROCESSING_INSTRUCTION_NODE
+        || fn.equals("name"))) {
       return "";
     }
     if (fn.equals("name")) {

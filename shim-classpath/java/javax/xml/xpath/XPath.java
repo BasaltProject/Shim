@@ -45,7 +45,8 @@ public interface XPath {
     throw new UnsupportedOperationException();
   }
 
-  default XPathEvaluationResult<?> evaluateExpression(String p0, org.xml.sax.InputSource p1) throws XPathExpressionException {
+  default XPathEvaluationResult<?> evaluateExpression(String p0, org.xml.sax.InputSource p1)
+      throws XPathExpressionException {
     throw new UnsupportedOperationException();
   }
 }

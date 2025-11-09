@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 17
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;

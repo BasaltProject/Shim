@@ -8,7 +8,8 @@
 
 package javax.xml.transform.sax;
 
-public interface TransformerHandler extends org.xml.sax.ContentHandler, org.xml.sax.ext.LexicalHandler, org.xml.sax.DTDHandler {
+public interface TransformerHandler extends org.xml.sax.ContentHandler, org.xml.sax.ext.LexicalHandler,
+    org.xml.sax.DTDHandler {
   void setResult(javax.xml.transform.Result p0) throws IllegalArgumentException;
 
   void setSystemId(String p0);

@@ -97,7 +97,6 @@ static class S2 {
     try { System.out.println("hasNext " + r.hasNext()); } catch (Throwable x) { System.out.println("hasNext " + fail(x)); }
     try { r.close(); r.close(); System.out.println("closed twice"); } catch (Throwable x) { System.out.println("close " + fail(x)); }
     try { System.out.println("after close type " + r.getEventType()); } catch (Throwable x) { System.out.println("after close type " + fail(x)); }
-    // getElementText / nextTag / require
     String[] docs = {"<a>text</a>", "<a>t<!--c-->u<?pi?>v</a>", "<a><b/></a>", "<a>x<b/>y</a>", "<a>&amp;t<![CDATA[c]]></a>", "<a></a>", "<a/>", "<a> <b/> </a>", "<a>t<b/></a>", "<a><!--c--><b/></a>", "<?pi?><a/>", "<a/><!--c-->"};
     for (String doc : docs) {
       XMLStreamReader x = XMLInputFactory.newInstance().createXMLStreamReader(new StringReader(doc));
@@ -113,7 +112,6 @@ static class S2 {
       try { x.require(XMLStreamConstants.END_ELEMENT, null, null); } catch (Throwable e) { System.out.println("   require2 " + fail(e)); }
       try { x.require(XMLStreamConstants.START_ELEMENT, null, "zz"); } catch (Throwable e) { System.out.println("   require3 " + fail(e)); }
     }
-    // factory behaviors
     XMLInputFactory ff = XMLInputFactory.newInstance();
     String[] props = {XMLInputFactory.IS_NAMESPACE_AWARE, XMLInputFactory.IS_VALIDATING, XMLInputFactory.IS_COALESCING, XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, XMLInputFactory.SUPPORT_DTD, XMLInputFactory.REPORTER, XMLInputFactory.RESOLVER, XMLInputFactory.ALLOCATOR, "http://java.sun.com/xml/stream/properties/report-cdata-event", "http://java.sun.com/xml/stream/properties/implementation-name", "http://java.sun.com/xml/stream/properties/ignore-external-dtd", "javax.xml.stream.isSupportingExternalEntities", "jdk.xml.entityExpansionLimit", "http://javax.xml.XMLConstants/property/accessExternalDTD", "http://www.oracle.com/xml/jaxp/properties/isStandalone", "nope", "http://java.sun.com/xml/stream/properties/reuse-instance", "http://java.sun.com/xml/stream/properties/report-cdata-event"};
     for (String p : props) { String res; try { res = "supported=" + ff.isPropertySupported(p) + " value=" + q(ff.getProperty(p)); } catch (Throwable x) { res = fail(x); } System.out.println("prop " + p + " " + res); }
@@ -125,7 +123,6 @@ static class S2 {
     try { ff.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, null); System.out.println("nsaware null " + ff.getProperty(XMLInputFactory.IS_NAMESPACE_AWARE)); } catch (Throwable x) { System.out.println("set nsaware null " + fail(x)); }
     try { ff.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, "false"); System.out.println("nsaware 'false' " + ff.getProperty(XMLInputFactory.IS_NAMESPACE_AWARE)); } catch (Throwable x) { System.out.println("set nsaware str " + fail(x)); }
     System.out.println("reporter/resolver/allocator " + ff.getXMLReporter() + " " + ff.getXMLResolver() + " " + ff.getEventAllocator());
-    // creation variants
     try { XMLInputFactory.newInstance().createXMLStreamReader((Reader) null); } catch (Throwable x) { System.out.println("create null reader " + fail(x)); }
     try { XMLInputFactory.newInstance().createXMLStreamReader((InputStream) null); } catch (Throwable x) { System.out.println("create null stream " + fail(x)); }
     try { XMLInputFactory.newInstance().createXMLStreamReader(new ByteArrayInputStream("<a/>".getBytes()), "nope-enc"); } catch (Throwable x) { System.out.println("create bad enc " + fail(x)); }
@@ -137,7 +134,6 @@ static class S2 {
     byte[][] bytes = { "<a/>".getBytes("UTF-8"), "<?xml version='1.0' encoding='ISO-8859-1'?><a>é</a>".getBytes("ISO-8859-1"), "<?xml version='1.0' encoding='UTF-16'?><a>x</a>".getBytes("UTF-16"), "﻿<a>x</a>".getBytes("UTF-8"), "<a>é中</a>".getBytes("UTF-8")};
     for (byte[] b : bytes) { try { XMLStreamReader sr = XMLInputFactory.newInstance().createXMLStreamReader(new ByteArrayInputStream(b)); StringBuilder sb = new StringBuilder("bytes: enc=" + q(sr.getEncoding()) + " cse=" + q(sr.getCharacterEncodingScheme()) + " "); while (sr.hasNext()) { int tt = sr.next(); sb.append(S1.name(tt)); if (tt == 4) sb.append("(" + q(sr.getText()) + ")"); sb.append(' '); } System.out.println(sb); } catch (Throwable x) { System.out.println("bytes " + fail(x)); } }
     try { XMLStreamReader sr = XMLInputFactory.newInstance().createXMLStreamReader(new ByteArrayInputStream("<a>é</a>".getBytes("UTF-8")), "UTF-8"); System.out.println("with enc: " + q(sr.getEncoding()) + " " + q(sr.getCharacterEncodingScheme())); } catch (Throwable x) { System.out.println("with enc " + fail(x)); }
-    // filtered
     XMLStreamReader fr = XMLInputFactory.newInstance().createFilteredReader(XMLInputFactory.newInstance().createXMLStreamReader(new StringReader("<a><b/>t<!--c--></a>")), new StreamFilter() { public boolean accept(XMLStreamReader rr) { return rr.isStartElement() || rr.isEndElement(); } });
     StringBuilder sb = new StringBuilder("filtered: " + S1.name(fr.getEventType()) + " "); while (fr.hasNext()) { sb.append(S1.name(fr.next())).append(' '); } System.out.println(sb);
   } }
@@ -177,7 +173,6 @@ static class S3 {
         try { System.out.println("peek " + r.peek()); } catch (Throwable t) { System.out.println("peek " + fail(t)); }
       }
     }
-    // peek / nextTag / getElementText / property
     XMLEventReader r = XMLInputFactory.newInstance().createXMLEventReader(new StringReader("<a><b>t</b> <c/></a>"));
     System.out.println("peek0 " + S1.name(r.peek().getEventType()) + " " + S1.name(r.peek().getEventType()) + " next=" + S1.name(r.nextEvent().getEventType()));
     System.out.println("nextTag " + r.nextTag() + " peek=" + S1.name(r.peek().getEventType()));
@@ -194,14 +189,11 @@ static class S3 {
     r2.nextEvent(); r2.nextEvent();
     try { r2.getElementText(); } catch (Throwable t) { System.out.println("elementText at chars " + fail(t)); }
     XMLEventReader r3 = XMLInputFactory.newInstance().createXMLEventReader(new StringReader("<a>t<b/></a>")); r3.nextEvent(); r3.nextEvent();
-    // from stream reader
     XMLStreamReader sr = XMLInputFactory.newInstance().createXMLStreamReader(new StringReader("<a x='1'>t</a>")); sr.next();
     XMLEventReader er = XMLInputFactory.newInstance().createXMLEventReader(sr);
     try { while (er.hasNext()) show(er.nextEvent()); } catch (Throwable t) { System.out.println("from stream " + fail(t)); }
-    // filtered
     XMLEventReader fr = XMLInputFactory.newInstance().createFilteredReader(XMLInputFactory.newInstance().createXMLEventReader(new StringReader("<a><b/>t</a>")), new EventFilter() { public boolean accept(XMLEvent e) { return e.isStartElement(); } });
     StringBuilder sb = new StringBuilder("filtered ev: "); while (fr.hasNext()) sb.append(S1.name(fr.nextEvent().getEventType())).append(' '); System.out.println(sb);
-    // malformed
     for (String bad : new String[]{"<a>", "<a></b>", "", "<a x=1/>"}) { XMLEventReader br = XMLInputFactory.newInstance().createXMLEventReader(new StringReader(bad)); StringBuilder s2 = new StringBuilder("bad " + q(bad) + ": "); try { while (br.hasNext()) s2.append(S1.name(br.nextEvent().getEventType())).append(' '); } catch (Throwable t) { s2.append(fail(t)); } System.out.println(s2); }
   } }
 
@@ -240,7 +232,6 @@ static class S4 {
     XMLEventFactory f = XMLEventFactory.newInstance(); f.setLocation(new Location() { public int getLineNumber() { return 7; } public int getColumnNumber() { return 8; } public int getCharacterOffset() { return 9; } public String getPublicId() { return "pub"; } public String getSystemId() { return "sys"; } });
     XMLEvent e = f.createComment("x"); System.out.println("with location: " + e.getLocation().getLineNumber() + ":" + e.getLocation().getColumnNumber() + "/" + e.getLocation().getCharacterOffset() + " " + e.getLocation().getSystemId());
     e = f.createStartElement("p", "u", "a"); System.out.println("with location2: " + e.getLocation().getLineNumber());
-    // event writer
     StringWriter sw = new StringWriter(); XMLEventWriter ew = XMLOutputFactory.newInstance().createXMLEventWriter(sw);
     XMLEventFactory ef = XMLEventFactory.newInstance();
     try { ew.add(ef.createStartDocument()); ew.add(ef.createStartElement("p", "u", "a")); ew.add(ef.createNamespace("p", "u")); ew.add(ef.createAttribute("x", "<1>")); ew.add(ef.createCharacters("t&")); ew.add(ef.createCData("cd")); ew.add(ef.createComment("c")); ew.add(ef.createProcessingInstruction("t", "d")); ew.add(ef.createEntityReference("e", null)); ew.add(ef.createSpace(" ")); ew.add(ef.createEndElement("p", "u", "a")); ew.add(ef.createEndDocument()); ew.flush(); } catch (Throwable t) { System.out.println("ew " + fail(t)); }
@@ -330,7 +321,6 @@ static class S5 {
     t("getProperty", w -> { System.out.print(w.getProperty("javax.xml.stream.isRepairingNamespaces") + "|"); });
     t("getProperty x", w -> { w.getProperty("x"); });
     t("getProperty null", w -> { w.getProperty(null); });
-    // repairing
     t("R simple", true, w -> { w.writeStartElement("a"); w.writeCharacters("t"); w.writeEndElement(); });
     t("R ns elem", true, w -> { w.writeStartElement("p", "a", "u"); w.writeEndElement(); });
     t("R ns elem noprefix", true, w -> { w.writeStartElement("", "a", "u"); w.writeEndElement(); });
@@ -341,14 +331,12 @@ static class S5 {
     t("R nested diff", true, w -> { w.writeStartElement("p", "a", "u"); w.writeStartElement("p", "b", "v"); w.writeEndElement(); w.writeEndElement(); });
     t("R prefix set", true, w -> { w.setPrefix("q", "u"); w.writeStartElement("u", "a"); w.writeEndElement(); });
     t("R two attrs", true, w -> { w.writeStartElement("a"); w.writeAttribute("p", "u", "x", "1"); w.writeAttribute("q", "u", "y", "2"); w.writeEndElement(); });
-    // factory
     XMLOutputFactory f = XMLOutputFactory.newInstance();
     for (String p : new String[]{XMLOutputFactory.IS_REPAIRING_NAMESPACES, "javax.xml.stream.isPrefixDefaulting", "escapeCharacters", "http://java.sun.com/xml/stream/properties/outputstream-encoding", "http://java.sun.com/xml/stream/properties/writestartdocument-always", "nope"}) { try { System.out.println("prop " + p + " " + f.isPropertySupported(p) + " " + f.getProperty(p)); } catch (Throwable x) { System.out.println("prop " + p + fail(x)); } }
     try { f.setProperty("nope", true); } catch (Throwable x) { System.out.println("set nope " + fail(x)); }
     try { f.setProperty(null, true); } catch (Throwable x) { System.out.println("set null " + fail(x)); }
     try { f.getProperty(null); } catch (Throwable x) { System.out.println("get null " + fail(x)); }
     try { f.setProperty(XMLOutputFactory.IS_REPAIRING_NAMESPACES, null); System.out.println("repair null " + f.getProperty(XMLOutputFactory.IS_REPAIRING_NAMESPACES)); } catch (Throwable x) { System.out.println("repair null " + fail(x)); }
-    // streams
     ByteArrayOutputStream bos = new ByteArrayOutputStream(); XMLStreamWriter w = f.createXMLStreamWriter(bos); w.writeStartDocument(); w.writeStartElement("a"); w.writeCharacters("é中😀"); w.writeEndElement(); w.writeEndDocument(); w.close(); System.out.println("utf8 bytes " + Arrays.toString(bos.toByteArray()));
     bos = new ByteArrayOutputStream(); w = f.createXMLStreamWriter(bos, "ISO-8859-1"); w.writeStartDocument("ISO-8859-1", "1.0"); w.writeStartElement("a"); w.writeAttribute("x", "中"); w.writeCharacters("é中😀"); w.writeEndElement(); w.writeEndDocument(); w.close(); System.out.println("latin1 " + bos.toString("ISO-8859-1"));
     bos = new ByteArrayOutputStream(); w = f.createXMLStreamWriter(bos, "UTF-16"); w.writeStartDocument(); w.writeStartElement("a"); w.writeEndElement(); w.close(); System.out.println("utf16 " + Arrays.toString(bos.toByteArray()));

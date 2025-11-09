@@ -9,7 +9,8 @@
 package javax.management;
 
 public interface NotificationBroadcaster {
-  void addNotificationListener(NotificationListener p0, NotificationFilter p1, Object p2) throws IllegalArgumentException;
+  void addNotificationListener(NotificationListener p0, NotificationFilter p1, Object p2)
+      throws IllegalArgumentException;
 
   void removeNotificationListener(NotificationListener p0) throws ListenerNotFoundException;
 

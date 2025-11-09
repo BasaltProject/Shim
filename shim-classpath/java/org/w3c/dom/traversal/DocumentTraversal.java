@@ -9,7 +9,8 @@
 package org.w3c.dom.traversal;
 
 public interface DocumentTraversal {
-  NodeIterator createNodeIterator(org.w3c.dom.Node p0, int p1, NodeFilter p2, boolean p3) throws org.w3c.dom.DOMException;
+  NodeIterator createNodeIterator(org.w3c.dom.Node p0, int p1, NodeFilter p2, boolean p3)
+      throws org.w3c.dom.DOMException;
 
   TreeWalker createTreeWalker(org.w3c.dom.Node p0, int p1, NodeFilter p2, boolean p3) throws org.w3c.dom.DOMException;
 }

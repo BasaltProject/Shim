@@ -115,7 +115,8 @@ public final class StaxReader implements XMLStreamReader {
   }
 
   private XMLStreamException wrap(XmlException e) {
-    return new XMLStreamException(translate(e.getMessage()), new StaxLocation(e.line, e.column, -1, systemId, publicId));
+    return new XMLStreamException(translate(e.getMessage()), new StaxLocation(e.line, e.column, -1, systemId,
+        publicId));
   }
 
   private String translate(String message) {
@@ -547,7 +548,6 @@ public final class StaxReader implements XMLStreamReader {
       if (eventType == CHARACTERS || eventType == CDATA || eventType == SPACE || eventType == ENTITY_REFERENCE) {
         content.append(getText());
       } else if (eventType == PROCESSING_INSTRUCTION || eventType == COMMENT) {
-        // skipped
       } else if (eventType == END_DOCUMENT) {
         throw new XMLStreamException("unexpected end of document when reading element text content");
       } else if (eventType == START_ELEMENT) {

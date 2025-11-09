@@ -24,7 +24,8 @@ public class DomConfiguration implements DOMConfiguration {
     "validate", "infoset", "normalize-characters", "canonical-form", "validate-if-schema",
     "check-character-normalization", "well-formed", "namespace-declarations", "element-content-whitespace",
     "error-handler", "schema-type", "schema-location", "resource-resolver",
-    "http://apache.org/xml/properties/internal/entity-resolver", "http://apache.org/xml/properties/internal/grammar-pool",
+    "http://apache.org/xml/properties/internal/entity-resolver",
+        "http://apache.org/xml/properties/internal/grammar-pool",
     "http://apache.org/xml/properties/security-manager", "http://apache.org/xml/properties/internal/symbol-table",
     "http://apache.org/xml/features/validation/schema/augment-psvi"
   };
@@ -70,7 +71,8 @@ public class DomConfiguration implements DOMConfiguration {
   public void setParameter(String name, Object value) throws DOMException {
     String k = key(name);
     if (k == null) {
-      throw new DOMException(DOMException.NOT_FOUND_ERR, "FEATURE_NOT_FOUND: The parameter " + name + " is not recognized.");
+      throw new DOMException(DOMException.NOT_FOUND_ERR, "FEATURE_NOT_FOUND: The parameter " + name
+          + " is not recognized.");
     }
     if (isBooleanParam(k)) {
       if (!(value instanceof Boolean)) {
@@ -119,7 +121,8 @@ public class DomConfiguration implements DOMConfiguration {
   public Object getParameter(String name) throws DOMException {
     String k = key(name);
     if (k == null) {
-      throw new DOMException(DOMException.NOT_FOUND_ERR, "FEATURE_NOT_FOUND: The parameter " + name + " is not recognized.");
+      throw new DOMException(DOMException.NOT_FOUND_ERR, "FEATURE_NOT_FOUND: The parameter " + name
+          + " is not recognized.");
     }
     if (k.equals("infoset")) {
       return Boolean.valueOf(bool("namespace-declarations") && !bool("validate-if-schema") && !bool("entities")

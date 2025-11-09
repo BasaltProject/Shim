@@ -119,7 +119,6 @@ public class KeyGenerator {
           this.spi = spi;
           return spi;
         } catch (Exception e) {
-          // try the next provider
         }
       }
       disableFailover();

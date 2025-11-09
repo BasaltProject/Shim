@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 21
 
 import java.lang.reflect.AccessFlag;
 import java.lang.reflect.ClassFileFormatVersion;
@@ -53,7 +52,6 @@ public class AccessFlagsAndClassFileFormatModern {
       if (ClassFileFormatVersion.fromMajor(69) != r25) throw new AssertionError();
       if (ClassFileFormatVersion.latest() != r25) throw new AssertionError();
     } catch (IllegalArgumentException ignored) {
-      // RELEASE_21 is the maximum defined when compiling under release 21
       if (ClassFileFormatVersion.latest() != ClassFileFormatVersion.RELEASE_21) throw new AssertionError();
     }
 
@@ -105,13 +103,11 @@ public class AccessFlagsAndClassFileFormatModern {
       throw new AssertionError();
     }
 
-    // Unmatched bit position for location should throw IllegalArgumentException
     try {
       AccessFlag.maskToAccessFlags(0x0002, AccessFlag.Location.CLASS);
       throw new AssertionError();
     } catch (IllegalArgumentException expected) {}
 
-    // Check with ClassFileFormatVersion parameter if supported
     try {
       java.lang.reflect.Method m3 = AccessFlag.class.getMethod("maskToAccessFlags",
           int.class, AccessFlag.Location.class, ClassFileFormatVersion.class);
@@ -120,7 +116,6 @@ public class AccessFlagsAndClassFileFormatModern {
           0x0001, AccessFlag.Location.CLASS, ClassFileFormatVersion.RELEASE_21);
       if (!versionedClass.contains(AccessFlag.PUBLIC)) throw new AssertionError();
     } catch (NoSuchMethodException ignored) {
-      // 3-arg maskToAccessFlags is standard starting in Java 22
     }
 
     System.out.println("MaskToAccessFlags: OK");
@@ -168,7 +163,6 @@ public class AccessFlagsAndClassFileFormatModern {
 
     Parameter[] params = sm.getParameters();
     if (params.length != 2) throw new AssertionError();
-    // In Java SE, parameter access flags are returned without throwing
     Set<AccessFlag> p0Flags = params[0].accessFlags();
     Set<AccessFlag> p1Flags = params[1].accessFlags();
     if (p0Flags == null || p1Flags == null) throw new AssertionError();
