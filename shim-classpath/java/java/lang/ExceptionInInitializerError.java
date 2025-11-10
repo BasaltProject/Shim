@@ -34,6 +34,15 @@ public class ExceptionInInitializerError extends LinkageError {
   }
 
   public ExceptionInInitializerError() {
-    this(null);
+    this((String) null);
+  }
+
+  public ExceptionInInitializerError(Throwable thrown) {
+    super(null, thrown);
+    exception = null;
+  }
+
+  public Throwable getException() {
+    return super.getCause();
   }
 }

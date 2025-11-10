@@ -45,6 +45,14 @@ public class URLClassLoader extends ClassLoader implements Closeable {
     }
   }
 
+  public URLClassLoader(String name, URL[] urls, ClassLoader parent, URLStreamHandlerFactory factory) {
+    this(name, urls, parent);
+  }
+
+  public URLClassLoader(URL[] urls, ClassLoader parent, URLStreamHandlerFactory factory) {
+    this(null, urls, parent, factory);
+  }
+
   public URLClassLoader(URL[] urls, ClassLoader parent) {
     this(null, urls, parent);
   }

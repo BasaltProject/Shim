@@ -56,6 +56,22 @@ public class Socket implements Closeable {
     oldImpl = impl != null;
   }
 
+  @Deprecated
+  public Socket(String host, int port, boolean stream) throws IOException {
+    this(host, port);
+    if (!stream) {
+      throw new IOException("Datagram sockets are not supported");
+    }
+  }
+
+  @Deprecated
+  public Socket(InetAddress address, int port, boolean stream) throws IOException {
+    this(address, port);
+    if (!stream) {
+      throw new IOException("Datagram sockets are not supported");
+    }
+  }
+
   public Socket(String host, int port) throws UnknownHostException, IOException {
     this(host != null ? new InetSocketAddress(host, port) : new InetSocketAddress(InetAddress.getByName(null), port),
         (SocketAddress) null);

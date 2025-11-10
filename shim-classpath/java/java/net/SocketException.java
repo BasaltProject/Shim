@@ -32,7 +32,15 @@ public class SocketException extends IOException {
     super(message);
   }
 
+  public SocketException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
+  public SocketException(Throwable cause) {
+    super(cause);
+  }
+
   public SocketException() {
-    this(null);
+    this((String) null);
   }
 }

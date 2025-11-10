@@ -30,6 +30,10 @@ public class LinkageError extends Error {
     super(message, null);
   }
 
+  public LinkageError(String message, Throwable cause) {
+    super(message, cause);
+  }
+
   public LinkageError() {
     this(null);
   }
