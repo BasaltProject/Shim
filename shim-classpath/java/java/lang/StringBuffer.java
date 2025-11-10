@@ -23,7 +23,8 @@
 
 package java.lang;
 
-public class StringBuffer implements java.io.Serializable, CharSequence, Appendable, Comparable<StringBuffer> {
+public final class StringBuffer extends AbstractStringBuilder
+    implements java.io.Serializable, Comparable<StringBuffer>, CharSequence {
   private static final long serialVersionUID = 3388685877147921107L;
   private static final java.io.ObjectStreamField[] serialPersistentFields = {
     new java.io.ObjectStreamField("value", char[].class),
@@ -31,14 +32,326 @@ public class StringBuffer implements java.io.Serializable, CharSequence, Appenda
     new java.io.ObjectStreamField("shared", Boolean.TYPE)
   };
 
-  private StringBuilder sb;
+  public StringBuffer() {
+    super(16);
+  }
+
+  public StringBuffer(int capacity) {
+    super(capacity);
+  }
+
+  public StringBuffer(String str) {
+    super(str);
+  }
+
+  public StringBuffer(CharSequence seq) {
+    super(seq);
+  }
+
+  @Override
+  public synchronized StringBuffer append(Object obj) {
+    super.append(obj);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(String str) {
+    super.append(str);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(StringBuffer sb) {
+    super.append(sb);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(CharSequence s) {
+    super.append(s);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(CharSequence s, int start, int end) {
+    super.append(s, start, end);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(char[] str) {
+    super.append(str);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(char[] str, int offset, int len) {
+    super.append(str, offset, len);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(boolean b) {
+    super.append(b);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(char c) {
+    super.append(c);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(int i) {
+    super.append(i);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(long lng) {
+    super.append(lng);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(float f) {
+    super.append(f);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer append(double d) {
+    super.append(d);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer appendCodePoint(int codePoint) {
+    super.appendCodePoint(codePoint);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer delete(int start, int end) {
+    super.delete(start, end);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer deleteCharAt(int index) {
+    super.deleteCharAt(index);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer replace(int start, int end, String str) {
+    super.replace(start, end, str);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int index, char[] str, int offset, int len) {
+    super.insert(index, str, offset, len);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, Object obj) {
+    super.insert(offset, obj);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, String str) {
+    super.insert(offset, str);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, char[] str) {
+    super.insert(offset, str);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int dstOffset, CharSequence s) {
+    super.insert(dstOffset, s);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int dstOffset, CharSequence s, int start, int end) {
+    super.insert(dstOffset, s, start, end);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, boolean b) {
+    super.insert(offset, b);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, char c) {
+    super.insert(offset, c);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, int i) {
+    super.insert(offset, i);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, long l) {
+    super.insert(offset, l);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, float f) {
+    super.insert(offset, f);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer insert(int offset, double d) {
+    super.insert(offset, d);
+    return this;
+  }
+
+  @Override
+  public synchronized int indexOf(String str) {
+    return super.indexOf(str);
+  }
+
+  @Override
+  public synchronized int indexOf(String str, int fromIndex) {
+    return super.indexOf(str, fromIndex);
+  }
+
+  @Override
+  public synchronized int lastIndexOf(String str) {
+    return super.lastIndexOf(str);
+  }
+
+  @Override
+  public synchronized int lastIndexOf(String str, int fromIndex) {
+    return super.lastIndexOf(str, fromIndex);
+  }
+
+  @Override
+  public synchronized StringBuffer reverse() {
+    super.reverse();
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer repeat(int codePoint, int count) {
+    super.repeat(codePoint, count);
+    return this;
+  }
+
+  @Override
+  public synchronized StringBuffer repeat(CharSequence cs, int count) {
+    super.repeat(cs, count);
+    return this;
+  }
+
+  @Override
+  public synchronized int compareTo(StringBuffer another) {
+    return compareToImpl(another);
+  }
+
+  @Override
+  public synchronized String toString() {
+    return new String(value, 0, count);
+  }
+
+
+  @Override
+  public synchronized int length() {
+    return super.length();
+  }
+
+  @Override
+  public synchronized int capacity() {
+    return super.capacity();
+  }
+
+  @Override
+  public synchronized void ensureCapacity(int minimumCapacity) {
+    super.ensureCapacity(minimumCapacity);
+  }
+
+  @Override
+  public synchronized void trimToSize() {
+    super.trimToSize();
+  }
+
+  @Override
+  public synchronized void setLength(int newLength) {
+    super.setLength(newLength);
+  }
+
+  @Override
+  public synchronized char charAt(int index) {
+    return super.charAt(index);
+  }
+
+  @Override
+  public synchronized int codePointAt(int index) {
+    return super.codePointAt(index);
+  }
+
+  @Override
+  public synchronized int codePointBefore(int index) {
+    return super.codePointBefore(index);
+  }
+
+  @Override
+  public synchronized int codePointCount(int beginIndex, int endIndex) {
+    return super.codePointCount(beginIndex, endIndex);
+  }
+
+  @Override
+  public synchronized int offsetByCodePoints(int index, int codePointOffset) {
+    return super.offsetByCodePoints(index, codePointOffset);
+  }
+
+  @Override
+  public synchronized void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {
+    super.getChars(srcBegin, srcEnd, dst, dstBegin);
+  }
+
+  @Override
+  public synchronized void setCharAt(int index, char ch) {
+    super.setCharAt(index, ch);
+  }
+
+  @Override
+  public synchronized String substring(int start) {
+    return super.substring(start);
+  }
+
+  @Override
+  public synchronized CharSequence subSequence(int start, int end) {
+    return super.substring(start, end);
+  }
+
+  @Override
+  public synchronized String substring(int start, int end) {
+    return super.substring(start, end);
+  }
 
   private synchronized void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
     java.io.ObjectOutputStream.PutField fields = s.putFields();
-    char[] val = new char[Math.max(sb.capacity(), sb.length())];
-    sb.getChars(0, sb.length(), val, 0);
+    char[] val = new char[capacity()];
+    System.arraycopy(value, 0, val, 0, count);
     fields.put("value", val);
-    fields.put("count", sb.length());
+    fields.put("count", count);
     fields.put("shared", false);
     s.writeFields();
   }
@@ -46,269 +359,11 @@ public class StringBuffer implements java.io.Serializable, CharSequence, Appenda
   private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
     java.io.ObjectInputStream.GetField fields = s.readFields();
     char[] val = (char[]) fields.get("value", null);
-    int count = fields.get("count", 0);
-    if (val == null || count < 0 || count > val.length) {
+    int cnt = fields.get("count", 0);
+    if (val == null || cnt < 0 || cnt > val.length) {
       throw new java.io.StreamCorruptedException("count value invalid");
     }
-    sb = new StringBuilder(0);
-    sb.append(val, 0, count);
+    value = val;
+    count = cnt;
   }
-
-  public StringBuffer(String s) {
-    sb = new StringBuilder(s);
-  }
-
-  public StringBuffer(CharSequence seq) {
-    this(seq.toString());
-  }
-
-  public StringBuffer(int capacity) {
-    sb = new StringBuilder(capacity);
-  }
-
-  public StringBuffer() {
-    this(0);
-  }
-
-  public synchronized StringBuffer append(String s) {
-    sb.append(s);
-    return this;
-  }
-
-  public synchronized StringBuffer append(CharSequence s) {
-    sb.append(s);
-    return this;
-  }
-
-  public synchronized StringBuffer append(CharSequence s, int start, int end) {
-    sb.append(s, start, end);
-    return this;
-  }
-
-  public synchronized StringBuffer append(StringBuffer s) {
-    sb.append(s);
-    return this;
-  }
-
-  public synchronized StringBuffer append(Object o) {
-    sb.append(o);
-    return this;
-  }
-
-  public synchronized StringBuffer append(char v) {
-    sb.append(v);
-    return this;
-  }
-
-  public synchronized StringBuffer append(boolean v) {
-    sb.append(v);
-    return this;
-  }
-
-  public synchronized StringBuffer append(int v) {
-    sb.append(v);
-    return this;
-  }
-
-  public synchronized StringBuffer append(long v) {
-    sb.append(v);
-    return this;
-  }
-
-  public synchronized StringBuffer append(float v) {
-    sb.append(v);
-    return this;
-  }
-
-  public synchronized StringBuffer append(double v) {
-    sb.append(v);
-    return this;
-  }
-
-  public synchronized StringBuffer append(char[] b, int offset, int length) {
-    sb.append(b, offset, length);
-    return this;
-  }
-
-  public synchronized StringBuffer append(char[] b) {
-    sb.append(b, 0, b.length);
-    return this;
-  }
-
-  public synchronized int indexOf(String s) {
-    return sb.indexOf(s);
-  }
-
-  public synchronized int indexOf(String s, int fromIndex) {
-    return sb.indexOf(s, fromIndex);
-  }
-
-  public synchronized StringBuffer insert(int i, String s) {
-    sb.insert(i, s);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, char c) {
-    sb.insert(i, c);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, int v) {
-    sb.insert(i, v);
-    return this;
-  }
-
-  public synchronized StringBuffer delete(int start, int end) {
-    sb.delete(start, end);
-    return this;
-  }
-
-  public synchronized StringBuffer deleteCharAt(int i) {
-    sb.deleteCharAt(i);
-    return this;
-  }
-
-  public synchronized char charAt(int i) {
-    return sb.charAt(i);
-  }
-
-  public synchronized int length() {
-    return sb.length();
-  }
-
-  public synchronized StringBuffer replace(int start, int end, String str) {
-    sb.replace(start, end, str);
-    return this;
-  }
-
-  public synchronized void setLength(int v) {
-    sb.setLength(v);
-  }
-
-  public synchronized void setCharAt(int index, char ch) {
-    sb.setCharAt(index, ch);
-  }
-
-  public synchronized void getChars(int srcStart, int srcEnd, char[] dst,
-                                    int dstStart)
-  {
-    sb.getChars(srcStart, srcEnd, dst, dstStart);
-  }
-
-  public synchronized String toString() {
-    return sb.toString();
-  }
-  
-  public String substring(int start, int end) {
-    return sb.substring(start, end);
-  }
-  
-  public CharSequence subSequence(int start, int end) {
-    return sb.subSequence(start, end);
-  }
-
-  public synchronized int compareTo(StringBuffer another) {
-    return CharSequence.compare(this, another);
-  }
-
-  public synchronized int codePointAt(int index) {
-    return sb.codePointAt(index);
-  }
-
-  public synchronized int codePointBefore(int index) {
-    return sb.codePointBefore(index);
-  }
-
-  public synchronized int codePointCount(int start, int end) {
-    return sb.codePointCount(start, end);
-  }
-
-  public synchronized StringBuffer reverse() {
-    sb.reverse();
-    return this;
-  }
-
-  public synchronized StringBuffer appendCodePoint(int codePoint) {
-    sb.appendCodePoint(codePoint);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, Object o) {
-    sb.insert(i, o);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, char[] chars) {
-    sb.insert(i, chars);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, char[] chars, int offset, int length) {
-    sb.insert(i, chars, offset, length);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, CharSequence seq) {
-    sb.insert(i, seq);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, CharSequence seq, int start, int end) {
-    sb.insert(i, seq, start, end);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, boolean v) {
-    sb.insert(i, v);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, long v) {
-    sb.insert(i, v);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, float v) {
-    sb.insert(i, v);
-    return this;
-  }
-
-  public synchronized StringBuffer insert(int i, double v) {
-    sb.insert(i, v);
-    return this;
-  }
-
-  public synchronized StringBuffer repeat(int codePoint, int count) {
-    sb.repeat(codePoint, count);
-    return this;
-  }
-
-  public synchronized StringBuffer repeat(CharSequence seq, int count) {
-    sb.repeat(seq, count);
-    return this;
-  }
-
-  public synchronized int lastIndexOf(String s) {
-    return sb.lastIndexOf(s);
-  }
-
-  public synchronized int lastIndexOf(String s, int lastIndex) {
-    return sb.lastIndexOf(s, lastIndex);
-  }
-
-  public synchronized String substring(int start) {
-    return substring(start, length());
-  }
-
-  public synchronized int offsetByCodePoints(int index, int codePointOffset) {
-    return Character.offsetByCodePoints(this, index, codePointOffset);
-  }
-
-  public synchronized int capacity() {
-    return Math.max(16, length());
-  }
-
-  public synchronized void ensureCapacity(int minimumCapacity) { }
-
-  public synchronized void trimToSize() { }
 }
