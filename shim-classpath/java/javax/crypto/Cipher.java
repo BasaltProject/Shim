@@ -92,6 +92,9 @@ public class Cipher {
     if (transformation == null) {
       throw new NoSuchAlgorithmException("No transformation given");
     }
+    if (transformation.matches("PBEWithHmacSHA512/(224|256)AndAES_(128|256)")) {
+      return new String[] {transformation, null, null};
+    }
     String[] tokens = transformation.split("/", 3);
     String[] parts = new String[3];
     int count = tokens.length;
