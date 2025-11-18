@@ -3340,7 +3340,7 @@ uint64_t boot(Thread* t, uintptr_t*)
   // sequence point, for gc (don't recombine statements)
   roots(t)->setNullPointerException(t, throwable);
 
-  throwable = makeThrowable(t, GcArithmeticException::Type);
+  throwable = makeThrowable(t, GcArithmeticException::Type, "/ by zero");
   // sequence point, for gc (don't recombine statements)
   roots(t)->setArithmeticException(t, throwable);
 

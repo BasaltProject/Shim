@@ -2654,7 +2654,7 @@ void NO_RETURN throwArithmetic(MyThread* t)
     t->setFlag(Thread::TracingFlag);
     THREAD_RESOURCE0(t, t->clearFlag(Thread::TracingFlag));
 
-    throwNew(t, GcArithmeticException::Type);
+    throwNew(t, GcArithmeticException::Type, "/ by zero");
   } else {
     // not enough memory available for a new exception and stack trace
     // -- use a preallocated instance instead
@@ -8779,7 +8779,8 @@ class SignalHandler : public SignalRegistrar::Handler {
   void setException(MyThread* t) {
     if (ensure(t, pad(fixedSize) + traceSize(t))) {
       t->setFlag(Thread::TracingFlag);
-      t->exception = makeThrowable(t, type);
+      GcThrowable* preallocated = (vm::roots(t)->*exc)();
+      t->exception = makeThrowable(t, type, preallocated ? preallocated->message() : 0);
       t->clearFlag(Thread::TracingFlag);
     } else {
       // not enough memory available for a new exception and stack
