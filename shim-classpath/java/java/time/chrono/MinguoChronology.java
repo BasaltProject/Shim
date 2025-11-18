@@ -31,6 +31,10 @@ public final class MinguoChronology extends YearShiftedChronology {
   }
 
   @Override
+  public boolean isIsoBased() {
+    return true;
+  }
+
   public String getCalendarType() {
     return "roc";
   }

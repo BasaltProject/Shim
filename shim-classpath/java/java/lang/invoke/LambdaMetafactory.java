@@ -572,6 +572,7 @@ public class LambdaMetafactory {
                                      MethodType instantiatedMethodType)
     throws LambdaConversionException
   {
+    methodImplementation = methodImplementation.asFixedArity();
     byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, emptyInterfaceList);
     return makeCallSite(invokedType, classData, methodImplementation);
   }
@@ -597,7 +598,7 @@ public class LambdaMetafactory {
     //    MethodType... bridges      // IF flags has BRIDGES set
     //  )
     MethodType methodType = (MethodType) args[0];
-    MethodHandle methodImplementation = (MethodHandle) args[1];
+    MethodHandle methodImplementation = ((MethodHandle) args[1]).asFixedArity();
 
     int flags = (Integer) args[3];
     boolean serializable = (flags & FLAG_SERIALIZABLE) != 0;

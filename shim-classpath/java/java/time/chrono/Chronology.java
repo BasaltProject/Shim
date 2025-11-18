@@ -30,6 +30,10 @@ import java.util.Objects;
 import java.util.Set;
 
 public interface Chronology extends Comparable<Chronology> {
+  default boolean isIsoBased() {
+    return false;
+  }
+
   static Chronology from(TemporalAccessor temporal) {
     Objects.requireNonNull(temporal, "temporal");
     Chronology obj = temporal.query(TemporalQueries.chronology());

@@ -9,6 +9,10 @@
 package java.security;
 
 public interface Principal {
+  default boolean implies(javax.security.auth.Subject subject) {
+    return subject != null && subject.getPrincipals().contains(this);
+  }
+
   String getName();
 
   boolean equals(Object another);

@@ -28,6 +28,11 @@ public class ProtectionDomain {
   private final ClassLoader classloader;
   private final Principal[] principals;
   private final PermissionCollection permissions;
+  private final boolean staticPermissions;
+
+  public final boolean staticPermissionsOnly() {
+    return staticPermissions;
+  }
 
   public ProtectionDomain(CodeSource codesource, PermissionCollection permissions) {
     this.codesource = codesource;
@@ -37,6 +42,7 @@ public class ProtectionDomain {
     this.permissions = permissions;
     this.classloader = null;
     this.principals = new Principal[0];
+    this.staticPermissions = true;
   }
 
   public ProtectionDomain(CodeSource codesource, PermissionCollection permissions, ClassLoader classloader,
@@ -48,6 +54,7 @@ public class ProtectionDomain {
     this.permissions = permissions;
     this.classloader = classloader;
     this.principals = principals != null ? principals.clone() : new Principal[0];
+    this.staticPermissions = false;
   }
 
   public final CodeSource getCodeSource() {

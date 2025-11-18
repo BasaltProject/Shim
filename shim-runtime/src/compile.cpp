@@ -2945,23 +2945,7 @@ void checkCast(MyThread* t, GcClass* class_, object o)
   PROTECT(t, class_);
   PROTECT(t, o);
   if (UNLIKELY(o and not isAssignableFrom(t, class_, objectClass(t, o)))) {
-    GcByteArray* classNameFrom = objectClass(t, o)->name();
-    GcByteArray* classNameTo = class_->name();
-    THREAD_RUNTIME_ARRAY(t, char, classFrom, classNameFrom->length());
-    THREAD_RUNTIME_ARRAY(t, char, classTo, classNameTo->length());
-    replace('/',
-            '.',
-            RUNTIME_ARRAY_BODY(classFrom),
-            reinterpret_cast<char*>(classNameFrom->body().begin()));
-    replace('/',
-            '.',
-            RUNTIME_ARRAY_BODY(classTo),
-            reinterpret_cast<char*>(classNameTo->body().begin()));
-    throwNew(t,
-             GcClassCastException::Type,
-             "%s cannot be cast to %s",
-             RUNTIME_ARRAY_BODY(classFrom),
-             RUNTIME_ARRAY_BODY(classTo));
+    throwClassCast(t, objectClass(t, o), class_);
   }
 }
 
@@ -8618,6 +8602,16 @@ class ArgumentList {
       case 'D':
         addLong(
             fieldAtOffset<int64_t>(objectArrayBody(t, arguments, index++), 8));
+        break;
+
+      case 'B':
+        addInt(static_cast<uintptr_t>(static_cast<intptr_t>(
+            fieldAtOffset<int8_t>(objectArrayBody(t, arguments, index++), BytesPerWord))));
+        break;
+
+      case 'S':
+        addInt(static_cast<uintptr_t>(static_cast<intptr_t>(
+            fieldAtOffset<int16_t>(objectArrayBody(t, arguments, index++), BytesPerWord))));
         break;
 
       default:

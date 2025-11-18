@@ -19,6 +19,18 @@ public interface Gatherer<T, A, R> {
 
   Integrator<A, T, R> integrator();
 
+  static <A> Supplier<A> defaultInitializer() {
+    return GatherImpl.<A>defaultInitializer();
+  }
+
+  static <A> BinaryOperator<A> defaultCombiner() {
+    return GatherImpl.<A>failingCombiner();
+  }
+
+  static <A, R> BiConsumer<A, Downstream<? super R>> defaultFinisher() {
+    return GatherImpl.<A, R>defaultFinisher();
+  }
+
   default BinaryOperator<A> combiner() {
     return GatherImpl.<A>failingCombiner();
   }

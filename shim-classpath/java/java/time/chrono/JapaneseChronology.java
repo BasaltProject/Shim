@@ -48,6 +48,10 @@ public final class JapaneseChronology extends AbstractChronology implements Seri
   }
 
   @Override
+  public boolean isIsoBased() {
+    return true;
+  }
+
   public String getCalendarType() {
     return "japanese";
   }

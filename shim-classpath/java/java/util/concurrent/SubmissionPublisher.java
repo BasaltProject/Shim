@@ -36,6 +36,14 @@ public class SubmissionPublisher<T> implements Flow.Publisher<T>, AutoCloseable 
     this.handler = handler;
   }
 
+  public Executor getExecutor() {
+    return executor;
+  }
+
+  public int getMaxBufferCapacity() {
+    return maxBufferCapacity;
+  }
+
   public SubmissionPublisher(Executor executor, int maxBufferCapacity) {
     this(executor, maxBufferCapacity, null);
   }
