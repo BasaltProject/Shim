@@ -311,6 +311,11 @@ inline unsigned pad(unsigned n)
   return pad(n, BytesPerWord);
 }
 
+inline uint64_t padWide(uint64_t n)
+{
+  return (n + (BytesPerWord - 1)) & ~static_cast<uint64_t>(BytesPerWord - 1);
+}
+
 inline uintptr_t padWord(uintptr_t n, uintptr_t alignment)
 {
   return (n + (alignment - 1)) & ~(alignment - 1);

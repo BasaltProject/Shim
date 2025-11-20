@@ -1668,8 +1668,15 @@ inline object allocateSmall(Thread* t, unsigned sizeInBytes)
   return o;
 }
 
-inline object allocate(Thread* t, unsigned sizeInBytes, bool objectMask)
+void NO_RETURN throwOutOfMemory(Thread* t);
+
+inline object allocate(Thread* t, size_t requestedSizeInBytes, bool objectMask)
 {
+  if (UNLIKELY(requestedSizeInBytes > 0x7fffffffu)) {
+    throwOutOfMemory(t);
+  }
+  unsigned sizeInBytes = static_cast<unsigned>(requestedSizeInBytes);
+
   stress(t);
 
   if (UNLIKELY(t->heapIndex + ceilingDivide(sizeInBytes, BytesPerWord)

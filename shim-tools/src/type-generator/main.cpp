@@ -1057,7 +1057,7 @@ void writeOffset(Output* out, Class* cl)
 {
   out->write(cl->fixedSize);
   if (cl->arrayField) {
-    out->write(" + pad(length * ");
+    out->write(" + padWide(length * ");
     out->write(cl->arrayField->elementSize);
     out->write(")");
   }
