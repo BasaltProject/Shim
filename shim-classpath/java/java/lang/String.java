@@ -62,11 +62,29 @@ public final class String
   private final int length;
   private int hashCode;
 
+  private static StringIndexOutOfBoundsException indexError(int index, int length) {
+    return new StringIndexOutOfBoundsException("Index " + index + " out of bounds for length " + length);
+  }
+
+  private static void checkFromToIndex(int from, int to, int length) {
+    if (from < 0 || from > to || to > length) {
+      throw new StringIndexOutOfBoundsException("Range [" + from + ", " + to + ") out of bounds for length "
+                                                + length);
+    }
+  }
+
+  private static void checkFromIndexSize(int from, int size, int length) {
+    if ((length | from | size) < 0 || size > length - from) {
+      throw new StringIndexOutOfBoundsException("Range [" + from + ", " + from + " + " + size
+                                                + ") out of bounds for length " + length);
+    }
+  }
+
   public String() {
     this(new char[0], 0, 0);
   }
 
-  public String(char[] data, int offset, int length, boolean copy) {
+  String(char[] data, int offset, int length, boolean copy) {
     this((Object) data, offset, length, copy);
   }
 
@@ -84,7 +102,7 @@ public final class String
     this(decodeBytes(bytes, offset, length, sun.nio.cs.StringCoding.lookup(charsetName)));
   }
 
-  public String(byte[] data, int offset, int length, boolean copy) {
+  String(byte[] data, int offset, int length, boolean copy) {
     this((Object) data, offset, length, copy);
   }
 
@@ -161,12 +179,7 @@ public final class String
   }
 
   public String(byte bytes[], int highByte, int offset, int length) {
-    if (offset < 0 )
-      throw new StringIndexOutOfBoundsException(offset);
-    else if (offset + length > bytes.length)
-      throw new StringIndexOutOfBoundsException(offset + length);
-    else if (length < 0)
-      throw new StringIndexOutOfBoundsException(length);
+    checkFromIndexSize(offset, length, bytes.length);
 
     char[] c = new char[length];
     int mask = highByte << 8;
@@ -187,12 +200,7 @@ public final class String
       l = ((byte[]) data).length;
     }
 
-    if (offset < 0 )
-      throw new StringIndexOutOfBoundsException(offset);
-    else if (offset + length > l)
-      throw new StringIndexOutOfBoundsException(offset + length);
-    else if (length < 0)
-      throw new StringIndexOutOfBoundsException(length);
+    checkFromIndexSize(offset, length, l);
 
     if(!copy && Utf8.test(data)) copy = true;
 
@@ -279,77 +287,194 @@ public final class String
     return length - s.length;
   }
 
+  private boolean isLatin1() {
+    for (int i = 0; i < length; ++i) {
+      if (charAt(i) > 0xFF) return false;
+    }
+    return true;
+  }
+
   public int compareToIgnoreCase(String s) {
     if (this == s) return 0;
-
-    int idx = 0;
-    int result;
-
-    int end = (length < s.length ? length : s.length);
-
-    while (idx < end) {
-      if ((result =
-           Character.toLowerCase(charAt(idx)) -
-           Character.toLowerCase(s.charAt(idx))) != 0) {
-        return result;
+    boolean byCodePoint = !isLatin1() && !s.isLatin1();
+    int i = 0;
+    int j = 0;
+    while (i < length && j < s.length) {
+      int c1;
+      int c2;
+      if (byCodePoint) {
+        c1 = codePointAt(i);
+        c2 = s.codePointAt(j);
+        i += Character.charCount(c1);
+        j += Character.charCount(c2);
+      } else {
+        c1 = charAt(i++);
+        c2 = s.charAt(j++);
       }
-      idx++;
+      if (c1 != c2) {
+        c1 = Character.toUpperCase(c1);
+        c2 = Character.toUpperCase(c2);
+        if (c1 != c2) {
+          c1 = Character.toLowerCase(c1);
+          c2 = Character.toLowerCase(c2);
+          if (c1 != c2) {
+            return c1 - c2;
+          }
+        }
+      }
     }
-    return length - s.length;
+    return (length - i) - (s.length - j);
   }
 
   public String trim() {
-    int start = -1;
+    int start = 0;
+    int end = length;
+    while (start < end && charAt(start) <= ' ') {
+      start++;
+    }
+    while (start < end && charAt(end - 1) <= ' ') {
+      end--;
+    }
+    return start == 0 && end == length ? this : substring(start, end);
+  }
+
+  private String turkic(boolean upper) {
+    StringBuilder sb = new StringBuilder(length);
     for (int i = 0; i < length; ++i) {
       char c = charAt(i);
-      if (start == -1 && ! Character.isWhitespace(c)) {
-        start = i;
-        break;
+      if (upper) {
+        sb.append(c == 'i' ? '\u0130' : c == '\u0131' ? 'I' : c);
+      } else if (c == 'I') {
+        if (i + 1 < length && charAt(i + 1) == '\u0307') {
+          sb.append('i');
+          ++i;
+        } else {
+          sb.append('\u0131');
+        }
+      } else if (c == '\u0130') {
+        sb.append('i');
+      } else {
+        sb.append(c);
       }
     }
-
-    int end = -1;
-    for (int i = length - 1; i >= 0; --i) {
-      char c = charAt(i);
-      if (end == -1 && ! Character.isWhitespace(c)) {
-        end = i + 1;
-        break;
-      }
-    }
-
-    if (start >= end) {
-      return "";
-    } else {
-      return substring(start, end);
-    }
+    return upper ? sb.toString().toUpperCase() : sb.toString().toLowerCase();
   }
 
   public String toLowerCase() {
-    for (int j = 0; j < length; ++j) {
-      char ch = charAt(j);
-      if (Character.toLowerCase(ch) != ch) {
-        char[] b = new char[length];
-        for (int i = 0; i < length; ++i) {
-          b[i] = Character.toLowerCase(charAt(i));
+    StringBuilder out = null;
+    for (int i = 0; i < length; ) {
+      int cp = codePointAt(i);
+      int n = Character.charCount(cp);
+      String mapped = null;
+      if (cp == 0x130) {
+        mapped = "i\u0307";
+      } else if (cp == 0x3A3) {
+        mapped = finalSigma(i) ? "\u03C2" : "\u03C3";
+      } else {
+        int lower = Character.toLowerCase(cp);
+        if (lower != cp) {
+          mapped = new String(Character.toChars(lower));
         }
-        return new String(b, 0, length, false);
       }
+      if (mapped != null && out == null) {
+        out = new StringBuilder(length + 4).append(this, 0, i);
+      }
+      if (out != null) {
+        if (mapped != null) {
+          out.append(mapped);
+        } else {
+          out.append(this, i, i + n);
+        }
+      }
+      i += n;
     }
-    return this;
+    return out == null ? this : out.toString();
+  }
+
+  private boolean finalSigma(int index) {
+    boolean before = false;
+    for (int i = index; i > 0; ) {
+      int cp = codePointBefore(i);
+      i -= Character.charCount(cp);
+      if (isCaseIgnorable(cp)) continue;
+      before = isCased(cp);
+      break;
+    }
+    if (!before) return false;
+    for (int i = index + 1; i < length; ) {
+      int cp = codePointAt(i);
+      i += Character.charCount(cp);
+      if (isCaseIgnorable(cp)) continue;
+      return !isCased(cp);
+    }
+    return true;
+  }
+
+  private static boolean isCased(int cp) {
+    return Character.isLowerCase(cp) || Character.isUpperCase(cp) || Character.isTitleCase(cp);
+  }
+
+  private static boolean isCaseIgnorable(int cp) {
+    int type = Character.getType(cp);
+    return cp == '\'' || cp == '.' || cp == ':' || cp == 0xB7 || cp == 0x2019 || type == Character.NON_SPACING_MARK
+        || type == Character.ENCLOSING_MARK || type == Character.FORMAT || type == Character.MODIFIER_LETTER
+        || type == Character.MODIFIER_SYMBOL;
+  }
+
+  private static String upperSpecial(int cp) {
+    switch (cp) {
+    case 0xDF: return "SS";
+    case 0x149: return "\u02BCN";
+    case 0x1F0: return "J\u030C";
+    case 0x390: return "\u0399\u0308\u0301";
+    case 0x3B0: return "\u03A5\u0308\u0301";
+    case 0x587: return "\u0535\u0552";
+    case 0x1E96: return "H\u0331";
+    case 0x1E97: return "T\u0308";
+    case 0x1E98: return "W\u030A";
+    case 0x1E99: return "Y\u030A";
+    case 0x1E9A: return "A\u02BE";
+    case 0xFB00: return "FF";
+    case 0xFB01: return "FI";
+    case 0xFB02: return "FL";
+    case 0xFB03: return "FFI";
+    case 0xFB04: return "FFL";
+    case 0xFB05: return "ST";
+    case 0xFB06: return "ST";
+    case 0xFB13: return "\u0544\u0546";
+    case 0xFB14: return "\u0544\u0535";
+    case 0xFB15: return "\u0544\u053B";
+    case 0xFB16: return "\u054E\u0546";
+    case 0xFB17: return "\u0544\u053D";
+    default: return null;
+    }
   }
 
   public String toUpperCase() {
-    for (int j = 0; j < length; ++j) {
-      char ch = charAt(j);
-      if (Character.toUpperCase(ch) != ch) {
-        char[] b = new char[length];
-        for (int i = 0; i < length; ++i) {
-          b[i] = Character.toUpperCase(charAt(i));
+    StringBuilder out = null;
+    for (int i = 0; i < length; ) {
+      int cp = codePointAt(i);
+      int n = Character.charCount(cp);
+      String mapped = upperSpecial(cp);
+      if (mapped == null) {
+        int upper = Character.toUpperCase(cp);
+        if (upper != cp) {
+          mapped = new String(Character.toChars(upper));
         }
-        return new String(b, 0, length, false);
       }
+      if (mapped != null && out == null) {
+        out = new StringBuilder(length + 4).append(this, 0, i);
+      }
+      if (out != null) {
+        if (mapped != null) {
+          out.append(mapped);
+        } else {
+          out.append(this, i, i + n);
+        }
+      }
+      i += n;
     }
-    return this;
+    return out == null ? this : out.toString();
   }
 
   public int indexOf(int c) {
@@ -357,17 +482,26 @@ public final class String
   }
 
   public int indexOf(int c, int start) {
-    for (int i = start; i < length; ++i) {
-      if (charAt(i) == c) {
-        return i;
+    if (start < 0) start = 0;
+    if (c < Character.MIN_SUPPLEMENTARY_CODE_POINT) {
+      for (int i = start; i < length; ++i) {
+        if (charAt(i) == c) {
+          return i;
+        }
       }
+      return -1;
     }
-
+    if (!Character.isValidCodePoint(c)) return -1;
+    char high = Character.highSurrogate(c);
+    char low = Character.lowSurrogate(c);
+    for (int i = start; i < length - 1; ++i) {
+      if (charAt(i) == high && charAt(i + 1) == low) return i;
+    }
     return -1;
   }
 
   public int lastIndexOf(int ch) {
-    return lastIndexOf(ch, length-1);
+    return lastIndexOf(ch, length - 1);
   }
 
   public int indexOf(String s) {
@@ -375,7 +509,8 @@ public final class String
   }
 
   public int indexOf(String s, int start) {
-    if (s.length == 0) return start;
+    if (start < 0) start = 0;
+    if (s.length == 0) return Math.min(start, length);
 
     for (int i = start; i < length - s.length + 1; ++i) {
       int j = 0;
@@ -393,15 +528,18 @@ public final class String
   }
 
   public int lastIndexOf(String s) {
-    return lastIndexOf(s, length - s.length);
+    return lastIndexOf(s, length);
   }
 
   public int lastIndexOf(String s, int lastIndex) {
+    int rightIndex = length - s.length;
+    if (lastIndex > rightIndex) lastIndex = rightIndex;
+    if (lastIndex < 0) return -1;
     if (s.length == 0) return lastIndex;
 
-    for (int i = Math.min(length - s.length, lastIndex); i >= 0; --i) {
+    for (int i = lastIndex; i >= 0; --i) {
       int j = 0;
-      for (; j < s.length && i + j < length; ++j) {
+      for (; j < s.length; ++j) {
         if (charAt(i + j) != s.charAt(j)) {
           break;
         }
@@ -425,6 +563,13 @@ public final class String
         }
       }
       return new String(buf, 0, length, false);
+    } else if (oldChar > 0x7f || newChar > 0x7f) {
+      char[] buf = new char[length];
+      for (int i = 0; i < length; i++) {
+        char c = charAt(i);
+        buf[i] = c == oldChar ? newChar : c;
+      }
+      return new String(buf, 0, length, false);
     } else {
       byte[] buf = new byte[length];
       byte[] orig = (byte[])data;
@@ -446,13 +591,8 @@ public final class String
   }
 
   public String substring(int start, int end) {
-    if (start < 0)
-      throw new StringIndexOutOfBoundsException(start);
-    else if (end > length)
-      throw new StringIndexOutOfBoundsException(end);
+    checkFromToIndex(start, end, length);
     int newLen = end - start;
-    if (newLen < 0)
-      throw new StringIndexOutOfBoundsException(newLen);
 
     if (start == 0 && end == length)
       return this;
@@ -501,12 +641,9 @@ public final class String
   public void getBytes(int srcOffset, int srcLength,
                        byte[] dst, int dstOffset)
   {
-    if (srcOffset < 0)
-      throw new StringIndexOutOfBoundsException(srcOffset);
-    else if (srcOffset + srcLength > length)
-      throw new StringIndexOutOfBoundsException(srcOffset + srcLength);
-    else if (srcLength < 0)
-      throw new StringIndexOutOfBoundsException(srcLength);
+    checkFromToIndex(srcOffset, srcLength, length);
+    srcLength -= srcOffset;
+    checkFromIndexSize(dstOffset, srcLength, dst.length);
 
     if (data instanceof char[]) {
       char[] src = (char[]) data;
@@ -562,12 +699,9 @@ public final class String
   public void getChars(int srcOffset, int srcEnd,
                        char[] dst, int dstOffset)
   {
-    if (srcOffset < 0)
-      throw new StringIndexOutOfBoundsException(srcOffset);
-    else if (srcEnd > length)
-      throw new StringIndexOutOfBoundsException(srcEnd);
-
-    int srcLength = srcEnd-srcOffset;
+    checkFromToIndex(srcOffset, srcEnd, length);
+    int srcLength = srcEnd - srcOffset;
+    checkFromIndexSize(dstOffset, srcLength, dst.length);
     if (data instanceof char[]) {
       char[] src = (char[]) data;
       System.arraycopy(src, offset + srcOffset, dst, dstOffset, srcLength);
@@ -587,8 +721,8 @@ public final class String
 
   @Override
   public char charAt(int index) {
-    if (index < 0 || index > length) {
-      throw new StringIndexOutOfBoundsException(index);
+    if (index < 0 || index >= length) {
+      throw indexError(index, length);
     }
 
     if (data instanceof char[]) {
@@ -683,14 +817,6 @@ public final class String
     return Boolean.toString(v);
   }
 
-  public static String valueOf(byte v) {
-    return Byte.toString(v);
-  }
-
-  public static String valueOf(short v) {
-    return Short.toString(v);
-  }
-
   public static String valueOf(char v) {
     return Character.toString(v);
   }
@@ -712,6 +838,7 @@ public final class String
   }
 
   public static String valueOf(char[] data, int offset, int length) {
+    checkFromIndexSize(offset, length, data.length);
     return new String(data, offset, length);
   }
 
@@ -723,12 +850,20 @@ public final class String
     if (lastIndex >= length) {
       lastIndex = length - 1;
     }
-    for (int i = lastIndex ; i >= 0; --i) {
-      if (charAt(i) == ch) {
-        return i;
+    if (ch < Character.MIN_SUPPLEMENTARY_CODE_POINT) {
+      for (int i = lastIndex; i >= 0; --i) {
+        if (charAt(i) == ch) {
+          return i;
+        }
       }
+      return -1;
     }
-
+    if (!Character.isValidCodePoint(ch)) return -1;
+    char high = Character.highSurrogate(ch);
+    char low = Character.lowSurrogate(ch);
+    for (int i = Math.min(lastIndex, length - 2); i >= 0; --i) {
+      if (charAt(i) == high && charAt(i + 1) == low) return i;
+    }
     return -1;
   }
 
@@ -772,22 +907,40 @@ public final class String
   }
 
   public int codePointAt(int offset) {
+    if (offset < 0 || offset >= length) {
+      throw indexError(offset, length);
+    }
     return Character.codePointAt(this, offset);
   }
 
   public int codePointCount(int start, int end) {
+    java.util.Objects.checkFromToIndex(start, end, length);
     return Character.codePointCount(this, start, end);
   }
 
   public String toUpperCase(Locale locale) {
+    if (locale == null) throw new NullPointerException();
+    String lang = locale.getLanguage();
+    if (lang.equals("tr") || lang.equals("az")) {
+      return turkic(true);
+    }
     return toUpperCase();
   }
 
   public String toLowerCase(Locale locale) {
+    if (locale == null) throw new NullPointerException();
+    String lang = locale.getLanguage();
+    if (lang.equals("tr") || lang.equals("az")) {
+      return turkic(false);
+    }
     return toLowerCase();
   }
 
   public int codePointBefore(int index) {
+    int i = index - 1;
+    if (i < 0 || i >= length) {
+      throw indexError(i, length);
+    }
     return Character.codePointBefore(this, index);
   }
 
@@ -848,9 +1001,17 @@ public final class String
     if (count == 0 || length == 0) {
       return "";
     }
+    boolean latin1 = true;
+    for (int i = 0; i < length && latin1; i++) {
+      latin1 = charAt(i) < 256;
+    }
+    int byteLength = latin1 ? length : length * 2;
+    if (Integer.MAX_VALUE / count < byteLength) {
+      throw new OutOfMemoryError("Required length exceeds implementation limit");
+    }
     long total = (long) length * (long) count;
-    if (total > Integer.MAX_VALUE) {
-      throw new OutOfMemoryError("Required array size too large");
+    if ((long) byteLength * count > Integer.MAX_VALUE - 2) {
+      throw new OutOfMemoryError("Requested array size exceeds VM limit");
     }
     char[] chars = new char[(int) total];
     char[] src = toCharArray();
@@ -894,6 +1055,15 @@ public final class String
       return "";
     }
     List<String> list = extractLines();
+    if (n > 0) {
+      long total = 0;
+      for (int i = 0; i < list.size(); i++) {
+        total += (long) list.get(i).length + n + 1;
+      }
+      if (total > Integer.MAX_VALUE - 2) {
+        throw new OutOfMemoryError("Requested array size exceeds VM limit");
+      }
+    }
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < list.size(); i++) {
       String line = list.get(i);
@@ -904,7 +1074,7 @@ public final class String
         sb.append(line);
       } else if (n < 0) {
         int left = line.indexOfNonWhitespace();
-        int toRemove = Math.min(-n, left);
+        int toRemove = (int) Math.min(-(long) n, left);
         sb.append(line.substring(toRemove));
       } else {
         sb.append(line);
@@ -1108,9 +1278,7 @@ public final class String
   }
 
   private void checkBoundsBeginEnd(int begin, int end) {
-    if (begin < 0 || begin > end || end > length) {
-      throw new StringIndexOutOfBoundsException("begin " + begin + ", end " + end + ", length " + length);
-    }
+    checkFromToIndex(begin, end, length);
   }
 
   public int indexOf(int ch, int beginIndex, int endIndex) {
@@ -1131,6 +1299,7 @@ public final class String
   }
 
   public int indexOf(String str, int beginIndex, int endIndex) {
+    java.util.Objects.requireNonNull(str);
     checkBoundsBeginEnd(beginIndex, endIndex);
     if (str.length == 0) return beginIndex;
     for (int i = beginIndex; i <= endIndex - str.length; ++i) {
@@ -1140,6 +1309,9 @@ public final class String
   }
 
   public int offsetByCodePoints(int index, int codePointOffset) {
+    if (index < 0 || index > length) {
+      throw new IndexOutOfBoundsException();
+    }
     return Character.offsetByCodePoints(this, index, codePointOffset);
   }
 

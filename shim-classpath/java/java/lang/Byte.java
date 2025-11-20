@@ -94,12 +94,8 @@ public final class Byte extends Number implements Comparable<Byte>, java.lang.co
     return value - o.value;
   }
 
-  public static String toString(byte v, int radix) {
-    return Long.toString(v, radix);
-  }
-
   public static String toString(byte v) {
-    return toString(v, 10);
+    return Integer.toString(v, 10);
   }
 
   public static byte parseByte(String s) {

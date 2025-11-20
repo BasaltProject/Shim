@@ -204,6 +204,14 @@ public class LambdaMetafactory {
       widenPrimitive(out, from.spec(), to.spec());
       return;
     }
+    if (!to.type().isPrimitive() && !from.type().isPrimitive() && to.type() != Object.class
+        && !to.type().isAssignableFrom(from.type())) {
+      String spec = to.spec();
+      String name = spec.startsWith("L") ? spec.substring(1, spec.length() - 1) : spec;
+      write1(out, 0xc0);
+      write2(out, ConstantPool.addClass(pool, name) + 1);
+      return;
+    }
     if (to.type().isPrimitive()) {
       if (! (from.type().isPrimitive() || "V".equals(to.spec()))) {
         write1(out, 0xc0);

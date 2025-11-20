@@ -94,7 +94,7 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
     int prefGrowth = oldLength + 2;
     long grown = (long) oldLength + Math.max(minGrowth, prefGrowth);
     if (grown > Integer.MAX_VALUE - 8) {
-      if (minCapacity < 0) {
+      if (minCapacity < 0 || minCapacity > Integer.MAX_VALUE - 8) {
         throw new OutOfMemoryError("Required length exceeds implementation limit");
       }
       return Math.max(minCapacity, Integer.MAX_VALUE - 8);

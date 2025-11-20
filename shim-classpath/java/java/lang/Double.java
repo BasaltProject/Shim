@@ -134,16 +134,77 @@ public final class Double extends Number implements Comparable<Double>,
   }
 
   public static double parseDouble(String s) {
-    if (s == null) {
-      throw new NullPointerException();
-    }
+    String literal = literal(s);
     int[] numRead = new int[1];
-    double d = doubleFromString(s, numRead);
+    double d = doubleFromString(literal, numRead);
     if (numRead[0] == 1) {
       return d;
-    } else {
-      throw new NumberFormatException(s);
     }
+    throw new NumberFormatException("For input string: \"" + s + "\"");
+  }
+
+  static String literal(String s) {
+    String t = s.trim();
+    int n = t.length();
+    if (n == 0) {
+      throw new NumberFormatException("empty String");
+    }
+    int i = 0;
+    boolean negative = false;
+    char c = t.charAt(0);
+    if (c == '+' || c == '-') {
+      negative = c == '-';
+      i++;
+    }
+    String sign = negative ? "-" : "";
+    String rest = t.substring(i);
+    if (rest.equals("NaN")) {
+      return sign + "nan";
+    }
+    if (rest.equals("Infinity")) {
+      return sign + "inf";
+    }
+    int end = n;
+    if (end > i && "fFdD".indexOf(t.charAt(end - 1)) >= 0) {
+      end--;
+    }
+    boolean hex = end - i > 2 && t.charAt(i) == '0' && (t.charAt(i + 1) == 'x' || t.charAt(i + 1) == 'X');
+    int p = hex ? i + 2 : i;
+    int digits = 0;
+    boolean dot = false;
+    while (p < end) {
+      c = t.charAt(p);
+      if (c == '.' && !dot) {
+        dot = true;
+      } else if ((c >= '0' && c <= '9') || (hex && ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))) {
+        digits++;
+      } else {
+        break;
+      }
+      p++;
+    }
+    boolean ok = digits > 0;
+    if (p < end) {
+      c = t.charAt(p);
+      boolean marker = hex ? (c == 'p' || c == 'P') : (c == 'e' || c == 'E');
+      ok = ok && marker;
+      p++;
+      if (ok && p < end && (t.charAt(p) == '+' || t.charAt(p) == '-')) {
+        p++;
+      }
+      int exp = 0;
+      while (ok && p < end && t.charAt(p) >= '0' && t.charAt(p) <= '9') {
+        exp++;
+        p++;
+      }
+      ok = ok && exp > 0 && p == end;
+    } else if (hex) {
+      ok = false;
+    }
+    if (!ok) {
+      throw new NumberFormatException("For input string: \"" + s + "\"");
+    }
+    return t.substring(0, end);
   }
 
   public static long doubleToLongBits(double value) {
@@ -151,7 +212,7 @@ public final class Double extends Number implements Comparable<Double>,
     return doubleToRawLongBits(value);
   }
 
-  public static native int fillBufferWithDouble(double value, byte[] buffer,
+  private static native int fillBufferWithDouble(double value, byte[] buffer,
                                                 int charCount);
 
   public static native long doubleToRawLongBits(double value);
@@ -162,7 +223,7 @@ public final class Double extends Number implements Comparable<Double>,
 
   public static native boolean isNaN(double value);
 
-  public static native double doubleFromString(String s, int[] numRead);
+  private static native double doubleFromString(String s, int[] numRead);
 
   @Override
   public java.util.Optional<Double> describeConstable() {

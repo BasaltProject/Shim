@@ -143,16 +143,13 @@ public final class Float extends Number implements Comparable<Float>,
   }
 
   public static float parseFloat(String s) {
-    if (s == null) {
-      throw new NullPointerException();
-    }
+    String literal = Double.literal(s);
     int[] numRead = new int[1];
-    float f = floatFromString(s, numRead);
+    float f = floatFromString(literal, numRead);
     if (numRead[0] == 1) {
       return f;
-    } else {
-      throw new NumberFormatException(s);
     }
+    throw new NumberFormatException("For input string: \"" + s + "\"");
   }
   
   public static int floatToIntBits(float value) {
@@ -174,7 +171,7 @@ public final class Float extends Number implements Comparable<Float>,
 
   public static native boolean isNaN(float value);
 
-  public static native float floatFromString(String s, int[] numRead);
+  private static native float floatFromString(String s, int[] numRead);
 
   public static short floatToFloat16(float f) {
     int fBits = floatToRawIntBits(f);
