@@ -113,7 +113,7 @@ public final class Array {
 
   public static Object newInstance(Class elementType, int length) {
     if (length < 0) {
-      throw new NegativeArraySizeException();
+      throw new NegativeArraySizeException(Integer.toString(length));
     }
 
     if (elementType.isPrimitive()) {
@@ -392,7 +392,7 @@ public final class Array {
     }
     for (int d : dimensions) {
       if (d < 0) {
-        throw new NegativeArraySizeException();
+        throw new NegativeArraySizeException(Integer.toString(d));
       }
     }
     if (dimensions.length == 1) {
