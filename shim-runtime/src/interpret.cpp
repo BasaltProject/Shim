@@ -834,7 +834,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   objectArrayLength(t, array));
         goto throw_;
@@ -865,7 +865,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   objectArrayLength(t, array));
         goto throw_;
@@ -993,7 +993,7 @@ loop:
         } else {
           exception = makeThrowable(t,
                                     GcArrayIndexOutOfBoundsException::Type,
-                                    "%d not in [0,%d)",
+                                    "Index %d out of bounds for length %d",
                                     index,
                                     a->length());
           goto throw_;
@@ -1006,7 +1006,7 @@ loop:
         } else {
           exception = makeThrowable(t,
                                     GcArrayIndexOutOfBoundsException::Type,
-                                    "%d not in [0,%d)",
+                                    "Index %d out of bounds for length %d",
                                     index,
                                     a->length());
           goto throw_;
@@ -1033,7 +1033,7 @@ loop:
         } else {
           exception = makeThrowable(t,
                                     GcArrayIndexOutOfBoundsException::Type,
-                                    "%d not in [0,%d)",
+                                    "Index %d out of bounds for length %d",
                                     index,
                                     a->length());
           goto throw_;
@@ -1046,7 +1046,7 @@ loop:
         } else {
           exception = makeThrowable(t,
                                     GcArrayIndexOutOfBoundsException::Type,
-                                    "%d not in [0,%d)",
+                                    "Index %d out of bounds for length %d",
                                     index,
                                     a->length());
           goto throw_;
@@ -1075,7 +1075,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -1099,7 +1099,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -1188,7 +1188,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -1212,7 +1212,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -1442,7 +1442,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -1466,7 +1466,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -1668,7 +1668,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -1700,7 +1700,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -2265,7 +2265,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -2297,7 +2297,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -2865,7 +2865,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
@@ -2889,7 +2889,7 @@ loop:
       } else {
         exception = makeThrowable(t,
                                   GcArrayIndexOutOfBoundsException::Type,
-                                  "%d not in [0,%d)",
+                                  "Index %d out of bounds for length %d",
                                   index,
                                   a->length());
         goto throw_;
