@@ -477,10 +477,7 @@ public class BigDecimal extends Number implements Comparable<BigDecimal> {
       throw new IllegalArgumentException("Invalid rounding mode");
     }
     if (divisor.signum() == 0) {
-      if (this.signum() == 0) {
-        throw new ArithmeticException("Division undefined");
-      }
-      throw new ArithmeticException("Division by zero");
+      throw new ArithmeticException(intVal.bitLength() < 64 ? "/ by zero" : "BigInteger divide by zero");
     }
     return divideScaled(this.intVal, this.scale, divisor.intVal, divisor.scale, scale, roundingMode, scale);
   }
@@ -991,9 +988,6 @@ public class BigDecimal extends Number implements Comparable<BigDecimal> {
   }
 
   public BigDecimal movePointLeft(int n) {
-    if (n == 0) {
-      return this;
-    }
     int newScale = checkScale((long) scale + n);
     BigDecimal num = new BigDecimal(intVal, newScale);
     return num.scale < 0 ? num.setScale(0, ROUND_UNNECESSARY) : num;

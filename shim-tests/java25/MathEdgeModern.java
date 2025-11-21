@@ -6,6 +6,10 @@
  * Minimum release: 21
  */
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.RoundingMode;
+
 public class MathEdgeModern {
   static int zero = 0;
   static long lzero = 0;
@@ -44,5 +48,12 @@ public class MathEdgeModern {
     t("powMinusOneInf", () -> Math.pow(-1.0, Double.NEGATIVE_INFINITY));
     t("powNaNZero", () -> Math.pow(Double.NaN, 0.0));
     t("exp", () -> Math.exp(2.5) + " " + Math.exp(-1.5) + " " + Math.exp(3.5));
+    t("clearBitHigh", () -> BigInteger.TEN.clearBit(Integer.MAX_VALUE));
+    t("clearBitNeg", () -> BigInteger.TEN.negate().clearBit(Integer.MAX_VALUE));
+    t("flipBitHigh", () -> BigInteger.TEN.flipBit(Integer.MAX_VALUE));
+    t("divideZeroScale", () -> BigDecimal.ONE.divide(BigDecimal.ZERO, RoundingMode.DOWN));
+    BigDecimal big = BigDecimal.valueOf(Long.MAX_VALUE).multiply(BigDecimal.TEN);
+    t("divideZeroBig", () -> big.divide(BigDecimal.ZERO, 2, RoundingMode.DOWN));
+    t("movePointLeftZero", () -> new BigDecimal("1E+5").movePointLeft(0));
   }
 }

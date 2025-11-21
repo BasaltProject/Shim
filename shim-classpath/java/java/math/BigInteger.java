@@ -735,7 +735,14 @@ public class BigInteger extends Number implements Comparable<BigInteger> {
       throw new ArithmeticException("Negative bit address");
     }
     int intNum = n >>> 5;
-    int[] result = new int[Math.max(intLength(), intNum + 2)];
+    if (mode == 1 && !testBit(n)) {
+      return this;
+    }
+    int length = Math.max(intLength(), intNum + 2);
+    if (length > (1 << 26)) {
+      throw new ArithmeticException("BigInteger would overflow supported range");
+    }
+    int[] result = new int[length];
     for (int i = 0; i < result.length; i++) {
       result[result.length - i - 1] = getInt(i);
     }
