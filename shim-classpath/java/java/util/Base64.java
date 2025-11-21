@@ -51,7 +51,7 @@ public class Base64 {
     for (byte b : lineSeparator) {
       if (b >= 0 && table[b] != -1) {
         throw new IllegalArgumentException(
-            "Illegal base64 character in line separator 0x" + Integer.toHexString(b));
+            "Illegal base64 line separator character 0x" + Integer.toHexString(b));
       }
     }
     lineLength = (lineLength >> 2) << 2;

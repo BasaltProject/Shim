@@ -275,8 +275,8 @@ public final class HexFormat {
     Objects.requireNonNull(string, "string");
     Objects.checkFromToIndex(fromIndex, toIndex, string.length());
     int len = toIndex - fromIndex;
-    if (len < 1 || len > 8) {
-      throw new IllegalArgumentException("length must be between 1 and 8: " + len);
+    if (len > 8) {
+      throw new IllegalArgumentException("string length greater than 8: " + len);
     }
     int value = 0;
     for (int i = fromIndex; i < toIndex; ++i) {
@@ -294,8 +294,8 @@ public final class HexFormat {
     Objects.requireNonNull(string, "string");
     Objects.checkFromToIndex(fromIndex, toIndex, string.length());
     int len = toIndex - fromIndex;
-    if (len < 1 || len > 16) {
-      throw new IllegalArgumentException("length must be between 1 and 16: " + len);
+    if (len > 16) {
+      throw new IllegalArgumentException("string length greater than 16: " + len);
     }
     long value = 0;
     for (int i = fromIndex; i < toIndex; ++i) {

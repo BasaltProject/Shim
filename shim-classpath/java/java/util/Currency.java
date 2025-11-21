@@ -37,6 +37,16 @@ public final class Currency implements Serializable {
     if (currencyCode == null) {
       throw new NullPointerException();
     }
+    if (currencyCode.length() != 3) {
+      throw new IllegalArgumentException("The input currency code: \"" + currencyCode
+          + "\" must have a length of 3 characters");
+    }
+    char first = currencyCode.charAt(0);
+    char second = currencyCode.charAt(1);
+    if (first < 'A' || first > 'Z' || second < 'A' || second > 'Z') {
+      throw new IllegalArgumentException("The country code: \"" + currencyCode.substring(0, 2)
+          + "\" is not a valid ISO 3166 code");
+    }
     synchronized (kInstances) {
       Currency existing = kInstances.get(currencyCode);
       if (existing != null) {
@@ -56,6 +66,9 @@ public final class Currency implements Serializable {
 
   public static Currency getInstance(Locale locale) {
     String country = locale.getCountry();
+    if ("XK".equals(country)) {
+      return getInstance("EUR");
+    }
     if (country == null || !country.matches("^[a-zA-Z]{2}$")
         || !Arrays.asList(Locale.getISOCountries()).contains(country.toUpperCase(Locale.ROOT))) {
       throw new IllegalArgumentException("The country of the input locale: \"" + locale

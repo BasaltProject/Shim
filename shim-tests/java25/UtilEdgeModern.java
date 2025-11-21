@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ * SPDX-License-Identifier: MIT
+ * Minimum release: 21
+ */
+
+import java.text.DateFormat;
+import java.text.NumberFormat;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Currency;
+import java.util.HexFormat;
+import java.util.Locale;
+import java.util.concurrent.Callable;
+
+public class UtilEdgeModern {
+  static void t(String name, Callable<Object> op) {
+    try {
+      System.out.println(name + " = " + op.call());
+    } catch (Throwable e) {
+      System.out.println(name + " ! " + e.getClass().getName() + ": " + e.getMessage());
+    }
+  }
+
+  static Object npe(Callable<Object> op) throws Exception {
+    try {
+      return op.call();
+    } catch (NullPointerException e) {
+      return "NullPointerException";
+    }
+  }
+
+  public static void main(String[] args) {
+    for (String code : new String[] {"USD", "usd", "ABC", "1US", "US", "$$$", "US1", "xxx"}) {
+      t("currency-" + code, () -> Currency.getInstance(code));
+    }
+    t("currency-xk", () -> Currency.getInstance(Locale.of("", "XK")));
+    t("hex-empty", () -> HexFormat.fromHexDigits(""));
+    t("hex-long-empty", () -> HexFormat.fromHexDigitsToLong("", 0, 0));
+    t("hex-nine", () -> HexFormat.fromHexDigits("123456789"));
+    t("hex-seventeen", () -> HexFormat.fromHexDigitsToLong("12345678901234567"));
+    t("mime-separator", () -> Base64.getMimeEncoder(0, new byte[] {'a'}));
+    t("locale-dotted-i", () -> Locale.of("İstanbul"));
+    t("number-null-locale", () -> npe(() -> NumberFormat.getInstance((Locale) null)));
+    t("percent-null-locale", () -> npe(() -> NumberFormat.getPercentInstance((Locale) null)));
+    t("date-style-order", () -> DateFormat.getDateTimeInstance(-1, 16, Locale.ROOT));
+    t("zone-ids-mutable", () -> java.time.ZoneId.getAvailableZoneIds().remove("UTC"));
+    t("stream-range", () -> Arrays.stream(new int[3], 7, 10));
+    t("stream-order", () -> Arrays.stream(new int[3], 100, 0));
+    t("spliterator-negative", () -> Arrays.spliterator(new long[3], -1, 2));
+  }
+}
