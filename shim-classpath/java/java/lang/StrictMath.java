@@ -16,20 +16,20 @@ public final class StrictMath {
 
   private StrictMath() { }
 
-  public static double sin(double a) { return Math.sin(a); }
-  public static double cos(double a) { return Math.cos(a); }
+  public static double sin(double a) { return shim.FdLibm.sin(a); }
+  public static double cos(double a) { return shim.FdLibm.cos(a); }
   public static double tan(double a) { return Math.tan(a); }
-  public static double cosh(double a) { return Math.cosh(a); }
+  public static double cosh(double a) { return shim.FdLibm.cosh(a); }
   public static double sinh(double a) { return Math.sinh(a); }
   public static double tanh(double a) { return Math.tanh(a); }
   public static double asin(double a) { return Math.asin(a); }
   public static double acos(double a) { return Math.acos(a); }
-  public static double atan(double a) { return Math.atan(a); }
-  public static double atan2(double y, double x) { return Math.atan2(y, x); }
-  public static double exp(double a) { return Math.exp(a); }
+  public static double atan(double a) { return shim.FdLibm.atan(a); }
+  public static double atan2(double y, double x) { return shim.FdLibm.atan2(y, x); }
+  public static double exp(double a) { return shim.FdLibm.exp(a); }
   public static double log(double a) { return Math.log(a); }
   public static double sqrt(double a) { return Math.sqrt(a); }
-  public static double pow(double a, double b) { return Math.pow(a, b); }
+  public static double pow(double a, double b) { return shim.FdLibm.pow(a, b); }
   public static double ceil(double a) { return Math.ceil(a); }
   public static double floor(double a) { return Math.floor(a); }
   public static int round(float a) { return Math.round(a); }
@@ -100,11 +100,11 @@ public final class StrictMath {
   public static int getExponent(double d) { return Math.getExponent(d); }
   public static double log10(double a) { return Math.log10(a); }
   public static double rint(double a) { return Math.rint(a); }
-  public static double cbrt(double a) { return Math.cbrt(a); }
+  public static double cbrt(double a) { return shim.FdLibm.cbrt(a); }
   public static double scalb(double d, int scaleFactor) { return Math.scalb(d, scaleFactor); }
   public static float scalb(float f, int scaleFactor) { return Math.scalb(f, scaleFactor); }
   public static double IEEEremainder(double f1, double f2) { return Math.IEEEremainder(f1, f2); }
-  public static double hypot(double x, double y) { return Math.hypot(x, y); }
+  public static double hypot(double x, double y) { return shim.FdLibm.hypot(x, y); }
   public static double expm1(double x) { return Math.expm1(x); }
   public static double log1p(double x) { return Math.log1p(x); }
   public static int unsignedMultiplyExact(int x, int y) { return Math.unsignedMultiplyExact(x, y); }

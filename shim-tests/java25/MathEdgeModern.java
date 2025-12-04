@@ -48,6 +48,13 @@ public class MathEdgeModern {
     t("powMinusOneInf", () -> Math.pow(-1.0, Double.NEGATIVE_INFINITY));
     t("powNaNZero", () -> Math.pow(Double.NaN, 0.0));
     t("exp", () -> Math.exp(2.5) + " " + Math.exp(-1.5) + " " + Math.exp(3.5));
+    t("strictExp", () -> StrictMath.exp(1.0) + " " + StrictMath.exp(-3.7) + " " + StrictMath.exp(300.5));
+    t("strictSin", () -> StrictMath.sin(2.5) + " " + StrictMath.sin(1.0e22) + " " + StrictMath.sin(-8.08e208));
+    t("strictCos", () -> StrictMath.cos(0.1) + " " + StrictMath.cos(1.5e300) + " " + StrictMath.cos(4.0e6));
+    t("strictPow", () -> StrictMath.pow(2.5, 2.5) + " " + StrictMath.pow(-3.0, 7.0) + " " + StrictMath.pow(0.1, 33.3));
+    t("strictAtan2", () -> StrictMath.atan2(1.0e10, -1.5) + " " + StrictMath.atan2(-0.0, -2.0));
+    t("strictHyperbolic", () -> StrictMath.cosh(1.0) + " " + StrictMath.hypot(3.14159, 1.2345678912345679E8));
+    t("strictCbrt", () -> StrictMath.cbrt(2.5) + " " + StrictMath.cbrt(-1.0e-310));
     t("clearBitHigh", () -> BigInteger.TEN.clearBit(Integer.MAX_VALUE));
     t("clearBitNeg", () -> BigInteger.TEN.negate().clearBit(Integer.MAX_VALUE));
     t("flipBitHigh", () -> BigInteger.TEN.flipBit(Integer.MAX_VALUE));
