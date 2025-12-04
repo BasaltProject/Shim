@@ -264,15 +264,25 @@ public final class Math {
     return shim.FdLibm.cosh(v);
   }
 
-  public static native double sinh(double v);
+  public static double sinh(double v) {
+    return shim.FdLibm.sinh(v);
+  }
 
-  public static native double tanh(double v);
+  public static double tanh(double v) {
+    return shim.FdLibm.tanh(v);
+  }
 
-  public static native double acos(double v);
+  public static double acos(double v) {
+    return shim.FdLibm.acos(v);
+  }
 
-  public static native double asin(double v);
+  public static double asin(double v) {
+    return shim.FdLibm.asin(v);
+  }
 
-  public static native double atan(double v);
+  public static double atan(double v) {
+    return shim.FdLibm.atan(v);
+  }
 
   public static double atan2(double y, double x) {
     return shim.FdLibm.atan2(y, x);
@@ -640,9 +650,13 @@ public final class Math {
     return Double.longBitsToDouble(tb | ((long) sign << 32));
   }
 
-  public static native double expm1(double v);
+  public static double expm1(double v) {
+    return shim.FdLibm.expm1(v);
+  }
 
-  public static native double log1p(double v);
+  public static double log1p(double v) {
+    return shim.FdLibm.log1p(v);
+  }
 
   public static double hypot(double x, double y) {
     return shim.FdLibm.hypot(x, y);

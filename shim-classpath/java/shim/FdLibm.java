@@ -703,4 +703,434 @@ public final class FdLibm {
     t = t + t * r;
     return withHi(t, sign | hi(t));
   }
+
+  private static final double[] TAN_T = {3.33333333333334091986e-01, 1.33333333333201242699e-01,
+      5.39682539762260521377e-02, 2.18694882948595424599e-02, 8.86323982359930005737e-03,
+      3.59207910759131235356e-03, 1.45620945432529025516e-03, 5.88041240820264096874e-04,
+      2.46463134818469906812e-04, 7.81794442939557092300e-05, 7.14072491382608190305e-05,
+      -1.85586374855275456654e-05, 2.59073051863633712884e-05};
+
+  private static double kTan(double x, double y, int iy) {
+    final double pio4 = 7.85398163397448278999e-01, pio4lo = 3.06161699786838301793e-17;
+    double z, r, v, w, s, t, a;
+    int hx = hi(x);
+    int ix = hx & 0x7fffffff;
+    if (ix < 0x3e300000) {
+      if ((int) x == 0) {
+        if (((ix | lo(x)) | (iy + 1)) == 0) return 1.0 / Math.abs(x);
+        if (iy == 1) return x;
+        w = x + y;
+        z = low0(w);
+        v = y - (z - x);
+        a = -1.0 / w;
+        t = low0(a);
+        s = 1.0 + t * z;
+        return t + a * (s + t * v);
+      }
+    }
+    if (ix >= 0x3FE59428) {
+      if (hx < 0) {
+        x = -x;
+        y = -y;
+      }
+      z = pio4 - x;
+      w = pio4lo - y;
+      x = z + w;
+      y = 0.0;
+    }
+    z = x * x;
+    w = z * z;
+    r = TAN_T[1] + w * (TAN_T[3] + w * (TAN_T[5] + w * (TAN_T[7] + w * (TAN_T[9] + w * TAN_T[11]))));
+    v = z * (TAN_T[2] + w * (TAN_T[4] + w * (TAN_T[6] + w * (TAN_T[8] + w * (TAN_T[10] + w * TAN_T[12])))));
+    s = z * x;
+    r = y + z * (s * (r + v) + y);
+    r += TAN_T[0] * s;
+    w = x + r;
+    if (ix >= 0x3FE59428) {
+      v = (double) iy;
+      return (double) (1 - ((hx >> 30) & 2)) * (v - 2.0 * (x - (w * w / (w + v) - r)));
+    }
+    if (iy == 1) return w;
+    z = low0(w);
+    v = r - (z - x);
+    a = -1.0 / w;
+    t = low0(a);
+    s = 1.0 + t * z;
+    return t + a * (s + t * v);
+  }
+
+  public static double tan(double x) {
+    int ix = hi(x) & 0x7fffffff;
+    if (ix <= 0x3fe921fb) return kTan(x, 0.0, 1);
+    if (ix >= 0x7ff00000) return x - x;
+    double[] y = new double[2];
+    int n = ix >= 0x413921fb ? remPio2Large(x, y) : remPio2(x, y);
+    return kTan(y[0], y[1], 1 - ((n & 1) << 1));
+  }
+
+  private static final double LN2_HI = 6.93147180369123816490e-01, LN2_LO = 1.90821492927058770002e-10,
+      TWO54 = 1.80143985094819840000e+16, LOG1 = 6.666666666666735130e-01, LOG2 = 3.999999999940941908e-01,
+      LOG3 = 2.857142874366239149e-01, LOG4 = 2.222219843214978396e-01, LOG5 = 1.818357216161805012e-01,
+      LOG6 = 1.531383769920937332e-01, LOG7 = 1.479819860511658591e-01;
+
+  public static double log(double x) {
+    double hfsq, f, s, z, r, w, t1, t2, dk;
+    int k, hx, i, j;
+    hx = hi(x);
+    int lx = lo(x);
+    k = 0;
+    if (hx < 0x00100000) {
+      if (((hx & 0x7fffffff) | lx) == 0) return Double.NEGATIVE_INFINITY;
+      if (hx < 0) return Double.NaN;
+      k -= 54;
+      x *= TWO54;
+      hx = hi(x);
+    }
+    if (hx >= 0x7ff00000) return x + x;
+    k += (hx >> 20) - 1023;
+    hx &= 0x000fffff;
+    i = (hx + 0x95f64) & 0x100000;
+    x = withHi(x, hx | (i ^ 0x3ff00000));
+    k += i >> 20;
+    f = x - 1.0;
+    if ((0x000fffff & (2 + hx)) < 3) {
+      if (f == 0.0) {
+        if (k == 0) return 0.0;
+        dk = (double) k;
+        return dk * LN2_HI + dk * LN2_LO;
+      }
+      r = f * f * (0.5 - 0.33333333333333333 * f);
+      if (k == 0) return f - r;
+      dk = (double) k;
+      return dk * LN2_HI - ((r - dk * LN2_LO) - f);
+    }
+    s = f / (2.0 + f);
+    dk = (double) k;
+    z = s * s;
+    i = hx - 0x6147a;
+    w = z * z;
+    j = 0x6b851 - hx;
+    t1 = w * (LOG2 + w * (LOG4 + w * LOG6));
+    t2 = z * (LOG1 + w * (LOG3 + w * (LOG5 + w * LOG7)));
+    i |= j;
+    r = t2 + t1;
+    if (i > 0) {
+      hfsq = 0.5 * f * f;
+      if (k == 0) return f - (hfsq - s * (hfsq + r));
+      return dk * LN2_HI - ((hfsq - (s * (hfsq + r) + dk * LN2_LO)) - f);
+    }
+    if (k == 0) return f - s * (f - r);
+    return dk * LN2_HI - ((s * (f - r) - dk * LN2_LO) - f);
+  }
+
+  public static double log10(double x) {
+    final double ivln10 = 4.34294481903251816668e-01, log10_2hi = 3.01029995663611771306e-01,
+        log10_2lo = 3.69423907715893078616e-13;
+    double y, z;
+    int i, k, hx;
+    hx = hi(x);
+    int lx = lo(x);
+    k = 0;
+    if (hx < 0x00100000) {
+      if (((hx & 0x7fffffff) | lx) == 0) return Double.NEGATIVE_INFINITY;
+      if (hx < 0) return Double.NaN;
+      k -= 54;
+      x *= TWO54;
+      hx = hi(x);
+    }
+    if (hx >= 0x7ff00000) return x + x;
+    k += (hx >> 20) - 1023;
+    i = (k & 0x80000000) >>> 31;
+    hx = (hx & 0x000fffff) | ((0x3ff - i) << 20);
+    y = (double) (k + i);
+    x = withHi(x, hx);
+    z = y * log10_2lo + ivln10 * log(x);
+    return z + y * log10_2hi;
+  }
+
+  private static final double PIO2_HI = 1.57079632679489655800e+00, PIO2_LO = 6.12323399573676603587e-17,
+      PIO4_HI = 7.85398163397448278999e-01, PS0 = 1.66666666666666657415e-01, PS1 = -3.25565818622400915405e-01,
+      PS2 = 2.01212532134862925881e-01, PS3 = -4.00555345006794114027e-02, PS4 = 7.91534994289814532176e-04,
+      PS5 = 3.47933107596021167570e-05, QS1 = -2.40339491173441421878e+00, QS2 = 2.02094576023350569471e+00,
+      QS3 = -6.88283971605453293030e-01, QS4 = 7.70381505559019352791e-02;
+
+  private static double asinP(double t) {
+    return t * (PS0 + t * (PS1 + t * (PS2 + t * (PS3 + t * (PS4 + t * PS5)))));
+  }
+
+  private static double asinQ(double t) {
+    return 1.0 + t * (QS1 + t * (QS2 + t * (QS3 + t * QS4)));
+  }
+
+  public static double asin(double x) {
+    double t = 0.0, w, p, q, c, r, s;
+    int hx = hi(x);
+    int ix = hx & 0x7fffffff;
+    if (ix >= 0x3ff00000) {
+      if (((ix - 0x3ff00000) | lo(x)) == 0) return x * PIO2_HI + x * PIO2_LO;
+      return (x - x) / (x - x);
+    } else if (ix < 0x3fe00000) {
+      if (ix < 0x3e400000) {
+        if (1.0e300 + x > 1.0) return x;
+      } else {
+        t = x * x;
+      }
+      p = asinP(t);
+      q = asinQ(t);
+      w = p / q;
+      return x + x * w;
+    }
+    w = 1.0 - Math.abs(x);
+    t = w * 0.5;
+    p = asinP(t);
+    q = asinQ(t);
+    s = Math.sqrt(t);
+    if (ix >= 0x3FEF3333) {
+      w = p / q;
+      t = PIO2_HI - (2.0 * (s + s * w) - PIO2_LO);
+    } else {
+      w = low0(s);
+      c = (t - w * w) / (s + w);
+      r = p / q;
+      p = 2.0 * s * r - (PIO2_LO - 2.0 * c);
+      q = PIO4_HI - 2.0 * w;
+      t = PIO4_HI - (p - q);
+    }
+    return hx > 0 ? t : -t;
+  }
+
+  public static double acos(double x) {
+    final double pi = 3.14159265358979311600e+00;
+    double z, p, q, r, w, s, c, df;
+    int hx = hi(x);
+    int ix = hx & 0x7fffffff;
+    if (ix >= 0x3ff00000) {
+      if (((ix - 0x3ff00000) | lo(x)) == 0) {
+        if (hx > 0) return 0.0;
+        return pi + 2.0 * PIO2_LO;
+      }
+      return (x - x) / (x - x);
+    }
+    if (ix < 0x3fe00000) {
+      if (ix <= 0x3c600000) return PIO2_HI + PIO2_LO;
+      z = x * x;
+      p = asinP(z);
+      q = asinQ(z);
+      r = p / q;
+      return PIO2_HI - (x - (PIO2_LO - x * r));
+    } else if (hx < 0) {
+      z = (1.0 + x) * 0.5;
+      p = asinP(z);
+      q = asinQ(z);
+      s = Math.sqrt(z);
+      r = p / q;
+      w = r * s - PIO2_LO;
+      return pi - 2.0 * (s + w);
+    }
+    z = (1.0 - x) * 0.5;
+    s = Math.sqrt(z);
+    df = low0(s);
+    c = (z - df * df) / (s + df);
+    p = asinP(z);
+    q = asinQ(z);
+    r = p / q;
+    w = r * s + c;
+    return 2.0 * (df + w);
+  }
+
+  public static double expm1(double x) {
+    final double huge = 1.0e300, tiny = 1.0e-300, oThreshold = 7.09782712893383973096e+02,
+        q1 = -3.33333333333331316428e-02, q2 = 1.58730158725481460165e-03, q3 = -7.93650757867487942473e-05,
+        q4 = 4.00821782732936239552e-06, q5 = -2.01099218183624371326e-07;
+    double y, hfx, hxs, r1, t, e, hi, lo, c = 0.0;
+    int k, xsb;
+    int hx = hi(x);
+    xsb = hx & 0x80000000;
+    hx &= 0x7fffffff;
+    if (hx >= 0x4043687A) {
+      if (hx >= 0x40862E42) {
+        if (hx >= 0x7ff00000) {
+          if (((hx & 0xfffff) | lo(x)) != 0) return x + x;
+          return xsb == 0 ? x : -1.0;
+        }
+        if (x > oThreshold) return Double.POSITIVE_INFINITY;
+      }
+      if (xsb != 0) {
+        if (x + tiny < 0.0) return tiny - 1.0;
+      }
+    }
+    if (hx > 0x3fd62e42) {
+      if (hx < 0x3FF0A2B2) {
+        if (xsb == 0) {
+          hi = x - LN2_HI;
+          lo = LN2_LO;
+          k = 1;
+        } else {
+          hi = x + LN2_HI;
+          lo = -LN2_LO;
+          k = -1;
+        }
+      } else {
+        k = (int) (1.44269504088896338700e+00 * x + (xsb == 0 ? 0.5 : -0.5));
+        t = k;
+        hi = x - t * LN2_HI;
+        lo = t * LN2_LO;
+      }
+      x = hi - lo;
+      c = (hi - x) - lo;
+    } else if (hx < 0x3c900000) {
+      t = huge + x;
+      return x - (t - (huge + x));
+    } else {
+      k = 0;
+    }
+    hfx = 0.5 * x;
+    hxs = x * hfx;
+    r1 = 1.0 + hxs * (q1 + hxs * (q2 + hxs * (q3 + hxs * (q4 + hxs * q5))));
+    t = 3.0 - r1 * hfx;
+    e = hxs * ((r1 - t) / (6.0 - x * t));
+    if (k == 0) return x - (x * e - hxs);
+    double twopk = make(0x3ff00000 + (k << 20), 0);
+    e = (x * (e - c) - c);
+    e -= hxs;
+    if (k == -1) return 0.5 * (x - e) - 0.5;
+    if (k == 1) {
+      if (x < -0.25) return -2.0 * (e - (x + 0.5));
+      return 1.0 + 2.0 * (x - e);
+    }
+    if (k <= -2 || k > 56) {
+      y = 1.0 - (e - x);
+      if (k == 1024) y = y * 2.0 * 0x1p1023;
+      else y = y * twopk;
+      return y - 1.0;
+    }
+    if (k < 20) {
+      t = make(0x3ff00000 - (0x200000 >> k), 0);
+      y = t - (e - x);
+      y = y * twopk;
+    } else {
+      t = make((0x3ff - k) << 20, 0);
+      y = x - (e + t);
+      y += 1.0;
+      y = y * twopk;
+    }
+    return y;
+  }
+
+  public static double sinh(double x) {
+    final double shuge = 1.0e307;
+    double t, w, h;
+    int ix, jx, lx;
+    jx = hi(x);
+    ix = jx & 0x7fffffff;
+    if (ix >= 0x7ff00000) return x + x;
+    h = 0.5;
+    if (jx < 0) h = -h;
+    if (ix < 0x40360000) {
+      if (ix < 0x3e300000) {
+        if (shuge + x > 1.0) return x;
+      }
+      t = expm1(Math.abs(x));
+      if (ix < 0x3ff00000) return h * (2.0 * t - t * t / (t + 1.0));
+      return h * (t + t / (t + 1.0));
+    }
+    if (ix < 0x40862E42) return h * exp(Math.abs(x));
+    lx = lo(x);
+    if (ix < 0x408633CE || (ix == 0x408633ce && Integer.compareUnsigned(lx, 0x8fb9f87d) <= 0)) {
+      w = exp(0.5 * Math.abs(x));
+      t = h * w;
+      return t * w;
+    }
+    return x * shuge;
+  }
+
+  public static double tanh(double x) {
+    final double tiny = 1.0e-300;
+    double t, z;
+    int jx = hi(x);
+    int ix = jx & 0x7fffffff;
+    if (ix >= 0x7ff00000) {
+      if (jx >= 0) return 1.0 / x + 1.0;
+      return 1.0 / x - 1.0;
+    }
+    if (ix < 0x40360000) {
+      if (ix < 0x3c800000) return x * (1.0 + x);
+      if (ix >= 0x3ff00000) {
+        t = expm1(2.0 * Math.abs(x));
+        z = 1.0 - 2.0 / (t + 2.0);
+      } else {
+        t = expm1(-2.0 * Math.abs(x));
+        z = -t / (t + 2.0);
+      }
+    } else {
+      z = 1.0 - tiny;
+    }
+    return jx >= 0 ? z : -z;
+  }
+
+  public static double log1p(double x) {
+    final double zero = 0.0, tiny = 1.0e-300, lp1 = 6.666666666666735130e-01, lp2 = 3.999999999940941908e-01,
+        lp3 = 2.857142874366239149e-01, lp4 = 2.222219843214978396e-01, lp5 = 1.818357216161805012e-01,
+        lp6 = 1.531383769920937332e-01, lp7 = 1.479819860511658591e-01;
+    double hfsq, f = 0.0, c = 0.0, s, z, r, u;
+    int k, hx, hu = 0, ax;
+    hx = hi(x);
+    ax = hx & 0x7fffffff;
+    k = 1;
+    if (hx < 0x3FDA827A) {
+      if (ax >= 0x3ff00000) {
+        if (x == -1.0) return Double.NEGATIVE_INFINITY;
+        return (x - x) / (x - x);
+      }
+      if (ax < 0x3e200000) {
+        if (TWO54 + x > zero && ax < 0x3c900000) return x;
+        return x - x * x * 0.5;
+      }
+      if (hx > 0 || hx <= 0xbfd2bec3) {
+        k = 0;
+        f = x;
+        hu = 1;
+      }
+    }
+    if (hx >= 0x7ff00000) return x + x;
+    if (k != 0) {
+      if (hx < 0x43400000) {
+        u = 1.0 + x;
+        hu = hi(u);
+        k = (hu >> 20) - 1023;
+        c = k > 0 ? 1.0 - (u - x) : x - (u - 1.0);
+        c /= u;
+      } else {
+        u = x;
+        hu = hi(u);
+        k = (hu >> 20) - 1023;
+        c = 0;
+      }
+      hu &= 0x000fffff;
+      if (hu < 0x6a09e) {
+        u = withHi(u, hu | 0x3ff00000);
+      } else {
+        k += 1;
+        u = withHi(u, hu | 0x3fe00000);
+        hu = (0x00100000 - hu) >> 2;
+      }
+      f = u - 1.0;
+    }
+    hfsq = 0.5 * f * f;
+    if (hu == 0) {
+      if (f == zero) {
+        if (k == 0) return zero;
+        c += k * LN2_LO;
+        return k * LN2_HI + c;
+      }
+      r = hfsq * (1.0 - 0.66666666666666666 * f);
+      if (k == 0) return f - r;
+      return k * LN2_HI - ((r - (k * LN2_LO + c)) - f);
+    }
+    s = f / (2.0 + f);
+    z = s * s;
+    r = z * (lp1 + z * (lp2 + z * (lp3 + z * (lp4 + z * (lp5 + z * (lp6 + z * lp7))))));
+    if (k == 0) return f - (hfsq - s * (hfsq + r));
+    return k * LN2_HI - ((hfsq - (s * (hfsq + r) + (k * LN2_LO + c))) - f);
+  }
 }

@@ -55,6 +55,11 @@ public class MathEdgeModern {
     t("strictAtan2", () -> StrictMath.atan2(1.0e10, -1.5) + " " + StrictMath.atan2(-0.0, -2.0));
     t("strictHyperbolic", () -> StrictMath.cosh(1.0) + " " + StrictMath.hypot(3.14159, 1.2345678912345679E8));
     t("strictCbrt", () -> StrictMath.cbrt(2.5) + " " + StrictMath.cbrt(-1.0e-310));
+    t("strictTan", () -> StrictMath.tan(1.0) + " " + StrictMath.tan(1.0e22) + " " + StrictMath.tan(-0.7));
+    t("strictInverse", () -> StrictMath.asin(0.3) + " " + StrictMath.acos(-0.9) + " " + StrictMath.atan(7.5));
+    t("strictLog", () -> StrictMath.log(10.0) + " " + StrictMath.log10(2.0e-310) + " " + StrictMath.log1p(1.0e-5));
+    t("strictExpm1", () -> StrictMath.expm1(15.118685898537043) + " " + StrictMath.sinh(-15.345947706271401));
+    t("strictTanh", () -> StrictMath.tanh(-7.5038666715406155) + " " + StrictMath.tanh(0.3));
     t("clearBitHigh", () -> BigInteger.TEN.clearBit(Integer.MAX_VALUE));
     t("clearBitNeg", () -> BigInteger.TEN.negate().clearBit(Integer.MAX_VALUE));
     t("flipBitHigh", () -> BigInteger.TEN.flipBit(Integer.MAX_VALUE));
