@@ -91,6 +91,9 @@ public class ConcurrentSkipListSet<E> extends AbstractSet<E>
 
   @Override
   public boolean remove(Object o) {
+    if (o == null) {
+      throw new NullPointerException();
+    }
     return m.remove(o, PRESENT);
   }
 
