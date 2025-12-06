@@ -45,7 +45,20 @@ public final class Integer extends Number implements Comparable<Integer>,
     this.value = parseInt(s);
   }
 
+  private static final class Cache {
+    static final Integer[] kValues = new Integer[256];
+
+    static {
+      for (int i = 0; i < kValues.length; i++) {
+        kValues[i] = new Integer(i - 128);
+      }
+    }
+  }
+
   public static Integer valueOf(int value) {
+    if (value >= -128 && value <= 127) {
+      return Cache.kValues[value + 128];
+    }
     return new Integer(value);
   }
 

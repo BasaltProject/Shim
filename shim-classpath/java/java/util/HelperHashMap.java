@@ -92,7 +92,7 @@ public class HelperHashMap<K, V> implements Map<K, V> {
           Cell<K, V> next;
           for (Cell<K, V> c = array[i]; c != null; c = next) {
             next = c.next();
-            int index = c.hashCode() & (capacity - 1);
+            int index = c.bucketHash() & (capacity - 1);
             c.setNext(newArray[index]);
             newArray[index] = c;
           }
@@ -120,13 +120,13 @@ public class HelperHashMap<K, V> implements Map<K, V> {
 
     grow();
 
-    int index = cell.hashCode() & (array.length - 1);
+    int index = cell.bucketHash() & (array.length - 1);
     cell.setNext(array[index]);
     array[index] = cell;
   }
 
   public void remove(Cell<K, V> cell) {
-    int index = cell.hashCode() & (array.length - 1);
+    int index = cell.bucketHash() & (array.length - 1);
     Cell<K, V> p = null;
     for (Cell<K, V> c = array[index]; c != null; c = c.next()) {
       if (c == cell) {
@@ -269,6 +269,8 @@ public class HelperHashMap<K, V> implements Map<K, V> {
   interface Cell<K, V> extends Entry<K, V> {
     public HelperHashMap.Cell<K, V> next();
 
+    public int bucketHash();
+
     public void setNext(HelperHashMap.Cell<K, V> next);
   }
 
@@ -315,8 +317,24 @@ public class HelperHashMap<K, V> implements Map<K, V> {
       this.next = next;
     }
 
-    public int hashCode() {
+    public int bucketHash() {
       return hashCode;
+    }
+
+    public int hashCode() {
+      return (key == null ? 0 : key.hashCode()) ^ (value == null ? 0 : value.hashCode());
+    }
+
+    public boolean equals(Object o) {
+      if (!(o instanceof Entry)) {
+        return false;
+      }
+      Entry<?, ?> e = (Entry<?, ?>) o;
+      return Objects.equals(key, e.getKey()) && Objects.equals(value, e.getValue());
+    }
+
+    public String toString() {
+      return key + "=" + value;
     }
   }
 

@@ -109,7 +109,20 @@ public final class Character implements java.io.Serializable, Comparable<Charact
     this.value = value;
   }
 
+  private static final class Cache {
+    static final Character[] kValues = new Character[128];
+
+    static {
+      for (int i = 0; i < kValues.length; i++) {
+        kValues[i] = new Character((char) i);
+      }
+    }
+  }
+
   public static Character valueOf(char value) {
+    if (value <= 127) {
+      return Cache.kValues[value];
+    }
     return new Character(value);
   }
 

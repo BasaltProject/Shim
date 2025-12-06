@@ -1148,6 +1148,13 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
         if (m.compare(lo, hi) > 0) {
           throw new IllegalArgumentException("fromKey > toKey");
         }
+      } else {
+        if (!fromStart) {
+          m.compare(lo, lo);
+        }
+        if (!toEnd) {
+          m.compare(hi, hi);
+        }
       }
       this.m = m;
       this.fromStart = fromStart;
