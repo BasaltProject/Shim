@@ -850,13 +850,13 @@ public class DecimalFormat extends NumberFormat {
             }
             continue;
           case '%':
-            buffer.append(symbols.getPercent());
+            buffer.append(symbols.getPercentText());
             continue;
           case '‰':
-            buffer.append(symbols.getPerMill());
+            buffer.append(symbols.getPerMillText());
             continue;
           case '-':
-            buffer.append(symbols.getMinusSign());
+            buffer.append(symbols.getMinusSignText());
             continue;
           default:
             break;

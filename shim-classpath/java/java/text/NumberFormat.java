@@ -117,7 +117,7 @@ public abstract class NumberFormat extends Format {
 
   public static NumberFormat getNumberInstance(Locale inLocale) {
     Objects.requireNonNull(inLocale);
-    return new DecimalFormat("#,##0.###", DecimalFormatSymbols.getInstance(inLocale));
+    return new DecimalFormat(pattern(inLocale, "NP", "#,##0.###"), DecimalFormatSymbols.getInstance(inLocale));
   }
 
   public static final NumberFormat getIntegerInstance() {
@@ -126,7 +126,7 @@ public abstract class NumberFormat extends Format {
 
   public static NumberFormat getIntegerInstance(Locale inLocale) {
     Objects.requireNonNull(inLocale);
-    DecimalFormat df = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(inLocale));
+    DecimalFormat df = new DecimalFormat(pattern(inLocale, "IP", "#,##0"), DecimalFormatSymbols.getInstance(inLocale));
     df.setMaximumFractionDigits(0);
     df.setDecimalSeparatorAlwaysShown(false);
     df.setParseIntegerOnly(true);
@@ -139,11 +139,7 @@ public abstract class NumberFormat extends Format {
 
   public static NumberFormat getCurrencyInstance(Locale inLocale) {
     Objects.requireNonNull(inLocale);
-    DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(inLocale);
-    String language = inLocale.getLanguage();
-    boolean suffix = !language.equals("en") && !language.isEmpty() && !language.equals("ja") && !language.equals("zh")
-        && !language.equals("ko") && !language.equals("pt") && !language.equals("nl");
-    return new DecimalFormat(suffix ? "#,##0.00 ¤" : "¤#,##0.00", symbols);
+    return new DecimalFormat(pattern(inLocale, "CP", "¤#,##0.00"), DecimalFormatSymbols.getInstance(inLocale));
   }
 
   public static final NumberFormat getPercentInstance() {
@@ -152,10 +148,12 @@ public abstract class NumberFormat extends Format {
 
   public static NumberFormat getPercentInstance(Locale inLocale) {
     Objects.requireNonNull(inLocale);
-    String language = inLocale.getLanguage();
-    boolean spaced = !language.equals("en") && !language.isEmpty() && !language.equals("ja") && !language.equals("zh")
-        && !language.equals("ko") && !language.equals("pt") && !language.equals("nl") && !language.equals("it");
-    return new DecimalFormat(spaced ? "#,##0 %" : "#,##0%", DecimalFormatSymbols.getInstance(inLocale));
+    return new DecimalFormat(pattern(inLocale, "PP", "#,##0%"), DecimalFormatSymbols.getInstance(inLocale));
+  }
+
+  private static String pattern(Locale locale, String key, String fallback) {
+    String found = shim.LocaleDb.get(locale, key);
+    return found == null ? fallback : found;
   }
 
   public enum Style {

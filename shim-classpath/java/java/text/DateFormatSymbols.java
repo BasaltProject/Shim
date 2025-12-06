@@ -56,7 +56,34 @@ public class DateFormatSymbols implements Serializable, Cloneable {
     this(Locale.getDefault());
   }
 
-  public DateFormatSymbols(Locale locale) { }
+  public DateFormatSymbols(Locale locale) {
+    Objects.requireNonNull(locale, "locale");
+    String[] monthNames = shim.LocaleDb.list(locale, "M0");
+    if (monthNames != null) {
+      months = withTrailingEmpty(monthNames);
+      shortMonths = withTrailingEmpty(shim.LocaleDb.list(locale, "M1"));
+      weekdays = sundayFirst(shim.LocaleDb.list(locale, "D0"));
+      shortWeekdays = sundayFirst(shim.LocaleDb.list(locale, "D1"));
+      ampm = shim.LocaleDb.list(locale, "AP");
+      String[] eraNames = shim.LocaleDb.list(locale, "E");
+      eras = new String[] {eraNames[0], eraNames[1]};
+    }
+  }
+
+  private static String[] withTrailingEmpty(String[] names) {
+    String[] result = new String[names.length + 1];
+    System.arraycopy(names, 0, result, 0, names.length);
+    result[names.length] = "";
+    return result;
+  }
+
+  private static String[] sundayFirst(String[] mondayFirst) {
+    String[] result = new String[8];
+    result[0] = "";
+    result[1] = mondayFirst[6];
+    System.arraycopy(mondayFirst, 0, result, 2, 6);
+    return result;
+  }
 
   public static DateFormatSymbols getInstance() {
     return new DateFormatSymbols();

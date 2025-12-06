@@ -59,20 +59,8 @@ public enum DayOfWeek implements TemporalAccessor, TemporalAdjuster {
   }
 
   public String getDisplayName(TextStyle style, Locale locale) {
-    Objects.requireNonNull(style, "style");
-    Objects.requireNonNull(locale, "locale");
-    String name = name();
-    String full = name.charAt(0) + name.substring(1).toLowerCase();
-    switch (style) {
-      case FULL:
-      case FULL_STANDALONE:
-        return full;
-      case SHORT:
-      case SHORT_STANDALONE:
-        return full.substring(0, 3);
-      default:
-        return full.substring(0, 1);
-    }
+    return new java.time.format.DateTimeFormatterBuilder().appendText(java.time.temporal.ChronoField.DAY_OF_WEEK, style)
+        .toFormatter(locale).format(this);
   }
 
   @Override

@@ -362,6 +362,74 @@ public final class Formatter implements Closeable, Flushable {
     printString(spec, text);
   }
 
+  private static String regroup(String text, int size) {
+    int start = 0;
+    while (start < text.length() && !(text.charAt(start) >= '0' && text.charAt(start) <= '9')) {
+      start++;
+    }
+    int end = start;
+    while (end < text.length() && ((text.charAt(end) >= '0' && text.charAt(end) <= '9') || text.charAt(end) == ',')) {
+      end++;
+    }
+    StringBuilder digits = new StringBuilder();
+    for (int i = start; i < end; i++) {
+      if (text.charAt(i) != ',') {
+        digits.append(text.charAt(i));
+      }
+    }
+    StringBuilder grouped = new StringBuilder();
+    int first = digits.length() % size;
+    for (int i = 0; i < digits.length(); i++) {
+      if (i > 0 && (i - first) % size == 0) {
+        grouped.append(',');
+      }
+      grouped.append(digits.charAt(i));
+    }
+    return text.substring(0, start) + grouped + text.substring(end);
+  }
+
+  private String localize(String text, FormatterSpec spec) {
+    char conversion = spec.conversion;
+    if (conversion == 'o' || conversion == 'x' || conversion == 'X' || conversion == 'a' || conversion == 'A') {
+      return text;
+    }
+    Locale locale = callLocale;
+    if (locale == null) {
+      return text;
+    }
+    java.text.DecimalFormatSymbols symbols = java.text.DecimalFormatSymbols.getInstance(locale);
+    char zero = symbols.getZeroDigit();
+    char grouping = symbols.getGroupingSeparator();
+    char decimal = symbols.getDecimalSeparator();
+    int groupSize = 3;
+    if (text.indexOf(',') >= 0) {
+      java.text.NumberFormat integers = java.text.NumberFormat.getIntegerInstance(locale);
+      if (integers instanceof java.text.DecimalFormat) {
+        groupSize = ((java.text.DecimalFormat) integers).getGroupingSize();
+      }
+      if (groupSize != 3 && groupSize > 0) {
+        text = regroup(text, groupSize);
+      }
+    }
+    if (zero == '0' && grouping == ',' && decimal == '.') {
+      return text;
+    }
+    StringBuilder sb = new StringBuilder(text.length());
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c >= '0' && c <= '9') {
+        sb.append((char) (zero + (c - '0')));
+      } else if (c == ',') {
+        sb.append(grouping);
+      } else if (c == '.') {
+        sb.append(decimal);
+      } else {
+        sb.append(c);
+      }
+    }
+    return sb.toString();
+  }
+
   private void printInteger(FormatterSpec spec, Object arg) {
     if (arg == null) {
       printString(spec, "null");
@@ -386,7 +454,7 @@ public final class Formatter implements Closeable, Flushable {
       failConversion(spec, arg);
       return;
     }
-    justify(text, spec);
+    justify(localize(text, spec), spec);
   }
 
   private void printFloat(FormatterSpec spec, Object arg) {
@@ -405,6 +473,6 @@ public final class Formatter implements Closeable, Flushable {
       failConversion(spec, arg);
       return;
     }
-    justify(text, spec);
+    justify(localize(text, spec), spec);
   }
 }

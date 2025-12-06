@@ -26,6 +26,9 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
   private String infinity;
   private String NaN;
   private char minusSign;
+  private String minusSignText = "-";
+  private String percentText = "%";
+  private String perMillText = "\u2030";
   private String currencySymbol;
   private String intlCurrencySymbol;
   private char monetaryDecimalSeparator;
@@ -62,25 +65,32 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
     this.minusSign = '-';
     this.exponentSeparator = "E";
     this.monetaryDecimalSeparator = '.';
-    String language = locale.getLanguage();
-    if (language.equals("de") || language.equals("es") || language.equals("it") || language.equals("pt")
-        || language.equals("nl") || language.equals("tr") || language.equals("id")) {
-      this.groupingSeparator = '.';
-      this.decimalSeparator = ',';
-    } else if (language.equals("fr")) {
-      this.groupingSeparator = '\u202f';
-      this.decimalSeparator = ',';
-    } else if (language.equals("ru") || language.equals("pl") || language.equals("cs") || language.equals("sv")
-        || language.equals("fi") || language.equals("nb") || language.equals("uk")) {
-      this.groupingSeparator = '\u00a0';
-      this.decimalSeparator = ',';
+    String[] symbols = shim.LocaleDb.list(locale, "S");
+    if (symbols != null && symbols.length >= 11) {
+      this.zeroDigit = symbols[0].charAt(0);
+      this.groupingSeparator = symbols[1].charAt(0);
+      this.decimalSeparator = symbols[2].charAt(0);
+      this.minusSign = symbols[3].charAt(0);
+      this.percent = symbols[4].charAt(0);
+      this.perMill = symbols[5].charAt(0);
+      this.infinity = symbols[6];
+      this.NaN = symbols[7];
+      this.exponentSeparator = symbols[8];
+      this.monetaryDecimalSeparator = symbols[9].charAt(0);
+      this.monetaryGroupingSeparator = symbols[10].charAt(0);
+      if (symbols.length >= 14) {
+        this.minusSignText = symbols[11];
+        this.percentText = symbols[12];
+        this.perMillText = symbols[13];
+      }
     }
-    if (language.equals("de") && locale.getCountry().equals("CH")) {
-      this.groupingSeparator = '\u2019';
-      this.decimalSeparator = '.';
+    String numbering = locale.getUnicodeLocaleType("nu");
+    if (numbering != null) {
+      char zero = shim.LocaleDb.zeroDigit(numbering);
+      if (zero != 0) {
+        this.zeroDigit = zero;
+      }
     }
-    this.monetaryDecimalSeparator = this.decimalSeparator;
-    this.monetaryGroupingSeparator = this.groupingSeparator;
     Currency found = null;
     try {
       found = Currency.getInstance(locale);
@@ -152,6 +162,7 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
 
   public void setPerMill(char perMill) {
     this.perMill = perMill;
+    this.perMillText = String.valueOf(perMill);
   }
 
   public char getPercent() {
@@ -160,6 +171,7 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
 
   public void setPercent(char percent) {
     this.percent = percent;
+    this.percentText = String.valueOf(percent);
   }
 
   public char getDigit() {
@@ -200,6 +212,19 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
 
   public void setMinusSign(char minusSign) {
     this.minusSign = minusSign;
+    this.minusSignText = String.valueOf(minusSign);
+  }
+
+  String getMinusSignText() {
+    return minusSignText;
+  }
+
+  String getPercentText() {
+    return percentText;
+  }
+
+  String getPerMillText() {
+    return perMillText;
   }
 
   public String getCurrencySymbol() {
