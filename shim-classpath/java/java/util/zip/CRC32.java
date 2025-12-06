@@ -58,6 +58,11 @@ public class CRC32 implements Checksum {
   }
 
   public void update(byte[] array, int offset, int length) {
+    int size = array.length;
+    if (offset < 0 || length < 0 || offset > size - length) {
+      throw new ArrayIndexOutOfBoundsException("Range [" + offset + ", " + offset + " + " + length
+          + ") out of bounds for length " + size);
+    }
     for (int i = 0; i < length; ++i) {
       update(array[offset + i] & 0xFF);
     }

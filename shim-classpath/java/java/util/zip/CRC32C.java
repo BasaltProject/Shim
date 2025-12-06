@@ -43,7 +43,8 @@ public final class CRC32C implements Checksum {
   public void update(byte[] b, int off, int len) {
     Objects.requireNonNull(b, "b");
     if (off < 0 || len < 0 || off > b.length - len) {
-      throw new ArrayIndexOutOfBoundsException("off=" + off + ", len=" + len + ", b.length=" + b.length);
+      throw new ArrayIndexOutOfBoundsException("Range [" + off + ", " + off + " + " + len
+          + ") out of bounds for length " + b.length);
     }
     int local = crc;
     int end = off + len;

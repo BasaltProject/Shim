@@ -29,6 +29,10 @@
 
 #include <shim/util/runtime-array.h>
 
+#if defined(__linux__) || defined(__APPLE__)
+#include <unistd.h>
+#endif
+
 using namespace vm;
 
 namespace {
@@ -3694,8 +3698,18 @@ extern "C" SHIM_EXPORT jint JNICALL
     }
   }
 
-  if (heapLimit == 0)
+  if (heapLimit == 0) {
     heapLimit = 128 * 1024 * 1024;
+#if defined(__linux__) || defined(__APPLE__)
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long pageSize = sysconf(_SC_PAGE_SIZE);
+    if (pages > 0 && pageSize > 0) {
+      uint64_t quarter = static_cast<uint64_t>(pages) * static_cast<uint64_t>(pageSize) / 4;
+      const uint64_t kMaxDefaultHeap = 2048ULL * 1024 * 1024;
+      if (quarter > heapLimit) heapLimit = static_cast<unsigned>(quarter < kMaxDefaultHeap ? quarter : kMaxDefaultHeap);
+    }
+#endif
+  }
 
   if (stackLimit == 0)
     stackLimit = 1024 * 1024;

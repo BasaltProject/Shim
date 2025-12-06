@@ -29,7 +29,8 @@ public class Adler32 implements Checksum {
   public void update(byte[] b, int off, int len) {
     Objects.requireNonNull(b, "b");
     if (off < 0 || len < 0 || off > b.length - len) {
-      throw new ArrayIndexOutOfBoundsException("off=" + off + ", len=" + len + ", b.length=" + b.length);
+      throw new ArrayIndexOutOfBoundsException("Range [" + off + ", " + off + " + " + len
+          + ") out of bounds for length " + b.length);
     }
     int localS1 = s1;
     int localS2 = s2;

@@ -78,10 +78,20 @@ public class BitSet implements Serializable, Cloneable {
     return false;
   }
 
-  public BitSet get(int fromIndex, int toIndex) {
-    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
-      throw new IndexOutOfBoundsException();
+  private static void checkRange(int fromIndex, int toIndex) {
+    if (fromIndex < 0) {
+      throw new IndexOutOfBoundsException("fromIndex < 0: " + fromIndex);
     }
+    if (toIndex < 0) {
+      throw new IndexOutOfBoundsException("toIndex < 0: " + toIndex);
+    }
+    if (fromIndex > toIndex) {
+      throw new IndexOutOfBoundsException("fromIndex: " + fromIndex + " > toIndex: " + toIndex);
+    }
+  }
+
+  public BitSet get(int fromIndex, int toIndex) {
+    checkRange(fromIndex, toIndex);
     int len = length();
     if (len <= fromIndex || fromIndex == toIndex) {
       return new BitSet(0);
@@ -116,9 +126,7 @@ public class BitSet implements Serializable, Cloneable {
   }
 
   public void set(int fromIndex, int toIndex) {
-    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
-      throw new IndexOutOfBoundsException();
-    }
+    checkRange(fromIndex, toIndex);
     if (fromIndex == toIndex) {
       return;
     }
@@ -159,9 +167,7 @@ public class BitSet implements Serializable, Cloneable {
   }
 
   public void clear(int fromIndex, int toIndex) {
-    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
-      throw new IndexOutOfBoundsException();
-    }
+    checkRange(fromIndex, toIndex);
     if (fromIndex == toIndex) {
       return;
     }
@@ -204,9 +210,7 @@ public class BitSet implements Serializable, Cloneable {
   }
 
   public void flip(int fromIndex, int toIndex) {
-    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
-      throw new IndexOutOfBoundsException();
-    }
+    checkRange(fromIndex, toIndex);
     if (fromIndex == toIndex) {
       return;
     }

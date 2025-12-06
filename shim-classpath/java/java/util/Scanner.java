@@ -201,7 +201,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   @Override
   public String next() {
     if (!hasNext()) {
-      throw new NoSuchElementException("No more tokens");
+      throw new NoSuchElementException();
     }
     hasNextCached = false;
     return nextToken;
@@ -228,7 +228,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
 
   public String next(Pattern pattern) {
     if (!hasNext(pattern)) {
-      if (!hasNext()) throw new NoSuchElementException("No more tokens");
+      if (!hasNext()) throw new NoSuchElementException();
       throw new InputMismatchException();
     }
     return next();
@@ -325,7 +325,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
         return this;
       }
       if (!readMore()) {
-        throw new NoSuchElementException("skip target not found");
+        throw new NoSuchElementException();
       }
     }
   }
@@ -352,6 +352,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public boolean hasNextByte(int radix) {
+    checkRadix(radix);
     if (!hasNext()) return false;
     try {
       Byte.parseByte(nextToken, radix);
@@ -366,6 +367,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public byte nextByte(int radix) {
+    checkRadix(radix);
     if (!hasNextByte(radix)) {
       if (!hasNext()) throw new NoSuchElementException();
       throw new InputMismatchException();
@@ -378,6 +380,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public boolean hasNextShort(int radix) {
+    checkRadix(radix);
     if (!hasNext()) return false;
     try {
       Short.parseShort(nextToken, radix);
@@ -392,6 +395,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public short nextShort(int radix) {
+    checkRadix(radix);
     if (!hasNextShort(radix)) {
       if (!hasNext()) throw new NoSuchElementException();
       throw new InputMismatchException();
@@ -404,6 +408,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public boolean hasNextInt(int radix) {
+    checkRadix(radix);
     if (!hasNext()) return false;
     try {
       Integer.parseInt(nextToken, radix);
@@ -418,6 +423,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public int nextInt(int radix) {
+    checkRadix(radix);
     if (!hasNextInt(radix)) {
       if (!hasNext()) throw new NoSuchElementException();
       throw new InputMismatchException();
@@ -430,6 +436,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public boolean hasNextLong(int radix) {
+    checkRadix(radix);
     if (!hasNext()) return false;
     try {
       Long.parseLong(nextToken, radix);
@@ -444,6 +451,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public long nextLong(int radix) {
+    checkRadix(radix);
     if (!hasNextLong(radix)) {
       if (!hasNext()) throw new NoSuchElementException();
       throw new InputMismatchException();
@@ -492,6 +500,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public boolean hasNextBigInteger(int radix) {
+    checkRadix(radix);
     if (!hasNext()) return false;
     try {
       new BigInteger(nextToken, radix);
@@ -506,6 +515,7 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
   }
 
   public BigInteger nextBigInteger(int radix) {
+    checkRadix(radix);
     if (!hasNextBigInteger(radix)) {
       if (!hasNext()) throw new NoSuchElementException();
       throw new InputMismatchException();
@@ -557,10 +567,14 @@ public final class Scanner implements Iterator<String>, Closeable, AutoCloseable
     return radix;
   }
 
-  public Scanner useRadix(int radix) {
+  private static void checkRadix(int radix) {
     if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
-      throw new IllegalArgumentException("radix out of range: " + radix);
+      throw new IllegalArgumentException("radix:" + radix);
     }
+  }
+
+  public Scanner useRadix(int radix) {
+    checkRadix(radix);
     this.radix = radix;
     return this;
   }

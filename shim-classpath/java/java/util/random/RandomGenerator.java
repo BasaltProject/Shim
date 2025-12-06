@@ -186,14 +186,20 @@ public interface RandomGenerator {
 
   default java.util.stream.DoubleStream equiDoubles(double left, double right, boolean isLeftIncluded,
       boolean isRightIncluded) {
-    if (!(left < right) || Double.isInfinite(right - left) || Double.isNaN(left) || Double.isNaN(right)) {
-      throw new IllegalArgumentException("bounds must be finite and left < right");
+    boolean empty = left > right || (left == right && !(isLeftIncluded && isRightIncluded))
+        || (!isLeftIncluded && !isRightIncluded && Math.nextUp(left) == right);
+    if (Double.isNaN(left) || Double.isNaN(right) || Double.isInfinite(left) || Double.isInfinite(right) || empty) {
+      throw new IllegalArgumentException("the boundaries must be finite and the interval must not be empty");
+    }
+    if (left == right) {
+      return java.util.stream.DoubleStream.generate(() -> left);
     }
     return java.util.stream.DoubleStream.generate(() -> {
       double v;
       do {
-        v = left + nextDouble() * (right - left);
-      } while ((!isLeftIncluded && v == left) || (!isRightIncluded && v == right) || v > right);
+        double u = nextDouble();
+        v = left * (1.0 - u) + right * u;
+      } while (v < left || v > right || (!isLeftIncluded && v == left) || (!isRightIncluded && v == right));
       return v;
     });
   }

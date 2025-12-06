@@ -10,7 +10,11 @@ import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.BitSet;
 import java.util.Currency;
+import java.util.Scanner;
+import java.util.zip.Adler32;
+import java.util.zip.CRC32;
 import java.util.IdentityHashMap;
 import java.util.TreeMap;
 import java.util.WeakHashMap;
@@ -106,6 +110,20 @@ public class UtilEdgeModern {
     t("skipset-null-remove", () -> new ConcurrentSkipListSet<Integer>().remove(null));
     t("deque-null-remove", () -> new ConcurrentLinkedDeque<Integer>().remove(null));
     t("cow-iterator-index", () -> new CopyOnWriteArrayList<>(java.util.List.of(1, 2)).listIterator(5));
+    t("bitset-range", () -> new BitSet().get(-1, 2));
+    t("bitset-order", () -> new BitSet().clear(5, 2));
+    t("crc-range", () -> {
+      new CRC32().update(new byte[3], 2, 5);
+      return "ok";
+    });
+    t("adler-range", () -> {
+      new Adler32().update(new byte[3], -1, 1);
+      return "ok";
+    });
+    t("scanner-radix", () -> new Scanner("12").nextInt(1));
+    t("scanner-empty", () -> new Scanner("").next());
+    t("equi-doubles-empty", () -> new java.util.Random(1).equiDoubles(2.0, 1.0, true, true));
+    t("random-factory-name", () -> java.util.random.RandomGeneratorFactory.of("nope"));
     t("spliterator-negative", () -> Arrays.spliterator(new long[3], -1, 2));
   }
 }
