@@ -2025,9 +2025,15 @@ public final class DateTimeFormatterBuilder {
       if (offsetSecs == null) {
         return false;
       }
+      int totalSecs = Math.toIntExact(offsetSecs);
+      String localized = sun.util.locale.provider.ZoneNames.gmtOffset(context.getLocale(), totalSecs,
+          style == TextStyle.FULL);
+      if (localized != null) {
+        buf.append(localized);
+        return true;
+      }
       String gmtText = "GMT";
       buf.append(gmtText);
-      int totalSecs = Math.toIntExact(offsetSecs);
       if (totalSecs != 0) {
         int absHours = Math.abs((totalSecs / 3600) % 100);
         int absMinutes = Math.abs((totalSecs / 60) % 60);
@@ -2290,7 +2296,7 @@ public final class DateTimeFormatterBuilder {
             }
           }
         }
-        String name = sun.util.locale.provider.ZoneNames.get(zname, textStyle, generic, daylight);
+        String name = sun.util.locale.provider.ZoneNames.get(context.getLocale(), zname, textStyle, generic, daylight);
         if (name != null) {
           zname = name;
         }

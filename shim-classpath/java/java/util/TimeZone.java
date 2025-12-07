@@ -103,21 +103,8 @@ public abstract class TimeZone implements Serializable, Cloneable {
     if (id.startsWith("GMT") && id.length() > 3 && (id.charAt(3) == '+' || id.charAt(3) == '-')) {
       return id;
     }
-    switch (id) {
-      case "EST":
-        return style == SHORT ? (daylight ? "EDT" : "EST") : (daylight ? "Eastern Daylight Time"
-            : "Eastern Standard Time");
-      case "MST":
-        return style == SHORT ? (daylight ? "MDT" : "MST") : (daylight ? "Mountain Daylight Time"
-            : "Mountain Standard Time");
-      case "HST":
-        return style == SHORT ? (daylight ? "HDT" : "HST")
-            : (daylight ? "Hawaii-Aleutian Daylight Time" : "Hawaii-Aleutian Standard Time");
-      default:
-        break;
-    }
-    String known = sun.util.locale.provider.ZoneNames.get(id, style == SHORT ? java.time.format.TextStyle.SHORT
-        : java.time.format.TextStyle.FULL, false, daylight);
+    String known = sun.util.locale.provider.ZoneNames.timeZoneName(Objects.requireNonNull(locale, "locale"), id,
+        daylight, style == SHORT);
     if (known != null) {
       return known;
     }
@@ -128,7 +115,7 @@ public abstract class TimeZone implements Serializable, Cloneable {
     Instant chosen = rules.isDaylightSavings(sample) == daylight ? sample
         : (rules.isDaylightSavings(other) == daylight ? other : sample);
     String pattern = style == SHORT ? "z" : "zzzz";
-    return DateTimeFormatter.ofPattern(pattern, Locale.US).format(ZonedDateTime.ofInstant(chosen, zone));
+    return DateTimeFormatter.ofPattern(pattern, locale).format(ZonedDateTime.ofInstant(chosen, zone));
   }
 
   public int getDSTSavings() {

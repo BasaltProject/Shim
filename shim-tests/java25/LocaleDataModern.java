@@ -15,6 +15,8 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.time.format.TextStyle;
@@ -53,7 +55,33 @@ public class LocaleDataModern {
     }
   }
 
+  static void zones() {
+    String[] ids = {"Europe/Madrid", "America/New_York", "Asia/Tokyo", "Asia/Kolkata", "Australia/Adelaide",
+        "America/Argentina/Buenos_Aires", "Africa/Abidjan", "UTC", "Pacific/Auckland", "Asia/Kathmandu"};
+    for (String tag : new String[] {"en", "es", "de", "fr", "ja", "ru", "ar", "th", "ko", "zh", "pt", "it"}) {
+      Locale locale = Locale.forLanguageTag(tag);
+      for (String id : ids) {
+        TimeZone zone = TimeZone.getTimeZone(id);
+        ZoneId zoneId = ZoneId.of(id);
+        StringBuilder sb = new StringBuilder(tag + " zone " + id + " " + zone.getDisplayName(false, TimeZone.SHORT, locale)
+            + "|" + zone.getDisplayName(false, TimeZone.LONG, locale) + "|" + zone.getDisplayName(true, TimeZone.SHORT, locale)
+            + "|" + zone.getDisplayName(true, TimeZone.LONG, locale));
+        for (TextStyle style : TextStyle.values()) {
+          sb.append('|').append(zoneId.getDisplayName(style, locale));
+        }
+        ZonedDateTime winter = ZonedDateTime.of(2026, 1, 15, 12, 0, 0, 0, zoneId);
+        ZonedDateTime summer = ZonedDateTime.of(2026, 7, 15, 12, 0, 0, 0, zoneId);
+        for (String pattern : new String[] {"z", "zzzz", "v", "vvvv", "O", "OOOO"}) {
+          DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern, locale);
+          sb.append('|').append(formatter.format(winter)).append('/').append(formatter.format(summer));
+        }
+        System.out.println(sb);
+      }
+    }
+  }
+
   public static void main(String[] args) {
+    zones();
     calendars(new Date(1792254716201L), TimeZone.getTimeZone("UTC"));
     LocalDate date = LocalDate.of(2026, 10, 17);
     LocalDateTime dateTime = LocalDateTime.of(2026, 10, 17, 15, 4, 5);
@@ -74,7 +102,7 @@ public class LocaleDataModern {
         dateFormat.setTimeZone(utc);
         SimpleDateFormat timeFormat = (SimpleDateFormat) DateFormat.getTimeInstance(style, locale);
         timeFormat.setTimeZone(utc);
-        String time = style >= DateFormat.MEDIUM ? timeFormat.format(instant) + " | " + timeFormat.toPattern() : "";
+        String time = timeFormat.format(instant) + " | " + timeFormat.toPattern();
         System.out.println(tag + " date" + style + " " + dateFormat.format(instant) + " | " + dateFormat.toPattern()
             + " | " + time);
       }
