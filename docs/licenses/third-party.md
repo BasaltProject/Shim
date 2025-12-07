@@ -11,7 +11,7 @@ SPDX-License-Identifier: MIT
 |---|---|---|
 | Avian source and supporting files | ISC | [LICENSE.txt](../../LICENSE.txt); original file headers remain intact |
 | Basalt Shim modifications | MIT | [LICENSE](../../LICENSE) |
-| Unicode 16.0 character data | Unicode-3.0 | [Unicode notice](../../shim-classpath/licenses/UNICODE), also embedded in the classpath archive |
+| Unicode 16.0 character data and CLDR locale data tables | Unicode-3.0 | [Unicode notice](../../shim-classpath/licenses/UNICODE), also embedded in the classpath archive |
 | `shim-classpath/openjdk/openjdk.ld`, from Sun Microsystems | GPL-2.0-only | [GPL-2.0.txt](GPL-2.0.txt); original file header remains intact |
 
 MIT references in source headers cover Basalt Shim modifications and do not
