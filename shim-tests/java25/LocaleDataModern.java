@@ -19,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.time.format.TextStyle;
 import java.time.temporal.WeekFields;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -28,7 +29,32 @@ public class LocaleDataModern {
       "pt-BR", "nl-NL", "ru-RU", "pl-PL", "tr-TR", "ja-JP", "ko-KR", "zh-CN", "zh-TW", "ar-SA", "ar-EG", "hi-IN",
       "sv-SE", "fi-FI", "cs-CZ", "el-GR", "he-IL", "th-TH", "fa-IR", "uk-UA", "af-ZA"};
 
+  static void calendars(Date instant, TimeZone utc) {
+    for (String tag : new String[] {"th-TH", "ja-JP-u-ca-japanese", "en-US-u-ca-buddhist", "th-TH-u-ca-gregory",
+        "ja-JP"}) {
+      Locale locale = Locale.forLanguageTag(tag);
+      Calendar calendar = Calendar.getInstance(utc, locale);
+      calendar.setTime(instant);
+      System.out.println(tag + " calendar " + calendar.getCalendarType() + " " + calendar.get(Calendar.ERA) + " "
+          + calendar.get(Calendar.YEAR) + " " + calendar.getFirstDayOfWeek());
+      for (int style = DateFormat.FULL; style <= DateFormat.SHORT; style++) {
+        SimpleDateFormat format = (SimpleDateFormat) DateFormat.getDateInstance(style, locale);
+        format.setTimeZone(utc);
+        System.out.println(tag + " calendar-date" + style + " " + format.format(instant) + " | " + format.toPattern());
+      }
+      calendar.set(Calendar.YEAR, calendar.get(Calendar.YEAR) + 3);
+      System.out.println(tag + " calendar-set " + calendar.get(Calendar.YEAR) + " "
+          + calendar.getActualMaximum(Calendar.MONTH));
+    }
+    Calendar japanese = new Calendar.Builder().setCalendarType("japanese").setTimeZone(utc).build();
+    for (long millis : new long[] {-3000000000000L, -1800000000000L, -600000000000L, 1000000000000L, 1600000000000L}) {
+      japanese.setTimeInMillis(millis);
+      System.out.println("japanese era " + japanese.get(Calendar.ERA) + " " + japanese.get(Calendar.YEAR));
+    }
+  }
+
   public static void main(String[] args) {
+    calendars(new Date(1792254716201L), TimeZone.getTimeZone("UTC"));
     LocalDate date = LocalDate.of(2026, 10, 17);
     LocalDateTime dateTime = LocalDateTime.of(2026, 10, 17, 15, 4, 5);
     Date instant = new Date(1792254716201L);

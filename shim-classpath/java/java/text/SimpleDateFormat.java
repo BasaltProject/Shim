@@ -282,16 +282,38 @@ public class SimpleDateFormat extends DateFormat {
     zeroPadAscii(buffer, offset % 60, 2);
   }
 
+  private String eraName(int count, int value) {
+    String type = calendar.getCalendarType();
+    int style = count >= 5 ? 2 : count == 4 ? 1 : 0;
+    if (!type.equals("gregory")) {
+      String[] names = shim.LocaleDb.eraNames(locale, type);
+      if (names != null) {
+        int samples = names.length / 3;
+        int era = samples == 1 ? 0 : Math.min(value, samples - 1);
+        return names[style * samples + era];
+      }
+    }
+    return formatSymbols.getEras()[value];
+  }
+
   private void formatField(char c, int count, StringBuffer buffer) {
     int field = kCalendarFields[kPatternChars.indexOf(c)];
     int value = c == 'Y' ? (calendar.isWeekDateSupported() ? calendar.getWeekYear() : calendar.get(Calendar.YEAR))
         : (field == Calendar.ZONE_OFFSET ? 0 : calendar.get(field));
     switch (c) {
       case 'G':
-        buffer.append(formatSymbols.getEras()[value]);
+        buffer.append(eraName(count, value));
         break;
       case 'y':
       case 'Y':
+        if (!calendar.getCalendarType().equals("gregory")) {
+          if (value == 1 && calendar.getCalendarType().equals("japanese") && locale.getLanguage().equals("ja")) {
+            buffer.append('\u5143');
+          } else {
+            zeroPad(buffer, count == 2 ? value % 100 : value, count >= 4 ? 1 : count);
+          }
+          break;
+        }
         zeroPad(buffer, count == 2 ? value % 100 : value, count);
         break;
       case 'M':

@@ -173,18 +173,29 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
   }
 
   public static Calendar getInstance() {
-    return new GregorianCalendar(TimeZone.getDefaultRef(), Locale.getDefault());
+    return createCalendar(TimeZone.getDefaultRef(), Locale.getDefault());
   }
 
   public static Calendar getInstance(TimeZone zone) {
-    return new GregorianCalendar(zone, Locale.getDefault());
+    return createCalendar(zone, Locale.getDefault());
   }
 
   public static Calendar getInstance(Locale aLocale) {
-    return new GregorianCalendar(TimeZone.getDefaultRef(), aLocale);
+    return createCalendar(TimeZone.getDefaultRef(), aLocale);
   }
 
   public static Calendar getInstance(TimeZone zone, Locale aLocale) {
+    return createCalendar(zone, aLocale);
+  }
+
+  private static Calendar createCalendar(TimeZone zone, Locale aLocale) {
+    String type = shim.LocaleDb.calendarType(aLocale);
+    if (type.equals("buddhist")) {
+      return new sun.util.BuddhistCalendar(zone, aLocale);
+    }
+    if (type.equals("japanese")) {
+      return new JapaneseImperialCalendar(zone, aLocale);
+    }
     return new GregorianCalendar(zone, aLocale);
   }
 
@@ -598,7 +609,11 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
   abstract public int getMinimum(int field);
 
   public static Set<String> getAvailableCalendarTypes() {
-    return Collections.singleton("gregory");
+    Set<String> types = new LinkedHashSet<String>();
+    types.add("gregory");
+    types.add("buddhist");
+    types.add("japanese");
+    return Collections.unmodifiableSet(types);
   }
 
   public String getCalendarType() {
@@ -1002,9 +1017,10 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
         locale = Locale.getDefault();
       }
       if (type == null) {
-        type = "gregory";
+        type = shim.LocaleDb.calendarType(locale);
       }
-      GregorianCalendar cal = new GregorianCalendar(zone, locale);
+      GregorianCalendar cal = type.equals("buddhist") ? new sun.util.BuddhistCalendar(zone, locale)
+          : type.equals("japanese") ? new JapaneseImperialCalendar(zone, locale) : new GregorianCalendar(zone, locale);
       cal.clear();
       cal.setLenient(lenient);
       if (type.equals("iso8601")) {

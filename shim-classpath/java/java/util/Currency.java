@@ -70,11 +70,18 @@ public final class Currency implements Serializable {
       return getInstance("EUR");
     }
     if (country == null || !country.matches("^[a-zA-Z]{2}$")
-        || !Arrays.asList(Locale.getISOCountries()).contains(country.toUpperCase(Locale.ROOT))) {
+        || !(country.equalsIgnoreCase("AN") || country.equalsIgnoreCase("CS")
+            || Arrays.asList(Locale.getISOCountries()).contains(country.toUpperCase(Locale.ROOT)))) {
       throw new IllegalArgumentException("The country of the input locale: \"" + locale
           + "\" is not a valid ISO 3166 country code");
     }
     country = country.toUpperCase(Locale.ROOT);
+    if (country.equals("AN")) {
+      return getInstance("ANG");
+    }
+    if (country.equals("CS")) {
+      return getInstance("CSD");
+    }
     for (String pair : CurrencyData.kCountries) {
       if (pair.startsWith(country)) {
         return getInstance(pair.substring(2));

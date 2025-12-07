@@ -214,7 +214,7 @@ public class DecimalFormat extends NumberFormat {
       boolean isInteger, int maxIntDigits, int minIntDigits, int maxFraDigits, int minFraDigits) {
     char zero = symbols.getZeroDigit();
     int zeroDelta = zero - '0';
-    char grouping = symbols.getGroupingSeparator();
+    char grouping = isCurrencyFormat ? symbols.getMonetaryGroupingSeparator() : symbols.getGroupingSeparator();
     char decimal = isCurrencyFormat ? symbols.getMonetaryDecimalSeparator() : symbols.getDecimalSeparator();
     if (digitList.isZero()) {
       digitList.decimalAt = 0;
@@ -567,7 +567,7 @@ public class DecimalFormat extends NumberFormat {
     digits.clear();
     char zero = symbols.getZeroDigit();
     char decimal = isCurrencyFormat ? symbols.getMonetaryDecimalSeparator() : symbols.getDecimalSeparator();
-    char grouping = symbols.getGroupingSeparator();
+    char grouping = isCurrencyFormat ? symbols.getMonetaryGroupingSeparator() : symbols.getGroupingSeparator();
     String exponentString = symbols.getExponentSeparator();
     boolean sawDecimal = false;
     boolean sawExponent = false;
