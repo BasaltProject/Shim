@@ -8,6 +8,7 @@
 
 #include "jni.h"
 #include "jni-util.h"
+#include "utf8-util.h"
 
 #ifdef PLATFORM_WINDOWS
 #include <winsock2.h>
@@ -77,6 +78,7 @@ typedef socklen_t NetLen;
 typedef int NetOptVal;
 #endif
 
+#include <locale.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -132,6 +134,18 @@ void ensureStarted()
 }
 #endif
 
+#ifndef PLATFORM_WINDOWS
+void useEnvironmentMessages()
+{
+  static bool set = false;
+  if (!set) {
+    set = true;
+    setlocale(LC_MESSAGES, "");
+    setlocale(LC_CTYPE, "");
+  }
+}
+#endif
+
 const char* errorText(int err)
 {
 #ifdef PLATFORM_WINDOWS
@@ -139,8 +153,26 @@ const char* errorText(int err)
   snprintf(buffer, sizeof(buffer), "Socket error %d", err);
   return buffer;
 #else
+  useEnvironmentMessages();
   return strerror(err);
 #endif
+}
+
+void throwNewUtf8(JNIEnv* e, const char* className, const char* message)
+{
+  jclass c = e->FindClass(className);
+  if (c == 0) {
+    return;
+  }
+  jmethodID constructor = e->GetMethodID(c, "<init>", "(Ljava/lang/String;)V");
+  jstring text = shimutf8::fromUtf8(e, message);
+  if (constructor != 0 && text != 0) {
+    jobject exception = e->NewObject(c, constructor, text);
+    if (exception != 0) {
+      e->Throw(static_cast<jthrowable>(exception));
+    }
+  }
+  e->DeleteLocalRef(c);
 }
 
 void throwForError(JNIEnv* e, int err, const char* what)
@@ -172,11 +204,17 @@ void throwForError(JNIEnv* e, int err, const char* what)
   } else if (err == NET_ENOTSOCK || err == NET_ENOTCONN) {
     message = err == NET_ENOTCONN ? "Socket is not connected" : "Socket closed";
   }
+#ifndef PLATFORM_WINDOWS
+  if (err == NET_ECONNREFUSED || err == NET_ETIMEDOUT || err == NET_ENETUNREACH || err == NET_EHOSTUNREACH
+      || err == NET_EADDRINUSE || err == NET_EADDRNOTAVAIL || err == NET_EACCES) {
+    message = errorText(err);
+  }
+#endif
   if (message == 0) {
     message = errorText(err);
   }
   (void)what;
-  throwNew(e, cls, "%s", message);
+  throwNewUtf8(e, cls, message);
 }
 
 bool waitFor(NetHandle fd, bool forWrite, int timeoutMs, int* err)
@@ -875,6 +913,18 @@ extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_membership(JNIEnv* e, jcla
   }
 }
 
+static int lastLookupError = 0;
+
+extern "C" JNIEXPORT jstring JNICALL Java_shim_NetNative_lookupError(JNIEnv* e, jclass)
+{
+#ifdef PLATFORM_WINDOWS
+  return e->NewStringUTF("Name or service not known");
+#else
+  useEnvironmentMessages();
+  return e->NewStringUTF(lastLookupError == 0 ? "Name or service not known" : gai_strerror(lastLookupError));
+#endif
+}
+
 extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_NetNative_lookup(JNIEnv* e, jclass, jstring host)
 {
   ensureStarted();
@@ -889,6 +939,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_NetNative_lookup(JNIEnv* e, 
   struct addrinfo* result = 0;
   int rc = getaddrinfo(name, 0, &hints, &result);
   e->ReleaseStringUTFChars(host, name);
+  lastLookupError = rc;
   if (rc != 0 || result == 0) {
     return 0;
   }

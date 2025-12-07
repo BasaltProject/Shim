@@ -67,6 +67,8 @@ public final class NetNative {
 
   public static native byte[][] lookup(String host);
 
+  public static native String lookupError();
+
   public static native String reverse(byte[] addr);
 
   public static native String localHostName();
