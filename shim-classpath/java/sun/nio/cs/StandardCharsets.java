@@ -54,29 +54,45 @@ public final class StandardCharsets {
       String aliases = entry.substring(first + 1, second);
       register(Integer.valueOf(i), entry.substring(0, first), aliases.isEmpty() ? new String[0] : aliases.split(","));
     }
+    for (int i = 0; i < MultiByteTables.kEntries.length; i++) {
+      String[] f = MultiByteTables.kEntries[i].split("\\|", -1);
+      register(Long.valueOf(i), f[0], f[1].isEmpty() ? new String[0] : f[1].split(","));
+    }
   }
 
   private static Charset resolve(Object o) {
     if (o instanceof Charset) {
       return (Charset) o;
     }
-    int index = ((Integer) o).intValue();
     synchronized (kAll) {
       Object current = kAll.get(kAll.indexOf(o));
       if (current instanceof Charset) {
         return (Charset) current;
       }
+      if (o instanceof Long) {
+        int multi = ((Long) o).intValue();
+        String[] m = MultiByteTables.kEntries[multi].split("\\|", -1);
+        Charset built = new MultiByte(m[0], m[1].isEmpty() ? new String[0] : m[1].split(","), m[2], m[3].equals("1"),
+            m[4].equals("1"), MultiByteTables.kBlobs[multi]);
+        replace(o, built);
+        return built;
+      }
+      int index = ((Integer) o).intValue();
       String[] f = SingleByteTables.kEntries[index].split("\\|", -1);
       String[] aliases = f[1].isEmpty() ? new String[0] : f[1].split(",");
       Charset cs = new SingleByte(f[0], aliases, f[2], Integer.parseInt(f[3], 16), f[4].equals("1"),
           f[5].equals("1"), f[6], f[7]);
-      kAll.set(kAll.indexOf(o), cs);
-      for (Map.Entry<String, Object> e : kByName.entrySet()) {
-        if (e.getValue() == o) {
-          e.setValue(cs);
-        }
-      }
+      replace(o, cs);
       return cs;
+    }
+  }
+
+  private static void replace(Object placeholder, Charset cs) {
+    kAll.set(kAll.indexOf(placeholder), cs);
+    for (Map.Entry<String, Object> e : kByName.entrySet()) {
+      if (e.getValue() == placeholder) {
+        e.setValue(cs);
+      }
     }
   }
 
