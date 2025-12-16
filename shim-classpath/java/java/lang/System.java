@@ -104,7 +104,13 @@ public abstract class System {
   }
 
   public static java.io.Console console() {
-    return null;
+    try {
+      java.lang.reflect.Method method = java.io.Console.class.getDeclaredMethod("instance");
+      method.setAccessible(true);
+      return (java.io.Console) method.invoke(null);
+    } catch (ReflectiveOperationException e) {
+      return null;
+    }
   }
 
   private static void setField(String name, Object value) {

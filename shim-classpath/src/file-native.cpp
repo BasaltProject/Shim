@@ -33,6 +33,7 @@ typedef struct _stat64 FsStat;
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <termios.h>
 #include <sys/statvfs.h>
 #include <unistd.h>
 #include <utime.h>
@@ -714,5 +715,41 @@ extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_cwd(JNIEnv* e, jclass)
     return 0;
   }
   return shimutf8::fromUtf8(e, buffer);
+#endif
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_shim_FileNative_isTerminal(JNIEnv*, jclass, jint fd)
+{
+#ifdef PLATFORM_WINDOWS
+  return _isatty(fd) != 0;
+#else
+  return isatty(fd) != 0;
+#endif
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_shim_FileNative_setEcho(JNIEnv*, jclass, jboolean on)
+{
+#ifdef PLATFORM_WINDOWS
+  HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+  DWORD mode = 0;
+  if (!GetConsoleMode(h, &mode)) {
+    return JNI_TRUE;
+  }
+  bool was = (mode & ENABLE_ECHO_INPUT) != 0;
+  SetConsoleMode(h, on ? (mode | ENABLE_ECHO_INPUT) : (mode & ~ENABLE_ECHO_INPUT));
+  return was;
+#else
+  struct termios t;
+  if (tcgetattr(0, &t) != 0) {
+    return JNI_TRUE;
+  }
+  bool was = (t.c_lflag & ECHO) != 0;
+  if (on) {
+    t.c_lflag |= ECHO;
+  } else {
+    t.c_lflag &= ~ECHO;
+  }
+  tcsetattr(0, TCSANOW, &t);
+  return was;
 #endif
 }
