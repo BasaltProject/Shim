@@ -17,6 +17,10 @@ import java.util.List;
 import java.util.Objects;
 
 public interface MethodTypeDesc extends ConstantDesc, TypeDescriptor.OfMethod<ClassDesc, MethodTypeDesc> {
+  boolean equals(Object o);
+
+  int hashCode();
+
 
   static MethodTypeDesc of(ClassDesc returnDesc) {
     return of(returnDesc, new ClassDesc[0]);

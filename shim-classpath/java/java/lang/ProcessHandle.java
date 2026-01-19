@@ -13,6 +13,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 public interface ProcessHandle extends Comparable<ProcessHandle> {
+  boolean equals(Object o);
+
+  int hashCode();
+
   long pid();
 
   Optional<ProcessHandle> parent();

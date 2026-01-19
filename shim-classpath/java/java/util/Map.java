@@ -254,6 +254,10 @@ public interface Map<K, V> {
   }
 
   public interface Entry<K, V> {
+    boolean equals(Object o);
+
+    int hashCode();
+
     public K getKey();
 
     public V getValue();

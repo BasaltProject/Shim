@@ -54,4 +54,6 @@ public interface DirectMethodHandleDesc extends MethodHandleDesc {
   ClassDesc owner();
 
   String methodName();
+
+  String lookupDescriptor();
 }

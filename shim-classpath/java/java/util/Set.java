@@ -24,6 +24,10 @@
 package java.util;
 
 public interface Set<T> extends Collection<T> {
+  boolean equals(Object o);
+
+  int hashCode();
+
   static <E> Set<E> of() {
     return ImmutableCollections.emptySet();
   }

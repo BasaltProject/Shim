@@ -11,6 +11,10 @@ package java.lang.constant;
 import java.util.Objects;
 
 public interface ModuleDesc {
+  boolean equals(Object o);
+
+  int hashCode();
+
   static ModuleDesc of(String name) {
     Objects.requireNonNull(name, "name");
     for (int i = 0; i < name.length(); i++) {

@@ -13,9 +13,29 @@ import java.lang.invoke.MethodHandles;
 import java.util.Objects;
 
 public interface MethodHandleDesc extends ConstantDesc {
+  boolean equals(Object o);
+
+  int hashCode();
+
 
   static DirectMethodHandleDesc of(DirectMethodHandleDesc.Kind kind, ClassDesc owner, String name, MethodTypeDesc type) {
     return ofMethod(kind, owner, name, type);
+  }
+
+  static DirectMethodHandleDesc of(DirectMethodHandleDesc.Kind kind, ClassDesc owner, String name,
+      String lookupDescriptor) {
+    Objects.requireNonNull(kind, "kind");
+    switch (kind) {
+      case CONSTRUCTOR:
+        return ofConstructor(owner, MethodTypeDesc.ofDescriptor(lookupDescriptor).parameterArray());
+      case GETTER:
+      case SETTER:
+      case STATIC_GETTER:
+      case STATIC_SETTER:
+        return ofField(kind, owner, name, ClassDesc.ofDescriptor(lookupDescriptor));
+      default:
+        return ofMethod(kind, owner, name, MethodTypeDesc.ofDescriptor(lookupDescriptor));
+    }
   }
 
   static DirectMethodHandleDesc ofMethod(DirectMethodHandleDesc.Kind kind, ClassDesc owner, String name, MethodTypeDesc type) {

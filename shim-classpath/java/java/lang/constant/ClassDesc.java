@@ -14,6 +14,10 @@ import java.lang.reflect.Array;
 import java.util.Objects;
 
 public interface ClassDesc extends ConstantDesc, TypeDescriptor.OfField<ClassDesc> {
+  boolean equals(Object o);
+
+  int hashCode();
+
 
   static ClassDesc of(String name) {
     Objects.requireNonNull(name, "name");

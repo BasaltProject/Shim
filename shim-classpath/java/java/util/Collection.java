@@ -24,6 +24,10 @@
 package java.util;
 
 public interface Collection<T> extends Iterable<T> {
+  boolean equals(Object o);
+
+  int hashCode();
+
   public int size();
 
   public boolean isEmpty();

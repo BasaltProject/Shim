@@ -32,6 +32,10 @@ public class DynamicConstantDesc<T> implements ConstantDesc {
     this.bootstrapArgs = bootstrapArgs != null ? bootstrapArgs.clone() : new ConstantDesc[0];
   }
 
+  public static <T> DynamicConstantDesc<T> of(DirectMethodHandleDesc bootstrapMethod) {
+    return of(bootstrapMethod, new ConstantDesc[0]);
+  }
+
   public static <T> DynamicConstantDesc<T> of(DirectMethodHandleDesc bootstrapMethod, ConstantDesc... bootstrapArgs) {
     return ofNamed(bootstrapMethod, ConstantDescs.DEFAULT_NAME, bootstrapMethod.invocationType().returnType(), bootstrapArgs);
   }
