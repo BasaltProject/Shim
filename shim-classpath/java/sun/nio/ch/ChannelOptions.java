@@ -22,11 +22,21 @@ final class ChannelOptions {
   static final int kStream = 0;
   static final int kServer = 1;
   static final int kDatagram = 2;
+  static final int kUnixStream = 3;
+  static final int kUnixServer = 4;
 
   private ChannelOptions() { }
 
   static Set<SocketOption<?>> supported(int kind) {
     Set<SocketOption<?>> options = new HashSet<SocketOption<?>>();
+    if (kind == kUnixStream || kind == kUnixServer) {
+      options.add(StandardSocketOptions.SO_RCVBUF);
+      if (kind == kUnixStream) {
+        options.add(StandardSocketOptions.SO_SNDBUF);
+        options.add(StandardSocketOptions.SO_LINGER);
+      }
+      return Collections.unmodifiableSet(options);
+    }
     options.add(StandardSocketOptions.SO_RCVBUF);
     options.add(StandardSocketOptions.SO_REUSEADDR);
     options.add(StandardSocketOptions.SO_REUSEPORT);

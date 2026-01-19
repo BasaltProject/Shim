@@ -49,6 +49,7 @@ typedef char NetOptVal;
 #include <poll.h>
 #include <signal.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
@@ -1473,3 +1474,136 @@ extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_socketPair(JNIEnv* e, jcla
   e->SetLongArrayRegion(out, 0, 2, pair);
 #endif
 }
+
+#ifndef PLATFORM_WINDOWS
+namespace {
+
+socklen_t makeUnixAddress(JNIEnv* e, jbyteArray path, struct sockaddr_un* un)
+{
+  memset(un, 0, sizeof(*un));
+  un->sun_family = AF_UNIX;
+  jsize n = e->GetArrayLength(path);
+  if (static_cast<size_t>(n) >= sizeof(un->sun_path)) {
+    throwNew(e, "java/net/SocketException", "Unix domain path too long");
+    return 0;
+  }
+  e->GetByteArrayRegion(path, 0, n, reinterpret_cast<jbyte*>(un->sun_path));
+  return static_cast<socklen_t>(offsetof(struct sockaddr_un, sun_path) + n + 1);
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jlong JNICALL Java_shim_NetNative_socketUnix(JNIEnv* e, jclass)
+{
+  ensureStarted();
+  int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+  if (fd < 0) {
+    throwForError(e, NET_ERRNO(), "socket");
+    return -1;
+  }
+  return static_cast<jlong>(fd);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_bindUnix(JNIEnv* e, jclass, jlong handle, jbyteArray path)
+{
+  struct sockaddr_un un;
+  socklen_t len = makeUnixAddress(e, path, &un);
+  if (len == 0) {
+    return;
+  }
+  if (::bind(handleFd(handle), reinterpret_cast<struct sockaddr*>(&un), len) != 0) {
+    throwForError(e, NET_ERRNO(), "bind");
+  }
+}
+
+extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_connectUnix(JNIEnv* e, jclass, jlong handle, jbyteArray path)
+{
+  struct sockaddr_un un;
+  socklen_t len = makeUnixAddress(e, path, &un);
+  if (len == 0) {
+    return;
+  }
+  for (;;) {
+    if (::connect(handleFd(handle), reinterpret_cast<struct sockaddr*>(&un), len) == 0) {
+      return;
+    }
+    int err = NET_ERRNO();
+    if (err == NET_EINTR) {
+      continue;
+    }
+    throwForError(e, err, "connect");
+    return;
+  }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_shim_NetNative_connectNbUnix(JNIEnv* e, jclass, jlong handle,
+                                                                       jbyteArray path)
+{
+  struct sockaddr_un un;
+  socklen_t len = makeUnixAddress(e, path, &un);
+  if (len == 0) {
+    return JNI_FALSE;
+  }
+  if (::connect(handleFd(handle), reinterpret_cast<struct sockaddr*>(&un), len) == 0) {
+    return JNI_TRUE;
+  }
+  int err = NET_ERRNO();
+  if (err == EINPROGRESS || err == EAGAIN) {
+    return JNI_FALSE;
+  }
+  throwForError(e, err, "connect");
+  return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_shim_NetNative_sockNameUnix(JNIEnv* e, jclass, jlong handle, jboolean peer)
+{
+  struct sockaddr_un un;
+  socklen_t len = sizeof(un);
+  memset(&un, 0, sizeof(un));
+  int r = peer ? ::getpeername(handleFd(handle), reinterpret_cast<struct sockaddr*>(&un), &len)
+               : ::getsockname(handleFd(handle), reinterpret_cast<struct sockaddr*>(&un), &len);
+  if (r != 0) {
+    return 0;
+  }
+  size_t offset = offsetof(struct sockaddr_un, sun_path);
+  size_t n = len > offset ? len - offset : 0;
+  if (n > 0 && un.sun_path[0] == 0 && n == 1) {
+    n = 0;
+  }
+  while (n > 0 && un.sun_path[n - 1] == 0) {
+    --n;
+  }
+  jbyteArray result = e->NewByteArray(static_cast<jsize>(n));
+  if (n > 0) {
+    e->SetByteArrayRegion(result, 0, static_cast<jsize>(n), reinterpret_cast<const jbyte*>(un.sun_path));
+  }
+  return result;
+}
+#else
+extern "C" JNIEXPORT jlong JNICALL Java_shim_NetNative_socketUnix(JNIEnv* e, jclass)
+{
+  throwNew(e, "java/lang/UnsupportedOperationException", "Protocol family not supported");
+  return -1;
+}
+
+extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_bindUnix(JNIEnv* e, jclass, jlong, jbyteArray)
+{
+  throwNew(e, "java/lang/UnsupportedOperationException", "Protocol family not supported");
+}
+
+extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_connectUnix(JNIEnv* e, jclass, jlong, jbyteArray)
+{
+  throwNew(e, "java/lang/UnsupportedOperationException", "Protocol family not supported");
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_shim_NetNative_connectNbUnix(JNIEnv* e, jclass, jlong, jbyteArray)
+{
+  throwNew(e, "java/lang/UnsupportedOperationException", "Protocol family not supported");
+  return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL Java_shim_NetNative_sockNameUnix(JNIEnv*, jclass, jlong, jboolean)
+{
+  return 0;
+}
+#endif

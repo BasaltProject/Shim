@@ -99,4 +99,14 @@ public final class NetNative {
   public static native void socketPair(long[] out) throws IOException;
 
   public static native void disconnect(long handle) throws IOException;
+
+  public static native long socketUnix() throws IOException;
+
+  public static native void bindUnix(long handle, byte[] path) throws IOException;
+
+  public static native void connectUnix(long handle, byte[] path) throws IOException;
+
+  public static native boolean connectNbUnix(long handle, byte[] path) throws IOException;
+
+  public static native byte[] sockNameUnix(long handle, boolean peer);
 }

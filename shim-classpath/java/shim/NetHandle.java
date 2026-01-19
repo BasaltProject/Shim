@@ -13,12 +13,18 @@ import java.net.SocketException;
 
 public final class NetHandle {
   private final boolean datagram;
+  private final boolean unix;
   private long handle = -1;
   private int operations;
   private boolean closed;
 
   public NetHandle(boolean datagram) {
+    this(datagram, false);
+  }
+
+  public NetHandle(boolean datagram, boolean unix) {
     this.datagram = datagram;
+    this.unix = unix;
   }
 
   public synchronized boolean isClosed() {
@@ -39,7 +45,7 @@ public final class NetHandle {
     }
     if (handle < 0) {
       NetNative.init();
-      handle = NetNative.socket(true, datagram);
+      handle = unix ? NetNative.socketUnix() : NetNative.socket(true, datagram);
     }
     operations++;
     return handle;

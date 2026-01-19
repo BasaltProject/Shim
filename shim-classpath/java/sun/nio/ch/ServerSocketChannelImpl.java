@@ -24,14 +24,22 @@ import shim.NetHandle;
 import shim.NetNative;
 
 final class ServerSocketChannelImpl extends ServerSocketChannel implements SelectorImpl.HasHandle {
-  private final NetHandle net = new NetHandle(false);
+  private final NetHandle net;
+  private final boolean unix;
+  private java.net.UnixDomainSocketAddress unixLocal;
   private final Object stateLock = new Object();
   private boolean bound;
   private InetSocketAddress local;
   private ServerSocket adaptor;
 
   ServerSocketChannelImpl(SelectorProvider provider) throws IOException {
+    this(provider, false);
+  }
+
+  ServerSocketChannelImpl(SelectorProvider provider, boolean unix) throws IOException {
     super(provider);
+    this.unix = unix;
+    this.net = new NetHandle(false, unix);
     net.begin();
     net.end();
   }
@@ -49,6 +57,21 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
       }
       if (bound) {
         throw new AlreadyBoundException();
+      }
+      if (unix) {
+        byte[] path = addr == null ? SocketChannelImpl.autobindPath().getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            : SocketChannelImpl.unixPathBytes(addr);
+        long uh = net.begin();
+        try {
+          NetNative.bindUnix(uh, path);
+          NetNative.listen(uh, backlog < 1 ? 50 : backlog);
+          byte[] raw = NetNative.sockNameUnix(uh, false);
+          unixLocal = java.net.UnixDomainSocketAddress.of(new String(raw, java.nio.charset.StandardCharsets.UTF_8));
+        } finally {
+          net.end();
+        }
+        bound = true;
+        return this;
       }
       InetSocketAddress isa = addr == null ? new InetSocketAddress(0) : SocketChannelImpl.checkAddress(addr);
       long h = net.begin();
@@ -75,7 +98,7 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    ChannelOptions.set(net, name, value, ChannelOptions.kServer);
+    ChannelOptions.set(net, name, value, unix ? ChannelOptions.kUnixServer : ChannelOptions.kServer);
     return this;
   }
 
@@ -87,16 +110,19 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
     if (!isOpen()) {
       throw new ClosedChannelException();
     }
-    return ChannelOptions.get(net, name, ChannelOptions.kServer);
+    return ChannelOptions.get(net, name, unix ? ChannelOptions.kUnixServer : ChannelOptions.kServer);
   }
 
   @Override
   public Set<SocketOption<?>> supportedOptions() {
-    return ChannelOptions.supported(ChannelOptions.kServer);
+    return ChannelOptions.supported(unix ? ChannelOptions.kUnixServer : ChannelOptions.kServer);
   }
 
   @Override
   public ServerSocket socket() {
+    if (unix) {
+      throw new UnsupportedOperationException("Not supported");
+    }
     synchronized (stateLock) {
       if (adaptor == null) {
         try {
@@ -137,6 +163,9 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
         }
       }
       NetNative.setBlocking(client, true);
+      if (unix) {
+        return new SocketChannelImpl(provider(), client, true);
+      }
       return new SocketChannelImpl(provider(), client, peer[0], peerPort[0]);
     } finally {
       net.end();
@@ -145,7 +174,7 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
 
   SocketAddress getLocalAddressUnchecked() {
     synchronized (stateLock) {
-      return bound ? local : null;
+      return bound ? (unix ? unixLocal : local) : null;
     }
   }
 
@@ -155,7 +184,7 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
       if (!isOpen()) {
         throw new ClosedChannelException();
       }
-      return bound ? local : null;
+      return bound ? (unix ? unixLocal : local) : null;
     }
   }
 
@@ -186,10 +215,11 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
       sb.append("closed");
     } else {
       synchronized (stateLock) {
-        if (local == null) {
+        Object shown = unix ? unixLocal : local;
+        if (shown == null) {
           sb.append("unbound");
         } else {
-          sb.append(local);
+          sb.append(shown);
         }
       }
     }
