@@ -423,6 +423,90 @@ public class LambdaMetafactory {
     return result;
   }
 
+  private static final MethodType.TypeSpec kObjectSpec = new MethodType.TypeSpec() {
+    public Class type() {
+      return Object.class;
+    }
+
+    public String spec() {
+      return "Ljava/lang/Object;";
+    }
+  };
+
+  private static void pushString(ByteArrayOutputStream out, List<PoolEntry> pool, String value) throws IOException {
+    write1(out, ldc_w);
+    write2(out, ConstantPool.addString(pool, value) + 1);
+  }
+
+  private static void pushInt(ByteArrayOutputStream out, List<PoolEntry> pool, int value) throws IOException {
+    write1(out, ldc_w);
+    write2(out, ConstantPool.addInteger(pool, value) + 1);
+  }
+
+  private static byte[] makeWriteReplaceCode(List<PoolEntry> pool,
+                                             String className,
+                                             MethodType fieldType,
+                                             MethodType interfaceMethodType,
+                                             String invokedName,
+                                             MethodType instantiatedType,
+                                             MethodHandle implementation,
+                                             Class<?> capturingClass)
+    throws IOException
+  {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    write2(out, 16); // max stack
+    write2(out, 1); // max locals
+    write4(out, 0); // length (we'll set the real value later)
+
+    write1(out, new_);
+    write2(out, ConstantPool.addClass(pool, "java/lang/invoke/SerializedLambda") + 1);
+    write1(out, dup);
+    write1(out, ldc_w);
+    write2(out, ConstantPool.addClass(pool, capturingClass.getName().replace('.', '/')) + 1);
+    pushString(out, pool, fieldType.returnType().getName().replace('.', '/'));
+    pushString(out, pool, invokedName);
+    pushString(out, pool, interfaceMethodType.toMethodDescriptorString());
+    pushInt(out, pool, implementation.kind);
+    pushString(out, pool, Classes.makeString(implementation.method.class_.name, 0,
+                                             implementation.method.class_.name.length - 1));
+    pushString(out, pool, Classes.makeString(implementation.method.name, 0, implementation.method.name.length - 1));
+    pushString(out, pool, Classes.makeString(implementation.method.spec, 0, implementation.method.spec.length - 1));
+    pushString(out, pool, instantiatedType.toMethodDescriptorString());
+
+    int count = 0;
+    for (MethodType.Parameter p: fieldType.parameters()) {
+      count++;
+    }
+    pushInt(out, pool, count);
+    write1(out, anewarray);
+    write2(out, ConstantPool.addClass(pool, "java/lang/Object") + 1);
+    int slot = 0;
+    for (MethodType.Parameter p: fieldType.parameters()) {
+      write1(out, dup);
+      pushInt(out, pool, slot++);
+      write1(out, aload_0);
+      write1(out, getfield);
+      write2(out, ConstantPool.addFieldRef(pool, className, "field" + p.index(), p.spec()) + 1);
+      maybeBoxOrUnbox(out, pool, p, kObjectSpec);
+      write1(out, aastore);
+    }
+
+    write1(out, invokespecial);
+    write2(out, ConstantPool.addMethodRef
+           (pool, "java/lang/invoke/SerializedLambda", "<init>",
+            "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;"
+            + "Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)V") + 1);
+    write1(out, areturn);
+
+    write2(out, 0); // exception handler table length
+    write2(out, 0); // attribute count
+
+    byte[] result = out.toByteArray();
+    set4(result, 4, result.length - 12);
+
+    return result;
+  }
+
   private static void writeMethodReference(OutputStream out,
                                            List<PoolEntry> pool,
                                            shim.VMMethod method)
@@ -468,21 +552,30 @@ public class LambdaMetafactory {
                                        implementationName,
                                        implementationSpec,
                                        implementationKind),
-                      emptyInterfaceList);
+                      emptyInterfaceList,
+                      null,
+                      new MethodType[0],
+                      null,
+                      false);
   }
 
   private static byte[] makeLambda(String invokedName,
                                    MethodType invokedType,
                                    MethodType methodType,
                                    MethodHandle methodImplementation,
-                                   Class[] interfaces)
+                                   Class[] interfaces,
+                                   MethodType instantiatedType,
+                                   MethodType[] bridges,
+                                   Class<?> caller,
+                                   boolean serializable)
   {
     String className;
     { int number;
       synchronized (LambdaMetafactory.class) {
         number = nextNumber++;
       }
-      className = "Lambda-" + number;
+      className = caller == null ? "Lambda-" + number
+          : caller.getName().replace('.', '/') + "$$Lambda$" + number;
     }
 
     List<PoolEntry> pool = new ArrayList();
@@ -529,6 +622,27 @@ public class LambdaMetafactory {
           ConstantPool.addUtf8(pool, methodType.toMethodDescriptorString()),
           makeInvocationCode(pool, className, constructorSpec, invokedType,
                              methodType, methodImplementation)));
+
+      for (MethodType bridge: bridges) {
+        if (bridge.toMethodDescriptorString().equals(methodType.toMethodDescriptorString())) continue;
+        methodTable.add
+          (new MethodData
+           (Modifier.PUBLIC | 0x40 | 0x1000,
+            ConstantPool.addUtf8(pool, invokedName),
+            ConstantPool.addUtf8(pool, bridge.toMethodDescriptorString()),
+            makeInvocationCode(pool, className, constructorSpec, invokedType,
+                               bridge, methodImplementation)));
+      }
+
+      if (serializable) {
+        methodTable.add
+          (new MethodData
+           (Modifier.PRIVATE | Modifier.FINAL,
+            ConstantPool.addUtf8(pool, "writeReplace"),
+            ConstantPool.addUtf8(pool, "()Ljava/lang/Object;"),
+            makeWriteReplaceCode(pool, className, invokedType, methodType, invokedName,
+                                 instantiatedType, methodImplementation, caller)));
+      }
     } catch (IOException e) {
       AssertionError error = new AssertionError();
       error.initCause(e);
@@ -543,7 +657,8 @@ public class LambdaMetafactory {
       Assembler.writeClass
         (out, pool, nameIndex, superIndex, interfaceIndexes,
          fieldTable.toArray(new FieldData[fieldTable.size()]),
-         methodTable.toArray(new MethodData[methodTable.size()]));
+         methodTable.toArray(new MethodData[methodTable.size()]),
+         Assembler.ACC_FINAL | Assembler.ACC_SYNTHETIC);
     } catch (IOException e) {
       AssertionError error = new AssertionError();
       error.initCause(e);
@@ -581,7 +696,8 @@ public class LambdaMetafactory {
     throws LambdaConversionException
   {
     methodImplementation = methodImplementation.asFixedArity();
-    byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, emptyInterfaceList);
+    byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, emptyInterfaceList,
+                                  instantiatedMethodType, new MethodType[0], caller.lookupClass(), false);
     return makeCallSite(invokedType, classData, methodImplementation);
   }
 
@@ -607,53 +723,38 @@ public class LambdaMetafactory {
     //  )
     MethodType methodType = (MethodType) args[0];
     MethodHandle methodImplementation = ((MethodHandle) args[1]).asFixedArity();
+    MethodType instantiatedMethodType = (MethodType) args[2];
 
     int flags = (Integer) args[3];
     boolean serializable = (flags & FLAG_SERIALIZABLE) != 0;
+    int next = 4;
 
-    // Marker interfaces are added to a lambda when they're written like this:
-    //
-    //    Runnable r = (Runnable & Serializable) () -> foo()
-    //
-    // The intersection type in the cast here indicates to the compiler what interfaces
-    // the generated lambda class should implement. Because a lambda has (by definition)
-    // one method only, it is meaningless for these interfaces to contain anything, thus
-    // they are only allowed to be empty marker interfaces. In practice the Serializable
-    // interface is handled specially and the use of markers is extremely rare. Adding
-    // support would be easy though.
-    if ((flags & FLAG_MARKERS) != 0)
-      throw new UnsupportedOperationException("Marker interfaces on lambdas are not supported on Basalt Shim yet. Sorry.");
-
-    // In some cases there is a mismatch between what the JVM type system supports and
-    // what the Java language supports. In other cases the type of a lambda expression
-    // may not perfectly match the functional interface which represents it. Consider the
-    // following case:
-    //
-    //    interface I { void foo(Integer i, String s1, Strings s2) }
-    //    class Foo { static void m(Number i, Object... rest) {} }
-    //
-    //    I lambda = Foo::m
-    //
-    // This is allowed by the Java language, even though the interface representing the
-    // lambda specifies three specific arguments and the method implementing the lambda
-    // uses varargs and a different type signature. Behind the scenes the compiler generates
-    // a "bridge" method that does the adaptation.
-    //
-    // You can learn more here: http://www.oracle.com/technetwork/java/jvmls2013heid-2013922.pdf
-    // and here: http://cr.openjdk.java.net/~briangoetz/lambda/lambda-translation.html
-    if ((flags & FLAG_BRIDGES) != 0) {
-      int bridgeCount = (Integer) args[4];
-      if (bridgeCount > 0)
-        throw new UnsupportedOperationException("A lambda that requires bridge methods was used, this is not yet supported by Basalt Shim. Sorry.");
+    List<Class> interfaceList = new ArrayList<Class>();
+    if (serializable) {
+      interfaceList.add(java.io.Serializable.class);
+    }
+    if ((flags & FLAG_MARKERS) != 0) {
+      int markerCount = (Integer) args[next++];
+      for (int i = 0; i < markerCount; i++) {
+        Class marker = (Class) args[next++];
+        if (!interfaceList.contains(marker)) {
+          interfaceList.add(marker);
+        }
+      }
     }
 
-    // TODO: This is not necessary if the function type interface is already inheriting
-    // from Serializable.
-    Class[] interfaces = new Class[serializable ? 1 : 0];
-    if (serializable)
-      interfaces[0] = java.io.Serializable.class;
+    MethodType[] bridges = new MethodType[0];
+    if ((flags & FLAG_BRIDGES) != 0) {
+      int bridgeCount = (Integer) args[next++];
+      bridges = new MethodType[bridgeCount];
+      for (int i = 0; i < bridgeCount; i++) {
+        bridges[i] = (MethodType) args[next++];
+      }
+    }
 
-    byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, interfaces);
+    Class[] interfaces = interfaceList.toArray(new Class[interfaceList.size()]);
+    byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, interfaces,
+                                  instantiatedMethodType, bridges, caller.lookupClass(), serializable);
     return makeCallSite(invokedType, classData, methodImplementation);
   }
 }

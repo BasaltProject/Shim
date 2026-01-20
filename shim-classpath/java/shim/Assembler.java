@@ -36,6 +36,8 @@ import java.io.IOException;
 public class Assembler {
   public static final int ACC_PUBLIC       = 1 <<  0;
   public static final int ACC_STATIC       = 1 <<  3;
+  public static final int ACC_FINAL        = 1 <<  4;
+  public static final int ACC_SYNTHETIC    = 1 << 12;
 
   public static final int aaload = 0x32;
   public static final int aastore = 0x53;
@@ -77,6 +79,19 @@ public class Assembler {
                                 MethodData[] methods)
     throws IOException
   {
+    writeClass(out, pool, name, super_, interfaces, fields, methods, ACC_PUBLIC);
+  }
+
+  public static void writeClass(OutputStream out,
+                                List<PoolEntry> pool,
+                                int name,
+                                int super_,
+                                int[] interfaces,
+                                FieldData[] fields,
+                                MethodData[] methods,
+                                int classFlags)
+    throws IOException
+  {
     int codeAttributeName = ConstantPool.addUtf8(pool, "Code");
 
     write4(out, 0xCAFEBABE);
@@ -88,7 +103,7 @@ public class Assembler {
       e.writeTo(out);
     }
 
-    write2(out, ACC_PUBLIC); // flags
+    write2(out, classFlags); // flags
     write2(out, name + 1);
     write2(out, super_ + 1);
     
