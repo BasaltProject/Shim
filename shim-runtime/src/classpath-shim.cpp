@@ -484,11 +484,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 {
   object o = reinterpret_cast<object>(arguments[0]);
 
-  if (LIKELY(o)) {
-    return objectHash(t, o);
-  } else {
-    throwNew(t, GcNullPointerException::Type);
-  }
+  return LIKELY(o) ? objectHash(t, o) : 0;
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL

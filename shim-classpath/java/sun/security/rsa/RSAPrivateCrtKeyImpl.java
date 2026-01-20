@@ -55,7 +55,7 @@ public final class RSAPrivateCrtKeyImpl implements RSAPrivateCrtKey {
       DerValue pkcs8 = new DerValue(encoded);
       DerInputStream in = pkcs8.data();
       int version = in.getInteger();
-      if (version != 0) {
+      if (version != 0 && version != 1) {
         throw new InvalidKeyException("Unsupported PKCS#8 version: " + version);
       }
       DerValue algId = in.getDerValue();
