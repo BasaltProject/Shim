@@ -140,6 +140,8 @@ using namespace shim::util;
 
 namespace vm {
 
+extern bool previewEnabled;
+
 const bool Verbose = false;
 const bool DebugRun = false;
 const bool DebugStack = false;

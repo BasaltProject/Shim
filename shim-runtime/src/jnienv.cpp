@@ -3646,7 +3646,9 @@ extern "C" SHIM_EXPORT jint JNICALL
   for (int i = 0; i < a->nOptions; ++i) {
     if (strncmp(a->options[i].optionString, "-X", 2) == 0) {
       const char* p = a->options[i].optionString + 2;
-      if (strncmp(p, "mx", 2) == 0) {
+      if (strcmp(p, "enable-preview") == 0) {
+        vm::previewEnabled = true;
+      } else if (strncmp(p, "mx", 2) == 0) {
         heapLimit = local::parseSize(p + 2);
       } else if (strncmp(p, "ss", 2) == 0) {
         stackLimit = local::parseSize(p + 2);
