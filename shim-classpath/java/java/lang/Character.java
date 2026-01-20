@@ -643,6 +643,22 @@ public final class Character implements java.io.Serializable, Comparable<Charact
     return n;
   }
 
+  public static String getName(int codePoint) {
+    if (!isValidCodePoint(codePoint)) {
+      throw new IllegalArgumentException(String.format("Not a valid Unicode code point: 0x%X", codePoint));
+    }
+    return shim.CharacterNames.nameOf(codePoint);
+  }
+
+  public static int codePointOf(String name) {
+    name = name.trim().toUpperCase(java.util.Locale.ROOT);
+    int cp = shim.CharacterNames.codePointOf(name);
+    if (cp < 0) {
+      throw new IllegalArgumentException("Unrecognized character name :" + name);
+    }
+    return cp;
+  }
+
   public static int offsetByCodePoints(CharSequence seq, int index, int codePointOffset) {
     int length = seq.length();
     if (index < 0 || index > length) {
