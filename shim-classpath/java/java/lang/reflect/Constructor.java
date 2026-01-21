@@ -32,6 +32,10 @@ public class Constructor<T> extends Executable {
     this.method = method;
   }
 
+  public int hashCode() {
+    return getDeclaringClass().getName().hashCode();
+  }
+
   public boolean equals(Object o) {
     return o instanceof Constructor
       && ((Constructor) o).method.equals(method);
@@ -72,11 +76,11 @@ public class Constructor<T> extends Executable {
     if (mod != 0) {
       sb.append(Modifier.toString(mod)).append(' ');
     }
-    sb.append(getDeclaringClass().getName()).append('(');
+    sb.append(getDeclaringClass().getTypeName()).append('(');
     Class<?>[] params = getParameterTypes();
     for (int i = 0; i < params.length; i++) {
       if (i > 0) sb.append(',');
-      sb.append(params[i].getName());
+      sb.append(params[i].getTypeName());
     }
     sb.append(')');
     Class<?>[] exceptions = getExceptionTypes();
@@ -84,7 +88,7 @@ public class Constructor<T> extends Executable {
       sb.append(" throws ");
       for (int i = 0; i < exceptions.length; i++) {
         if (i > 0) sb.append(',');
-        sb.append(exceptions[i].getName());
+        sb.append(exceptions[i].getTypeName());
       }
     }
     return sb.toString();

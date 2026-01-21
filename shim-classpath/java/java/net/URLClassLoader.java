@@ -129,7 +129,7 @@ public class URLClassLoader extends ClassLoader implements Closeable {
   }
 
   @Override
-  protected URL findResource(String path) {
+  public URL findResource(String path) {
     for (File root : roots) {
       URL u = find(root, path);
       if (u != null) {
@@ -140,7 +140,7 @@ public class URLClassLoader extends ClassLoader implements Closeable {
   }
 
   @Override
-  protected Enumeration<URL> findResources(String path) throws IOException {
+  public Enumeration<URL> findResources(String path) throws IOException {
     List<URL> found = new ArrayList<URL>();
     for (File root : roots) {
       URL u = find(root, path);

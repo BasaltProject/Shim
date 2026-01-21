@@ -720,4 +720,26 @@ public class Classes {
   private static native void releaseClassLock();
 
   public static native String makeString(byte[] array, int offset, int length);
+
+  private static void collectAllFields(VMClass vmClass, java.util.ArrayList<java.lang.reflect.Field> fields) {
+    if (vmClass.super_ != null) {
+      collectAllFields(vmClass.super_, fields);
+    }
+    if (vmClass.fieldTable != null) {
+      linkFields(vmClass);
+      for (int i = 0; i < vmClass.fieldTable.length; ++i) {
+        fields.add(new java.lang.reflect.Field(vmClass.fieldTable[i]));
+      }
+    }
+  }
+
+  public static java.lang.reflect.Field[] allFields(Class<?> c) {
+    java.util.ArrayList<java.lang.reflect.Field> fields = new java.util.ArrayList<java.lang.reflect.Field>();
+    collectAllFields(toVMClass(c), fields);
+    return fields.toArray(new java.lang.reflect.Field[fields.size()]);
+  }
+
+  public static boolean isInstance(VMClass c, Object o) {
+    return o != null && isAssignableFrom(c, toVMClass(o.getClass()));
+  }
 }

@@ -233,10 +233,6 @@ public class Inflater implements AutoCloseable {
     end();
   }
 
-  public void dispose() {
-    end();
-  }
-
   private static native void inflate
     (long peer,
      byte[] input, int inputOffset, int inputLength,

@@ -115,7 +115,7 @@ public class Field<T> extends AccessibleObject implements Member {
     if (instance == null) {
       throw new NullPointerException("Cannot invoke \"Object.getClass()\" because \"obj\" is null");
     }
-    if (!Class.isInstance(vmField.class_, instance)) {
+    if (!Classes.isInstance(vmField.class_, instance)) {
       throw new IllegalArgumentException("Can not " + (setting ? "set " : "get ") + describe()
                                          + (setting ? " to " : " on ") + instance.getClass().getName());
     }
@@ -398,14 +398,27 @@ public class Field<T> extends AccessibleObject implements Member {
     return getAnnotations();
   }
 
+  public boolean equals(Object obj) {
+    if (obj instanceof Field) {
+      Field other = (Field) obj;
+      return getDeclaringClass() == other.getDeclaringClass() && getName().equals(other.getName())
+          && getType() == other.getType();
+    }
+    return false;
+  }
+
+  public int hashCode() {
+    return getDeclaringClass().getName().hashCode() ^ getName().hashCode();
+  }
+
   public String toString() {
     StringBuilder sb = new StringBuilder();
     int mod = getModifiers() & Modifier.fieldModifiers();
     if (mod != 0) {
       sb.append(Modifier.toString(mod)).append(' ');
     }
-    sb.append(getType().getName()).append(' ');
-    sb.append(getDeclaringClass().getName()).append('.');
+    sb.append(getType().getTypeName()).append(' ');
+    sb.append(getDeclaringClass().getTypeName()).append('.');
     sb.append(getName());
     return sb.toString();
   }

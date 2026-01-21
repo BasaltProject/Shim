@@ -177,7 +177,7 @@ public final class Class <T>
     return java.lang.reflect.Array.newInstance(this, 0).getClass();
   }
 
-  public static String getName(VMClass c) {
+  private static String getName(VMClass c) {
     if (c.name == null) {
       if ((c.vmFlags & PrimitiveFlag) != 0) {
         if (c == Classes.primitiveClass('V')) {
@@ -332,7 +332,17 @@ public final class Class <T>
         return SystemClassLoader.getClass(Classes.primitiveClass('D'));
       }
 
-      if (vmClass.arrayElementClass == null) throw new AssertionError();
+      if (vmClass.arrayElementClass == null) {
+        String element = n.substring(1);
+        if (element.startsWith("L") && element.endsWith(";")) {
+          element = element.substring(1, element.length() - 1);
+        }
+        try {
+          return Classes.forName(element, false, vmClass.loader);
+        } catch (ClassNotFoundException e) {
+          throw new NoClassDefFoundError(element);
+        }
+      }
       return SystemClassLoader.getClass((VMClass) vmClass.arrayElementClass);
     } else {
       return null;
@@ -470,25 +480,6 @@ public final class Class <T>
 
   public Field[] getFields() {
     return shim.PublicFields.get(this);
-  }
-
-  private static void getAllFields(VMClass vmClass, ArrayList<Field> fields) {
-    if (vmClass.super_ != null) {
-      getAllFields(vmClass.super_, fields);
-    }
-    if (vmClass.fieldTable != null) {
-      Classes.linkFields(vmClass);
-
-      for (int i = 0; i < vmClass.fieldTable.length; ++i) {
-        fields.add(new Field(vmClass.fieldTable[i]));
-      }
-    }
-  }
-
-  public Field[] getAllFields() {
-    ArrayList<Field> fields = new ArrayList<Field>();
-    getAllFields(vmClass, fields);
-    return fields.toArray(new Field[fields.size()]);
   }
 
   public Method[] getDeclaredMethods() {
@@ -686,13 +677,8 @@ public final class Class <T>
     return vmClass.arrayDimensions != 0;
   }
 
-  public static boolean isInstance(VMClass c, Object o) {
-    return o != null && Classes.isAssignableFrom
-      (c, o.getVMClass());
-  }
-
   public boolean isInstance(Object o) {
-    return isInstance(vmClass, o);
+    return Classes.isInstance(vmClass, o);
   }
 
   public boolean isPrimitive() {
@@ -851,7 +837,7 @@ public final class Class <T>
   }
 
   public TypeVariable<?>[] getTypeParameters() {
-    throw new UnsupportedOperationException("not yet implemented");
+    return java.lang.reflect.SignatureParser.classTypeParameters(this);
   }
 
   /** 
