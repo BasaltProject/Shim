@@ -94,6 +94,7 @@ final class HttpsClient extends HttpClient {
     serverSocket = s;
     serverOutput = new PrintStream(new BufferedOutputStream(s.getOutputStream()), false, StandardCharsets.ISO_8859_1);
     serverInput = new BufferedInputStream(s.getInputStream());
+    rawInput = serverInput;
     if (needToCheckSpoofing) {
       checkURLSpoofing(hv);
     }
