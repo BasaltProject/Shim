@@ -4714,6 +4714,37 @@ void NO_RETURN throwOutOfMemory(Thread* t)
   throw_(t, roots(t)->outOfMemoryError());
 }
 
+namespace {
+
+int gcStressIntervalValue = -1;
+
+unsigned gcStressInterval()
+{
+  if (gcStressIntervalValue < 0) {
+    const char* v = getenv("SHIM_GC_STRESS");
+    gcStressIntervalValue = v ? static_cast<int>(strtoul(v, 0, 10)) : 0;
+  }
+  return static_cast<unsigned>(gcStressIntervalValue);
+}
+
+bool gcStressDue()
+{
+  unsigned interval = gcStressInterval();
+  if (interval == 0) {
+    return false;
+  }
+  static volatile unsigned counter = 0;
+  return (__atomic_add_fetch(&counter, 1, __ATOMIC_RELAXED) % interval) == 0;
+}
+
+bool gcStressMajor()
+{
+  static volatile unsigned counter = 0;
+  return (__atomic_add_fetch(&counter, 1, __ATOMIC_RELAXED) % 8) == 0;
+}
+
+}  // namespace
+
 object allocate2(Thread* t, unsigned sizeInBytes, bool objectMask)
 {
   return allocate3(
@@ -4797,7 +4828,9 @@ object allocate3(Thread* t,
     int pendingAllocation = t->m->heap->fixedFootprint(
         ceilingDivide(sizeInBytes, BytesPerWord), objectMask);
 
-    if (t->heap == 0 or t->m->heap->limitExceeded(pendingAllocation)) {
+    if (gcStressDue()) {
+      collect(t, gcStressMajor() ? Heap::MajorCollection : Heap::MinorCollection, pendingAllocation);
+    } else if (t->heap == 0 or t->m->heap->limitExceeded(pendingAllocation)) {
       //     fprintf(stderr, "gc");
       //     vmPrintTrace(t);
       collect(t, Heap::MinorCollection, pendingAllocation);

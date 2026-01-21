@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.Set;
 import shim.NetHandle;
 import shim.NetNative;
+import shim.SocketOptionSupport;
 
 public class Socket implements Closeable {
   private final NetHandle net = new NetHandle(false);
@@ -649,6 +650,9 @@ public class Socket implements Closeable {
       setTrafficClass((Integer) value);
     } else if (name == StandardSocketOptions.TCP_NODELAY) {
       setTcpNoDelay((Boolean) value);
+    } else if (SocketOptionSupport.supported(SocketOptionSupport.kTcpClient).contains(name)
+        && SocketOptionSupport.isExtended(name)) {
+      SocketOptionSupport.setExtended(net, name, value);
     } else {
       throw new UnsupportedOperationException("'" + name + "' not supported");
     }
@@ -680,19 +684,14 @@ public class Socket implements Closeable {
     } else if (name == StandardSocketOptions.TCP_NODELAY) {
       return (T) Boolean.valueOf(getTcpNoDelay());
     }
+    if (SocketOptionSupport.supported(SocketOptionSupport.kTcpClient).contains(name)
+        && SocketOptionSupport.isExtended(name)) {
+      return SocketOptionSupport.getExtended(net, name);
+    }
     throw new UnsupportedOperationException("'" + name + "' not supported");
   }
 
   public Set<SocketOption<?>> supportedOptions() {
-    Set<SocketOption<?>> options = new HashSet<SocketOption<?>>();
-    options.add(StandardSocketOptions.SO_KEEPALIVE);
-    options.add(StandardSocketOptions.SO_SNDBUF);
-    options.add(StandardSocketOptions.SO_RCVBUF);
-    options.add(StandardSocketOptions.SO_REUSEADDR);
-    options.add(StandardSocketOptions.SO_REUSEPORT);
-    options.add(StandardSocketOptions.SO_LINGER);
-    options.add(StandardSocketOptions.IP_TOS);
-    options.add(StandardSocketOptions.TCP_NODELAY);
-    return Collections.unmodifiableSet(options);
+    return SocketOptionSupport.supported(SocketOptionSupport.kTcpClient);
   }
 }

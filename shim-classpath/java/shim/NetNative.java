@@ -26,6 +26,12 @@ public final class NetNative {
   public static final int OPT_MULTICAST_TTL = 11;
   public static final int OPT_MULTICAST_LOOP = 12;
   public static final int OPT_MULTICAST_IF = 13;
+  public static final int OPT_TCP_KEEPIDLE = 14;
+  public static final int OPT_TCP_KEEPINTERVAL = 15;
+  public static final int OPT_TCP_KEEPCOUNT = 16;
+  public static final int OPT_TCP_QUICKACK = 17;
+  public static final int OPT_INCOMING_NAPI_ID = 18;
+  public static final int OPT_DONTFRAGMENT = 19;
 
   public static native void init();
 
@@ -109,4 +115,6 @@ public final class NetNative {
   public static native boolean connectNbUnix(long handle, byte[] path) throws IOException;
 
   public static native byte[] sockNameUnix(long handle, boolean peer);
+
+  public static native long[] peerCredentials(long handle);
 }

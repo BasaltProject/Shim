@@ -15,10 +15,10 @@ import java.nio.file.attribute.UserPrincipalLookupService;
 import java.nio.file.attribute.UserPrincipalNotFoundException;
 import shim.NioNative;
 
-final class UnixUserPrincipals {
+public final class UnixUserPrincipals {
   private UnixUserPrincipals() { }
 
-  static class User implements UserPrincipal {
+  public static class User implements UserPrincipal {
     private final int id;
     private final boolean isGroup;
     private final String name;
@@ -85,13 +85,13 @@ final class UnixUserPrincipals {
     }
   }
 
-  static class Group extends User implements GroupPrincipal {
+  public static class Group extends User implements GroupPrincipal {
     Group(int id, String name) {
       super(id, true, name);
     }
   }
 
-  static User fromUid(int uid) {
+  public static User fromUid(int uid) {
     String name = NioNative.userName(uid);
     if (name == null) {
       name = Integer.toString(uid);
@@ -99,7 +99,7 @@ final class UnixUserPrincipals {
     return new User(uid, name);
   }
 
-  static Group fromGid(int gid) {
+  public static Group fromGid(int gid) {
     String name = NioNative.groupName(gid);
     if (name == null) {
       name = Integer.toString(gid);
