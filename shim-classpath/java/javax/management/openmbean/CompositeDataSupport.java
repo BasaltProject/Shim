@@ -191,6 +191,24 @@ public class CompositeDataSupport implements CompositeData, Serializable {
   @Override
   public String toString() {
     return new StringBuilder().append(this.getClass().getName()).append("(compositeType=")
-        .append(compositeType.toString()).append(",contents=").append(contents.toString()).append(")").toString();
+        .append(compositeType.toString()).append(",contents=").append(contentsString()).append(")").toString();
+  }
+
+  private String contentsString() {
+    StringBuilder sb = new StringBuilder("{");
+    boolean first = true;
+    for (java.util.Map.Entry<String, Object> e : contents.entrySet()) {
+      if (!first) {
+        sb.append(", ");
+      }
+      first = false;
+      Object v = e.getValue();
+      String text = v != null && v.getClass().isArray() ? java.util.Arrays.deepToString(new Object[] {v}) : String.valueOf(v);
+      if (v != null && v.getClass().isArray()) {
+        text = text.substring(1, text.length() - 1);
+      }
+      sb.append(e.getKey()).append('=').append(text);
+    }
+    return sb.append('}').toString();
   }
 }
