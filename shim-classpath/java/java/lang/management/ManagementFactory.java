@@ -162,6 +162,15 @@ public class ManagementFactory {
     return platformMBeanServer;
   }
 
+  private static com.sun.management.HotSpotDiagnosticMXBean hotSpot;
+
+  private static synchronized com.sun.management.HotSpotDiagnosticMXBean hotSpotDiagnostic() {
+    if (hotSpot == null) {
+      hotSpot = new sun.management.HotSpotDiagnosticImpl();
+    }
+    return hotSpot;
+  }
+
   private static List<PlatformManagedObject> allBeans() {
     List<PlatformManagedObject> all = new ArrayList<PlatformManagedObject>();
     all.add(getClassLoadingMXBean());
@@ -171,6 +180,7 @@ public class ManagementFactory {
     all.add(getRuntimeMXBean());
     all.add(getThreadMXBean());
     all.add(loggingBean());
+    all.add(hotSpotDiagnostic());
     all.addAll(getGarbageCollectorMXBeans());
     all.addAll(getMemoryPoolMXBeans());
     all.addAll(getBufferPools());
@@ -199,7 +209,10 @@ public class ManagementFactory {
     return c == ClassLoadingMXBean.class || c == CompilationMXBean.class || c == MemoryMXBean.class
         || c == OperatingSystemMXBean.class || c == RuntimeMXBean.class || c == ThreadMXBean.class
         || c == PlatformLoggingMXBean.class || c == GarbageCollectorMXBean.class || c == MemoryManagerMXBean.class
-        || c == MemoryPoolMXBean.class || c == BufferPoolMXBean.class;
+        || c == MemoryPoolMXBean.class || c == BufferPoolMXBean.class
+        || c == com.sun.management.HotSpotDiagnosticMXBean.class
+        || c == com.sun.management.OperatingSystemMXBean.class || c == com.sun.management.UnixOperatingSystemMXBean.class
+        || c == com.sun.management.ThreadMXBean.class || c == com.sun.management.GarbageCollectorMXBean.class;
   }
 
   private static boolean isSingleton(Class<?> c) {
