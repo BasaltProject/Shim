@@ -3425,6 +3425,8 @@ inline unsigned poolSize(Thread* t, GcSingleton* pool)
 
 GcClass* nestHostOf(Thread* t, GcClass* c);
 
+GcClass* codeOwner(Thread* t, GcMethod* method);
+
 bool classAccessible(Thread* t, GcClass* accessor, GcClass* c);
 
 bool isPolymorphicStub(GcMethod* method);
@@ -3487,10 +3489,10 @@ inline GcClass* resolveClassInPool(Thread* t,
         = resolveClass(t, loader, cast<GcReference>(t, o)->name(), throw_);
 
     if (c) {
-      if (not classAccessible(t, method->class_(), c)) {
+      if (not classAccessible(t, codeOwner(t, method), c)) {
         if (!throw_) return 0;
         PROTECT(t, c);
-        checkClassAccess(t, method->class_(), c);
+        checkClassAccess(t, codeOwner(t, method), c);
       }
       storeStoreMemoryBarrier();
 
@@ -3508,7 +3510,7 @@ inline GcClass* resolveClassInPool(Thread* t,
                                    bool throw_ = true)
 {
   return resolveClassInPool(
-      t, method->class_()->loader(), method, index, throw_);
+      t, codeOwner(t, method)->loader(), method, index, throw_);
 }
 
 inline object resolve(
@@ -3578,7 +3580,7 @@ inline GcField* resolveField(Thread* t,
                                findFieldInClass,
                                GcNoSuchFieldError::Type,
                                throw_,
-                               method->class_()));
+                               codeOwner(t, method)));
 }
 
 inline GcField* resolveField(Thread* t,
@@ -3586,7 +3588,7 @@ inline GcField* resolveField(Thread* t,
                              unsigned index,
                              bool throw_ = true)
 {
-  return resolveField(t, method->class_()->loader(), method, index, throw_);
+  return resolveField(t, codeOwner(t, method)->loader(), method, index, throw_);
 }
 
 inline void acquireFieldForRead(Thread* t, GcField* field)
@@ -3682,7 +3684,7 @@ inline GcMethod* resolveMethod(Thread* t,
                                 findMethodInClass,
                                 GcNoSuchMethodError::Type,
                                 throw_,
-                                method->class_()));
+                                codeOwner(t, method)));
 
   return handle ? handle->method() : 0;
 }
@@ -3692,7 +3694,7 @@ inline GcMethod* resolveMethod(Thread* t,
                                unsigned index,
                                bool throw_ = true)
 {
-  return resolveMethod(t, method->class_()->loader(), method, index, throw_);
+  return resolveMethod(t, codeOwner(t, method)->loader(), method, index, throw_);
 }
 
 GcVector* vectorAppend(Thread*, GcVector*, object);
