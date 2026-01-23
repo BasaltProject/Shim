@@ -87,25 +87,53 @@ public class URLClassLoader extends ClassLoader implements Closeable {
   public void close() throws IOException { }
 
   protected Class findClass(String name) throws ClassNotFoundException {
+    String path = name.replace('.', '/') + ".class";
     try {
-      InputStream stream = getResourceAsStream(name.replace(".", "/") + ".class");
-      if(stream == null) {
-        throw new ClassNotFoundException("couldn't find class " + name);
-      }
-      byte[] buf = new byte[2048];
-      ByteArrayOutputStream mem = new ByteArrayOutputStream();
-      try {
-        int size;
-        while((size = stream.read(buf, 0, buf.length)) > 0) {
-          mem.write(buf, 0, size);
+      for (File root : roots) {
+        byte[] data = readBytes(root, path);
+        if (data != null) {
+          return defineClass(name, data, 0, data.length);
         }
-        byte[] data = mem.toByteArray();
-        return defineClass(name, data, 0, data.length);
-      } finally {
+      }
+    } catch (IOException e) {
+      throw new ClassNotFoundException("couldn't find class " + name, e);
+    }
+    throw new ClassNotFoundException("couldn't find class " + name);
+  }
+
+  private static byte[] readBytes(File root, String path) throws IOException {
+    InputStream stream = null;
+    try {
+      if (root.isDirectory()) {
+        File f = new File(root, path);
+        if (!f.isFile()) {
+          return null;
+        }
+        stream = new java.io.FileInputStream(f);
+      } else if (root.isFile()) {
+        java.util.jar.JarFile jar = shim.JarCache.open(root);
+        java.util.zip.ZipEntry entry = jar.getEntry(path);
+        if (entry == null) {
+          return null;
+        }
+        stream = jar.getInputStream(entry);
+        if (stream == null) {
+          return null;
+        }
+      } else {
+        return null;
+      }
+      ByteArrayOutputStream mem = new ByteArrayOutputStream();
+      byte[] buf = new byte[8192];
+      int size;
+      while ((size = stream.read(buf, 0, buf.length)) > 0) {
+        mem.write(buf, 0, size);
+      }
+      return mem.toByteArray();
+    } finally {
+      if (stream != null) {
         stream.close();
       }
-    } catch(IOException e) {
-      throw new ClassNotFoundException("couldn't find class " + name, e);
     }
   }
 
@@ -117,10 +145,8 @@ public class URLClassLoader extends ClassLoader implements Closeable {
           return f.toURI().toURL();
         }
       } else if (root.exists()) {
-        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(root)) {
-          if (zf.getEntry(path) != null) {
-            return new URL("jar:file:" + root.getAbsolutePath() + "!/" + path);
-          }
+        if (shim.JarCache.open(root).getEntry(path) != null) {
+          return new URL("jar:file:" + root.getAbsolutePath() + "!/" + path);
         }
       }
     } catch (IOException ignored) {
