@@ -339,7 +339,7 @@ public class LambdaMetafactory {
   {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     write2(out, fieldType.footprint()
-           + localType.footprint() + 4); // max stack
+           + localType.footprint() + implementation.type().footprint() + 6); // max stack
     write2(out, localType.footprint() + 1); // max locals
     write4(out, 0); // length (we'll set the real value later)
 

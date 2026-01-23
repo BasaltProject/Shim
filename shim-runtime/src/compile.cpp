@@ -10906,6 +10906,11 @@ void compile(MyThread* t,
 
   PROTECT(t, clone);
 
+  if (getenv("SHIM_TRACE_COMPILE")) {
+    fprintf(stderr, "SHIMDBG compile %s.%s%s\n", method->class_()->name()->body().begin(),
+            method->name()->body().begin(), method->spec()->body().begin());
+  }
+
   Context context(t, bootContext, clone);
   compile(t, &context);
 
