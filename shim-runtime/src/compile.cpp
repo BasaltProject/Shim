@@ -2429,6 +2429,9 @@ void compile(MyThread* t,
 
 GcMethod* resolveMethod(Thread* t, GcPair* pair)
 {
+  if (objectClass(t, pair->second()) == type(t, GcMethod::Type)) {
+    return cast<GcMethod>(t, pair->second());
+  }
   PROTECT(t, pair);
   GcReference* reference = cast<GcReference>(t, pair->second());
   PROTECT(t, reference);
@@ -2439,7 +2442,7 @@ GcMethod* resolveMethod(Thread* t, GcPair* pair)
       reference,
       ReferenceClass);
 
-  return cast<GcMethod>(t,
+  GcMethod* resolved = cast<GcMethod>(t,
                         resolveMember(t,
                                         codeOwner(t, cast<GcMethod>(t, pair->first()))->loader(),
                                         class_,
@@ -2449,6 +2452,8 @@ GcMethod* resolveMethod(Thread* t, GcPair* pair)
                                         GcNoSuchMethodError::Type,
                                         true,
                                         codeOwner(t, cast<GcMethod>(t, pair->first()))));
+  pair->setSecond(t, resolved);
+  return resolved;
 }
 
 bool methodAbstract(Thread* t UNUSED, GcMethod* method)
