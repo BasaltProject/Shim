@@ -639,30 +639,57 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     if (v != null) {
       return v;
     }
-    V computed = mappingFunction.apply(key);
-    if (computed == null) {
-      return null;
+    synchronized (stripe(key)) {
+      v = get(key);
+      if (v != null) {
+        return v;
+      }
+      V computed = mappingFunction.apply(key);
+      if (computed == null) {
+        return null;
+      }
+      V prior = putVal(key, computed, true);
+      return prior != null ? prior : computed;
     }
-    V prior = putVal(key, computed, true);
-    return prior != null ? prior : computed;
+  }
+
+  private transient volatile Object[] stripes;
+
+  private Object stripe(Object key) {
+    Object[] s = stripes;
+    if (s == null) {
+      synchronized (lock) {
+        s = stripes;
+        if (s == null) {
+          s = new Object[16];
+          for (int i = 0; i < s.length; i++) {
+            s[i] = new Object();
+          }
+          stripes = s;
+        }
+      }
+    }
+    return s[spread(key.hashCode()) & 15];
   }
 
   public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
     if (key == null || remappingFunction == null) {
       throw new NullPointerException();
     }
-    for (;;) {
-      V old = get(key);
-      if (old == null) {
-        return null;
-      }
-      V nv = remappingFunction.apply(key, old);
-      if (nv == null) {
-        if (replaceNode(key, null, old) != null) {
+    synchronized (stripe(key)) {
+      for (;;) {
+        V old = get(key);
+        if (old == null) {
           return null;
         }
-      } else if (replaceNode(key, nv, old) != null) {
-        return nv;
+        V nv = remappingFunction.apply(key, old);
+        if (nv == null) {
+          if (replaceNode(key, null, old) != null) {
+            return null;
+          }
+        } else if (replaceNode(key, nv, old) != null) {
+          return nv;
+        }
       }
     }
   }
@@ -671,22 +698,24 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     if (key == null || remappingFunction == null) {
       throw new NullPointerException();
     }
-    for (;;) {
-      V old = get(key);
-      V nv = remappingFunction.apply(key, old);
-      if (old == null) {
-        if (nv == null) {
-          return null;
-        }
-        if (putVal(key, nv, true) == null) {
+    synchronized (stripe(key)) {
+      for (;;) {
+        V old = get(key);
+        V nv = remappingFunction.apply(key, old);
+        if (old == null) {
+          if (nv == null) {
+            return null;
+          }
+          if (putVal(key, nv, true) == null) {
+            return nv;
+          }
+        } else if (nv == null) {
+          if (replaceNode(key, null, old) != null) {
+            return null;
+          }
+        } else if (replaceNode(key, nv, old) != null) {
           return nv;
         }
-      } else if (nv == null) {
-        if (replaceNode(key, null, old) != null) {
-          return null;
-        }
-      } else if (replaceNode(key, nv, old) != null) {
-        return nv;
       }
     }
   }
@@ -695,20 +724,22 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     if (key == null || value == null || remappingFunction == null) {
       throw new NullPointerException();
     }
-    for (;;) {
-      V old = get(key);
-      if (old == null) {
-        if (putVal(key, value, true) == null) {
-          return value;
-        }
-      } else {
-        V nv = remappingFunction.apply(old, value);
-        if (nv == null) {
-          if (replaceNode(key, null, old) != null) {
-            return null;
+    synchronized (stripe(key)) {
+      for (;;) {
+        V old = get(key);
+        if (old == null) {
+          if (putVal(key, value, true) == null) {
+            return value;
           }
-        } else if (replaceNode(key, nv, old) != null) {
-          return nv;
+        } else {
+          V nv = remappingFunction.apply(old, value);
+          if (nv == null) {
+            if (replaceNode(key, null, old) != null) {
+              return null;
+            }
+          } else if (replaceNode(key, nv, old) != null) {
+            return nv;
+          }
         }
       }
     }
