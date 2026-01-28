@@ -233,16 +233,23 @@ public abstract class ClassLoader {
     }
   }
 
-  private final java.util.concurrent.ConcurrentHashMap<String, Object> parallelLockMap =
-      new java.util.concurrent.ConcurrentHashMap<String, Object>();
+  private java.util.HashMap<String, Object> parallelLockMap;
 
   protected Object getClassLoadingLock(String className) {
     if (className == null) {
       throw new NullPointerException();
     }
-    Object newLock = new Object();
-    Object lock = parallelLockMap.putIfAbsent(className, newLock);
-    return lock == null ? newLock : lock;
+    synchronized (this) {
+      if (parallelLockMap == null) {
+        parallelLockMap = new java.util.HashMap<String, Object>();
+      }
+      Object lock = parallelLockMap.get(className);
+      if (lock == null) {
+        lock = new Object();
+        parallelLockMap.put(className, lock);
+      }
+      return lock;
+    }
   }
 
   protected void resolveClass(Class c) {
