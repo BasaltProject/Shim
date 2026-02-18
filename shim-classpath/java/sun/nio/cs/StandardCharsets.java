@@ -47,6 +47,7 @@ public final class StandardCharsets {
     register(UnicodeCharset.UTF_32LE);
     register(UnicodeCharset.UTF_32BE_BOM);
     register(UnicodeCharset.UTF_32LE_BOM);
+    register(ISO2022_JP.INSTANCE);
     for (int i = 0; i < SingleByteTables.kEntries.length; i++) {
       String entry = SingleByteTables.kEntries[i];
       int first = entry.indexOf('|');
