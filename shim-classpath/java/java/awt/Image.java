@@ -8,6 +8,8 @@
 package java.awt;
 
 public abstract class Image {
+  public static final Object UndefinedProperty = new Object();
+
   protected float accelerationPriority = .5f;
 
   public void flush() { }
