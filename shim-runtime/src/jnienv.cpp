@@ -3299,34 +3299,28 @@ struct JavaVMInitArgs {
   jboolean ignoreUnrecognized;
 };
 
-int parseSize(const char* s)
+unsigned parseSize(const char* s)
 {
   unsigned length = strlen(s);
-  RUNTIME_ARRAY(char, buffer, length + 1);
-
   if (length == 0)
     return 0;
 
+  uint64_t scale = 1;
   char suffix = s[length - 1];
-  if (suffix== 'k' or suffix == 'K') {
-    memcpy(RUNTIME_ARRAY_BODY(buffer), s, length - 1);
-    RUNTIME_ARRAY_BODY(buffer)[length - 1] = 0;
-    return atoi(RUNTIME_ARRAY_BODY(buffer)) * 1024;
+  if (suffix == 'k' or suffix == 'K') {
+    scale = 1024;
+  } else if (suffix == 'm' or suffix == 'M') {
+    scale = 1024ULL * 1024;
+  } else if (suffix == 'g' or suffix == 'G') {
+    scale = 1024ULL * 1024 * 1024;
   }
 
-  if (suffix == 'm' or suffix == 'M') {
-    memcpy(RUNTIME_ARRAY_BODY(buffer), s, length - 1);
-    RUNTIME_ARRAY_BODY(buffer)[length - 1] = 0;
-    return atoi(RUNTIME_ARRAY_BODY(buffer)) * 1024 * 1024;
-  }
+  long long value = atoll(s);
+  if (value <= 0)
+    return 0;
 
-  if (suffix == 'g' or suffix == 'G') {
-    memcpy(RUNTIME_ARRAY_BODY(buffer), s, length - 1);
-    RUNTIME_ARRAY_BODY(buffer)[length - 1] = 0;
-    return atoi(RUNTIME_ARRAY_BODY(buffer)) * 1024 * 1024 * 1024;
-  }
-
-  return atoi(s);
+  uint64_t bytes = static_cast<uint64_t>(value) * scale;
+  return bytes > 0xFFFFFFFFULL ? 0xFFFFFFFFU : static_cast<unsigned>(bytes);
 }
 
 void append(char** p, const char* value, unsigned length, char tail)
