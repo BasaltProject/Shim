@@ -48,7 +48,7 @@ public class HttpServerEdgeModern {
     System.exit(0);
   }
 
-  static void headers() throws Exception { 
+  static void headers() throws Exception {
   for (String k: new String[]{"a b","a:b","","a\rb","a\0b","é","a\tb"," a","a ","a(b)","a,b","a\u007fb"}) { String kk=k; t("key["+kk.replace("\r","\\r").replace("\0","\\0").replace("\t","\\t").replace("\u007f","DEL")+"]", ()->{ Headers h=new Headers(); h.add(kk,"v"); return h.keySet(); }); }
   for (String v: new String[]{"a\rb","a\nb","a\r\n b","a\r\nb","a\0b","é","a\tb","  padded  ","","a\u007fb","a\u0001b"}) { String vv=v; t("val["+vv.replace("\r","\\r").replace("\n","\\n").replace("\0","\\0").replace("\t","\\t").replace("\u007f","DEL").replace("\u0001","SOH")+"]", ()->{ Headers h=new Headers(); h.add("k",vv); return h.get("k"); }); }
   t("put-list-null", ()->new Headers().put("k", null)); t("put-list-with-null", ()->{ Headers h=new Headers(); h.put("k", Arrays.asList("a", null)); return h.get("k"); });
@@ -92,13 +92,13 @@ public class HttpServerEdgeModern {
   s.createContext("/hello", ex->{ byte[] b="hello".getBytes(); ex.sendResponseHeaders(200,b.length); try(OutputStream o=ex.getResponseBody()){o.write(b);} });
   s.createContext("/echo", ex->{ byte[] body=ex.getRequestBody().readAllBytes(); ex.sendResponseHeaders(200, body.length); try(OutputStream o=ex.getResponseBody()){o.write(body);} });
   s.createContext("/chunky", ex->{ ex.sendResponseHeaders(200,0); try(OutputStream o=ex.getResponseBody()){ o.write("abc".getBytes()); o.flush(); o.write(new byte[0]); o.write("de".getBytes()); } });
-  
+
   s.createContext("/lowmem", ex->{ ex.sendResponseHeaders(200, 0); ex.getResponseBody().close(); });
   s.createContext("/emptychunk", ex->{ ex.sendResponseHeaders(200, 0); ex.close(); });
   s.createContext("/closeonly", ex->{ ex.close(); });
   s.createContext("/ro", ex->{ ex.getResponseHeaders().add("Content-Length","3"); ex.getResponseHeaders().add("Transfer-Encoding", "x"); ex.getResponseHeaders().add("Date","custom"); ex.getResponseHeaders().add("Connection","keep-alive"); ex.sendResponseHeaders(200, 2); ex.getResponseBody().write("ok".getBytes()); ex.close(); });
-  
-  
+
+
   s.createContext("/read", ex->{ InputStream in=ex.getRequestBody(); int c1=in.read(); byte[] rest=in.readAllBytes(); int eof=in.read(); in.close(); String m=c1+" "+rest.length+" "+eof+" "+in.available(); byte[] b=m.getBytes(); ex.sendResponseHeaders(200,b.length); try(OutputStream o=ex.getResponseBody()){o.write(b);} });
   s.start();
   String[][] cases={
