@@ -262,7 +262,7 @@ public final class PolymorphicStubs {
     if (r == 'V') {
       write1(out, 0x57);
     } else if (r == 'L' || r == '[') {
-      if (!result.equals("Ljava/lang/Object;")) {
+      if (variable && !result.equals("Ljava/lang/Object;")) {
         write1(out, checkcast);
         write2(out, ConstantPool.addClass(pool, r == 'L' ? result.substring(1, result.length() - 1) : result) + 1);
       }
