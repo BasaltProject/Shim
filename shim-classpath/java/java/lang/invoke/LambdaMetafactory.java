@@ -194,6 +194,51 @@ public class LambdaMetafactory {
     }
   }
 
+  private static String primitiveOfWrapper(Class<?> c) {
+    if (c == Boolean.class) return "Z";
+    if (c == Byte.class) return "B";
+    if (c == Short.class) return "S";
+    if (c == Character.class) return "C";
+    if (c == Integer.class) return "I";
+    if (c == Float.class) return "F";
+    if (c == Long.class) return "J";
+    if (c == Double.class) return "D";
+    return null;
+  }
+
+  private static void maybeBoxOrUnbox(ByteArrayOutputStream out,
+                                      List<PoolEntry> pool,
+                                      MethodType.TypeSpec from,
+                                      MethodType.TypeSpec to,
+                                      Class<?> hint)
+    throws IOException
+  {
+    String hinted = hint == null ? null : primitiveOfWrapper(hint);
+    if (hinted != null && to.type().isPrimitive() && !from.type().isPrimitive() && !hinted.equals(to.spec())
+        && !hinted.equals("Z") && !to.spec().equals("Z")) {
+      MethodType.TypeSpec prim = hintSpec(hinted);
+      maybeBoxOrUnbox(out, pool, from, prim, null);
+      widenPrimitive(out, hinted, to.spec());
+      return;
+    }
+    maybeBoxOrUnbox(out, pool, from, to);
+  }
+
+  private static MethodType.TypeSpec hintSpec(final String spec) {
+    final Class<?> type = spec.equals("B") ? byte.class : spec.equals("S") ? short.class
+        : spec.equals("C") ? char.class : spec.equals("I") ? int.class : spec.equals("F") ? float.class
+        : spec.equals("J") ? long.class : double.class;
+    return new MethodType.TypeSpec() {
+      public Class type() {
+        return type;
+      }
+
+      public String spec() {
+        return spec;
+      }
+    };
+  }
+
   private static void maybeBoxOrUnbox(ByteArrayOutputStream out,
                                       List<PoolEntry> pool,
                                       MethodType.TypeSpec from,
@@ -334,6 +379,7 @@ public class LambdaMetafactory {
                                            String constructorSpec,
                                            MethodType fieldType,
                                            MethodType localType,
+                                           MethodType instantiatedType,
                                            MethodHandle implementation)
     throws IOException
   {
@@ -371,13 +417,15 @@ public class LambdaMetafactory {
       }
     }
 
+    Iterator<MethodType.Parameter> instantiated = instantiatedType.parameters().iterator();
     for (MethodType.Parameter p: localType.parameters()) {
+      Class<?> hint = instantiated.hasNext() ? instantiated.next().type() : null;
       write1(out, p.load());
       write1(out, p.position() + 1);
       if (skip) {
         skip = false;
       } else {
-        maybeBoxOrUnbox(out, pool, p, dst.next());
+        maybeBoxOrUnbox(out, pool, p, dst.next(), hint);
       }
     }
 
@@ -621,7 +669,7 @@ public class LambdaMetafactory {
           ConstantPool.addUtf8(pool, invokedName),
           ConstantPool.addUtf8(pool, methodType.toMethodDescriptorString()),
           makeInvocationCode(pool, className, constructorSpec, invokedType,
-                             methodType, methodImplementation)));
+                             methodType, instantiatedType, methodImplementation)));
 
       for (MethodType bridge: bridges) {
         if (bridge.toMethodDescriptorString().equals(methodType.toMethodDescriptorString())) continue;
@@ -631,7 +679,7 @@ public class LambdaMetafactory {
             ConstantPool.addUtf8(pool, invokedName),
             ConstantPool.addUtf8(pool, bridge.toMethodDescriptorString()),
             makeInvocationCode(pool, className, constructorSpec, invokedType,
-                               bridge, methodImplementation)));
+                               bridge, instantiatedType, methodImplementation)));
       }
 
       if (serializable) {
