@@ -1303,13 +1303,13 @@ void**& dynamicTable(MyThread* t);
 
 unsigned& dynamicTableSize(MyThread* t);
 
-void updateDynamicTable(MyThread* t, MyThread* o)
+void updateDynamicTable(MyThread* t, void** table)
 {
-  o->dynamicTable = dynamicTable(t);
+  t->dynamicTable = table;
   if (t->peer)
-    updateDynamicTable(static_cast<MyThread*>(t->peer), o);
+    updateDynamicTable(static_cast<MyThread*>(t->peer), table);
   if (t->child)
-    updateDynamicTable(static_cast<MyThread*>(t->child), o);
+    updateDynamicTable(static_cast<MyThread*>(t->child), table);
 }
 
 uintptr_t defaultDynamicThunk(MyThread* t);
@@ -1373,7 +1373,7 @@ unsigned addDynamic(MyThread* t, GcInvocation* invocation)
       dynamicTableSize(t) = newCapacity * BytesPerWord;
       roots(t)->setInvocations(t, newData);
 
-      updateDynamicTable(static_cast<MyThread*>(t->m->rootThread), t);
+      updateDynamicTable(static_cast<MyThread*>(t->m->rootThread), newTable);
 
       compileRoots(t)->setDynamicThunks(t, newThunks);
     }
@@ -2429,11 +2429,12 @@ void compile(MyThread* t,
 
 GcMethod* resolveMethod(Thread* t, GcPair* pair)
 {
-  if (objectClass(t, pair->second()) == type(t, GcMethod::Type)) {
-    return cast<GcMethod>(t, pair->second());
+  object entry = pair->second();
+  if (objectClass(t, entry) == type(t, GcMethod::Type)) {
+    return cast<GcMethod>(t, entry);
   }
   PROTECT(t, pair);
-  GcReference* reference = cast<GcReference>(t, pair->second());
+  GcReference* reference = cast<GcReference>(t, entry);
   PROTECT(t, reference);
 
   GcClass* class_ = resolveClassInObject(
@@ -8863,6 +8864,25 @@ class SignalHandler : public SignalRegistrar::Handler {
 
     if (compileLog) {
       fflush(compileLog);
+    }
+
+    if (t) {
+      for (unsigned i = 0; i < 16; ++i) {
+        void* candidate = static_cast<void**>(*stack)[i];
+        GcMethod* caller = methodForIp(t, candidate);
+        if (caller) {
+          fprintf(stderr, "fatal signal: caller %s.%s%s line %d\n",
+                  reinterpret_cast<const char*>(caller->class_()->name()->body().begin()),
+                  reinterpret_cast<const char*>(caller->name()->body().begin()),
+                  reinterpret_cast<const char*>(caller->spec()->body().begin()),
+                  findLineNumber(t, caller, reinterpret_cast<intptr_t>(candidate) - methodCompiled(t, caller)));
+        }
+      }
+      GcMethod* owner = methodForIp(t, *ip);
+      fprintf(stderr, "fatal signal: ip=%p state=%d method=%s.%s%s\n", *ip, static_cast<int>(t->state),
+              owner ? reinterpret_cast<const char*>(owner->class_()->name()->body().begin()) : "?",
+              owner ? reinterpret_cast<const char*>(owner->name()->body().begin()) : "?",
+              owner ? reinterpret_cast<const char*>(owner->spec()->body().begin()) : "");
     }
 
     return false;
