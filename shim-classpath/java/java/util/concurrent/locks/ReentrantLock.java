@@ -288,9 +288,10 @@ public class ReentrantLock implements Lock, Serializable {
       if (Thread.interrupted()) {
         throw new InterruptedException();
       }
-      int count = fullyRelease();
+      int count;
       boolean interrupted = false;
       synchronized (condSync) {
+        count = fullyRelease();
         condWaiters++;
         try {
           condSync.wait();
@@ -317,10 +318,11 @@ public class ReentrantLock implements Lock, Serializable {
         return false;
       }
       long deadline = System.nanoTime() + nanos;
-      int count = fullyRelease();
+      int count;
       boolean interrupted = false;
       boolean timedOut = false;
       synchronized (condSync) {
+        count = fullyRelease();
         condWaiters++;
         try {
           long remaining = deadline - System.nanoTime();
@@ -356,9 +358,10 @@ public class ReentrantLock implements Lock, Serializable {
       }
       long start = System.nanoTime();
       long deadline = start + nanosTimeout;
-      int count = fullyRelease();
+      int count;
       boolean interrupted = false;
       synchronized (condSync) {
+        count = fullyRelease();
         condWaiters++;
         try {
           long remaining = deadline - System.nanoTime();
@@ -382,8 +385,9 @@ public class ReentrantLock implements Lock, Serializable {
     }
 
     public void awaitUninterruptibly() {
-      int count = fullyRelease();
+      int count;
       synchronized (condSync) {
+        count = fullyRelease();
         condWaiters++;
         boolean interrupted = false;
         try {
