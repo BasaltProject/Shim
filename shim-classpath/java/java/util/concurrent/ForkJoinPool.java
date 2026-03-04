@@ -282,8 +282,13 @@ public class ForkJoinPool extends AbstractExecutorService implements ScheduledEx
         t.doExec();
       } catch (Throwable ex) {
         Thread.UncaughtExceptionHandler h = ueh;
+        if (h == null) {
+          h = w.getUncaughtExceptionHandler();
+        }
         if (h != null) {
-          h.uncaughtException(w, ex);
+          try {
+            h.uncaughtException(w, ex);
+          } catch (Throwable ignore) { }
         }
       } finally {
         synchronized (lock) {
