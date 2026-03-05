@@ -238,6 +238,7 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
   private class EnumSetIterator implements Iterator<T> {
     private int currentIndex = 0;
     private boolean removeAllowed = false;
+    private final T[] universe = elementType.getEnumConstants();
     
     public T next() {
       if (!hasNext()) {
@@ -245,7 +246,7 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
       }
 
       int indexOfNextValue = nextIndex();
-      T element = elementType.getEnumConstants()[indexOfNextValue];
+      T element = universe[indexOfNextValue];
       currentIndex = indexOfNextValue + 1;
       removeAllowed = true;
       
