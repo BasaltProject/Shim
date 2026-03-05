@@ -17,6 +17,7 @@ final class XPathParser {
   private final List<Tok> toks;
   private final NamespaceContext namespaces;
   private final boolean lenient;
+  private boolean xslt;
   private int pos;
 
   private XPathParser(List<Tok> toks, NamespaceContext namespaces, boolean lenient) {
@@ -25,13 +26,22 @@ final class XPathParser {
     this.lenient = lenient;
   }
 
+  static XPathExpr parseXslt(String text, NamespaceContext namespaces) {
+    XPathParser p = new XPathParser(XPathLexer.lex(text), namespaces, false);
+    p.xslt = true;
+    return p.finish();
+  }
+
   static XPathExpr parse(String text, NamespaceContext namespaces, boolean lenient) {
-    XPathParser p = new XPathParser(XPathLexer.lex(text), namespaces, lenient);
-    XPathExpr e = p.orExpr();
-    if (p.peek().type != XPathLexer.kEnd) {
+    return new XPathParser(XPathLexer.lex(text), namespaces, lenient).finish();
+  }
+
+  private XPathExpr finish() {
+    XPathExpr e = orExpr();
+    if (peek().type != XPathLexer.kEnd) {
       StringBuilder sb = new StringBuilder();
-      for (int i = p.pos; i < p.toks.size() - 1; i++) {
-        sb.append(i > p.pos ? ", " : "").append('\'').append(p.toks.get(i).text).append('\'');
+      for (int i = pos; i < toks.size() - 1; i++) {
+        sb.append(i > pos ? ", " : "").append('\'').append(toks.get(i).text).append('\'');
       }
       throw new XPathError("Extra illegal tokens: " + sb);
     }
@@ -311,13 +321,34 @@ final class XPathParser {
     }
     expect(")");
     if (t.prefix == null) {
-      XPathFunctions.check(t.local, args.size());
+      if (!(xslt && isXsltFunction(t.local))) {
+        XPathFunctions.check(t.local, args.size());
+      }
     } else if (!lenient) {
       String uri = namespaces.getNamespaceURI(t.prefix);
       if (uri == null || uri.isEmpty()) {
         throw new XPathError("Prefix must resolve to a namespace: " + t.prefix);
       }
     }
-    return new XPathExpr.Call(t.prefix, t.local, args);
+    XPathExpr.Call call = new XPathExpr.Call(t.prefix, t.local, args);
+    call.external = t.prefix == null && xslt && isXsltFunction(t.local);
+    return call;
+  }
+
+  private static boolean isXsltFunction(String name) {
+    switch (name) {
+    case "current":
+    case "generate-id":
+    case "key":
+    case "document":
+    case "format-number":
+    case "system-property":
+    case "element-available":
+    case "function-available":
+    case "unparsed-entity-uri":
+      return true;
+    default:
+      return false;
+    }
   }
 }

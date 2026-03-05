@@ -177,6 +177,14 @@ public class IdentityTransformer extends Transformer {
     return errorListener;
   }
 
+  void defaultOutput(String name, String value) {
+    outputProperties.setProperty(name, value);
+  }
+
+  String explicitOutput(String name) {
+    return outputProperties.getProperty(name);
+  }
+
   String property(String name) {
     String v = outputProperties.getProperty(name);
     return v != null ? v : defaultOf(name);
