@@ -293,9 +293,21 @@ public class ForkJoinPool extends AbstractExecutorService implements ScheduledEx
       } finally {
         synchronized (lock) {
           active--;
-          lock.notifyAll();
+          if (lockWaiters > 0 || shutdown || stop) {
+            lock.notifyAll();
+          }
         }
       }
+    }
+  }
+
+  private int lockWaiters;
+
+  private void wakeLocked() {
+    if (lockWaiters > 0) {
+      lock.notifyAll();
+    } else if (idle > 0) {
+      lock.notify();
     }
   }
 
@@ -306,7 +318,7 @@ public class ForkJoinPool extends AbstractExecutorService implements ScheduledEx
       }
       task.pool = this;
       q.deque.addLast(task);
-      lock.notifyAll();
+      wakeLocked();
       maybeCreateWorkerLocked();
     }
   }
@@ -323,7 +335,7 @@ public class ForkJoinPool extends AbstractExecutorService implements ScheduledEx
       task.pool = this;
       task.submitter = Thread.currentThread();
       submissions.addLast(task);
-      lock.notifyAll();
+      wakeLocked();
       maybeCreateWorkerLocked();
     }
   }
@@ -928,7 +940,12 @@ public class ForkJoinPool extends AbstractExecutorService implements ScheduledEx
         if (remaining <= 0L) {
           return false;
         }
-        lock.wait(Math.max(1L, remaining / 1000000L));
+        lockWaiters++;
+        try {
+          lock.wait(Math.max(1L, remaining / 1000000L));
+        } finally {
+          lockWaiters--;
+        }
       }
       return true;
     }
@@ -958,11 +975,14 @@ public class ForkJoinPool extends AbstractExecutorService implements ScheduledEx
           if (remaining <= 0L) {
             return false;
           }
+          lockWaiters++;
           try {
             lock.wait(Math.max(1L, Math.min(10L, remaining / 1000000L)));
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
+          } finally {
+            lockWaiters--;
           }
         }
       }
