@@ -4185,6 +4185,7 @@ Machine::Machine(System* system,
       hiddenClassSequence(0),
       threadIdSequence(0),
       referenceLock(0),
+      monitorMapLock(0),
       shutdownLock(0),
       libraries(0),
       errorLog(0),
@@ -4232,6 +4233,7 @@ Machine::Machine(System* system,
       or not system->success(system->make(&heapLock))
       or not system->success(system->make(&classLock))
       or not system->success(system->make(&referenceLock))
+      or not system->success(system->make(&monitorMapLock))
       or not system->success(system->make(&shutdownLock))
       or not system->success(system->load(&libraries, bootstrapPropertyDup))) {
     system->abort();
@@ -4260,6 +4262,7 @@ void Machine::dispose()
   heapLock->dispose();
   classLock->dispose();
   referenceLock->dispose();
+  monitorMapLock->dispose();
   shutdownLock->dispose();
 
   if (libraries) {
@@ -6410,6 +6413,51 @@ void addFinalizer(Thread* t, object target, void (*finalize)(Thread*, object))
   t->m->finalizers = f;
 }
 
+namespace {
+
+// Readers walk the chains unlocked: writers only link fully built nodes at the head; growing needs exclusive state.
+void monitorMapInsert(Thread* t, object o, object m)
+{
+  PROTECT(t, o);
+  PROTECT(t, m);
+
+  GcTriple* n = 0;
+  PROTECT(t, n);
+
+  {
+    // a weak reference must be registered before the next allocation or a collection would leave its target stale
+    ACQUIRE(t, t->m->referenceLock);
+
+    GcWeakReference* r = makeWeakReference(t, 0, 0, 0, 0);
+    r->setTarget(t, o);
+    r->setVmNext(t, t->m->weakReferences);
+    t->m->weakReferences = r->as<GcJreference>(t);
+
+    PROTECT(t, r);
+    n = makeTriple(t, r, m, 0);
+  }
+
+  GcHashMap* map = cast<GcHashMap>(t, roots(t)->monitorMap());
+  GcArray* array = map->array();
+  if (array == 0 or map->size() + 1 >= array->length() * 2) {
+    ENTER(t, Thread::ExclusiveState);
+    map = cast<GcHashMap>(t, roots(t)->monitorMap());
+    array = map->array();
+    if (array == 0 or map->size() + 1 >= array->length() * 2) {
+      hashMapResize(t, map, objectHash, array ? array->length() * 2 : 1 << 16);
+    }
+    array = map->array();
+  }
+
+  unsigned index = objectHash(t, o) & (array->length() - 1);
+  n->setThird(t, array->body()[index]);
+  storeStoreMemoryBarrier();
+  array->setBodyElement(t, index, n);
+  ++map->size();
+}
+
+}  // namespace
+
 GcMonitor* objectMonitor(Thread* t, object o, bool createNew)
 {
   assertT(t, t->state == Thread::ActiveState);
@@ -6426,31 +6474,25 @@ GcMonitor* objectMonitor(Thread* t, object o, bool createNew)
     PROTECT(t, o);
     PROTECT(t, m);
 
-    {
-      ENTER(t, Thread::ExclusiveState);
+    ACQUIRE(t, t->m->monitorMapLock);
 
-      m = hashMapFind(t, roots(t)->monitorMap(), o, objectHash, objectEqual);
+    m = hashMapFind(t, roots(t)->monitorMap(), o, objectHash, objectEqual);
 
-      if (m) {
-        if (DebugMonitors) {
-          fprintf(
-              stderr, "found monitor %p for object %x\n", m, objectHash(t, o));
-        }
-
-        return cast<GcMonitor>(t, m);
-      }
-
-      object head = makeMonitorNode(t, 0, 0);
-      m = makeMonitor(t, 0, 0, 0, head, head, 0);
-
-      if (DebugMonitors) {
-        fprintf(stderr, "made monitor %p for object %x\n", m, objectHash(t, o));
-      }
-
-      hashMapInsert(t, roots(t)->monitorMap(), o, m, objectHash);
-
-      addFinalizer(t, o, removeMonitor);
+    if (m) {
+      return cast<GcMonitor>(t, m);
     }
+
+    object head = makeMonitorNode(t, 0, 0);
+    PROTECT(t, head);
+    m = makeMonitor(t, 0, 0, 0, head, head, 0);
+
+    if (DebugMonitors) {
+      fprintf(stderr, "made monitor %p for object %x\n", m, objectHash(t, o));
+    }
+
+    monitorMapInsert(t, o, m);
+
+    addFinalizer(t, o, removeMonitor);
 
     return cast<GcMonitor>(t, m);
   } else {
