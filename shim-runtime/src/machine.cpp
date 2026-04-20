@@ -4318,6 +4318,9 @@ Thread::Thread(Machine* m, GcThread* javaThread, Thread* parent)
           static_cast<uintptr_t*>(m->heap->allocate(ThreadHeapSizeInBytes))),
       heap(defaultHeap),
       backupHeapIndex(0),
+      waitNodeRef(0),
+      waitState(0),
+      wakePending(0),
       flags(ActiveFlag)
 {
 }
