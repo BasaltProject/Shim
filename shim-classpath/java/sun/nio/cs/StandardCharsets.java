@@ -50,6 +50,13 @@ public final class StandardCharsets {
     register(ISO2022_JP.INSTANCE);
     register(ISO2022_JP.INSTANCE2);
     register(ISO2022_KR.INSTANCE);
+    register(ISO2022_CN.CNS);
+    register(ISO2022_CN.GB);
+    register(ISO2022_JP.MS50220);
+    register(ISO2022_JP.MS50221);
+    register(ISO2022_JP.WINDOWS);
+    register(ISCII91.INSTANCE);
+    register(JISAutoDetect.INSTANCE);
     for (int i = 0; i < SingleByteTables.kEntries.length; i++) {
       String entry = SingleByteTables.kEntries[i];
       int first = entry.indexOf('|');
@@ -61,6 +68,12 @@ public final class StandardCharsets {
       String[] f = MultiByteTables.kEntries[i].split("\\|", -1);
       register(Long.valueOf(i), f[0], f[1].isEmpty() ? new String[0] : f[1].split(","));
     }
+    for (int i = 0; i < ExtendedTables.kEntries.length; i++) {
+      String[] f = ExtendedTables.kEntries[i].split("\\|", -1);
+      if (!f[3].equals("X")) {
+        register(Short.valueOf((short) i), f[0], f[1].isEmpty() ? new String[0] : f[1].split(","));
+      }
+    }
   }
 
   private static Charset resolve(Object o) {
@@ -71,6 +84,12 @@ public final class StandardCharsets {
       Object current = kAll.get(kAll.indexOf(o));
       if (current instanceof Charset) {
         return (Charset) current;
+      }
+      if (o instanceof Short) {
+        int extended = ((Short) o).intValue();
+        Charset built = new TableCharset(ExtendedTables.kEntries[extended].split("\\|", -1), ExtendedTables.kBlobs[extended]);
+        replace(o, built);
+        return built;
       }
       if (o instanceof Long) {
         int multi = ((Long) o).intValue();
