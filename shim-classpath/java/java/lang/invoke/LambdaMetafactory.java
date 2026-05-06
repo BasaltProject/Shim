@@ -744,6 +744,9 @@ public class LambdaMetafactory {
     throws LambdaConversionException
   {
     methodImplementation = methodImplementation.asFixedArity();
+    if (!LambdaProxies.isDirect(methodImplementation)) {
+      return LambdaProxies.callSite(invokedType, invokedName, methodImplementation, emptyInterfaceList);
+    }
     byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, emptyInterfaceList,
                                   instantiatedMethodType, new MethodType[0], caller.lookupClass(), false);
     return makeCallSite(invokedType, classData, methodImplementation);
@@ -801,6 +804,9 @@ public class LambdaMetafactory {
     }
 
     Class[] interfaces = interfaceList.toArray(new Class[interfaceList.size()]);
+    if (!LambdaProxies.isDirect(methodImplementation)) {
+      return LambdaProxies.callSite(invokedType, invokedName, methodImplementation, interfaces);
+    }
     byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, interfaces,
                                   instantiatedMethodType, bridges, caller.lookupClass(), serializable);
     return makeCallSite(invokedType, classData, methodImplementation);

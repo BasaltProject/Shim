@@ -129,14 +129,37 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
   public abstract boolean compareAndSet(Object... args);
 
+  private static final Object[] STRIPES = new Object[64];
+
+  static {
+    for (int i = 0; i < STRIPES.length; i++) STRIPES[i] = new Object();
+  }
+
+  static Object stripe(Object base, int slot) {
+    int h = System.identityHashCode(base) * 31 + slot;
+    return STRIPES[(h ^ (h >>> 16)) & (STRIPES.length - 1)];
+  }
+
+  Object lockFor(Object[] args) {
+    return this;
+  }
+
+  static boolean sameValue(Class<?> type, Object a, Object b) {
+    if (a == b) return true;
+    if (a == null || b == null) return false;
+    return type.isPrimitive() && a.equals(b);
+  }
+
   public abstract Object getAndSet(Object... args);
 
   public abstract Object getAndAdd(Object... args);
 
   public Object compareAndExchange(Object... args) {
-    Object old = get(Arrays.copyOf(args, coordinateTypes.size()));
-    compareAndSet(args);
-    return old;
+    synchronized (lockFor(args)) {
+      Object old = get(Arrays.copyOf(args, coordinateTypes.size()));
+      compareAndSet(args);
+      return old;
+    }
   }
 
   public Object compareAndExchangeAcquire(Object... args) {
@@ -595,8 +618,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
           (ClassDesc) varType().describeConstable().orElse(null)));
     }
 
-    @Override
-    public Object get(Object... args) {
+    private Object get0(Object[] args) {
       try {
         return field.get(args[0]);
       } catch (IllegalAccessException e) {
@@ -604,8 +626,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public void set(Object... args) {
+    private void set0(Object[] args) {
       try {
         field.set(args[0], args[1]);
       } catch (IllegalAccessException e) {
@@ -613,14 +634,13 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public synchronized boolean compareAndSet(Object... args) {
+    private boolean compareAndSet0(Object[] args) {
       Object recv = args[0];
       Object expected = args[1];
       Object update = args[2];
       try {
         Object current = field.get(recv);
-        if (Objects.equals(current, expected)) {
+        if (sameValue(varType(), current, expected)) {
           field.set(recv, update);
           return true;
         }
@@ -630,8 +650,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public synchronized Object getAndSet(Object... args) {
+    private Object getAndSet0(Object[] args) {
       Object recv = args[0];
       Object update = args[1];
       try {
@@ -643,8 +662,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public synchronized Object getAndAdd(Object... args) {
+    private Object getAndAdd0(Object[] args) {
       Object recv = args[0];
       Object delta = args[1];
       try {
@@ -664,6 +682,46 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       } catch (IllegalAccessException e) {
         throw new IllegalAccessError(e.getMessage());
       }
+    }
+
+
+    @Override
+    public Object get(Object... args) {
+      synchronized (lockFor(args)) {
+        return get0(args);
+      }
+    }
+
+    @Override
+    public void set(Object... args) {
+      synchronized (lockFor(args)) {
+        set0(args);
+      }
+    }
+
+    @Override
+    public boolean compareAndSet(Object... args) {
+      synchronized (lockFor(args)) {
+        return compareAndSet0(args);
+      }
+    }
+
+    @Override
+    public Object getAndSet(Object... args) {
+      synchronized (lockFor(args)) {
+        return getAndSet0(args);
+      }
+    }
+
+    @Override
+    public Object getAndAdd(Object... args) {
+      synchronized (lockFor(args)) {
+        return getAndAdd0(args);
+      }
+    }
+    @Override
+    Object lockFor(Object[] args) {
+      return stripe(args[0], field.hashCode());
     }
 
     @Override
@@ -688,8 +746,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
           (ClassDesc) varType().describeConstable().orElse(null)));
     }
 
-    @Override
-    public Object get(Object... args) {
+    private Object get0(Object[] args) {
       try {
         return field.get(null);
       } catch (IllegalAccessException e) {
@@ -697,8 +754,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public void set(Object... args) {
+    private void set0(Object[] args) {
       try {
         field.set(null, args[0]);
       } catch (IllegalAccessException e) {
@@ -706,13 +762,12 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public synchronized boolean compareAndSet(Object... args) {
+    private boolean compareAndSet0(Object[] args) {
       Object expected = args[0];
       Object update = args[1];
       try {
         Object current = field.get(null);
-        if (Objects.equals(current, expected)) {
+        if (sameValue(varType(), current, expected)) {
           field.set(null, update);
           return true;
         }
@@ -722,8 +777,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public synchronized Object getAndSet(Object... args) {
+    private Object getAndSet0(Object[] args) {
       Object update = args[0];
       try {
         Object current = field.get(null);
@@ -734,8 +788,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
-    @Override
-    public synchronized Object getAndAdd(Object... args) {
+    private Object getAndAdd0(Object[] args) {
       Object delta = args[0];
       try {
         Object current = field.get(null);
@@ -756,6 +809,46 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       }
     }
 
+
+    @Override
+    public Object get(Object... args) {
+      synchronized (lockFor(args)) {
+        return get0(args);
+      }
+    }
+
+    @Override
+    public void set(Object... args) {
+      synchronized (lockFor(args)) {
+        set0(args);
+      }
+    }
+
+    @Override
+    public boolean compareAndSet(Object... args) {
+      synchronized (lockFor(args)) {
+        return compareAndSet0(args);
+      }
+    }
+
+    @Override
+    public Object getAndSet(Object... args) {
+      synchronized (lockFor(args)) {
+        return getAndSet0(args);
+      }
+    }
+
+    @Override
+    public Object getAndAdd(Object... args) {
+      synchronized (lockFor(args)) {
+        return getAndAdd0(args);
+      }
+    }
+    @Override
+    Object lockFor(Object[] args) {
+      return stripe(field.getDeclaringClass(), field.hashCode());
+    }
+
     @Override
     public String toString() {
       return "VarHandle[varType=" + varType().getName() + ", coord=[]]";
@@ -773,37 +866,33 @@ public abstract class VarHandle implements java.lang.constant.Constable {
           coordinateTypes().get(0).describeConstable().orElse(null)));
     }
 
-    @Override
-    public Object get(Object... args) {
+    private Object get0(Object[] args) {
       Object array = args[0];
       int index = ((Number) args[1]).intValue();
       return Array.get(array, index);
     }
 
-    @Override
-    public void set(Object... args) {
+    private void set0(Object[] args) {
       Object array = args[0];
       int index = ((Number) args[1]).intValue();
       Object val = args[2];
       Array.set(array, index, val);
     }
 
-    @Override
-    public synchronized boolean compareAndSet(Object... args) {
+    private boolean compareAndSet0(Object[] args) {
       Object array = args[0];
       int index = ((Number) args[1]).intValue();
       Object expected = args[2];
       Object update = args[3];
       Object current = Array.get(array, index);
-      if (Objects.equals(current, expected)) {
+      if (sameValue(varType(), current, expected)) {
         Array.set(array, index, update);
         return true;
       }
       return false;
     }
 
-    @Override
-    public synchronized Object getAndSet(Object... args) {
+    private Object getAndSet0(Object[] args) {
       Object array = args[0];
       int index = ((Number) args[1]).intValue();
       Object update = args[2];
@@ -812,8 +901,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       return current;
     }
 
-    @Override
-    public synchronized Object getAndAdd(Object... args) {
+    private Object getAndAdd0(Object[] args) {
       Object array = args[0];
       int index = ((Number) args[1]).intValue();
       Object delta = args[2];
@@ -830,6 +918,46 @@ public abstract class VarHandle implements java.lang.constant.Constable {
         return Long.valueOf(cur);
       }
       throw new UnsupportedOperationException("getAndAdd not supported on " + varType());
+    }
+
+
+    @Override
+    public Object get(Object... args) {
+      synchronized (lockFor(args)) {
+        return get0(args);
+      }
+    }
+
+    @Override
+    public void set(Object... args) {
+      synchronized (lockFor(args)) {
+        set0(args);
+      }
+    }
+
+    @Override
+    public boolean compareAndSet(Object... args) {
+      synchronized (lockFor(args)) {
+        return compareAndSet0(args);
+      }
+    }
+
+    @Override
+    public Object getAndSet(Object... args) {
+      synchronized (lockFor(args)) {
+        return getAndSet0(args);
+      }
+    }
+
+    @Override
+    public Object getAndAdd(Object... args) {
+      synchronized (lockFor(args)) {
+        return getAndAdd0(args);
+      }
+    }
+    @Override
+    Object lockFor(Object[] args) {
+      return stripe(args[0], ((Number) args[1]).intValue());
     }
 
     @Override
@@ -1127,7 +1255,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
       Object expected = args[2];
       Object update = args[3];
       Object current = get(buf, offset);
-      if (Objects.equals(current, expected)) {
+      if (sameValue(varType(), current, expected)) {
         set(buf, offset, update);
         return true;
       }
