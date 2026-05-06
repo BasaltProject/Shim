@@ -131,6 +131,6 @@ public final class Parameter implements AnnotatedElement {
   }
 
   public AnnotatedType getAnnotatedType() {
-    return new AnnotatedTypeImpl(getParameterizedType());
+    return AnnotatedTypeImpl.create(getParameterizedType());
   }
 }

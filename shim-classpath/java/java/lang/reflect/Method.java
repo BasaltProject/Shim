@@ -422,7 +422,7 @@ public class Method extends Executable {
 
   @Override
   public AnnotatedType getAnnotatedReturnType() {
-    return new AnnotatedTypeImpl(getGenericReturnType());
+    return AnnotatedTypeImpl.create(getGenericReturnType());
   }
 
   public boolean isBridge() {

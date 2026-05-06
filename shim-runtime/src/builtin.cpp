@@ -1456,9 +1456,9 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_java_lang_Class_getEnclosingClass(Thread* t,
-                                            object,
-                                            uintptr_t* arguments)
+    Shim_java_lang_Class_getEnclosingClass0(Thread* t,
+                                             object,
+                                             uintptr_t* arguments)
 {
   GcClass* c
       = cast<GcJclass>(t, reinterpret_cast<object>(arguments[0]))->vmClass();

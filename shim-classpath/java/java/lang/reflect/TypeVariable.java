@@ -22,7 +22,7 @@ public interface TypeVariable<D extends GenericDeclaration> extends Type, Annota
     Type[] bounds = getBounds();
     AnnotatedType[] res = new AnnotatedType[bounds.length];
     for (int i = 0; i < bounds.length; i++) {
-      res[i] = new AnnotatedTypeImpl(bounds[i]);
+      res[i] = AnnotatedTypeImpl.create(bounds[i]);
     }
     return res;
   }

@@ -82,6 +82,6 @@ public final class RecordComponent implements AnnotatedElement {
   }
 
   public AnnotatedType getAnnotatedType() {
-    return new AnnotatedTypeImpl(getGenericType());
+    return AnnotatedTypeImpl.create(getGenericType());
   }
 }
