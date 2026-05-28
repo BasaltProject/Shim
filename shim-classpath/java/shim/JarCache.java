@@ -41,7 +41,7 @@ public final class JarCache {
         return e.file;
       }
     }
-    JarFile jar = new JarFile(file);
+    JarFile jar = new JarFile(file, true, java.util.zip.ZipFile.OPEN_READ, Runtime.version());
     synchronized (kEntries) {
       Entry e = kEntries.get(key);
       if (e != null && e.modified == modified && e.length == length) {

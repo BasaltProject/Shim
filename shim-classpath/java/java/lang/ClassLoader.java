@@ -191,7 +191,9 @@ public abstract class ClassLoader {
   protected final Class defineClass(String name, byte[] b, int offset, int length,
                                     ProtectionDomain domain)
   {
-    return defineClass(name, b, offset, length);
+    Class defined = defineClass(name, b, offset, length);
+    if (domain != null) shim.Classes.setProtectionDomain(defined, domain);
+    return defined;
   }
 
   protected Class findClass(String name) throws ClassNotFoundException {
