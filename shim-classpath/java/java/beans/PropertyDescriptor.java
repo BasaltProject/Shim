@@ -231,6 +231,21 @@ public class PropertyDescriptor extends FeatureDescriptor {
     this.constrained = constrained;
   }
 
+  public PropertyEditor createPropertyEditor(Object bean) {
+    Class<?> cls = getPropertyEditorClass();
+    if (cls == null) {
+      return null;
+    }
+    if (!PropertyEditor.class.isAssignableFrom(cls)) {
+      return null;
+    }
+    try {
+      return (PropertyEditor) cls.getConstructor().newInstance();
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
   public void setPropertyEditorClass(Class<?> propertyEditorClass) {
     this.propertyEditorClass = propertyEditorClass;
   }
