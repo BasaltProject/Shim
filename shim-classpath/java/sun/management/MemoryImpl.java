@@ -10,10 +10,39 @@ package sun.management;
 
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
+import java.util.concurrent.CopyOnWriteArrayList;
+import javax.management.ListenerNotFoundException;
+import javax.management.MBeanNotificationInfo;
+import javax.management.NotificationEmitter;
+import javax.management.NotificationFilter;
+import javax.management.NotificationListener;
 import javax.management.ObjectName;
 
-public class MemoryImpl implements MemoryMXBean {
+public class MemoryImpl implements MemoryMXBean, NotificationEmitter {
   private volatile boolean verbose;
+  private final CopyOnWriteArrayList<NotificationListener> listeners = new CopyOnWriteArrayList<NotificationListener>();
+
+  @Override
+  public void addNotificationListener(NotificationListener listener, NotificationFilter filter, Object handback) {
+    if (listener == null) throw new IllegalArgumentException("Listener can't be null");
+    listeners.add(listener);
+  }
+
+  @Override
+  public void removeNotificationListener(NotificationListener listener) throws ListenerNotFoundException {
+    if (!listeners.remove(listener)) throw new ListenerNotFoundException("Listener not registered");
+  }
+
+  @Override
+  public void removeNotificationListener(NotificationListener listener, NotificationFilter filter, Object handback)
+      throws ListenerNotFoundException {
+    removeNotificationListener(listener);
+  }
+
+  @Override
+  public MBeanNotificationInfo[] getNotificationInfo() {
+    return new MBeanNotificationInfo[0];
+  }
 
   @Override
   public int getObjectPendingFinalizationCount() {
