@@ -8,7 +8,7 @@
 
 package java.awt;
 
-public class Color implements Transparency, java.io.Serializable {
+public class Color implements Paint, java.io.Serializable {
   public static final Color white = new Color(255, 255, 255);
   public static final Color WHITE = white;
   public static final Color lightGray = new Color(192, 192, 192);
@@ -354,6 +354,132 @@ public class Color implements Transparency, java.io.Serializable {
       f[2] = frgbvalue[2];
     }
     return f;
+  }
+
+  private java.awt.color.ColorSpace cs;
+  private float[] fvalue;
+
+  public Color(java.awt.color.ColorSpace cspace, float[] components, float alpha) {
+    boolean rangeError = false;
+    String badComponentString = "";
+    int n = cspace.getNumComponents();
+    fvalue = new float[n];
+    for (int i = 0; i < n; i++) {
+      if (components[i] < 0.0 || components[i] > 1.0) {
+        rangeError = true;
+        badComponentString = badComponentString + "Component " + i + " ";
+      } else {
+        fvalue[i] = components[i];
+      }
+    }
+    if (alpha < 0.0 || alpha > 1.0) {
+      rangeError = true;
+      badComponentString = badComponentString + "Alpha";
+    } else {
+      falpha = alpha;
+    }
+    if (rangeError) {
+      throw new IllegalArgumentException("Color parameter outside of expected range: " + badComponentString);
+    }
+    float[] rgb = cspace.toRGB(fvalue);
+    cs = cspace;
+    frgbvalue = rgb;
+    value = ((((int) (falpha * 255 + 0.5)) & 0xFF) << 24) | ((((int) (rgb[0] * 255 + 0.5)) & 0xFF) << 16)
+        | ((((int) (rgb[1] * 255 + 0.5)) & 0xFF) << 8) | ((((int) (rgb[2] * 255 + 0.5)) & 0xFF) << 0);
+  }
+
+  public float[] getComponents(float[] compArray) {
+    if (fvalue == null) {
+      return getRGBComponents(compArray);
+    }
+    float[] f;
+    int n = fvalue.length;
+    if (compArray == null) {
+      f = new float[n + 1];
+    } else {
+      f = compArray;
+    }
+    for (int i = 0; i < n; i++) {
+      f[i] = fvalue[i];
+    }
+    f[n] = falpha;
+    return f;
+  }
+
+  public float[] getColorComponents(float[] compArray) {
+    if (fvalue == null) {
+      return getRGBColorComponents(compArray);
+    }
+    float[] f;
+    int n = fvalue.length;
+    if (compArray == null) {
+      f = new float[n];
+    } else {
+      f = compArray;
+    }
+    for (int i = 0; i < n; i++) {
+      f[i] = fvalue[i];
+    }
+    return f;
+  }
+
+  public float[] getComponents(java.awt.color.ColorSpace cspace, float[] compArray) {
+    if (cs == null) {
+      cs = java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_sRGB);
+    }
+    float[] f;
+    if (fvalue == null) {
+      f = new float[] {getRed() / 255f, getGreen() / 255f, getBlue() / 255f};
+    } else {
+      f = fvalue;
+    }
+    float[] tmp = cs.toCIEXYZ(f);
+    float[] tmpout = cspace.fromCIEXYZ(tmp);
+    if (compArray == null) {
+      compArray = new float[tmpout.length + 1];
+    }
+    for (int i = 0; i < tmpout.length; i++) {
+      compArray[i] = tmpout[i];
+    }
+    if (fvalue == null) {
+      compArray[tmpout.length] = getAlpha() / 255f;
+    } else {
+      compArray[tmpout.length] = falpha;
+    }
+    return compArray;
+  }
+
+  public float[] getColorComponents(java.awt.color.ColorSpace cspace, float[] compArray) {
+    if (cs == null) {
+      cs = java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_sRGB);
+    }
+    float[] f;
+    if (fvalue == null) {
+      f = new float[] {getRed() / 255f, getGreen() / 255f, getBlue() / 255f};
+    } else {
+      f = fvalue;
+    }
+    float[] tmp = cs.toCIEXYZ(f);
+    float[] tmpout = cspace.fromCIEXYZ(tmp);
+    if (compArray == null) {
+      return tmpout;
+    }
+    for (int i = 0; i < tmpout.length; i++) {
+      compArray[i] = tmpout[i];
+    }
+    return compArray;
+  }
+
+  public java.awt.color.ColorSpace getColorSpace() {
+    if (cs == null) {
+      cs = java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_sRGB);
+    }
+    return cs;
+  }
+
+  public synchronized PaintContext createContext(java.awt.image.ColorModel cm, Rectangle r, java.awt.geom.Rectangle2D r2d,
+      java.awt.geom.AffineTransform xform, RenderingHints hints) {
+    return new shim.awt.ColorPaintContext(getRGB(), cm);
   }
 
   @Override
