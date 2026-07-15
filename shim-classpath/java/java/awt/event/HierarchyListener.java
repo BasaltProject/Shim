@@ -1,0 +1,13 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package java.awt.event;
+
+public interface HierarchyListener extends java.util.EventListener {
+  void hierarchyChanged(java.awt.event.HierarchyEvent p0);
+}
