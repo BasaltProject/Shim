@@ -50,6 +50,38 @@ public final class PolymorphicStubs {
     return handle.invokeWithArguments(arguments);
   }
 
+  public static Object get(VarHandle h, Object[] a) { return h.get(a); }
+  public static Object getVolatile(VarHandle h, Object[] a) { return h.getVolatile(a); }
+  public static Object getOpaque(VarHandle h, Object[] a) { return h.getOpaque(a); }
+  public static Object getAcquire(VarHandle h, Object[] a) { return h.getAcquire(a); }
+  public static Object compareAndExchange(VarHandle h, Object[] a) { return h.compareAndExchange(a); }
+  public static Object compareAndExchangeAcquire(VarHandle h, Object[] a) { return h.compareAndExchangeAcquire(a); }
+  public static Object compareAndExchangeRelease(VarHandle h, Object[] a) { return h.compareAndExchangeRelease(a); }
+  public static Object getAndSet(VarHandle h, Object[] a) { return h.getAndSet(a); }
+  public static Object getAndSetAcquire(VarHandle h, Object[] a) { return h.getAndSetAcquire(a); }
+  public static Object getAndSetRelease(VarHandle h, Object[] a) { return h.getAndSetRelease(a); }
+  public static Object getAndAdd(VarHandle h, Object[] a) { return h.getAndAdd(a); }
+  public static Object getAndAddAcquire(VarHandle h, Object[] a) { return h.getAndAddAcquire(a); }
+  public static Object getAndAddRelease(VarHandle h, Object[] a) { return h.getAndAddRelease(a); }
+  public static Object getAndBitwiseOr(VarHandle h, Object[] a) { return h.getAndBitwiseOr(a); }
+  public static Object getAndBitwiseOrAcquire(VarHandle h, Object[] a) { return h.getAndBitwiseOrAcquire(a); }
+  public static Object getAndBitwiseOrRelease(VarHandle h, Object[] a) { return h.getAndBitwiseOrRelease(a); }
+  public static Object getAndBitwiseAnd(VarHandle h, Object[] a) { return h.getAndBitwiseAnd(a); }
+  public static Object getAndBitwiseAndAcquire(VarHandle h, Object[] a) { return h.getAndBitwiseAndAcquire(a); }
+  public static Object getAndBitwiseAndRelease(VarHandle h, Object[] a) { return h.getAndBitwiseAndRelease(a); }
+  public static Object getAndBitwiseXor(VarHandle h, Object[] a) { return h.getAndBitwiseXor(a); }
+  public static Object getAndBitwiseXorAcquire(VarHandle h, Object[] a) { return h.getAndBitwiseXorAcquire(a); }
+  public static Object getAndBitwiseXorRelease(VarHandle h, Object[] a) { return h.getAndBitwiseXorRelease(a); }
+  public static void set(VarHandle h, Object[] a) { h.set(a); }
+  public static void setVolatile(VarHandle h, Object[] a) { h.setVolatile(a); }
+  public static void setOpaque(VarHandle h, Object[] a) { h.setOpaque(a); }
+  public static void setRelease(VarHandle h, Object[] a) { h.setRelease(a); }
+  public static boolean compareAndSet(VarHandle h, Object[] a) { return h.compareAndSet(a); }
+  public static boolean weakCompareAndSetPlain(VarHandle h, Object[] a) { return h.weakCompareAndSetPlain(a); }
+  public static boolean weakCompareAndSet(VarHandle h, Object[] a) { return h.weakCompareAndSet(a); }
+  public static boolean weakCompareAndSetAcquire(VarHandle h, Object[] a) { return h.weakCompareAndSetAcquire(a); }
+  public static boolean weakCompareAndSetRelease(VarHandle h, Object[] a) { return h.weakCompareAndSetRelease(a); }
+
   public static Object varHandle(VarHandle handle, String mode, Object[] arguments) {
     switch (mode) {
     case "get": return handle.get(arguments);
@@ -216,9 +248,9 @@ public final class PolymorphicStubs {
     write4(out, 0);
 
     write1(out, 0x2a);
-    write1(out, ldc_w);
-    write2(out, ConstantPool.addString(pool, variable ? name : descriptor) + 1);
     if (!variable) {
+      write1(out, ldc_w);
+      write2(out, ConstantPool.addString(pool, descriptor) + 1);
       write1(out, ldc_w);
       write2(out, ConstantPool.addClass(pool, className) + 1);
     }
@@ -245,10 +277,18 @@ public final class PolymorphicStubs {
     }
 
     if (variable) {
+      boolean returnsVoid = name.startsWith("set");
+      boolean returnsBoolean = name.equals("compareAndSet") || name.startsWith("weakCompareAndSet");
       write1(out, 0xb8);
-      write2(out, ConstantPool.addMethodRef(pool, "shim/PolymorphicStubs", "varHandle",
-                                            "(Ljava/lang/invoke/VarHandle;Ljava/lang/String;"
-                                            + "[Ljava/lang/Object;)Ljava/lang/Object;") + 1);
+      write2(out, ConstantPool.addMethodRef(pool, "shim/PolymorphicStubs", name,
+                                            "(Ljava/lang/invoke/VarHandle;[Ljava/lang/Object;)"
+                                            + (returnsVoid ? "V" : returnsBoolean ? "Z" : "Ljava/lang/Object;")) + 1);
+      if (returnsVoid) {
+        write1(out, 0x01);
+      } else if (returnsBoolean) {
+        write1(out, 0xb8);
+        write2(out, ConstantPool.addMethodRef(pool, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;") + 1);
+      }
     } else {
       write1(out, iconst_0 + (exact ? 1 : 0));
       write1(out, 0xb8);
