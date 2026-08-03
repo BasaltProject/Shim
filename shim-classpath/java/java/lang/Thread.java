@@ -223,7 +223,12 @@ public class Thread implements Runnable {
   public static native Thread currentThread();
 
   public void interrupt() {
-    interrupt(peer);
+    long p = peer;
+    if (p != 0 && state == (byte) State.RUNNABLE.ordinal()) {
+      interrupt(p);
+    } else {
+      interrupted = true;
+    }
   }
 
   private static native boolean interrupt(long peer);

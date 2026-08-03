@@ -41,6 +41,12 @@ public final class Unsafe {
 
   public native void freeMemory(long address);
 
+  public void invokeCleaner(java.nio.ByteBuffer directBuffer) {
+    if (!directBuffer.isDirect()) {
+      throw new IllegalArgumentException("Not a direct buffer");
+    }
+  }
+
   public native byte getByte(long address);
 
   public native void putByte(long address, byte x);
