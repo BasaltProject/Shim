@@ -771,9 +771,10 @@ public class MethodHandle implements java.lang.constant.Constable {
         return target.invokeWithArguments(arguments);
       } catch (Throwable t) {
         if (exType.isInstance(t)) {
-          Object[] handlerArgs = new Object[arguments.length + 1];
+          int handlerCount = handler.type().parameterCount();
+          Object[] handlerArgs = new Object[handlerCount];
           handlerArgs[0] = t;
-          System.arraycopy(arguments, 0, handlerArgs, 1, arguments.length);
+          System.arraycopy(arguments, 0, handlerArgs, 1, handlerCount - 1);
           return handler.invokeWithArguments(handlerArgs);
         }
         throw t;
