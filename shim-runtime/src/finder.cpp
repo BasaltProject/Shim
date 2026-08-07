@@ -503,7 +503,8 @@ class JarElement : public Element {
                               : 0),
         sourceUrl_(this->name ? append(allocator, "file:", this->name) : 0),
         region(0),
-        index(0)
+        index(0),
+        multiRelease(-1)
   {
   }
 
@@ -519,8 +520,38 @@ class JarElement : public Element {
         sourceUrl_(name ? append(allocator, "file:", name) : 0),
         region(new (allocator->allocate(sizeof(PointerRegion)))
                PointerRegion(s, allocator, jarData, jarLength)),
-        index(JarIndex::open(s, allocator, region))
+        index(JarIndex::open(s, allocator, region)),
+        multiRelease(-1)
   {
+  }
+
+  bool isMultiRelease()
+  {
+    if (multiRelease < 0) {
+      multiRelease = 0;
+      System::Region* manifest = index ? index->find("META-INF/MANIFEST.MF", region->start()) : 0;
+      if (manifest) {
+        const char* text = reinterpret_cast<const char*>(manifest->start());
+        size_t length = manifest->length();
+        const char key[] = "multi-release:";
+        for (size_t i = 0; i + sizeof(key) < length; ++i) {
+          if ((i == 0 or text[i - 1] == '\n') and strncasecmp(text + i, key, sizeof(key) - 1) == 0) {
+            size_t j = i + sizeof(key) - 1;
+            while (j < length and (text[j] == ' ' or text[j] == '\t')) ++j;
+            multiRelease = (j + 4 <= length and strncasecmp(text + j, "true", 4) == 0) ? 1 : 0;
+            break;
+          }
+        }
+        manifest->dispose();
+      }
+    }
+    return multiRelease == 1;
+  }
+
+  bool versionedName(const char* name, int version, char* out, size_t size)
+  {
+    if (strncmp(name, "META-INF/", 9) == 0) return false;
+    return ::snprintf(out, size, "META-INF/versions/%d/%s", version, name) < static_cast<int>(size);
   }
 
   virtual Element::Iterator* iterator()
@@ -549,7 +580,14 @@ class JarElement : public Element {
     while (*name == '/')
       name++;
 
-    System::Region* r = (index ? index->find(name, region->start()) : 0);
+    System::Region* r = 0;
+    if (index and isMultiRelease()) {
+      char versioned[1024];
+      for (int v = 25; not r and v >= 9; --v) {
+        if (versionedName(name, v, versioned, sizeof(versioned))) r = index->find(versioned, region->start());
+      }
+    }
+    if (r == 0) r = (index ? index->find(name, region->start()) : 0);
     if (DebugFind) {
       if (r) {
         fprintf(stderr, "found %s in %s\n", name, this->name);
@@ -569,8 +607,16 @@ class JarElement : public Element {
     while (*name == '/')
       name++;
 
-    System::FileType type = (index ? index->stat(name, length, tryDirectory)
-                                   : System::TypeDoesNotExist);
+    System::FileType type = System::TypeDoesNotExist;
+    if (index and isMultiRelease()) {
+      char versioned[1024];
+      for (int v = 25; type == System::TypeDoesNotExist and v >= 9; --v) {
+        if (versionedName(name, v, versioned, sizeof(versioned))) type = index->stat(versioned, length, false);
+      }
+    }
+    if (type == System::TypeDoesNotExist) {
+      type = (index ? index->stat(name, length, tryDirectory) : System::TypeDoesNotExist);
+    }
     if (DebugStat) {
       fprintf(stderr, "stat %s in %s: %d\n", name, this->name, type);
     }
@@ -619,6 +665,7 @@ class JarElement : public Element {
   const char* sourceUrl_;
   System::Region* region;
   JarIndex* index;
+  int multiRelease;
 };
 
 class BuiltinElement : public JarElement {
