@@ -10,6 +10,8 @@
 #include "jni-util.h"
 #include "utf8-util.h"
 
+#include <stddef.h>
+
 #ifdef PLATFORM_WINDOWS
 #include <winsock2.h>
 #include <ws2tcpip.h>

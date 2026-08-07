@@ -15,6 +15,7 @@
 #include "utf8-util.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdint.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -28,7 +29,6 @@
 #include <grp.h>
 #include <pwd.h>
 #include <sys/mman.h>
-#include <sys/sysmacros.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -36,6 +36,7 @@
 #include <sys/xattr.h>
 #endif
 #if defined(__linux__)
+#include <sys/sysmacros.h>
 #include <poll.h>
 #include <sys/inotify.h>
 #endif

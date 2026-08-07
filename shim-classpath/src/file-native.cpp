@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <locale.h>
 #include <sys/stat.h>
 #include <sys/types.h>
