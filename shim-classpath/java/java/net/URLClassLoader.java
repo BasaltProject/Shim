@@ -76,8 +76,16 @@ public class URLClassLoader extends java.security.SecureClassLoader implements C
     if (!url.getProtocol().equals("file")) {
       throw new UnsupportedOperationException(url.getProtocol());
     }
+    final File root;
+    try {
+      // getFile() is still URL-escaped: a literal %20 is not a filesystem space.
+      // File(URI) decodes escapes without treating a literal '+' as a space.
+      root = new File(url.toURI());
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException("Invalid class path URL: " + url, e);
+    }
     urls.add(url);
-    roots.add(new File(url.getFile()));
+    roots.add(root);
   }
 
   public URL[] getURLs() {
@@ -154,7 +162,7 @@ public class URLClassLoader extends java.security.SecureClassLoader implements C
         }
       } else if (root.exists()) {
         if (shim.JarCache.open(root).getEntry(path) != null) {
-          return new URL("jar:file:" + root.getAbsolutePath() + "!/" + path);
+          return new URL("jar:" + root.toURI().toURL().toExternalForm() + "!/" + path);
         }
       }
     } catch (IOException ignored) {
