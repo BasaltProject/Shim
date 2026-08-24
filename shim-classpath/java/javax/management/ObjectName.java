@@ -21,14 +21,14 @@ public class ObjectName implements Comparable<ObjectName>, QueryExp {
 
   public static final ObjectName WILDCARD = newWildcard();
 
-  private String domain;
-  private LinkedHashMap<String, String> properties = new LinkedHashMap<String, String>();
-  private TreeMap<String, String> sorted = new TreeMap<String, String>();
-  private boolean domainPattern;
-  private boolean listPattern;
-  private boolean valuePattern;
-  private String keyString = "";
-  private String canonicalName;
+  private transient String domain;
+  private transient LinkedHashMap<String, String> properties = new LinkedHashMap<String, String>();
+  private transient TreeMap<String, String> sorted = new TreeMap<String, String>();
+  private transient boolean domainPattern;
+  private transient boolean listPattern;
+  private transient boolean valuePattern;
+  private transient String keyString = "";
+  private transient String canonicalName;
 
   private static ObjectName newWildcard() {
     try {
@@ -333,6 +333,24 @@ public class ObjectName implements Comparable<ObjectName>, QueryExp {
     return b.toString();
   }
 
+  private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+    out.defaultWriteObject();
+    out.writeObject(getSerializedNameString());
+  }
+
+  private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+    in.defaultReadObject();
+    properties = new LinkedHashMap<String, String>();
+    sorted = new TreeMap<String, String>();
+    keyString = "";
+    String name = (String) in.readObject();
+    try {
+      parse(name);
+    } catch (MalformedObjectNameException e) {
+      throw new java.io.InvalidObjectException(e.getMessage());
+    }
+  }
+
   private String getSerializedNameString() {
     if (!listPattern) {
       return domain + ":" + keyString;
@@ -393,9 +411,6 @@ public class ObjectName implements Comparable<ObjectName>, QueryExp {
   }
 
   public String getKeyProperty(String property) {
-    if (property == null) {
-      throw new NullPointerException("key property can't be null");
-    }
     return properties.get(property);
   }
 
