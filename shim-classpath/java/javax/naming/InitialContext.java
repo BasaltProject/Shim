@@ -70,31 +70,37 @@ public class InitialContext implements Context {
   }
 
   private static Context getInitialContext(Hashtable<?, ?> env) throws NamingException {
-    String className = env == null ? null : (String) env.get(Context.INITIAL_CONTEXT_FACTORY);
-    if (className == null) {
-      NoInitialContextException ne = new NoInitialContextException("Need to specify class name in environment "
-          + "or system property, or in an application resource file: " + Context.INITIAL_CONTEXT_FACTORY);
-      throw ne;
-    }
-    try {
-      ClassLoader cl = Thread.currentThread().getContextClassLoader();
-      Class<?> c = cl != null ? Class.forName(className, true, cl) : Class.forName(className);
-      InitialContextFactory factory = (InitialContextFactory) c.getDeclaredConstructor().newInstance();
-      return factory.getInitialContext(env);
-    } catch (NamingException e) {
-      throw e;
-    } catch (Exception e) {
-      NoInitialContextException ne = new NoInitialContextException("Cannot instantiate class: " + className);
-      ne.setRootCause(e);
-      throw ne;
-    }
+    return javax.naming.spi.NamingManager.getInitialContext(env);
   }
 
   protected Context getURLOrDefaultInitCtx(Name name) throws NamingException {
+    if (javax.naming.spi.NamingManager.hasInitialContextFactoryBuilder()) {
+      return getDefaultInitCtx();
+    }
+    if (name.size() > 0) {
+      String first = name.get(0);
+      String scheme = getURLScheme(first);
+      if (scheme != null) {
+        Context ctx = javax.naming.spi.NamingManager.getURLContext(scheme, myProps);
+        if (ctx != null) {
+          return ctx;
+        }
+      }
+    }
     return getDefaultInitCtx();
   }
 
   protected Context getURLOrDefaultInitCtx(String name) throws NamingException {
+    if (javax.naming.spi.NamingManager.hasInitialContextFactoryBuilder()) {
+      return getDefaultInitCtx();
+    }
+    String scheme = getURLScheme(name);
+    if (scheme != null) {
+      Context ctx = javax.naming.spi.NamingManager.getURLContext(scheme, myProps);
+      if (ctx != null) {
+        return ctx;
+      }
+    }
     return getDefaultInitCtx();
   }
 
