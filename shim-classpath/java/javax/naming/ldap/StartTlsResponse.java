@@ -1,0 +1,41 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package javax.naming.ldap;
+
+import java.io.IOException;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
+
+public abstract class StartTlsResponse implements ExtendedResponse {
+  private static final long serialVersionUID = 8372842182579276418L;
+
+  public static final String OID = "1.3.6.1.4.1.1466.20037";
+
+  protected StartTlsResponse() {
+  }
+
+  public String getID() {
+    return OID;
+  }
+
+  public byte[] getEncodedValue() {
+    return null;
+  }
+
+  public abstract void setEnabledCipherSuites(String[] suites);
+
+  public abstract void setHostnameVerifier(HostnameVerifier verifier);
+
+  public abstract SSLSession negotiate() throws IOException;
+
+  public abstract SSLSession negotiate(SSLSocketFactory factory) throws IOException;
+
+  public abstract void close() throws IOException;
+}
