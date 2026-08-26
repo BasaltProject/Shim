@@ -150,9 +150,9 @@ public class LoginContext {
     LoginException firstError = null;
     LoginException firstRequiredError = null;
     boolean success = false;
-    int index = 0;
-    for (int i = index; i < moduleStack.length; i++) {
+    for (int i = 0; i < moduleStack.length; i++) {
       moduleIndex = i;
+      LoginException le = null;
       try {
         if (moduleStack[i].module == null) {
           Class<?> c = Class.forName(moduleStack[i].entry.getLoginModuleName(), true, contextClassLoader);
@@ -173,15 +173,14 @@ public class LoginContext {
       } catch (NoSuchMethodException e) {
         java.io.StringWriter sw = new java.io.StringWriter();
         new InstantiationException(moduleStack[i].entry.getLoginModuleName()).printStackTrace(new java.io.PrintWriter(sw));
-        throw new LoginException(sw.toString());
+        le = new LoginException(sw.toString());
       } catch (InstantiationException e) {
-        throw new LoginException("unable to instantiate LoginModule: " + e.getMessage());
+        le = new LoginException("unable to instantiate LoginModule: " + e.getMessage());
       } catch (ClassNotFoundException e) {
-        throw new LoginException("No LoginModule found for " + e.getMessage());
+        le = new LoginException("No LoginModule found for " + e.getMessage());
       } catch (IllegalAccessException e) {
-        throw new LoginException("unable to access LoginModule: " + e.getMessage());
+        le = new LoginException("unable to access LoginModule: " + e.getMessage());
       } catch (InvocationTargetException ite) {
-        LoginException le;
         if (ite.getCause() instanceof LoginException) {
           le = (LoginException) ite.getCause();
         } else if (ite.getCause() instanceof SecurityException) {
@@ -192,6 +191,8 @@ public class LoginContext {
           ite.getCause().printStackTrace(new java.io.PrintWriter(sw));
           le = new LoginException(sw.toString());
         }
+      }
+      if (le != null) {
         AppConfigurationEntry.LoginModuleControlFlag flag = moduleStack[i].entry.getControlFlag();
         if (flag == AppConfigurationEntry.LoginModuleControlFlag.REQUISITE) {
           if (methodName.equals("abort") || methodName.equals("logout")) {
