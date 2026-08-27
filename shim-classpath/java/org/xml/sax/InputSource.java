@@ -72,4 +72,8 @@ public class InputSource {
   public Reader getCharacterStream() {
     return characterStream;
   }
+
+  public boolean isEmpty() {
+    return (systemId == null || systemId.isEmpty()) && byteStream == null && characterStream == null;
+  }
 }
