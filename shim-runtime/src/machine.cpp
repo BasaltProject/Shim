@@ -3415,6 +3415,17 @@ static void checkLoadingConstraint(Thread* t, GcClassLoader* loader, GcClass* cl
   }
 }
 
+static bool specUsesOnlyBootClasses(GcByteArray* spec)
+{
+  for (unsigned i = 0; i + 1 < spec->length(); ++i) {
+    if (spec->body()[i] != 'L') continue;
+    unsigned start = ++i;
+    while (i + 1 < spec->length() && spec->body()[i] != ';') ++i;
+    if (i - start < 5 || memcmp(&spec->body()[start], "java/", 5) != 0) return false;
+  }
+  return true;
+}
+
 static void imposeLoadingConstraints(Thread* t, GcClassLoader* left, GcClassLoader* right, GcByteArray* spec)
 {
   if (left == right) return;
@@ -6080,8 +6091,13 @@ object resolveMember(Thread* t,
                  declaring->name()->body().begin());
       }
     }
-    if (!throw_ && loader != declaring->loader()) return 0;
-    imposeLoadingConstraints(t, loader, declaring->loader(), spec);
+    if (loader != declaring->loader()) {
+      if (not throw_) {
+        if (declaring->loader() != roots(t)->bootLoader() or not specUsesOnlyBootClasses(spec)) return 0;
+      } else {
+        imposeLoadingConstraints(t, loader, declaring->loader(), spec);
+      }
+    }
   }
   return member;
 }
