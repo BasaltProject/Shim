@@ -103,4 +103,13 @@ public class SimpleJavaFileObject implements JavaFileObject {
   public String toString() {
     return getClass().getName() + "[" + toUri() + "]";
   }
+
+  public static JavaFileObject forSource(URI uri, final String content) {
+    return new SimpleJavaFileObject(uri, Kind.SOURCE) {
+      @Override
+      public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+        return content;
+      }
+    };
+  }
 }

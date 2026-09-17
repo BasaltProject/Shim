@@ -75,4 +75,38 @@ public class ForwardingJavaFileManager<M extends JavaFileManager> implements Jav
   public void close() throws IOException {
     fileManager.close();
   }
+
+  public boolean contains(Location location, FileObject fo) throws IOException {
+    return fileManager.contains(location, fo);
+  }
+
+  public <S> java.util.ServiceLoader<S> getServiceLoader(Location location, Class<S> service) throws IOException {
+    return fileManager.getServiceLoader(location, service);
+  }
+
+  public JavaFileObject getJavaFileForOutputForOriginatingFiles(Location location, String className,
+      JavaFileObject.Kind kind, FileObject... originatingFiles) throws IOException {
+    return fileManager.getJavaFileForOutputForOriginatingFiles(location, className, kind, originatingFiles);
+  }
+
+  public FileObject getFileForOutputForOriginatingFiles(Location location, String packageName, String relativeName,
+      FileObject... originatingFiles) throws IOException {
+    return fileManager.getFileForOutputForOriginatingFiles(location, packageName, relativeName, originatingFiles);
+  }
+
+  public Location getLocationForModule(Location location, String moduleName) throws IOException {
+    return fileManager.getLocationForModule(location, moduleName);
+  }
+
+  public Location getLocationForModule(Location location, JavaFileObject fo) throws IOException {
+    return fileManager.getLocationForModule(location, fo);
+  }
+
+  public String inferModuleName(Location location) throws IOException {
+    return fileManager.inferModuleName(location);
+  }
+
+  public Iterable<java.util.Set<Location>> listLocationsForModules(Location location) throws IOException {
+    return fileManager.listLocationsForModules(location);
+  }
 }

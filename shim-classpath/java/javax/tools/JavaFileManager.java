@@ -53,4 +53,42 @@ public interface JavaFileManager extends Closeable, Flushable, OptionChecker {
   void flush() throws IOException;
 
   void close() throws IOException;
+
+  default boolean contains(Location location, FileObject fo) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  default <S> java.util.ServiceLoader<S> getServiceLoader(Location location, Class<S> service) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  default JavaFileObject getJavaFileForOutputForOriginatingFiles(Location location, String className,
+      JavaFileObject.Kind kind, FileObject... originatingFiles) throws IOException {
+    return getJavaFileForOutput(location, className, kind, siblingFrom(originatingFiles));
+  }
+
+  default FileObject getFileForOutputForOriginatingFiles(Location location, String packageName, String relativeName,
+      FileObject... originatingFiles) throws IOException {
+    return getFileForOutput(location, packageName, relativeName, siblingFrom(originatingFiles));
+  }
+
+  default Location getLocationForModule(Location location, String moduleName) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  default Location getLocationForModule(Location location, JavaFileObject fo) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  default String inferModuleName(Location location) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  default Iterable<java.util.Set<Location>> listLocationsForModules(Location location) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  static FileObject siblingFrom(FileObject[] originatingFiles) {
+    return originatingFiles != null && originatingFiles.length > 0 ? originatingFiles[0] : null;
+  }
 }
