@@ -8,14 +8,82 @@
 
 package jdk.jfr;
 
+import java.lang.annotation.Annotation;
+import java.util.Collections;
+import java.util.List;
+import jdk.jfr.internal.AnnotationProxy;
+import jdk.jfr.internal.Types;
+
 public final class SettingDescriptor {
-  public java.lang.String getName() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getTypeName() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public <A extends java.lang.annotation.Annotation> A getAnnotation(java.lang.Class<A> arg0) { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getDefaultValue() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getLabel() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getContentType() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public long getTypeId() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.util.List<jdk.jfr.AnnotationElement> getAnnotationElements() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getDescription() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+  private final String name;
+  private final String typeName;
+  private final String defaultValue;
+  private final List<AnnotationElement> annotations;
+
+  SettingDescriptor(String name, String typeName, String defaultValue, List<AnnotationElement> annotations) {
+    this.name = name;
+    this.typeName = typeName;
+    this.defaultValue = defaultValue;
+    this.annotations = Collections.unmodifiableList(annotations);
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public String getLabel() {
+    AnnotationElement a = find(Label.class.getName());
+    return a == null ? null : (String) a.getValue("value");
+  }
+
+  public String getDescription() {
+    AnnotationElement a = find(Description.class.getName());
+    return a == null ? null : (String) a.getValue("value");
+  }
+
+  public String getTypeName() {
+    return typeName;
+  }
+
+  public String getContentType() {
+    for (AnnotationElement a : annotations) {
+      for (AnnotationElement m : a.getAnnotationElements()) {
+        if (m.getTypeName().equals(ContentType.class.getName())) {
+          return a.getTypeName();
+        }
+      }
+    }
+    return null;
+  }
+
+  public long getTypeId() {
+    return Types.idOf(typeName);
+  }
+
+  public String getDefaultValue() {
+    return defaultValue;
+  }
+
+  public List<AnnotationElement> getAnnotationElements() {
+    return annotations;
+  }
+
+  @SuppressWarnings("unchecked")
+  public <A extends Annotation> A getAnnotation(Class<A> annotationType) {
+    AnnotationElement a = find(annotationType.getName());
+    return a == null ? null : AnnotationProxy.create(annotationType, a);
+  }
+
+  private AnnotationElement find(String type) {
+    for (AnnotationElement a : annotations) {
+      if (a.getTypeName().equals(type)) {
+        return a;
+      }
+    }
+    return null;
+  }
+
+  public String toString() {
+    return name + ":" + typeName;
+  }
 }

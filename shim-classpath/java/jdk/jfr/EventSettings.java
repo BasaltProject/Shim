@@ -8,11 +8,33 @@
 
 package jdk.jfr;
 
+import java.time.Duration;
+
 public abstract class EventSettings {
-  public abstract jdk.jfr.EventSettings with(java.lang.String arg0, java.lang.String arg1);
-  public final jdk.jfr.EventSettings withStackTrace() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public final jdk.jfr.EventSettings withoutStackTrace() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public final jdk.jfr.EventSettings withoutThreshold() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public final jdk.jfr.EventSettings withPeriod(java.time.Duration arg0) { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public final jdk.jfr.EventSettings withThreshold(java.time.Duration arg0) { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+  EventSettings() {
+  }
+
+  public abstract EventSettings with(String name, String value);
+
+  public final EventSettings withStackTrace() {
+    return with(StackTrace.NAME, "true");
+  }
+
+  public final EventSettings withoutStackTrace() {
+    return with(StackTrace.NAME, "false");
+  }
+
+  public final EventSettings withPeriod(Duration duration) {
+    java.util.Objects.requireNonNull(duration);
+    return with(Period.NAME, JfrRuntime.formatTimespan(duration));
+  }
+
+  public final EventSettings withThreshold(Duration duration) {
+    java.util.Objects.requireNonNull(duration);
+    return with(Threshold.NAME, JfrRuntime.formatTimespan(duration));
+  }
+
+  public final EventSettings withoutThreshold() {
+    return with(Threshold.NAME, "0 ns");
+  }
 }

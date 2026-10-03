@@ -8,12 +8,41 @@
 
 package jdk.jfr;
 
-@jdk.jfr.Enabled() @jdk.jfr.StackTrace() @jdk.jfr.Registered() public abstract class Event extends jdk.internal.event.Event {
-  protected Event() { }
-  public final void commit() { }
-  public final void begin() { }
-  public final void end() { }
-  public final void set(int arg0, java.lang.Object arg1) { }
-  public final boolean isEnabled() { return false; }
-  public final boolean shouldCommit() { return false; }
+@Enabled
+@StackTrace
+@Registered
+public abstract class Event extends jdk.internal.event.Event {
+  long jfrStart;
+  long jfrEnd;
+
+  protected Event() {
+  }
+
+  public final void commit() {
+    JfrRuntime.commit(this);
+  }
+
+  public final void begin() {
+    jfrStart = System.nanoTime();
+  }
+
+  public final void end() {
+    jfrEnd = System.nanoTime();
+  }
+
+  public final void set(int index, Object value) {
+    if (this instanceof DynamicEvent) {
+      ((DynamicEvent) this).setValue(index, value);
+      return;
+    }
+    throw new UnsupportedOperationException("Not supported for instrumented events");
+  }
+
+  public final boolean isEnabled() {
+    return JfrRuntime.isEnabled(this);
+  }
+
+  public final boolean shouldCommit() {
+    return JfrRuntime.shouldCommit(this);
+  }
 }
