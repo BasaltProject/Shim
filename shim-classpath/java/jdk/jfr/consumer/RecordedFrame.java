@@ -8,10 +8,29 @@
 
 package jdk.jfr.consumer;
 
-public final class RecordedFrame extends jdk.jfr.consumer.RecordedObject {
-  public jdk.jfr.consumer.RecordedMethod getMethod() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getType() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public int getLineNumber() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public boolean isJavaFrame() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public int getBytecodeIndex() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+public final class RecordedFrame extends RecordedObject {
+  RecordedFrame(Chunk.TypeDef td, Object[] vals, Chunk chunk) {
+    super(td, vals, chunk);
+  }
+
+  public boolean isJavaFrame() {
+    String t = getType();
+    return t != null && (t.equals("Interpreted") || t.equals("JIT compiled") || t.equals("Inlined"));
+  }
+
+  public int getBytecodeIndex() {
+    return getInt("bytecodeIndex");
+  }
+
+  public int getLineNumber() {
+    return getInt("lineNumber");
+  }
+
+  public String getType() {
+    return getString("type");
+  }
+
+  public RecordedMethod getMethod() {
+    return (RecordedMethod) getValue("method");
+  }
 }

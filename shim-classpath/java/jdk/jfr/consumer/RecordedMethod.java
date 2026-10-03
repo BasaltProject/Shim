@@ -8,10 +8,28 @@
 
 package jdk.jfr.consumer;
 
-public final class RecordedMethod extends jdk.jfr.consumer.RecordedObject {
-  public java.lang.String getName() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public boolean isHidden() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public int getModifiers() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getDescriptor() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public jdk.jfr.consumer.RecordedClass getType() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+public final class RecordedMethod extends RecordedObject {
+  RecordedMethod(Chunk.TypeDef td, Object[] vals, Chunk chunk) {
+    super(td, vals, chunk);
+  }
+
+  public RecordedClass getType() {
+    return (RecordedClass) getValue("type");
+  }
+
+  public String getName() {
+    return getString("name");
+  }
+
+  public String getDescriptor() {
+    return getString("descriptor");
+  }
+
+  public int getModifiers() {
+    return getInt("modifiers");
+  }
+
+  public boolean isHidden() {
+    return getBoolean("hidden");
+  }
 }

@@ -8,8 +8,20 @@
 
 package jdk.jfr.consumer;
 
-public final class RecordedClassLoader extends jdk.jfr.consumer.RecordedObject {
-  public java.lang.String getName() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public long getId() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public jdk.jfr.consumer.RecordedClass getType() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+public final class RecordedClassLoader extends RecordedObject {
+  RecordedClassLoader(Chunk.TypeDef td, Object[] vals, Chunk chunk) {
+    super(td, vals, chunk);
+  }
+
+  public RecordedClass getType() {
+    return (RecordedClass) getValue("type");
+  }
+
+  public String getName() {
+    return getString("name");
+  }
+
+  public long getId() {
+    return 0;
+  }
 }

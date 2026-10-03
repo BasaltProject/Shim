@@ -8,12 +8,42 @@
 
 package jdk.jfr.consumer;
 
-public final class RecordedEvent extends jdk.jfr.consumer.RecordedObject {
-  public jdk.jfr.consumer.RecordedStackTrace getStackTrace() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.util.List<jdk.jfr.ValueDescriptor> getFields() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.time.Duration getDuration() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public jdk.jfr.EventType getEventType() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.time.Instant getStartTime() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.time.Instant getEndTime() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public jdk.jfr.consumer.RecordedThread getThread() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import jdk.jfr.EventType;
+import jdk.jfr.ValueDescriptor;
+
+public final class RecordedEvent extends RecordedObject {
+  RecordedEvent(Chunk.TypeDef td, Object[] vals, Chunk chunk) {
+    super(td, vals, chunk);
+  }
+
+  public RecordedStackTrace getStackTrace() {
+    return (RecordedStackTrace) getValue("stackTrace");
+  }
+
+  public RecordedThread getThread() {
+    return (RecordedThread) getValue("eventThread");
+  }
+
+  public EventType getEventType() {
+    return chunk.eventType(td);
+  }
+
+  public List<ValueDescriptor> getFields() {
+    return getEventType().getFields();
+  }
+
+  public Instant getStartTime() {
+    return chunk.instantOf(getLong("startTime"));
+  }
+
+  public Instant getEndTime() {
+    return getStartTime().plus(getDuration());
+  }
+
+  public Duration getDuration() {
+    return Duration.ofNanos((long) (getLong("duration") * (1e9 / chunk.ticksPerSecond)));
+  }
 }

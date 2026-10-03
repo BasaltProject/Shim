@@ -8,7 +8,17 @@
 
 package jdk.jfr.consumer;
 
-public final class RecordedStackTrace extends jdk.jfr.consumer.RecordedObject {
-  public java.util.List<jdk.jfr.consumer.RecordedFrame> getFrames() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public boolean isTruncated() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+public final class RecordedStackTrace extends RecordedObject {
+  RecordedStackTrace(Chunk.TypeDef td, Object[] vals, Chunk chunk) {
+    super(td, vals, chunk);
+  }
+
+  @SuppressWarnings("unchecked")
+  public java.util.List<RecordedFrame> getFrames() {
+    return (java.util.List<RecordedFrame>) getValue("frames");
+  }
+
+  public boolean isTruncated() {
+    return getBoolean("truncated");
+  }
 }
