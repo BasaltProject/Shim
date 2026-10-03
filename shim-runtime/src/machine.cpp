@@ -6246,13 +6246,42 @@ void postInitClass(Thread* t, GcClass* c)
   t->m->classLock->notifyAll(t->systemThread);
 }
 
+static bool declaresDefaultMethod(Thread* t, GcClass* interface)
+{
+  GcArray* methods = cast<GcArray>(t, interface->methodTable());
+  if (methods) {
+    for (unsigned i = 0; i < methods->length(); ++i) {
+      GcMethod* m = cast<GcMethod>(t, methods->body()[i]);
+      if (m->code() and not(m->flags() & ACC_STATIC) and not(m->vmFlags() & ClassInitFlag)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 void initClass(Thread* t, GcClass* c)
 {
+  if (c->vmFlags() & InitializedFlag) {
+    loadMemoryBarrier();
+    return;
+  }
+
   PROTECT(t, c);
 
   GcClass* super = c->super();
   if (super) {
     initClass(t, super);
+  }
+
+  if (not(c->flags() & ACC_INTERFACE) and c->interfaceTable()) {
+    for (unsigned i = 0; c->interfaceTable() and i < cast<GcArray>(t, c->interfaceTable())->length(); i += 2) {
+      GcClass* interface = cast<GcClass>(t, cast<GcArray>(t, c->interfaceTable())->body()[i]);
+      if (interface and not(interface->vmFlags() & (InitializedFlag | BootstrapFlag))
+          and declaresDefaultMethod(t, interface)) {
+        initClass(t, interface);
+      }
+    }
   }
 
   if (preInitClass(t, c)) {
@@ -6265,6 +6294,12 @@ void initClass(Thread* t, GcClass* c)
 
       t->m->processor->invoke(t, initializer, 0);
     }
+  }
+
+  ACQUIRE(t, t->m->classLock);
+  if (not(c->vmFlags() & (NeedInitFlag | InitFlag | InitErrorFlag))
+      and (c->super() == 0 or (c->super()->vmFlags() & InitializedFlag))) {
+    c->vmFlags() |= InitializedFlag;
   }
 }
 

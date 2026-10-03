@@ -205,6 +205,7 @@ const unsigned HasFinalMemberFlag = 1 << 9;
 const unsigned SingletonFlag = 1 << 10;
 const unsigned ContinuationFlag = 1 << 11;
 const unsigned HiddenClassFlag = 1 << 12;
+const unsigned InitializedFlag = 1 << 13;
 
 // method vmFlags:
 const unsigned ClassInitFlag = 1 << 0;
