@@ -28,6 +28,10 @@ class KeyGeneratorCore extends KeyGeneratorSpi {
     this.keySize = defaultKeySize >> 3;
   }
 
+  void setKeyBytes(int bytes) {
+    this.keySize = bytes;
+  }
+
   @Override
   protected void engineInit(SecureRandom random) {
     this.random = random;
@@ -61,6 +65,35 @@ class KeyGeneratorCore extends KeyGeneratorSpi {
   public static final class ARCFOURKeyGenerator extends KeyGeneratorCore {
     public ARCFOURKeyGenerator() {
       super("ARCFOUR", 128);
+    }
+  }
+
+  public static final class BlowfishKeyGenerator extends KeyGeneratorCore {
+    public BlowfishKeyGenerator() {
+      super("Blowfish", 128);
+    }
+
+    @Override
+    protected void engineInit(int keysize, SecureRandom random) {
+      if (keysize < 32 || keysize > 448 || keysize % 8 != 0) {
+        throw new InvalidParameterException("Keysize must be multiple of 8, and can only range from 32 to 448 (inclusive)");
+      }
+      super.setKeyBytes(keysize >> 3);
+      super.engineInit(random);
+    }
+  }
+
+  public static final class ChaCha20KeyGenerator extends KeyGeneratorCore {
+    public ChaCha20KeyGenerator() {
+      super("ChaCha20", 256);
+    }
+
+    @Override
+    protected void engineInit(int keysize, SecureRandom random) {
+      if (keysize != 256) {
+        throw new InvalidParameterException("Key length for ChaCha20 must be 256 bits");
+      }
+      super.engineInit(random);
     }
   }
 }

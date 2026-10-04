@@ -196,6 +196,14 @@ public final class SunJCE extends Provider {
     add("Cipher", "PBEWithMD5AndTripleDES", "com.sun.crypto.provider.PBES1Core$PBEWithMD5AndTripleDES", new String[] {}, new String[] {});
     add("SecretKeyFactory", "PBEWithMD5AndTripleDES", "com.sun.crypto.provider.PBEKeyFactory$PBEWithMD5AndTripleDES", new String[] {}, new String[] {});
     add("AlgorithmParameters", "PBEWithMD5AndTripleDES", "com.sun.crypto.provider.PBEParameters", new String[] {}, new String[] {});
+    add("Cipher", "Blowfish", "com.sun.crypto.provider.BlowfishCipher", new String[] {"OID.1.3.6.1.4.1.3029.1.2", "1.3.6.1.4.1.3029.1.2"}, new String[] {"SupportedModes", "ECB|CBC|PCBC|CTR|CTS|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING", "SupportedKeyFormats", "RAW"});
+    add("KeyGenerator", "Blowfish", "com.sun.crypto.provider.KeyGeneratorCore$BlowfishKeyGenerator", new String[] {"OID.1.3.6.1.4.1.3029.1.2", "1.3.6.1.4.1.3029.1.2"}, new String[] {});
+    add("AlgorithmParameters", "Blowfish", "com.sun.crypto.provider.BlowfishParameters", new String[] {"OID.1.3.6.1.4.1.3029.1.2", "1.3.6.1.4.1.3029.1.2"}, new String[] {});
+    add("Cipher", "ChaCha20", "com.sun.crypto.provider.ChaCha20Cipher$ChaCha20Only", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "ChaCha20-Poly1305", "com.sun.crypto.provider.ChaCha20Cipher$ChaCha20Poly1305", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("KeyGenerator", "ChaCha20", "com.sun.crypto.provider.KeyGeneratorCore$ChaCha20KeyGenerator", new String[] {}, new String[] {});
+    add("AlgorithmParameters", "ChaCha20-Poly1305", "com.sun.crypto.provider.ChaCha20Poly1305Parameters", new String[] {}, new String[] {});
+    add("Cipher", "AES/KW/NoPadding", "com.sun.crypto.provider.AESKeyWrap", new String[] {"AESWrap"}, new String[] {"SupportedKeyFormats", "RAW"});
     add("Cipher", "ARCFOUR", "com.sun.crypto.provider.ARCFOURCipher", new String[] {"OID.1.2.840.113549.3.4", "1.2.840.113549.3.4", "RC4"}, new String[] {"SupportedModes", "ECB", "SupportedPaddings", "NOPADDING", "SupportedKeyFormats", "RAW"});
     add("KeyGenerator", "ARCFOUR", "com.sun.crypto.provider.KeyGeneratorCore$ARCFOURKeyGenerator", new String[] {"OID.1.2.840.113549.3.4", "1.2.840.113549.3.4", "RC4"}, new String[] {});
     add("Cipher", "PBEWithHmacSHA1AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA1AndAES_128", new String[] {},
