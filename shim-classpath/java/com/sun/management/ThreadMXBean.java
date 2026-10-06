@@ -38,4 +38,8 @@ public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
   default long getCurrentThreadAllocatedBytes() {
     return getThreadAllocatedBytes(Thread.currentThread().threadId());
   }
+
+  default long getTotalThreadAllocatedBytes() {
+    throw new UnsupportedOperationException();
+  }
 }

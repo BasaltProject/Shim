@@ -15,7 +15,7 @@ import java.util.Set;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.CompositeType;
 
-public class GcInfo implements CompositeData {
+public class GcInfo implements CompositeData, javax.management.openmbean.CompositeDataView {
   private final long index;
   private final long startTime;
   private final long endTime;
@@ -55,6 +55,11 @@ public class GcInfo implements CompositeData {
 
   public Map<String, MemoryUsage> getMemoryUsageAfterGc() {
     return usageAfterGc;
+  }
+
+  @Override
+  public CompositeData toCompositeData(CompositeType ct) {
+    return data;
   }
 
   public static GcInfo from(CompositeData cd) {

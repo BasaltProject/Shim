@@ -55,4 +55,16 @@ public class VMOption {
     return "VM option: " + getName() + " value: " + value + " " + " origin: " + origin + " " + (writeable
         ? "(read-write)" : "(read-only)");
   }
+
+  public static VMOption from(javax.management.openmbean.CompositeData cd) {
+    if (cd == null) {
+      return null;
+    }
+    if (cd.containsKey("name") && cd.containsKey("value") && cd.containsKey("origin")
+        && cd.containsKey("writeable")) {
+      return new VMOption((String) cd.get("name"), (String) cd.get("value"), ((Boolean) cd.get("writeable")).booleanValue(),
+          Origin.valueOf(String.valueOf(cd.get("origin"))));
+    }
+    throw new IllegalArgumentException("Attributes of VMOption are missing from the CompositeData");
+  }
 }

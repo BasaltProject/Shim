@@ -20,4 +20,13 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
   VMOption getVMOption(String name);
 
   void setVMOption(String name, String value);
+
+  enum ThreadDumpFormat {
+    TEXT_PLAIN,
+    JSON,
+  }
+
+  default void dumpThreads(String outputFile, ThreadDumpFormat format) throws IOException {
+    throw new UnsupportedOperationException();
+  }
 }
