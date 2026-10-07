@@ -25,6 +25,7 @@ package shim;
 
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.AbstractCollection;
 import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Iterator;
@@ -195,7 +196,7 @@ public class Data {
     }
   }
 
-  public static class Values<K, V> implements Collection<V> {
+  public static class Values<K, V> extends AbstractCollection<V> implements Collection<V> {
     private final EntryMap<K, V> map;
 
     public Values(EntryMap<K, V> map) {
