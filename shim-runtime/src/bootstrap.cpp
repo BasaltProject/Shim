@@ -53,26 +53,10 @@ object bootstrapConstant(Thread* t, GcInvocation* invocation, unsigned index)
     }
     case CONSTANT_String:
         return singletonObject(t, pool, index);
-    case CONSTANT_Class: {
-        object value = singletonObject(t, pool, index);
-        GcClass* class_;
-        if (objectClass(t, value) == type(t, GcReference::Type)) {
-            GcByteArray* name = cast<GcReference>(t, value)->name();
-            class_ = resolveClass(t, invocation->class_()->loader(), name);
-        } else {
-            class_ = cast<GcClass>(t, value);
-        }
-        return t->m->classpath->makeJclass(t, class_);
-    }
-    case CONSTANT_MethodType: {
-        object value = singletonObject(t, pool, index);
-        return objectClass(t, value) == type(t, GcMethodType::Type) ? value
-            : reinterpret_cast<object>(makeMethodType(t, invocation->class_()->loader(),
-                 cast<GcByteArray>(t, value), 0, 0, 0));
-    }
+    case CONSTANT_Class:
+    case CONSTANT_MethodType:
     case CONSTANT_MethodHandle:
-        return resolve(t, invocation->class_()->loader(), pool, index,
-                       findMethodInClass, GcNoSuchMethodError::Type);
+        return resolveLoadableConstant(t, invocation->class_()->loader(), pool, index);
     default:
         throwNew(t, GcBootstrapMethodError::Type, "Unsupported bootstrap constant tag %u", tags->body()[index]);
     }
@@ -165,8 +149,23 @@ GcCallSite* resolveDynamic(Thread* t, GcInvocation* invocation)
         throwNew(t, GcBootstrapMethodError::Type, "Bootstrap method did not return a CallSite");
     }
     GcCallSite* site = cast<GcCallSite>(t, result);
+    PROTECT(t, site);
     if (site->target() == 0 or site->target()->method() == 0) {
         throwNew(t, GcBootstrapMethodError::Type, "CallSite has no target");
+    }
+    GcMethod* typeMethod = resolveMethod(t, roots(t)->bootLoader(),
+        "java/lang/invoke/MethodHandle", "type", "()Ljava/lang/invoke/MethodType;");
+    object targetType = t->m->processor->invokeArray(t, typeMethod, site->target(), static_cast<GcArray*>(0));
+    PROTECT(t, targetType);
+    GcMethod* equalsMethod = resolveMethod(t, roots(t)->bootLoader(),
+        "java/lang/invoke/MethodType", "equals", "(Ljava/lang/Object;)Z");
+    PROTECT(t, equalsMethod);
+    GcArray* comparison = makeArray(t, 1);
+    PROTECT(t, comparison);
+    comparison->setBodyElement(t, 0, arguments->body()[2]);
+    object matches = t->m->processor->invokeArray(t, equalsMethod, targetType, comparison);
+    if (!cast<GcInt>(t, matches)->value()) {
+        throwNew(t, GcBootstrapMethodError::Type, "CallSite target type does not match invocation type");
     }
     return site;
 }
