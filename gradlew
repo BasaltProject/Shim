@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+# Gradle wrapper (https://github.com/gradle/gradle).
+# Original work Copyright Gradle contributors.
+# Original work licensed under Apache-2.0; see docs/licenses/Gradle-LICENSE.txt:
+# https://github.com/BasaltProject/Shim/blob/main/docs/licenses/Gradle-LICENSE.txt
+#
+# Modifications Copyright (c) 2026 BasaltMC.
+# Modifications licensed under MIT; see LICENSE:
+# https://github.com/BasaltProject/Shim/blob/main/LICENSE
+#
+# SPDX-License-Identifier: Apache-2.0 AND MIT
+
 
 ##############################################################################
 ##

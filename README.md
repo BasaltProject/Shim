@@ -1,3 +1,10 @@
+<!--
+Copyright (c) 2026 BasaltMC.
+Licensed under MIT; see LICENSE:
+https://github.com/BasaltProject/Shim/blob/main/LICENSE
+SPDX-License-Identifier: MIT
+-->
+
 <p align="center">
   <img src="docs/assets/basalt-logo.png" alt="Basalt" width="360">
 </p>
@@ -40,8 +47,9 @@ integrating plugins with Basalt will belong to a separate project.
 ## License
 
 The original material in this repository is distributed under the [MIT License](LICENSE).
-Avian is licensed under ISC. Imported Avian code must retain its copyright and
-license notices; third-party components retain their respective licenses.
+Avian's original code retains its [ISC License](LICENSE.txt). Basalt Shim
+modifications use MIT. Third-party components retain their respective licenses;
+see [third-party notices](docs/licenses/third-party.md).
 
 Basalt is not affiliated with Mojang Studios or Microsoft. Minecraft is a
 trademark of Mojang Studios.

@@ -1,3 +1,16 @@
+/*
+ * Based on Avian (https://github.com/ReadyTalk/avian).
+ * Original work Copyright (c) 2008-2015, Avian Contributors.
+ * Original work licensed under ISC; see LICENSE.txt:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
+ *
+ * Modifications Copyright (c) 2026 BasaltMC.
+ * Modifications licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: ISC AND MIT
+ */
+
 /* Copyright (c) 2008-2015, Avian Contributors
 
    Permission to use, copy, modify, and/or distribute this software
@@ -25,27 +38,27 @@ import avian.FormatString;
 public class Formatter implements Closeable, Flushable, AutoCloseable {
 
   private final Appendable _out;
-  
+
   private final Locale _locale;
-   
+
   private IOException lastException;
-  
+
   private boolean _closed;
- 
+
   private void ensureNotClosed() {
     if (this._closed) {
       throw new IllegalStateException();
     }
   }
-  
+
   public Formatter() {
     this((Appendable) null, (Locale) null);
   }
-  
+
   public Formatter(final Appendable a) {
-    this(a, null); 
+    this(a, null);
   }
-  
+
   public Formatter(final Appendable a, final Locale l) {
     if (a == null) {
       this._out = new StringBuilder();
@@ -58,35 +71,35 @@ public class Formatter implements Closeable, Flushable, AutoCloseable {
       this._locale = l;
     }
   }
-  
+
   public Formatter(File file) throws IOException {
     this(file, null);
   }
-  
+
   public Formatter(File file, Locale l) throws IOException {
     this(new FileWriter(file), l);
   }
-  
+
   public Formatter(Locale l) {
     this((Appendable) null, l);
   }
-  
+
   public Formatter(OutputStream os) {
     this(os, null);
   }
-  
+
   public Formatter(OutputStream os, Locale l) {
     this(new OutputStreamWriter(os), l);
   }
-  
+
   public Formatter(PrintStream ps) {
     this(new OutputStreamWriter(ps));
   }
-  
+
   public Formatter(String fileName) throws IOException {
     this(fileName, (Locale) null);
   }
-  
+
   public Formatter(String fileName, Locale l) throws IOException {
     this(new File(fileName), l);
   }
