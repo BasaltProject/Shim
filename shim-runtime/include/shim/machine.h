@@ -2393,6 +2393,9 @@ GcInvocation* dynamicInvocation(Thread* t, GcMethod* method, GcCode* code,
 
 object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* pool, unsigned index);
 
+object resolveDynamicConstant(Thread* t, GcDynamicConstant* constant, GcClass* owner);
+uint64_t dynamicConstantBits(Thread* t, GcDynamicConstant* constant, object value);
+
 inline bool emptyMethod(Thread* t UNUSED, GcMethod* method)
 {
   return ((method->flags() & ACC_NATIVE) == 0)

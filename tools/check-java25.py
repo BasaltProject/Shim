@@ -17,6 +17,7 @@ import sys
 
 sys.dont_write_bytecode = True
 from java25_constants import generate as generate_constants
+from java25_dynamic import generate as generate_dynamic
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -116,6 +117,38 @@ def check_versions(java, runtimes, directory):
     return failures
 
 
+def check_dynamic_formats(java, runtimes, directory):
+    failures = 0
+    for variant in ("old-dynamic-version", "void-dynamic-type"):
+        output = directory.parent / (directory.name + "-" + variant)
+        if output.exists():
+            shutil.rmtree(output)
+        shutil.copytree(directory, output)
+        path = output / "DynamicConstantData.class"
+        data = bytearray(path.read_bytes())
+        if variant == "old-dynamic-version":
+            struct.pack_into(">H", data, 6, 54)
+        else:
+            for tag, position in constant_pool_offsets(data).values():
+                if tag == 1 and struct.unpack_from(">H", data, position + 1)[0] == 1 and data[position + 3] == ord("B"):
+                    data[position + 3] = ord("V")
+                    break
+            else:
+                raise RuntimeError("Missing dynamic descriptor fixture")
+        path.write_bytes(data)
+        reference = run([java, "-cp", str(output), "DynamicConstants"])
+        if reference.returncode <= 0 or "ClassFormatError" not in reference.stderr:
+            raise RuntimeError("Unexpected OpenJDK dynamic-format result")
+        for runtime in runtimes:
+            result = run([runtime, "-cp", str(output), "DynamicConstants"])
+            passed = result.returncode > 0 and "ClassFormatError" in result.stderr
+            print("{} dynamic-format={} {}".format("PASS" if passed else "FAIL", variant, runtime))
+            if not passed:
+                failures += 1
+                print(result.stderr, file=sys.stderr)
+    return failures
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shim", action="append", type=Path, required=True)
@@ -152,6 +185,8 @@ def main():
                 raise RuntimeError("Unexpected class-file version")
             if source.stem == "LoadableConstants":
                 generate_constants(output, major)
+            elif source.stem == "DynamicConstants":
+                generate_dynamic(output, major)
             reference = run([java, "-cp", str(output), source.stem])
             if reference.returncode:
                 print(reference.stderr, file=sys.stderr)
@@ -171,6 +206,8 @@ def main():
                     print("Expected:\n" + reference.stdout + "Observed:\n" + detail, file=sys.stderr)
             if source.stem == "ClassFileValidation" and release == 25:
                 failures += check_versions(java, runtimes, output)
+            if source.stem == "DynamicConstants" and release == 25:
+                failures += check_dynamic_formats(java, runtimes, output)
     return 1 if failures else 0
 
 

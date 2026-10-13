@@ -105,6 +105,11 @@
   (callSite site)
   (throwable failure))
 
+(type dynamicConstant
+  (extends invocation)
+  (object value)
+  (uint8_t resolved))
+
 (type triple
   (object first)
   (object second)

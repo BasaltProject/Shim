@@ -2327,7 +2327,16 @@ loop:
     GcSingleton* pool = code->pool();
 
     if (singletonIsObject(t, pool, index - 1)) {
-      pushObject(t, resolveLoadableConstant(t, frameMethod(t, frame)->class_()->loader(), pool, index - 1));
+      object value = singletonObject(t, pool, index - 1);
+      if (objectClass(t, value) == type(t, GcDynamicConstant::Type)) {
+        GcDynamicConstant* constant = cast<GcDynamicConstant>(t, value);
+        PROTECT(t, constant);
+        value = resolveDynamicConstant(t, constant, frameMethod(t, frame)->class_());
+        if (constant->template_()->returnCode() == ObjectField) pushObject(t, value);
+        else pushInt(t, dynamicConstantBits(t, constant, value));
+      } else {
+        pushObject(t, resolveLoadableConstant(t, frameMethod(t, frame)->class_()->loader(), pool, index - 1));
+      }
     } else {
       pushInt(t, singletonValue(t, pool, index - 1));
     }
@@ -2340,7 +2349,14 @@ loop:
     GcSingleton* pool = code->pool();
 
     uint64_t v;
-    memcpy(&v, &singletonValue(t, pool, index - 1), 8);
+    if (singletonIsObject(t, pool, index - 1)) {
+      GcDynamicConstant* constant = cast<GcDynamicConstant>(t, singletonObject(t, pool, index - 1));
+      PROTECT(t, constant);
+      object value = resolveDynamicConstant(t, constant, frameMethod(t, frame)->class_());
+      v = dynamicConstantBits(t, constant, value);
+    } else {
+      memcpy(&v, &singletonValue(t, pool, index - 1), 8);
+    }
     pushLong(t, v);
   }
     goto loop;
