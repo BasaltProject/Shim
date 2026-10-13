@@ -66,3 +66,23 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Upstream build and editor files
+.gdb_history
+/build
+*~
+.classpath
+.project
+.settings
+bin
+/lib
+/distrib
+*.pdb
+*.swp
+/.gradle
+/*.sublime-*
+workspace/
+src/.cproject
+/cmake-build
+/cmake-build
+.idea/*
