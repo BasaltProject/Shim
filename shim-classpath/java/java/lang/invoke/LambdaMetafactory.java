@@ -299,7 +299,9 @@ public class LambdaMetafactory {
 
     Iterator<MethodType.Parameter> dst = implementation.type().parameters().iterator();
 
-    boolean skip = implementation.kind != MethodHandle.REF_invokeStatic;
+    boolean skip = implementation.kind != MethodHandle.REF_invokeStatic
+        && implementation.kind != MethodHandle.REF_newInvokeSpecial;
+    if (skip) dst.next(); // MethodHandle.type includes the receiver parameter.
 
     for (MethodType.Parameter p: fieldType.parameters()) {
       write1(out, aload_0);

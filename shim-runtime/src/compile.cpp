@@ -2565,6 +2565,14 @@ int64_t getJClassFromReference(MyThread* t, GcPair* pair)
                    cast<GcReference>(t, pair->second())->name())));
 }
 
+int64_t getLoadableConstant(MyThread* t, GcPair* pair)
+{
+  GcPair* location = cast<GcPair>(t, pair->second());
+  return reinterpret_cast<intptr_t>(resolveLoadableConstant(t,
+      cast<GcClassLoader>(t, location->first()), cast<GcSingleton>(t, pair->first()),
+      cast<GcInt>(t, location->second())->value()));
+}
+
 unsigned traceSize(Thread* t)
 {
   class Counter : public Processor::StackVisitor {
@@ -5688,11 +5696,26 @@ loop:
       }
 
       GcSingleton* pool = code->pool();
+      PROTECT(t, pool);
 
       if (singletonIsObject(t, pool, index - 1)) {
         object v = singletonObject(t, pool, index - 1);
 
         loadMemoryBarrier();
+
+        if (objectClass(t, v) == type(t, GcByteArray::Type)
+            or (objectClass(t, v) == type(t, GcReference::Type)
+                and cast<GcReference>(t, v)->kind() != 0)) {
+          GcInt* poolIndex = makeInt(t, index - 1);
+          PROTECT(t, poolIndex);
+          GcPair* location = makePair(t, context->method->class_()->loader(), poolIndex);
+          PROTECT(t, location);
+          frame->push(ir::Type::object(), c->nativeCall(
+              c->constant(getThunk(t, getLoadableConstantThunk), ir::Type::iptr()),
+              0, frame->trace(0, 0), ir::Type::object(),
+              args(c->threadRegister(), frame->append(makePair(t, pool, location)))));
+          break;
+        }
 
         if (objectClass(t, v) == type(t, GcReference::Type)) {
           GcReference* reference = cast<GcReference>(t, v);
