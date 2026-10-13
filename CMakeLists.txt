@@ -9,32 +9,37 @@
 #
 # SPDX-License-Identifier: ISC AND MIT
 
-# NOTE that this CMake file doesn't current build all of shim.
-# It only builds what's required for example/kaleidoscope.
+# GNU Make builds the complete VM; CMake builds native libraries, tools and tests.
+cmake_minimum_required(VERSION 3.28)
+project(shim LANGUAGES C CXX)
 
-cmake_minimum_required (VERSION 2.6)
-project (shim)
+option(SHIM_WERROR "Treat compiler warnings as errors" OFF)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include_directories (include src)
+foreach(module shim-runtime shim-codegen shim-system shim-heap shim-util shim-tools)
+    include_directories(${module}/include ${module}/src)
+endforeach()
+include_directories(shim-classpath/src)
 
-add_definitions (
-  -DSHIM_TARGET_FORMAT=SHIM_FORMAT_MACHO
-
-  -DSHIM_TARGET_ARCH=SHIM_ARCH_X86_64
-
-  -DTARGET_BYTES_PER_WORD=8
-  -D__STDC_LIMIT_MACROS
-  -D__STDC_CONSTANT_MACROS
+add_definitions(
+    -DSHIM_TARGET_FORMAT=SHIM_FORMAT_MACHO
+    -DSHIM_TARGET_ARCH=SHIM_ARCH_X86_64
+    -DTARGET_BYTES_PER_WORD=8
+    -D__STDC_LIMIT_MACROS
+    -D__STDC_CONSTANT_MACROS
 )
 
-include ("cmake/Platform.cmake")
-
+include(cmake/Platform.cmake)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PLATFORM_CXX_FLAGS}")
+include(CTest)
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
 
-include (CTest)
-
-# Sadly, we can't use the 'test' target, as that's coopted by ctest
-add_custom_target(check ${CMAKE_CTEST_COMMAND} -V)
-
-add_subdirectory (src)
-add_subdirectory (unittest)
+add_subdirectory(shim-util)
+add_subdirectory(shim-system)
+add_subdirectory(shim-heap)
+add_subdirectory(shim-codegen)
+add_subdirectory(shim-runtime)
+add_subdirectory(shim-tools)
+add_subdirectory(shim-tests)
