@@ -23,10 +23,10 @@
 
 package java.lang.reflect;
 
-import avian.VMMethod;
-import avian.AnnotationInvocationHandler;
-import avian.SystemClassLoader;
-import avian.Classes;
+import shim.VMMethod;
+import shim.AnnotationInvocationHandler;
+import shim.SystemClassLoader;
+import shim.Classes;
 
 import java.lang.annotation.Annotation;
 

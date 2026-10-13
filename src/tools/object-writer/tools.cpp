@@ -26,11 +26,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <avian/tools/object-writer/tools.h>
+#include <shim/tools/object-writer/tools.h>
 
-using namespace avian::util;
+using namespace shim::util;
 
-namespace avian {
+namespace shim {
 
 namespace tools {
 
@@ -147,4 +147,4 @@ Platform* Platform::getPlatform(PlatformInfo info)
 
 }  // namespace tools
 
-}  // namespace avian
+}  // namespace shim

@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_X86_REGISTERS_H
-#define AVIAN_CODEGEN_ASSEMBLER_X86_REGISTERS_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_X86_REGISTERS_H
+#define SHIM_CODEGEN_ASSEMBLER_X86_REGISTERS_H
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -71,6 +71,6 @@ constexpr RegisterMask FloatRegisterMask = vm::TargetBytesPerWord == 4 ? 0x00ff0
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_X86_REGISTERS_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_X86_REGISTERS_H

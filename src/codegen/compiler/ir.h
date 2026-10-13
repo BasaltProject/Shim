@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_IR_H
-#define AVIAN_CODEGEN_COMPILER_IR_H
+#ifndef SHIM_CODEGEN_COMPILER_IR_H
+#define SHIM_CODEGEN_COMPILER_IR_H
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -94,6 +94,6 @@ unsigned machineOffset(Context* c, int logicalIp);
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_IR_H
+#endif  // SHIM_CODEGEN_COMPILER_IR_H

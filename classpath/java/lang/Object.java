@@ -41,10 +41,10 @@ public class Object {
   protected void finalize() throws Throwable { }
 
   public final Class<? extends Object> getClass() {
-    return avian.SystemClassLoader.getClass(getVMClass());
+    return shim.SystemClassLoader.getClass(getVMClass());
   }
 
-  native avian.VMClass getVMClass();
+  native shim.VMClass getVMClass();
 
   public native int hashCode();
 

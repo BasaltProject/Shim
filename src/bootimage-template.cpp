@@ -14,17 +14,17 @@
 const unsigned NAME(BootMask) = (~static_cast<unsigned>(0))
                                 / NAME(BytesPerWord);
 
-const unsigned NAME(BootShift) UNUSED = 32 - avian::util::log(NAME(BytesPerWord));
+const unsigned NAME(BootShift) UNUSED = 32 - shim::util::log(NAME(BytesPerWord));
 
 inline unsigned LABEL(codeMapSize)(unsigned codeSize)
 {
-  return avian::util::ceilingDivide(codeSize, TargetBitsPerWord)
+  return shim::util::ceilingDivide(codeSize, TargetBitsPerWord)
          * TargetBytesPerWord;
 }
 
 inline unsigned LABEL(heapMapSize)(unsigned heapSize)
 {
-  return avian::util::ceilingDivide(heapSize,
+  return shim::util::ceilingDivide(heapSize,
                                     TargetBitsPerWord * TargetBytesPerWord)
          * TargetBytesPerWord;
 }

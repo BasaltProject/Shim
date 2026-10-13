@@ -44,11 +44,11 @@ typedef struct ucontext {
 #include "ucontext.h"
 #endif
 
-#include "avian/arch.h"
-#include <avian/system/system.h>
-#include <avian/system/signal.h>
+#include "shim/arch.h"
+#include <shim/system/system.h>
+#include <shim/system/signal.h>
 
-namespace avian {
+namespace shim {
 namespace system {
 
 namespace posix {
@@ -237,4 +237,4 @@ void SignalRegistrar::setCrashDumpDirectory(const char*)
 }
 
 }  // namespace system
-}  // namespace avian
+}  // namespace shim

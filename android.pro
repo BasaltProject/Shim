@@ -85,10 +85,10 @@
    Thread(java.lang.ThreadGroup, java.lang.String, int, boolean);
  }
 
--keep class avian.Classes {
+-keep class shim.Classes {
    java.lang.Class forName(java.lang.String, boolean, java.lang.ClassLoader);
-   int findField(avian.VMClass, java.lang.String);
-   int findMethod(avian.VMClass, java.lang.String, java.lang.Class[]);
+   int findField(shim.VMClass, java.lang.String);
+   int findMethod(shim.VMClass, java.lang.String, java.lang.Class[]);
    java.lang.annotation.Annotation getAnnotation(java.lang.ClassLoader, java.lang.Object[]);
  }
 
@@ -97,4 +97,4 @@
  }
 
 # loaded reflectively to handle embedded resources:
--keep class avian.avianvmresource.Handler
+-keep class shim.shimvmresource.Handler

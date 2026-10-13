@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_PROMISE_H
-#define AVIAN_CODEGEN_COMPILER_PROMISE_H
+#ifndef SHIM_CODEGEN_COMPILER_PROMISE_H
+#define SHIM_CODEGEN_COMPILER_PROMISE_H
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -60,6 +60,6 @@ Promise* poolPromise(Context* c, int key);
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_PROMISE_H
+#endif  // SHIM_CODEGEN_COMPILER_PROMISE_H

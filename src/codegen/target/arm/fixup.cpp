@@ -31,7 +31,7 @@ const unsigned InstructionSize = 4;
 
 }  // namespace
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -343,4 +343,4 @@ void resolve(MyBlock* b)
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

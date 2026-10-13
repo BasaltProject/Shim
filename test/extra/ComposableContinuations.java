@@ -13,13 +13,13 @@
 
 package extra;
 
-import static avian.Continuations.shift;
-import static avian.Cell.cons;
-import static avian.Cell.equal;
+import static shim.Continuations.shift;
+import static shim.Cell.cons;
+import static shim.Cell.equal;
 
-import avian.Cell;
-import avian.Function;
-import avian.Continuations;
+import shim.Cell;
+import shim.Function;
+import shim.Continuations;
 
 import java.util.concurrent.Callable;
 

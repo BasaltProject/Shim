@@ -21,14 +21,14 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
+#include "shim/target.h"
 
-#include <avian/util/runtime-array.h>
+#include <shim/util/runtime-array.h>
 
-#include <avian/codegen/compiler.h>
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/architecture.h>
-#include <avian/codegen/promise.h>
+#include <shim/codegen/compiler.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/architecture.h>
+#include <shim/codegen/promise.h>
 
 #include "codegen/compiler/regalloc.h"
 #include "codegen/compiler/context.h"
@@ -43,7 +43,7 @@
 
 using namespace vm;
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -2595,7 +2595,7 @@ class MyCompiler : public Compiler {
     Stack* b UNUSED = c.stack;
     appendCall(&c,
                static_cast<Value*>(address),
-               ir::CallingConvention::Avian,
+               ir::CallingConvention::Shim,
                flags,
                traceHandler,
                result,
@@ -2974,4 +2974,4 @@ Compiler* makeCompiler(System* system,
 }
 
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

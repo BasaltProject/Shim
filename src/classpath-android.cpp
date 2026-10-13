@@ -38,10 +38,10 @@ int libconscrypt_JNI_OnLoad(_JavaVM*, void*);
 
 #define _POSIX_C_SOURCE 200112L
 #undef _GNU_SOURCE
-#include "avian/machine.h"
-#include "avian/classpath-common.h"
-#include "avian/process.h"
-#include "avian/util.h"
+#include "shim/machine.h"
+#include "shim/classpath-common.h"
+#include "shim/process.h"
+#include "shim/util.h"
 
 #ifdef PLATFORM_WINDOWS
 const char* getErrnoDescription(
@@ -50,8 +50,8 @@ const char* getErrnoDescription(
 
 using namespace vm;
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_avian_Classes_defineVMClass(Thread*, object, uintptr_t*);
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_defineVMClass(Thread*, object, uintptr_t*);
 
 namespace {
 
@@ -78,7 +78,7 @@ void JNICALL loadLibrary(Thread* t, object, uintptr_t* arguments)
   THREAD_RUNTIME_ARRAY(t, char, n, length + 1);
   stringChars(t, name, RUNTIME_ARRAY_BODY(n));
 
-  /* org_conscrypt_NativeCrypto.o is linked statically, and in Avian build
+  /* org_conscrypt_NativeCrypto.o is linked statically, and in Basalt Shim build
   the package is named org.conscrypt.NativeCrypto. When Android code sees
   that name it thinks the library isn't linked as a part of Android, so it
   tries to load in dynamically, but there's actually no need to, so we
@@ -107,7 +107,7 @@ int64_t JNICALL defineClass(Thread* t, object method, uintptr_t* arguments)
 {
   uintptr_t args[] = {arguments[0], arguments[2], arguments[3], arguments[4]};
 
-  int64_t v = Avian_avian_Classes_defineVMClass(t, method, args);
+  int64_t v = Shim_shim_Classes_defineVMClass(t, method, args);
 
   if (v) {
     return reinterpret_cast<uintptr_t>(
@@ -403,7 +403,7 @@ class MyClasspath : public Classpath {
 // LD_LIBRARY_PATH is not set as of this writing:
 #ifdef PLATFORM_WINDOWS
     _wputenv(L"LD_LIBRARY_PATH=(dummy)");
-#elif(!defined AVIAN_IOS)
+#elif(!defined SHIM_IOS)
     setenv("LD_LIBRARY_PATH", "", false);
 #endif
 
@@ -430,7 +430,7 @@ class MyClasspath : public Classpath {
 
   virtual const char* bootClasspath()
   {
-    return AVIAN_CLASSPATH;
+    return SHIM_CLASSPATH;
   }
 
   virtual object makeDirectByteBuffer(Thread* t, void* p, jlong capacity)
@@ -759,8 +759,8 @@ int register_org_apache_harmony_dalvik_NativeTestTarget(_JNIEnv*)
   return 0;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_String_compareTo(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_String_compareTo(Thread* t, object, uintptr_t* arguments)
 {
   GcString* a = cast<GcString>(t, reinterpret_cast<object>(arguments[0]));
   GcString* b = cast<GcString>(t, reinterpret_cast<object>(arguments[1]));
@@ -780,44 +780,44 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return a->length(t) - b->length(t);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_String_isEmpty(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_String_isEmpty(Thread* t, object, uintptr_t* arguments)
 {
   return cast<GcString>(t, reinterpret_cast<object>(arguments[0]))->length(t)
          == 0;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_String_length(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_String_length(Thread* t, object, uintptr_t* arguments)
 {
   return cast<GcString>(t, reinterpret_cast<object>(arguments[0]))->length(t);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_String_intern(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_String_intern(Thread* t, object, uintptr_t* arguments)
 {
   return reinterpret_cast<intptr_t>(
       intern(t, reinterpret_cast<object>(arguments[0])));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_String_charAt(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_String_charAt(Thread* t, object, uintptr_t* arguments)
 {
   return stringCharAt(t,
                       cast<GcString>(t, reinterpret_cast<object>(arguments[0])),
                       arguments[1]);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_String_equals(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_String_equals(Thread* t, object, uintptr_t* arguments)
 {
   return arguments[1] and stringEqual(t,
                                       reinterpret_cast<object>(arguments[0]),
                                       reinterpret_cast<object>(arguments[1]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_String_fastIndexOf(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_String_fastIndexOf(Thread* t, object, uintptr_t* arguments)
 {
   GcString* s = cast<GcString>(t, reinterpret_cast<object>(arguments[0]));
   unsigned c = arguments[1];
@@ -832,31 +832,31 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return -1;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_avian_SystemClassLoader_findLoadedVMClass(Thread*,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_SystemClassLoader_findLoadedVMClass(Thread*,
                                                     object,
                                                     uintptr_t*);
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMRuntime_bootClassPath(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMRuntime_bootClassPath(Thread* t, object, uintptr_t*)
 {
   return reinterpret_cast<uintptr_t>(roots(t)->bootLoader());
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMRuntime_classPath(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMRuntime_classPath(Thread* t, object, uintptr_t*)
 {
   return reinterpret_cast<uintptr_t>(roots(t)->appLoader());
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMRuntime_vmVersion(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMRuntime_vmVersion(Thread* t, object, uintptr_t*)
 {
-  return reinterpret_cast<uintptr_t>(makeString(t, "%s", AVIAN_VERSION));
+  return reinterpret_cast<uintptr_t>(makeString(t, "%s", SHIM_VERSION));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMRuntime_properties(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMRuntime_properties(Thread* t, object, uintptr_t*)
 {
   object array
       = makeObjectArray(t, type(t, GcString::Type), t->m->propertyCount + 1);
@@ -870,7 +870,7 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   }
 
   {
-    GcString* s = makeString(t, "%s", "java.protocol.handler.pkgs=avian");
+    GcString* s = makeString(t, "%s", "java.protocol.handler.pkgs=shim");
     setField(t,
              array,
              ArrayBody + (i++ * BytesPerWord),
@@ -880,28 +880,28 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return reinterpret_cast<uintptr_t>(array);
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_Runtime_gc(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Runtime_gc(Thread* t, object, uintptr_t*)
 {
   collect(t, Heap::MajorCollection);
 }
 
-extern "C" AVIAN_EXPORT jlong JNICALL
-    Avian_java_lang_Runtime_maxMemory(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT jlong JNICALL
+    Shim_java_lang_Runtime_maxMemory(Thread* t, object, uintptr_t*)
 {
   return t->m->heap->limit();
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_Runtime_nativeExit(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Runtime_nativeExit(Thread* t, object, uintptr_t* arguments)
 {
   shutDown(t);
 
   t->m->system->exit(arguments[0]);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Runtime_nativeLoad(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Runtime_nativeLoad(Thread* t, object, uintptr_t* arguments)
 {
   GcString* name = cast<GcString>(t, reinterpret_cast<object>(arguments[0]));
   PROTECT(t, name);
@@ -917,8 +917,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   }
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_System_arraycopy(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_System_arraycopy(Thread* t, object, uintptr_t* arguments)
 {
   arrayCopy(t,
             reinterpret_cast<object>(arguments[0]),
@@ -928,24 +928,24 @@ extern "C" AVIAN_EXPORT void JNICALL
             arguments[4]);
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_System_arraycopyCharUnchecked(Thread* t,
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_System_arraycopyCharUnchecked(Thread* t,
                                                   object method,
                                                   uintptr_t* arguments)
 {
-  Avian_java_lang_System_arraycopy(t, method, arguments);
+  Shim_java_lang_System_arraycopy(t, method, arguments);
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_System_arraycopyByteUnchecked(Thread* t,
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_System_arraycopyByteUnchecked(Thread* t,
                                                   object method,
                                                   uintptr_t* arguments)
 {
-  Avian_java_lang_System_arraycopy(t, method, arguments);
+  Shim_java_lang_System_arraycopy(t, method, arguments);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_sun_misc_Unsafe_objectFieldOffset(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_sun_misc_Unsafe_objectFieldOffset(Thread* t,
                                             object,
                                             uintptr_t* arguments)
 {
@@ -954,8 +954,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       ->offset();
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_Thread_nativeInterrupt(Thread* t,
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Thread_nativeInterrupt(Thread* t,
                                            object,
                                            uintptr_t* arguments)
 {
@@ -965,14 +965,14 @@ extern "C" AVIAN_EXPORT void JNICALL
           cast<GcThread>(t, reinterpret_cast<object>(arguments[0]))->peer()));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Thread_interrupted(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Thread_interrupted(Thread* t, object, uintptr_t*)
 {
   return getAndClearInterrupted(t, t);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Thread_isInterrupted(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Thread_isInterrupted(Thread* t,
                                          object,
                                          uintptr_t* arguments)
 {
@@ -980,8 +980,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       ->interrupted();
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Thread_nativeGetStatus(Thread*,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Thread_nativeGetStatus(Thread*,
                                            object,
                                            uintptr_t* arguments)
 {
@@ -991,26 +991,26 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return arguments[1] ? Runnable : New;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Thread_currentThread(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Thread_currentThread(Thread* t, object, uintptr_t*)
 {
   return reinterpret_cast<uintptr_t>(t->javaThread);
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_Thread_nativeCreate(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Thread_nativeCreate(Thread* t, object, uintptr_t* arguments)
 {
   startThread(t, cast<GcThread>(t, reinterpret_cast<object>(arguments[0])));
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_Thread_nativeSetName(Thread*, object, uintptr_t*)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Thread_nativeSetName(Thread*, object, uintptr_t*)
 {
   // ignore
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_Thread_sleep(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Thread_sleep(Thread* t, object, uintptr_t* arguments)
 {
   object lock = reinterpret_cast<object>(arguments[0]);
   PROTECT(t, lock);
@@ -1027,8 +1027,8 @@ extern "C" AVIAN_EXPORT void JNICALL
   release(t, lock);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Thread_nativeHoldsLock(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Thread_nativeHoldsLock(Thread* t,
                                            object,
                                            uintptr_t* arguments)
 {
@@ -1045,14 +1045,14 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return m and m->owner() == t;
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_Thread_yield(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Thread_yield(Thread* t, object, uintptr_t*)
 {
   t->m->system->yield();
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMStack_getThreadStackTrace(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMStack_getThreadStackTrace(Thread* t,
                                                     object,
                                                     uintptr_t* arguments)
 {
@@ -1063,8 +1063,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       t, p == t ? makeTrace(t) : t->m->processor->getStackTrace(t, p)));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMStack_getCallingClassLoader(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMStack_getCallingClassLoader(Thread* t,
                                                       object,
                                                       uintptr_t*)
 {
@@ -1094,8 +1094,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return reinterpret_cast<uintptr_t>(v.loader);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMStack_getClosestUserClassLoader(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMStack_getClosestUserClassLoader(Thread* t,
                                                           object,
                                                           uintptr_t* arguments)
 {
@@ -1134,8 +1134,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return reinterpret_cast<uintptr_t>(v.loader);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMStack_getClasses(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMStack_getClasses(Thread* t, object, uintptr_t*)
 {
   class Visitor : public Processor::StackVisitor {
    public:
@@ -1177,69 +1177,69 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       v.array ? v.array : makeObjectArray(t, type(t, GcJclass::Type), 0));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_min(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_min(Thread*, object, uintptr_t* arguments)
 {
   return min(static_cast<int>(arguments[0]), static_cast<int>(arguments[1]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_max(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_max(Thread*, object, uintptr_t* arguments)
 {
   return max(static_cast<int>(arguments[0]), static_cast<int>(arguments[1]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_cos(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_cos(Thread*, object, uintptr_t* arguments)
 {
   int64_t v;
   memcpy(&v, arguments, 8);
   return doubleToBits(cos(bitsToDouble(v)));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_sin(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_sin(Thread*, object, uintptr_t* arguments)
 {
   int64_t v;
   memcpy(&v, arguments, 8);
   return doubleToBits(sin(bitsToDouble(v)));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_sqrt(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_sqrt(Thread*, object, uintptr_t* arguments)
 {
   int64_t v;
   memcpy(&v, arguments, 8);
   return doubleToBits(sqrt(bitsToDouble(v)));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_abs__I(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_abs__I(Thread*, object, uintptr_t* arguments)
 {
   return abs(static_cast<int32_t>(arguments[0]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_abs__J(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_abs__J(Thread*, object, uintptr_t* arguments)
 {
   int64_t v; memcpy(&v, arguments, 8);
   return llabs(v);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Math_abs__F(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Math_abs__F(Thread*, object, uintptr_t* arguments)
 {
   return floatToBits(abs(bitsToFloat(arguments[0])));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Float_intBitsToFloat(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Float_intBitsToFloat(Thread*, object, uintptr_t* arguments)
 {
   return arguments[0];
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Float_floatToIntBits(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Float_floatToIntBits(Thread*, object, uintptr_t* arguments)
 {
   if (((arguments[0] & 0x7F800000) == 0x7F800000)
       and ((arguments[0] & 0x007FFFFF) != 0)) {
@@ -1249,27 +1249,27 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   }
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Double_doubleToRawLongBits(Thread*,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Double_doubleToRawLongBits(Thread*,
                                                object,
                                                uintptr_t* arguments)
 {
   int64_t v;
   memcpy(&v, arguments, 8);
   // todo: do we need to do NaN checks as in
-  // Avian_java_lang_Float_floatToIntBits above?  If so, update
-  // Double.doubleToRawLongBits in the Avian class library too.
+  // Shim_java_lang_Float_floatToIntBits above?  If so, update
+  // Double.doubleToRawLongBits in the Basalt Shim class library too.
   return v;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_reflect_Method_getCaller(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_reflect_Method_getCaller(Thread* t, object, uintptr_t*)
 {
   return reinterpret_cast<int64_t>(getCaller(t, 2));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_reflect_Method_invoke(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_reflect_Method_invoke(Thread* t,
                                           object,
                                           uintptr_t* arguments)
 {
@@ -1279,8 +1279,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
                       reinterpret_cast<object>(arguments[2]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_reflect_Field_getObject(Thread*,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_reflect_Field_getObject(Thread*,
                                             object,
                                             uintptr_t* arguments)
 {
@@ -1288,8 +1288,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       reinterpret_cast<object>(arguments[0]), arguments[1]));
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_reflect_Field_setObject(Thread* t,
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_reflect_Field_setObject(Thread* t,
                                             object,
                                             uintptr_t* arguments)
 {
@@ -1299,8 +1299,8 @@ extern "C" AVIAN_EXPORT void JNICALL
            reinterpret_cast<object>(arguments[2]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_reflect_Field_getPrimitive(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_reflect_Field_getPrimitive(Thread* t,
                                                object,
                                                uintptr_t* arguments)
 {
@@ -1308,8 +1308,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       t, reinterpret_cast<object>(arguments[0]), arguments[1], arguments[2]);
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_java_lang_reflect_Field_setPrimitive(Thread* t,
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_reflect_Field_setPrimitive(Thread* t,
                                                object,
                                                uintptr_t* arguments)
 {
@@ -1323,8 +1323,8 @@ extern "C" AVIAN_EXPORT void JNICALL
                value);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_reflect_Constructor_make(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_reflect_Constructor_make(Thread* t,
                                              object,
                                              uintptr_t* arguments)
 {
@@ -1332,23 +1332,23 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       make(t, cast<GcClass>(t, reinterpret_cast<object>(arguments[0]))));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_ref_Reference_get(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_ref_Reference_get(Thread* t, object, uintptr_t* arguments)
 {
   return reinterpret_cast<uintptr_t>(
       cast<GcJreference>(t, reinterpret_cast<object>(arguments[0]))->target());
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Throwable_nativeFillInStackTrace(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Throwable_nativeFillInStackTrace(Thread* t,
                                                      object,
                                                      uintptr_t*)
 {
   return reinterpret_cast<uintptr_t>(getTrace(t, 2));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_Throwable_nativeGetStackTrace(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Throwable_nativeGetStackTrace(Thread* t,
                                                   object,
                                                   uintptr_t* arguments)
 {
@@ -1356,15 +1356,15 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       local::translateStackTrace(t, reinterpret_cast<object>(arguments[0])));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_avian_Classes_getVMClass(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_getVMClass(Thread* t, object, uintptr_t* arguments)
 {
   return reinterpret_cast<int64_t>(
       objectClass(t, reinterpret_cast<object>(arguments[0])));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_avian_Classes_makeMethod(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_makeMethod(Thread* t, object, uintptr_t* arguments)
 {
   return reinterpret_cast<uintptr_t>(
       makeMethod(t,
@@ -1372,8 +1372,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
                  arguments[1]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_avian_Classes_isAssignableFrom(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_isAssignableFrom(Thread* t,
                                          object,
                                          uintptr_t* arguments)
 {
@@ -1387,8 +1387,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   }
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_reflect_Array_createObjectArray(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_reflect_Array_createObjectArray(Thread* t,
                                                     object,
                                                     uintptr_t* arguments)
 {
@@ -1398,14 +1398,14 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
       arguments[1]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_nio_ByteOrder_isLittleEndian(Thread*, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_nio_ByteOrder_isLittleEndian(Thread*, object, uintptr_t*)
 {
   return true;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMRuntime_newNonMovableArray(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMRuntime_newNonMovableArray(Thread* t,
                                                      object,
                                                      uintptr_t* arguments)
 {
@@ -1428,16 +1428,16 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   }
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_dalvik_system_VMRuntime_addressOf(Thread*,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_dalvik_system_VMRuntime_addressOf(Thread*,
                                             object,
                                             uintptr_t* arguments)
 {
   return arguments[1] + ArrayBody;
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_libcore_io_Memory_pokeLong(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_libcore_io_Memory_pokeLong(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
@@ -1449,8 +1449,8 @@ extern "C" AVIAN_EXPORT void JNICALL
   memcpy(reinterpret_cast<void*>(address), &v, 8);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_libcore_io_Memory_peekLong(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_libcore_io_Memory_peekLong(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
@@ -1459,8 +1459,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return arguments[2] ? swapV8(v) : v;
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_libcore_io_Memory_pokeInt(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_libcore_io_Memory_pokeInt(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
@@ -1468,8 +1468,8 @@ extern "C" AVIAN_EXPORT void JNICALL
   memcpy(reinterpret_cast<void*>(address), &v, 4);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_libcore_io_Memory_peekInt(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_libcore_io_Memory_peekInt(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
@@ -1478,8 +1478,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return arguments[2] ? swapV4(v) : v;
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_libcore_io_Memory_pokeShort(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_libcore_io_Memory_pokeShort(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
@@ -1487,8 +1487,8 @@ extern "C" AVIAN_EXPORT void JNICALL
   memcpy(reinterpret_cast<void*>(address), &v, 2);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_libcore_io_Memory_peekShort(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_libcore_io_Memory_peekShort(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
@@ -1497,44 +1497,44 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return arguments[2] ? swapV2(v) : v;
 }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_libcore_io_Memory_pokeByte(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_libcore_io_Memory_pokeByte(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
   *reinterpret_cast<int8_t*>(address) = arguments[2];
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_libcore_io_Memory_peekByte(Thread*, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_libcore_io_Memory_peekByte(Thread*, object, uintptr_t* arguments)
 {
   int64_t address;
   memcpy(&address, arguments, 8);
   return *reinterpret_cast<int8_t*>(address);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_System_nanoTime(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_System_nanoTime(Thread* t, object, uintptr_t*)
 {
   return t->m->system->now() * 1000 * 1000;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_System_currentTimeMillis(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_System_currentTimeMillis(Thread* t, object, uintptr_t*)
 {
   return t->m->system->now();
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_lang_System_identityHashCode(Thread* t,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_System_identityHashCode(Thread* t,
                                             object,
                                             uintptr_t* arguments)
 {
   return objectHash(t, reinterpret_cast<object>(arguments[0]));
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_java_util_concurrent_atomic_AtomicLong_VMSupportsCS8(Thread*,
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_util_concurrent_atomic_AtomicLong_VMSupportsCS8(Thread*,
                                                                object,
                                                                uintptr_t*)
 {
@@ -1557,8 +1557,8 @@ void register_libcore_net_RawSocket(_JNIEnv*)
 // void register_org_apache_harmony_xnet_provider_jsse_NativeCrypto(_JNIEnv*) {
 // }
 
-extern "C" AVIAN_EXPORT void JNICALL
-    Avian_libcore_io_OsConstants_initConstants(Thread* t,
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_libcore_io_OsConstants_initConstants(Thread* t,
                                                object m,
                                                uintptr_t*)
 {
@@ -1579,8 +1579,8 @@ extern "C" AVIAN_EXPORT void JNICALL
   fieldAtOffset<jint>(table, field->offset()) = 2;
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_libcore_io_Posix_getenv(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_libcore_io_Posix_getenv(Thread* t, object, uintptr_t* arguments)
 {
   GcString* name = cast<GcString>(t, reinterpret_cast<object>(arguments[1]));
 
@@ -1605,8 +1605,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   }
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_libcore_io_Posix_uname(Thread* t, object, uintptr_t*)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_libcore_io_Posix_uname(Thread* t, object, uintptr_t*)
 {
   GcClass* c
       = resolveClass(t, roots(t)->bootLoader(), "libcore/io/StructUtsname");
@@ -1647,8 +1647,8 @@ extern "C" AVIAN_EXPORT int64_t JNICALL
   return reinterpret_cast<uintptr_t>(instance);
 }
 
-extern "C" AVIAN_EXPORT int64_t JNICALL
-    Avian_libcore_io_Posix_writeBytes(Thread* t, object, uintptr_t* arguments)
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_libcore_io_Posix_writeBytes(Thread* t, object, uintptr_t* arguments)
 {
   object fd = reinterpret_cast<object>(arguments[1]);
   PROTECT(t, fd);

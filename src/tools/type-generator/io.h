@@ -25,10 +25,10 @@
 
 #include "assert.h"
 
-#ifndef AVIAN_TOOLS_TYPE_GENERATOR_IO_H
-#define AVIAN_TOOLS_TYPE_GENERATOR_IO_H
+#ifndef SHIM_TOOLS_TYPE_GENERATOR_IO_H
+#define SHIM_TOOLS_TYPE_GENERATOR_IO_H
 
-namespace avian {
+namespace shim {
 namespace tools {
 namespace typegenerator {
 
@@ -189,6 +189,6 @@ class FileOutput : public Output {
 
 }  // namespace typegenerator
 }  // namespace tools
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_TOOLS_TYPE_GENERATOR_IO_H
+#endif  // SHIM_TOOLS_TYPE_GENERATOR_IO_H

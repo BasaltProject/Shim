@@ -27,7 +27,7 @@
 
 #include "endianness.h"
 
-#include <avian/tools/object-writer/tools.h>
+#include <shim/tools/object-writer/tools.h>
 
 #define MH_MAGIC_64 0xfeedfacf
 #define MH_MAGIC 0xfeedface
@@ -55,14 +55,14 @@
 
 namespace {
 
-using namespace avian::tools;
-using namespace avian::util;
+using namespace shim::tools;
+using namespace shim::util;
 
 typedef int cpu_type_t;
 typedef int cpu_subtype_t;
 typedef int vm_prot_t;
 
-using avian::endian::Endianness;
+using shim::endian::Endianness;
 
 #define V1 Endianness<TargetLittleEndian>::v1
 #define V2 Endianness<TargetLittleEndian>::v2

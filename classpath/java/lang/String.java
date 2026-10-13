@@ -30,8 +30,8 @@ import java.util.Formatter;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-import avian.Iso88591;
-import avian.Utf8;
+import shim.Iso88591;
+import shim.Utf8;
 
 public final class String
   implements Comparable<String>, CharSequence, Serializable

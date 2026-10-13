@@ -47,7 +47,7 @@ import static java.io.ObjectOutputStream.SC_EXTERNALIZABLE;
 import static java.io.ObjectOutputStream.SC_ENUM;
 import static java.io.ObjectOutputStream.getReadOrWriteMethod;
 
-import avian.VMClass;
+import shim.VMClass;
 
 import java.util.ArrayList;
 import java.util.HashMap;

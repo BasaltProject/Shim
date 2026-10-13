@@ -21,13 +21,13 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/jnienv.h"
-#include "avian/machine.h"
-#include "avian/util.h"
-#include "avian/processor.h"
-#include "avian/constants.h"
+#include "shim/jnienv.h"
+#include "shim/machine.h"
+#include "shim/util.h"
+#include "shim/processor.h"
+#include "shim/constants.h"
 
-#include <avian/util/runtime-array.h>
+#include <shim/util/runtime-array.h>
 
 using namespace vm;
 
@@ -131,12 +131,12 @@ jint JNICALL GetEnv(Machine* m, Thread** t, jint version)
   *t = static_cast<Thread*>(m->localThread->get());
   if (*t) {
     if (version <= JNI_VERSION_1_6) {
-      return AVIAN_JNI_OK;
+      return SHIM_JNI_OK;
     } else {
-      return AVIAN_JNI_EVERSION;
+      return SHIM_JNI_EVERSION;
     }
   } else {
-    return AVIAN_JNI_EDETACHED;
+    return SHIM_JNI_EDETACHED;
   }
 }
 
@@ -2632,13 +2632,13 @@ void JNICALL ReleaseBooleanArrayElements(Thread* t,
 
   unsigned size = (*array)->length() * sizeof(jboolean);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -2650,13 +2650,13 @@ void JNICALL
 
   unsigned size = (*array)->length() * sizeof(jbyte);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -2668,13 +2668,13 @@ void JNICALL
 
   unsigned size = (*array)->length() * sizeof(jchar);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -2688,13 +2688,13 @@ void JNICALL ReleaseShortArrayElements(Thread* t,
 
   unsigned size = (*array)->length() * sizeof(jshort);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -2706,13 +2706,13 @@ void JNICALL
 
   unsigned size = (*array)->length() * sizeof(jint);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -2724,13 +2724,13 @@ void JNICALL
 
   unsigned size = (*array)->length() * sizeof(jlong);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -2744,13 +2744,13 @@ void JNICALL ReleaseFloatArrayElements(Thread* t,
 
   unsigned size = (*array)->length() * sizeof(jfloat);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -2764,13 +2764,13 @@ void JNICALL ReleaseDoubleArrayElements(Thread* t,
 
   unsigned size = (*array)->length() * sizeof(jdouble);
 
-  if (mode == 0 or mode == AVIAN_JNI_COMMIT) {
+  if (mode == 0 or mode == SHIM_JNI_COMMIT) {
     if (size) {
       memcpy((*array)->body().begin(), p, size);
     }
   }
 
-  if (mode == 0 or mode == AVIAN_JNI_ABORT) {
+  if (mode == 0 or mode == SHIM_JNI_ABORT) {
     t->m->heap->free(p, size);
   }
 }
@@ -3370,14 +3370,14 @@ uint64_t boot(Thread* t, uintptr_t*)
 
   t->m->classpath->boot(t);
 
-  const char* port = findProperty(t, "avian.trace.port");
+  const char* port = findProperty(t, "shim.trace.port");
   if (port) {
     GcString* host = makeString(t, "0.0.0.0");
     PROTECT(t, host);
 
     GcMethod* method = resolveMethod(t,
                                      roots(t)->bootLoader(),
-                                     "avian/Traces",
+                                     "shim/Traces",
                                      "startTraceListener",
                                      "(Ljava/lang/String;I)V");
 
@@ -3608,19 +3608,19 @@ void populateJNITables(JavaVMVTable* vmTable, JNIEnvVTable* envTable)
 
 }  // namespace vm
 
-extern "C" AVIAN_EXPORT jint JNICALL JNI_GetDefaultJavaVMInitArgs(void*)
+extern "C" SHIM_EXPORT jint JNICALL JNI_GetDefaultJavaVMInitArgs(void*)
 {
   return 0;
 }
 
-extern "C" AVIAN_EXPORT jint JNICALL
+extern "C" SHIM_EXPORT jint JNICALL
     JNI_GetCreatedJavaVMs(Machine**, jsize, jsize*)
 {
   // todo
   return -1;
 }
 
-extern "C" AVIAN_EXPORT jint JNICALL
+extern "C" SHIM_EXPORT jint JNICALL
     JNI_CreateJavaVM(Machine** m, Thread** t, void* args)
 {
   local::JavaVMInitArgs* a = static_cast<local::JavaVMInitArgs*>(args);
@@ -3629,9 +3629,9 @@ extern "C" AVIAN_EXPORT jint JNICALL
   unsigned stackLimit = 0;
   const char* bootLibraries = 0;
   const char* classpath = 0;
-  const char* javaHome = AVIAN_JAVA_HOME;
+  const char* javaHome = SHIM_JAVA_HOME;
   bool reentrant = false;
-  const char* embedPrefix = AVIAN_EMBED_PREFIX;
+  const char* embedPrefix = SHIM_EMBED_PREFIX;
   const char* bootClasspathPrepend = "";
   const char* bootClasspath = 0;
   const char* bootClasspathAppend = "";
@@ -3745,7 +3745,7 @@ extern "C" AVIAN_EXPORT jint JNICALL
     free(bootLibrary);
   Processor* p = makeProcessor(s, h, crashDumpDirectory, true);
 
-  // reserve space for avian.version and file.encoding:
+  // reserve space for shim.version and file.encoding:
   propertyCount += 2;
 
   const char** properties = static_cast<const char**>(
@@ -3774,7 +3774,7 @@ extern "C" AVIAN_EXPORT jint JNICALL
     *(propertyPointer++) = RUNTIME_ARRAY_BODY(classpathProperty);
   }
 
-  *(propertyPointer++) = "avian.version=" AVIAN_VERSION;
+  *(propertyPointer++) = "shim.version=" SHIM_VERSION;
 
   // todo: should this be derived from the OS locale?  Should it be
   // overrideable via JavaVMInitArgs?
@@ -3802,20 +3802,20 @@ extern "C" AVIAN_EXPORT jint JNICALL
   return run(*t, local::boot, 0) ? 0 : -1;
 }
 
-extern "C" AVIAN_EXPORT jstring JNICALL JVM_GetTemporaryDirectory(JNIEnv* e UNUSED)
+extern "C" SHIM_EXPORT jstring JNICALL JVM_GetTemporaryDirectory(JNIEnv* e UNUSED)
 {
   // Unimplemented
   // This is used in newer builds of openjdk8, as a place to store statistics or something...
   abort();
 }
 
-extern "C" AVIAN_EXPORT jboolean JNICALL JVM_KnownToNotExist(JNIEnv* e UNUSED, jobject loader UNUSED, jstring classname UNUSED)
+extern "C" SHIM_EXPORT jboolean JNICALL JVM_KnownToNotExist(JNIEnv* e UNUSED, jobject loader UNUSED, jstring classname UNUSED)
 {
   // Unimplemented
   abort();
 }
 
-extern "C" AVIAN_EXPORT jintArray JNICALL JVM_GetResourceLookupCache(JNIEnv* e UNUSED, jobject loader UNUSED, jstring resourcename UNUSED)
+extern "C" SHIM_EXPORT jintArray JNICALL JVM_GetResourceLookupCache(JNIEnv* e UNUSED, jobject loader UNUSED, jstring resourcename UNUSED)
 {
   // Unimplemented
   abort();

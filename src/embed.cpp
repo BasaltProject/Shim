@@ -28,7 +28,7 @@
 #include <vector>
 #include <string>
 
-#include "avian/embed.h"
+#include "shim/embed.h"
 
 #ifdef __x86_64__
 #define BINARY_LOADER(x) _binary_loader_##x

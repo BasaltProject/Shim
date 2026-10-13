@@ -21,11 +21,11 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/machine.h>
+#include <shim/machine.h>
 
 #include "debug-util.h"
 
-namespace avian {
+namespace shim {
 namespace jvm {
 namespace debug {
 
@@ -623,4 +623,4 @@ void disassembleCode(const char* prefix, uint8_t* code, unsigned length)
 
 }  // namespace debug
 }  // namespace jvm
-}  // namespace avian
+}  // namespace shim

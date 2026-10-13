@@ -21,20 +21,20 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_ARM_PROMISE_H
-#define AVIAN_CODEGEN_ASSEMBLER_ARM_PROMISE_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_ARM_PROMISE_H
+#define SHIM_CODEGEN_ASSEMBLER_ARM_PROMISE_H
 
-#include "avian/target.h"
+#include "shim/target.h"
 
-#include <avian/codegen/lir.h>
-#include <avian/codegen/assembler.h>
-#include "avian/alloc-vector.h"
+#include <shim/codegen/lir.h>
+#include <shim/codegen/assembler.h>
+#include "shim/alloc-vector.h"
 
 namespace vm {
 class System;
 }
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -161,6 +161,6 @@ void appendPoolEvent(Context* con,
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_ARM_PROMISE_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_ARM_PROMISE_H

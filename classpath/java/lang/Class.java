@@ -23,12 +23,12 @@
 
 package java.lang;
 
-import avian.VMClass;
-import avian.ClassAddendum;
-import avian.AnnotationInvocationHandler;
-import avian.SystemClassLoader;
-import avian.Classes;
-import avian.InnerClassReference;
+import shim.VMClass;
+import shim.ClassAddendum;
+import shim.AnnotationInvocationHandler;
+import shim.SystemClassLoader;
+import shim.Classes;
+import shim.InnerClassReference;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.GenericDeclaration;

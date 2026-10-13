@@ -25,8 +25,8 @@
 #include <tchar.h>
 #include <stdint.h>
 
-#include "avian/embed.h"
-#include "avian/common.h"
+#include "shim/embed.h"
+#include "shim/common.h"
 #include "jni.h"
 
 extern "C" {
@@ -37,7 +37,7 @@ void __cxa_pure_virtual(void)
   abort();
 }
 
-AVIAN_EXPORT const uint8_t* bootJar(unsigned* size)
+SHIM_EXPORT const uint8_t* bootJar(unsigned* size)
 {
   if (HRSRC hResInfo = FindResourceW(
           NULL, RESID_BOOT_JAR, reinterpret_cast<LPCWSTR>(RT_RCDATA))) {

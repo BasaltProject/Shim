@@ -13,11 +13,11 @@
 
 package extra;
 
-import static avian.Continuations.callWithCurrentContinuation;
-import static avian.Continuations.dynamicWind;
+import static shim.Continuations.callWithCurrentContinuation;
+import static shim.Continuations.dynamicWind;
 
-import avian.Function;
-import avian.Callback;
+import shim.Function;
+import shim.Callback;
 
 import java.util.concurrent.Callable;
 

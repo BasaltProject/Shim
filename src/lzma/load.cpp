@@ -166,7 +166,7 @@ int main(int ac, const char** av)
             unlink(name);
 
             if (library) {
-              void* main = librarySymbol(library, "avianMain");
+              void* main = librarySymbol(library, "shimMain");
               if (main) {
                 int (*mainFunction)(const char*, int, const char**);
                 memcpy(&mainFunction, &main, sizeof(void*));

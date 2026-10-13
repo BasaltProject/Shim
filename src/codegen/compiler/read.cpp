@@ -21,7 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
+#include "shim/target.h"
 
 #include "codegen/compiler/context.h"
 #include "codegen/compiler/value.h"
@@ -29,7 +29,7 @@
 #include "codegen/compiler/resource.h"
 #include "codegen/compiler/read.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -225,4 +225,4 @@ SingleRead* read(Context* c, const SiteMask& mask, Value* successor)
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

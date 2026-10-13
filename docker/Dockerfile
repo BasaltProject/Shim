@@ -35,7 +35,7 @@ RUN dpkg-reconfigure locales && \
 
 ENV LC_ALL C.UTF-8
 
-# Set JAVA_HOME for avian's benefit
+# Set JAVA_HOME for shim's benefit
 ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64
 
 # Add i386 libraries
@@ -55,7 +55,7 @@ RUN apt-get install -y \
         --no-install-recommends && \
     apt-get clean all
 
-# Download win32 and win64 adjacent to avian
+# Download win32 and win64 adjacent to shim
 RUN cd /var/src/ && \
     wget https://github.com/ReadyTalk/win32/archive/master.zip -O win32.zip && \
     unzip win32.zip && \
@@ -89,6 +89,6 @@ RUN mkdir /var/src/lzma && \
     wget http://www.7-zip.org/a/lzma1507.7z -O lzma.7z && \
     p7zip -d lzma.7z
 
-# Avian build location
-VOLUME /var/src/avian
-WORKDIR /var/src/avian
+# Basalt Shim build location
+VOLUME /var/src/shim
+WORKDIR /var/src/shim

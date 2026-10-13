@@ -24,7 +24,7 @@
 #include "context.h"
 #include "block.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -46,4 +46,4 @@ Context::Context(vm::System* s, util::Alloc* a, vm::Zone* zone)
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

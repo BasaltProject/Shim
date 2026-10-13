@@ -21,13 +21,13 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/util/allocator.h"
-#include "avian/zone.h"
+#include "shim/util/allocator.h"
+#include "shim/zone.h"
 
 #include "context.h"
 #include "block.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -54,4 +54,4 @@ Context::Context(vm::System* s,
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

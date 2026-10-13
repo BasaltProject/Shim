@@ -21,7 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
+#include "shim/target.h"
 
 #include "codegen/compiler/context.h"
 #include "codegen/compiler/value.h"
@@ -30,7 +30,7 @@
 #include "codegen/compiler/frame.h"
 #include "codegen/compiler/promise.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -716,4 +716,4 @@ MemorySite* frameSite(Context* c, int frameIndex)
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

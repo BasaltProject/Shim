@@ -21,15 +21,15 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_ARM_REGISTERS_H
-#define AVIAN_CODEGEN_ASSEMBLER_ARM_REGISTERS_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_ARM_REGISTERS_H
+#define SHIM_CODEGEN_ASSEMBLER_ARM_REGISTERS_H
 
-#include <avian/codegen/lir.h>
-#include <avian/codegen/assembler.h>
+#include <shim/codegen/lir.h>
+#include <shim/codegen/assembler.h>
 
-#include "avian/environment.h"
+#include "shim/environment.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -85,6 +85,6 @@ inline bool isFpr(lir::RegisterPair* reg)
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_ARM_REGISTERS_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_ARM_REGISTERS_H

@@ -21,18 +21,18 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_CONTEXT_H
-#define AVIAN_CODEGEN_COMPILER_CONTEXT_H
+#ifndef SHIM_CODEGEN_COMPILER_CONTEXT_H
+#define SHIM_CODEGEN_COMPILER_CONTEXT_H
 
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/compiler.h>
-#include <avian/util/list.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/compiler.h>
+#include <shim/util/list.h>
 
 #include "regalloc.h"
 
-using namespace avian::util;
+using namespace shim::util;
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -157,6 +157,6 @@ List<T>* cons(Context* c, const T& value, List<T>* next)
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_CONTEXT_H
+#endif  // SHIM_CODEGEN_COMPILER_CONTEXT_H

@@ -21,17 +21,17 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/jnienv.h"
-#include "avian/machine.h"
-#include "avian/util.h"
-#include <avian/util/stream.h>
-#include "avian/constants.h"
-#include "avian/processor.h"
-#include "avian/arch.h"
-#include "avian/lzma.h"
+#include "shim/jnienv.h"
+#include "shim/machine.h"
+#include "shim/util.h"
+#include <shim/util/stream.h>
+#include "shim/constants.h"
+#include "shim/processor.h"
+#include "shim/arch.h"
+#include "shim/lzma.h"
 
-#include <avian/util/runtime-array.h>
-#include <avian/util/math.h>
+#include <shim/util/runtime-array.h>
+#include <shim/util/math.h>
 
 #if defined(PLATFORM_WINDOWS)
 #define WIN32_LEAN_AND_MEAN
@@ -39,7 +39,7 @@
 #endif
 
 using namespace vm;
-using namespace avian::util;
+using namespace shim::util;
 
 namespace {
 
@@ -3676,7 +3676,7 @@ void updatePackageMap(Thread* t, GcClass* class_)
 
         source = vm::makeByteArray(t, "%s", RUNTIME_ARRAY_BODY(sourceName));
       } else {
-        source = vm::makeByteArray(t, "avian-dummy-package-source");
+        source = vm::makeByteArray(t, "shim-dummy-package-source");
       }
 
       hashMapInsert(t, roots(t)->packageMap(), key, source, byteArrayHash);
@@ -3877,7 +3877,7 @@ void Thread::init()
 
     BootImage* image = 0;
     uint8_t* code = 0;
-    const char* imageFunctionName = findProperty(m, "avian.bootimage");
+    const char* imageFunctionName = findProperty(m, "shim.bootimage");
     if (imageFunctionName) {
       bool lzma = strncmp("lzma:", imageFunctionName, 5) == 0;
       const char* symbolName = lzma ? imageFunctionName + 5 : imageFunctionName;
@@ -3890,7 +3890,7 @@ void Thread::init()
         size_t size = 0;
         uint8_t* imageBytes = imageFunction(&size);
         if (lzma) {
-#ifdef AVIAN_USE_LZMA
+#ifdef SHIM_USE_LZMA
           m->bootimage = image = reinterpret_cast<BootImage*>(decodeLZMA(
               m->system, m->heap, imageBytes, size, &(m->bootimageSize)));
 #else
@@ -3900,7 +3900,7 @@ void Thread::init()
           image = reinterpret_cast<BootImage*>(imageBytes);
         }
 
-        const char* codeFunctionName = findProperty(m, "avian.codeimage");
+        const char* codeFunctionName = findProperty(m, "shim.codeimage");
         if (codeFunctionName) {
           void* codep = m->libraries->resolve(codeFunctionName);
           if (codep) {
@@ -5959,7 +5959,7 @@ GcClass* defineClass(Thread* t,
 
   // const unsigned BufferSize = 1024;
   // char path[BufferSize];
-  // snprintf(path, BufferSize, "/tmp/avian-define-class/%s.class", name);
+  // snprintf(path, BufferSize, "/tmp/shim-define-class/%s.class", name);
 
   // FILE* file = fopen(path, "wb");
   // if (file) {
@@ -6306,7 +6306,7 @@ void noop()
 }  // namespace vm
 
 // for debugging
-AVIAN_EXPORT void vmfPrintTrace(Thread* t, FILE* out)
+SHIM_EXPORT void vmfPrintTrace(Thread* t, FILE* out)
 {
   class Visitor : public Processor::StackVisitor {
    public:
@@ -6347,13 +6347,13 @@ AVIAN_EXPORT void vmfPrintTrace(Thread* t, FILE* out)
   fflush(out);
 }
 
-AVIAN_EXPORT void vmPrintTrace(Thread* t)
+SHIM_EXPORT void vmPrintTrace(Thread* t)
 {
   vmfPrintTrace(t, stderr);
 }
 
 // also for debugging
-AVIAN_EXPORT void* vmAddressFromLine(GcMethod* m, unsigned line)
+SHIM_EXPORT void* vmAddressFromLine(GcMethod* m, unsigned line)
 {
   GcCode* code = m->code();
   printf("code: %p\n", code);

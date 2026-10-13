@@ -28,7 +28,7 @@
 
 #include "endianness.h"
 
-#include <avian/tools/object-writer/tools.h>
+#include <shim/tools/object-writer/tools.h>
 
 #define EI_NIDENT 16
 
@@ -84,8 +84,8 @@
 
 namespace {
 
-using namespace avian::tools;
-using namespace avian::util;
+using namespace shim::tools;
+using namespace shim::util;
 
 template <class AddrTy>
 struct ElfTypes {
@@ -126,7 +126,7 @@ struct Symbol_Ty<uint32_t> {
   Elf::Section st_shndx;
 };
 
-using avian::endian::Endianness;
+using shim::endian::Endianness;
 
 #define V1 Endianness<TargetLittleEndian>::v1
 #define V2 Endianness<TargetLittleEndian>::v2

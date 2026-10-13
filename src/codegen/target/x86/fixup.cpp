@@ -23,20 +23,20 @@
 
 #include <string.h>
 
-#include "avian/util/allocator.h"
-#include "avian/alloc-vector.h"
-#include "avian/common.h"
-#include "avian/zone.h"
+#include "shim/util/allocator.h"
+#include "shim/alloc-vector.h"
+#include "shim/common.h"
+#include "shim/zone.h"
 
-#include <avian/util/abort.h>
-#include <avian/system/system.h>
+#include <shim/util/abort.h>
+#include <shim/system/system.h>
 
 #include "context.h"
 #include "fixup.h"
 #include "padding.h"
 #include "block.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -219,4 +219,4 @@ ShiftMaskPromise* shiftMaskPromise(Context* c,
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

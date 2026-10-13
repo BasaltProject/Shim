@@ -22,11 +22,11 @@
    details. */
 
 #include "jni.h"
-#include "avian/machine.h"
+#include "shim/machine.h"
 #include "sockets.h"
 #include "jni-util.h"
 
-using namespace avian::classpath::sockets;
+using namespace shim::classpath::sockets;
 
 extern "C" JNIEXPORT void JNICALL Java_java_net_Socket_init(JNIEnv* e, jclass)
 {
@@ -82,7 +82,7 @@ extern "C" JNIEXPORT void JNICALL
 }
 
 extern "C" JNIEXPORT void JNICALL
-    Avian_java_net_Socket_send(vm::Thread* t, vm::object, uintptr_t* arguments)
+    Shim_java_net_Socket_send(vm::Thread* t, vm::object, uintptr_t* arguments)
 { /* SOCKET s, object buffer_obj, int start_pos, int count  */
   SOCKET& s = *(reinterpret_cast<SOCKET*>(&arguments[0]));
   vm::GcByteArray* buffer_obj = vm::cast<vm::GcByteArray>(
@@ -90,11 +90,11 @@ extern "C" JNIEXPORT void JNICALL
   int32_t& start_pos = *(reinterpret_cast<int32_t*>(&arguments[3]));
   int32_t& count = *(reinterpret_cast<int32_t*>(&arguments[4]));
   char* buffer = reinterpret_cast<char*>(&buffer_obj->body()[start_pos]);
-  avian::classpath::sockets::send((JNIEnv*)t, s, buffer, count);
+  shim::classpath::sockets::send((JNIEnv*)t, s, buffer, count);
 }
 
 extern "C" JNIEXPORT int64_t JNICALL
-    Avian_java_net_Socket_recv(vm::Thread* t, vm::object, uintptr_t* arguments)
+    Shim_java_net_Socket_recv(vm::Thread* t, vm::object, uintptr_t* arguments)
 { /* SOCKET s, object buffer_obj, int start_pos, int count  */
   SOCKET& s = *(reinterpret_cast<SOCKET*>(&arguments[0]));
   vm::GcByteArray* buffer_obj = vm::cast<vm::GcByteArray>(
@@ -102,7 +102,7 @@ extern "C" JNIEXPORT int64_t JNICALL
   int32_t& start_pos = *(reinterpret_cast<int32_t*>(&arguments[3]));
   int32_t& count = *(reinterpret_cast<int32_t*>(&arguments[4]));
   char* buffer = reinterpret_cast<char*>(&buffer_obj->body()[start_pos]);
-  return avian::classpath::sockets::recv((JNIEnv*)t, s, buffer, count);
+  return shim::classpath::sockets::recv((JNIEnv*)t, s, buffer, count);
 }
 
 extern "C" JNIEXPORT jint JNICALL

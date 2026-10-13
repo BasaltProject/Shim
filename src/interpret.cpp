@@ -21,21 +21,21 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/common.h"
-#include <avian/system/system.h>
-#include <avian/system/signal.h>
-#include "avian/constants.h"
-#include "avian/machine.h"
-#include "avian/processor.h"
-#include "avian/process.h"
-#include "avian/arch.h"
+#include "shim/common.h"
+#include <shim/system/system.h>
+#include <shim/system/signal.h>
+#include "shim/constants.h"
+#include "shim/machine.h"
+#include "shim/processor.h"
+#include "shim/process.h"
+#include "shim/arch.h"
 
-#include <avian/util/runtime-array.h>
-#include <avian/util/list.h>
-#include <avian/util/slice.h>
+#include <shim/util/runtime-array.h>
+#include <shim/util/list.h>
+#include <shim/util/slice.h>
 
 using namespace vm;
-using namespace avian::system;
+using namespace shim::system;
 
 namespace local {
 
@@ -3509,7 +3509,7 @@ class MyProcessor : public Processor {
     return makeObjectArray(t, 0);
   }
 
-  virtual void initialize(BootImage*, avian::util::Slice<uint8_t>)
+  virtual void initialize(BootImage*, shim::util::Slice<uint8_t>)
   {
     abort(s);
   }
@@ -3523,7 +3523,7 @@ class MyProcessor : public Processor {
                              Zone*,
                              GcTriple**,
                              GcTriple**,
-                             avian::codegen::DelayedPromise**,
+                             shim::codegen::DelayedPromise**,
                              GcMethod*,
                              OffsetResolver*,
                              JavaVM*)

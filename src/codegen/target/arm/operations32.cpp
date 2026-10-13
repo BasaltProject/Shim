@@ -30,12 +30,12 @@
 
 #if TARGET_BYTES_PER_WORD == 4
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
 using namespace isa;
-using namespace avian::util;
+using namespace shim::util;
 
 inline bool isOfWidth(int64_t i, int size)
 {
@@ -1445,7 +1445,7 @@ void trap(Context* con)
 
 void memoryBarrier(Context* con UNUSED)
 {
-#ifndef AVIAN_ASSUME_ARMV6
+#ifndef SHIM_ASSUME_ARMV6
   emit(con, dmb());
 #endif
 }
@@ -1467,6 +1467,6 @@ void storeLoadBarrier(Context* con)
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
 #endif  // TARGET_BYTES_PER_WORD == 4

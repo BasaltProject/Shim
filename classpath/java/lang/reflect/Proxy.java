@@ -23,21 +23,21 @@
 
 package java.lang.reflect;
 
-import static avian.Stream.write1;
-import static avian.Stream.write2;
-import static avian.Stream.write4;
-import static avian.Stream.set4;
-import static avian.Assembler.*;
+import static shim.Stream.write1;
+import static shim.Stream.write2;
+import static shim.Stream.write4;
+import static shim.Stream.set4;
+import static shim.Assembler.*;
 
-import avian.SystemClassLoader;
-import avian.Classes;
+import shim.SystemClassLoader;
+import shim.Classes;
 
-import avian.ConstantPool;
-import avian.ConstantPool.PoolEntry;
+import shim.ConstantPool;
+import shim.ConstantPool.PoolEntry;
 
-import avian.Assembler;
-import avian.Assembler.FieldData;
-import avian.Assembler.MethodData;
+import shim.Assembler;
+import shim.Assembler.FieldData;
+import shim.Assembler.MethodData;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -385,9 +385,9 @@ public class Proxy {
     List<MethodData> methodTable = new ArrayList<MethodData>();
     List<Method> refs = new ArrayList<Method>();
     for (Class c: interfaces) {
-      avian.VMMethod[] ivtable = SystemClassLoader.vmClass(c).virtualTable;
+      shim.VMMethod[] ivtable = SystemClassLoader.vmClass(c).virtualTable;
       if (ivtable != null) {
-        for (avian.VMMethod m: ivtable) {
+        for (shim.VMMethod m: ivtable) {
           String spec = Classes.toString(m.name) + Classes.toString(m.spec);
           if (specs.contains(spec)) {
             continue;
@@ -420,8 +420,8 @@ public class Proxy {
        methodTable.toArray(new MethodData[methodTable.size()]));
 
     byte[] classData = out.toByteArray();
-    Class result = avian.SystemClassLoader.getClass
-      (avian.Classes.defineVMClass(loader, classData, 0, classData.length));
+    Class result = shim.SystemClassLoader.getClass
+      (shim.Classes.defineVMClass(loader, classData, 0, classData.length));
     methodRefsMap.put(result, refs.toArray(new Method[refs.size()]));
     return result;
   }

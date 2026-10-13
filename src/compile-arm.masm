@@ -125,7 +125,7 @@ vmInvoke_returnAddress
 		EXPORT vmInvoke_safeStack
 vmInvoke_safeStack
 
-;if AVIAN_CONTINUATIONS
+;if SHIM_CONTINUATIONS
 ;		; call the next continuation, if any
 ;		ldr  r5,[r8,#TARGET_THREAD_CONTINUATION]
 ;		cmp  r5,#0
@@ -185,7 +185,7 @@ vmInvoke_safeStack
 ;		bx   r7
 ;
 ;vmInvoke_exit
-;endif ; AVIAN_CONTINUATIONS
+;endif ; SHIM_CONTINUATIONS
 
 		mov   ip, #0
 		str   ip, [r8, #TARGET_THREAD_STACK]
@@ -201,7 +201,7 @@ vmInvoke_return
 
 		EXPORT vmJumpAndInvoke
 vmJumpAndInvoke
-;if :DEF:AVIAN_CONTINUATIONS
+;if :DEF:SHIM_CONTINUATIONS
 ;		;      r0: thread
 ;		;      r1: address
 ;		;      r2: stack
@@ -254,10 +254,10 @@ vmJumpAndInvoke
 ;vmJumpAndInvoke_getAddress_word
 ;   .word _GLOBAL_OFFSET_TABLE_-(vmJumpAndInvoke_getAddress)+8)
 ;
-;else ; not AVIAN_CONTINUATIONS
+;else ; not SHIM_CONTINUATIONS
 		; vmJumpAndInvoke should only be called when continuations are
 		; enabled
 		bkpt 0
-;endif ; not AVIAN_CONTINUATIONS
+;endif ; not SHIM_CONTINUATIONS
 
 		END

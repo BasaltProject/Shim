@@ -21,21 +21,21 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/heap/heap.h>
-#include "avian/heapwalk.h"
-#include "avian/common.h"
-#include "avian/machine.h"
-#include "avian/util.h"
-#include <avian/util/stream.h>
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/promise.h>
-#include "avian/target.h"
-#include <avian/tools/object-writer/tools.h>
-#include <avian/util/runtime-array.h>
-#include "avian/lzma.h"
+#include <shim/heap/heap.h>
+#include "shim/heapwalk.h"
+#include "shim/common.h"
+#include "shim/machine.h"
+#include "shim/util.h"
+#include <shim/util/stream.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/promise.h>
+#include "shim/target.h"
+#include <shim/tools/object-writer/tools.h>
+#include <shim/util/runtime-array.h>
+#include "shim/lzma.h"
 
-#include <avian/util/arg-parser.h>
-#include <avian/util/abort.h>
+#include <shim/util/arg-parser.h>
+#include <shim/util/abort.h>
 
 // since we aren't linking against libstdc++, we must implement this
 // ourselves:
@@ -45,9 +45,9 @@ extern "C" void __cxa_pure_virtual(void)
 }
 
 using namespace vm;
-using namespace avian::tools;
-using namespace avian::util;
-using namespace avian::codegen;
+using namespace shim::tools;
+using namespace shim::util;
+using namespace shim::codegen;
 
 namespace {
 
@@ -1935,21 +1935,21 @@ void writeBootImage2(Thread* t,
     // fwrite(code, pad(image->codeSize, TargetBytesPerWord), 1, codeOutput);
 
     Platform* platform = Platform::getPlatform(
-        PlatformInfo((PlatformInfo::Format)AVIAN_TARGET_FORMAT,
-                     (PlatformInfo::Architecture)AVIAN_TARGET_ARCH));
+        PlatformInfo((PlatformInfo::Format)SHIM_TARGET_FORMAT,
+                     (PlatformInfo::Architecture)SHIM_TARGET_ARCH));
 
     if (!platform) {
       fprintf(stderr,
               "unsupported platform: target-format = %d / target-arch = %d\n",
-              AVIAN_TARGET_FORMAT,
-              AVIAN_TARGET_ARCH);
+              SHIM_TARGET_FORMAT,
+              SHIM_TARGET_ARCH);
       abort();
     }
 
     uint8_t* bootimage;
     size_t bootimageLength;
     if (useLZMA) {
-#ifdef AVIAN_USE_LZMA
+#ifdef SHIM_USE_LZMA
       bootimage = encodeLZMA(t->m->system,
                              t->m->heap,
                              bootimageData.data,
@@ -2213,7 +2213,7 @@ int main(int ac, const char** av)
 
   System* s = makeSystem();
   Heap* h = makeHeap(s, HeapCapacity * 2);
-  Classpath* c = makeClasspath(s, h, AVIAN_JAVA_HOME, AVIAN_EMBED_PREFIX);
+  Classpath* c = makeClasspath(s, h, SHIM_JAVA_HOME, SHIM_EMBED_PREFIX);
   Finder* f = makeFinder(s, h, args.classpath, 0);
   Processor* p = makeProcessor(s, h, 0, false);
 
@@ -2222,8 +2222,8 @@ int main(int ac, const char** av)
 // in a branch instruction for the target architecture (~32MB on ARM).
 // When that limitation is removed, we'll be able to specify a
 // capacity as large as we like here:
-#if (AVIAN_TARGET_ARCH == AVIAN_ARCH_X86_64) \
-    || (AVIAN_TARGET_ARCH == AVIAN_ARCH_X86)
+#if (SHIM_TARGET_ARCH == SHIM_ARCH_X86_64) \
+    || (SHIM_TARGET_ARCH == SHIM_ARCH_X86)
   const unsigned CodeCapacity = 128 * 1024 * 1024;
 #else
   const unsigned CodeCapacity = 30 * 1024 * 1024;
@@ -2286,7 +2286,7 @@ int main(int ac, const char** av)
 
         JavaVMOption options[2];
         options[0].optionString = RUNTIME_ARRAY_BODY(classpathPropertyBuffer);
-        options[1].optionString = const_cast<char*>("-Davian.reentrant=true");
+        options[1].optionString = const_cast<char*>("-Dshim.reentrant=true");
 
         vmArgs.options = options;
 

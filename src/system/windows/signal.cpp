@@ -42,10 +42,10 @@
 
 #endif
 
-#include <avian/system/signal.h>
-#include <avian/common.h>
+#include <shim/system/signal.h>
+#include <shim/common.h>
 
-namespace avian {
+namespace shim {
 namespace system {
 
 namespace windows {
@@ -353,4 +353,4 @@ void SignalRegistrar::setCrashDumpDirectory(const char* crashDumpDirectory)
 }
 
 }  // namespace system
-}  // namespace avian
+}  // namespace shim

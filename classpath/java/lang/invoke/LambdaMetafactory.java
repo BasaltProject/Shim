@@ -23,11 +23,11 @@
 
 package java.lang.invoke;
 
-import static avian.Stream.write1;
-import static avian.Stream.write2;
-import static avian.Stream.write4;
-import static avian.Stream.set4;
-import static avian.Assembler.*;
+import static shim.Stream.write1;
+import static shim.Stream.write2;
+import static shim.Stream.write4;
+import static shim.Stream.set4;
+import static shim.Assembler.*;
 
 import java.lang.reflect.Proxy;
 import java.lang.reflect.InvocationHandler;
@@ -42,11 +42,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.io.IOException;
 
-import avian.Classes;
-import avian.ConstantPool;
-import avian.Assembler;
-import avian.ConstantPool.PoolEntry;
-import avian.SystemClassLoader;
+import shim.Classes;
+import shim.ConstantPool;
+import shim.Assembler;
+import shim.ConstantPool.PoolEntry;
+import shim.SystemClassLoader;
 
 // To understand what this is all about, please read:
 //
@@ -378,7 +378,7 @@ public class LambdaMetafactory {
 
   private static void writeMethodReference(OutputStream out,
                                            List<PoolEntry> pool,
-                                           avian.VMMethod method)
+                                           shim.VMMethod method)
     throws IOException
   {
     write2(out, ConstantPool.addMethodRef
@@ -393,7 +393,7 @@ public class LambdaMetafactory {
 
   private static void writeInterfaceMethodReference(OutputStream out,
                                                     List<PoolEntry> pool,
-                                                    avian.VMMethod method)
+                                                    shim.VMMethod method)
     throws IOException
   {
     write2(out, ConstantPool.addInterfaceMethodRef
@@ -511,8 +511,8 @@ public class LambdaMetafactory {
       return new CallSite
               (new MethodHandle
                       (MethodHandle.REF_invokeStatic, invokedType.loader, Classes.toVMMethod
-                              (avian.SystemClassLoader.getClass
-                                      (avian.Classes.defineVMClass
+                              (shim.SystemClassLoader.getClass
+                                      (shim.Classes.defineVMClass
                                               (invokedType.loader, classData, 0, classData.length))
                                       .getMethod("make", invokedType.parameterArray()))));
     } catch (NoSuchMethodException e) {
@@ -573,7 +573,7 @@ public class LambdaMetafactory {
     // interface is handled specially and the use of markers is extremely rare. Adding
     // support would be easy though.
     if ((flags & FLAG_MARKERS) != 0)
-      throw new UnsupportedOperationException("Marker interfaces on lambdas are not supported on Avian yet. Sorry.");
+      throw new UnsupportedOperationException("Marker interfaces on lambdas are not supported on Basalt Shim yet. Sorry.");
 
     // In some cases there is a mismatch between what the JVM type system supports and
     // what the Java language supports. In other cases the type of a lambda expression
@@ -595,7 +595,7 @@ public class LambdaMetafactory {
     if ((flags & FLAG_BRIDGES) != 0) {
       int bridgeCount = (Integer) args[4];
       if (bridgeCount > 0)
-        throw new UnsupportedOperationException("A lambda that requires bridge methods was used, this is not yet supported by Avian. Sorry.");
+        throw new UnsupportedOperationException("A lambda that requires bridge methods was used, this is not yet supported by Basalt Shim. Sorry.");
     }
 
     // TODO: This is not necessary if the function type interface is already inheriting

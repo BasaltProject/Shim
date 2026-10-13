@@ -11,7 +11,7 @@
 
 # proguard include file (http://proguard.sourceforge.net)
 
-# Enums have methods and members that are called reflectively in both Avian and OpenJDK.
+# Enums have methods and members that are called reflectively in both Basalt Shim and OpenJDK.
 -keepclassmembers enum * {
     **[] $VALUES;
     public *;
@@ -44,18 +44,18 @@
 -keepclassmembers class java.lang.reflect.Constructor { !static <fields>; }
 -keepclassmembers class java.lang.reflect.AccessibleObject { !static <fields>; }
 -keepclassmembers class sun.reflect.ConstantPool { !static <fields>; }
--keepclassmembers class avian.VMClass { !static <fields>; }
--keepclassmembers class avian.VMMethod { !static <fields>; }
--keepclassmembers class avian.VMField { !static <fields>; }
--keepclassmembers class avian.ClassAddendum { !static <fields>; }
--keepclassmembers class avian.MethodAddendum { !static <fields>; }
--keepclassmembers class avian.FieldAddendum { !static <fields>; }
--keepclassmembers class avian.Continuations$Continuation { !static <fields>; }
--keepclassmembers class avian.Continuations$UnwindResult { !static <fields>; }
+-keepclassmembers class shim.VMClass { !static <fields>; }
+-keepclassmembers class shim.VMMethod { !static <fields>; }
+-keepclassmembers class shim.VMField { !static <fields>; }
+-keepclassmembers class shim.ClassAddendum { !static <fields>; }
+-keepclassmembers class shim.MethodAddendum { !static <fields>; }
+-keepclassmembers class shim.FieldAddendum { !static <fields>; }
+-keepclassmembers class shim.Continuations$Continuation { !static <fields>; }
+-keepclassmembers class shim.Continuations$UnwindResult { !static <fields>; }
 
 # the VM may throw instances of the following:
 
--keep public class avian.IncompatibleContinuationException
+-keep public class shim.IncompatibleContinuationException
 -keep public class java.lang.Exception
 -keep public class java.lang.RuntimeException
 -keep public class java.lang.IllegalStateException
@@ -89,12 +89,12 @@
 
 # ClassLoader.getSystemClassloader() depends on the existence of this class:
 
--keep             class avian.SystemClassLoader
+-keep             class shim.SystemClassLoader
 
 # the VM references these classes by name, so protect them from obfuscation:
 
 -keepnames public class java.lang.**
--keepnames public class avian.**
+-keepnames public class shim.**
 
 # Don't optimize calls to ResourceBundle
 -keep,allowshrinking,allowobfuscation public class java.util.ResourceBundle {
@@ -116,18 +116,18 @@
 
 # when continuations are enabled, the VM may call these methods by name:
 
--keepclassmembers class avian.Continuations {
+-keepclassmembers class shim.Continuations {
    *** wind(...);
    *** rewind(...);
  }
 
--keepclassmembernames class avian.CallbackReceiver {
+-keepclassmembernames class shim.CallbackReceiver {
    *** receive(...);
  }
 
 # the above methods include these classes in their signatures:
 
--keepnames public class avian.Callback
+-keepnames public class shim.Callback
 -keepnames public class java.util.concurrent.Callable
 
 # Proguard gets confused about clone() and array classes (http://sourceforge.net/tracker/index.php?func=detail&aid=2851344&group_id=54750&atid=474704):
@@ -142,6 +142,6 @@
    public java.lang.Class loadClass(java.lang.String);
  }
 
- -keepclassmembers class avian.Classes {
-   public java.security.ProtectionDomain getProtectionDomain(avian.VMClass);
+ -keepclassmembers class shim.Classes {
+   public java.security.ProtectionDomain getProtectionDomain(shim.VMClass);
  }

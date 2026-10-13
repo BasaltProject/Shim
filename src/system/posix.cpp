@@ -62,18 +62,18 @@ typedef struct ucontext {
 #include "dirent.h"
 #include "sched.h"
 
-#include <avian/arch.h>
-#include <avian/append.h>
+#include <shim/arch.h>
+#include <shim/append.h>
 
-#include <avian/system/system.h>
-#include <avian/system/signal.h>
-#include <avian/system/memory.h>
-#include <avian/util/math.h>
+#include <shim/system/system.h>
+#include <shim/system/signal.h>
+#include <shim/system/memory.h>
+#include <shim/util/math.h>
 
 #define ACQUIRE(x) MutexResource MAKE_NAME(mutexResource_)(x)
 
 using namespace vm;
-using namespace avian::util;
+using namespace shim::util;
 
 namespace {
 
@@ -950,7 +950,7 @@ class MySystem : public System {
 
   virtual void abort()
   {
-    avian::system::crash();
+    shim::system::crash();
   }
 
   virtual void dispose()
@@ -1007,7 +1007,7 @@ void handleSignal(int signal, siginfo_t*, void* context)
 
 namespace vm {
 
-AVIAN_EXPORT System* makeSystem(bool reentrant)
+SHIM_EXPORT System* makeSystem(bool reentrant)
 {
   return new (malloc(sizeof(MySystem))) MySystem(reentrant);
 }

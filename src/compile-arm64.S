@@ -21,8 +21,8 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/types.h"
-#include "avian/target-fields.h"
+#include "shim/types.h"
+#include "shim/target-fields.h"
 
 .text
 
@@ -112,7 +112,7 @@ GLOBAL(vmInvoke_returnAddress):
 .align 2
 GLOBAL(vmInvoke_safeStack):
 
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
   // call the next continuation, if any
   ldr   x5, [x19,#TARGET_THREAD_CONTINUATION]
   cmp   x5, xzr
@@ -170,7 +170,7 @@ LOCAL(vmInvoke_handleException):
 LOCAL(vmInvoke_exit):
   str   xzr, [x19, #TARGET_THREAD_STACK]
 
-#endif // AVIAN_CONTINUATIONS
+#endif // SHIM_CONTINUATIONS
 
   // restore return type
   ldr   w5, [sp],#16
@@ -189,7 +189,7 @@ LOCAL(vmInvoke_return):
 .globl GLOBAL(vmJumpAndInvoke)
 .align 2
 GLOBAL(vmJumpAndInvoke):
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
    // x0: thread
    // x1: address
    // x2: stack
@@ -228,8 +228,8 @@ LOCAL(vmJumpAndInvoke_argumentTest):
 
    br    x1
 
-#else // not AVIAN_CONTINUATIONS
+#else // not SHIM_CONTINUATIONS
    // vmJumpAndInvoke should only be called when continuations are
    // enabled, so we force a crash if we reach here:
    brk 0
-#endif // not AVIAN_CONTINUATIONS
+#endif // not SHIM_CONTINUATIONS

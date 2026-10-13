@@ -23,13 +23,13 @@
 
 #include <stdio.h>
 
-#include "avian/common.h"
+#include "shim/common.h"
 
-#include <avian/util/arg-parser.h>
+#include <shim/util/arg-parser.h>
 
 #include "test-harness.h"
 
-using namespace avian::util;
+using namespace shim::util;
 
 TEST(ArgParser)
 {

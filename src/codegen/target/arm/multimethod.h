@@ -21,18 +21,18 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_ARM_MULTIMETHOD_H
-#define AVIAN_CODEGEN_ASSEMBLER_ARM_MULTIMETHOD_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_ARM_MULTIMETHOD_H
+#define SHIM_CODEGEN_ASSEMBLER_ARM_MULTIMETHOD_H
 
-#include <avian/codegen/lir.h>
-#include <avian/codegen/assembler.h>
+#include <shim/codegen/lir.h>
+#include <shim/codegen/assembler.h>
 
 #define CAST1(x) reinterpret_cast<UnaryOperationType>(x)
 #define CAST2(x) reinterpret_cast<BinaryOperationType>(x)
 #define CAST3(x) reinterpret_cast<TernaryOperationType>(x)
 #define CAST_BRANCH(x) reinterpret_cast<BranchOperationType>(x)
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace arm {
 
@@ -53,6 +53,6 @@ void populateTables(ArchitectureContext* con);
 
 }  // namespace arm
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_ARM_MULTIMETHOD_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_ARM_MULTIMETHOD_H

@@ -21,7 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/lzma-util.h"
+#include "shim/lzma-util.h"
 #include "C/LzmaEnc.h"
 
 using namespace vm;
@@ -38,7 +38,7 @@ SRes myProgress(void*, UInt64, UInt64)
 namespace vm {
 
 uint8_t* encodeLZMA(System* s,
-                    avian::util::Alloc* a,
+                    shim::util::Alloc* a,
                     uint8_t* in,
                     size_t inSize,
                     size_t* outSize)

@@ -21,20 +21,20 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/system/system.h>
-#include <avian/util/string.h>
-#include <avian/util/runtime-array.h>
-#include <avian/util/list.h>
-#include <avian/util/hash.h>
-#include <avian/util/tokenizer.h>
+#include <shim/system/system.h>
+#include <shim/util/string.h>
+#include <shim/util/runtime-array.h>
+#include <shim/util/list.h>
+#include <shim/util/hash.h>
+#include <shim/util/tokenizer.h>
 
-#include "avian/zlib-custom.h"
-#include "avian/finder.h"
-#include "avian/lzma.h"
-#include "avian/append.h"
+#include "shim/zlib-custom.h"
+#include "shim/finder.h"
+#include "shim/lzma.h"
+#include "shim/append.h"
 
 using namespace vm;
-using namespace avian::util;
+using namespace shim::util;
 
 namespace {
 
@@ -650,7 +650,7 @@ class BuiltinElement : public JarElement {
           if (data) {
             bool freePointer;
             if (lzma) {
-#ifdef AVIAN_USE_LZMA
+#ifdef SHIM_USE_LZMA
               size_t outSize;
               data = decodeLZMA(s, allocator, data, size, &outSize);
               size = outSize;
@@ -679,7 +679,7 @@ class BuiltinElement : public JarElement {
 
   virtual const char* urlPrefix()
   {
-    return "avianvmresource:";
+    return "shimvmresource:";
   }
 
   virtual const char* sourceUrl()
@@ -1098,7 +1098,7 @@ class MyFinder : public Finder {
 
 namespace vm {
 
-AVIAN_EXPORT Finder* makeFinder(System* s,
+SHIM_EXPORT Finder* makeFinder(System* s,
                                 Alloc* a,
                                 const char* path,
                                 const char* bootLibrary)

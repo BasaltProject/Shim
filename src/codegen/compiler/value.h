@@ -21,13 +21,13 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_VALUE_H
-#define AVIAN_CODEGEN_COMPILER_VALUE_H
+#ifndef SHIM_CODEGEN_COMPILER_VALUE_H
+#define SHIM_CODEGEN_COMPILER_VALUE_H
 
-#include <avian/codegen/lir.h>
-#include <avian/codegen/compiler.h>
+#include <shim/codegen/lir.h>
+#include <shim/codegen/compiler.h>
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -92,6 +92,6 @@ Value* value(Context* c, ir::Type type, Site* site = 0, Site* target = 0);
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_VALUE_H
+#endif  // SHIM_CODEGEN_COMPILER_VALUE_H

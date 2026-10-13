@@ -11,16 +11,16 @@
  * SPDX-License-Identifier: ISC AND MIT
  */
 
-#include "avian/machine.h"
+#include "shim/machine.h"
 
 using namespace vm;
 
-extern "C" AVIAN_EXPORT jint JNICALL net_JNI_OnLoad(JavaVM*, void*)
+extern "C" SHIM_EXPORT jint JNICALL net_JNI_OnLoad(JavaVM*, void*)
 {
   return 0;
 }
 
-extern "C" AVIAN_EXPORT jint JNICALL management_JNI_OnLoad(JavaVM*, void*)
+extern "C" SHIM_EXPORT jint JNICALL management_JNI_OnLoad(JavaVM*, void*)
 {
   return 0;
 }

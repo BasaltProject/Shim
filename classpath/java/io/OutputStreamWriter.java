@@ -23,7 +23,7 @@
 
 package java.io;
 
-import avian.Utf8;
+import shim.Utf8;
 
 public class OutputStreamWriter extends Writer {
   private final OutputStream out;

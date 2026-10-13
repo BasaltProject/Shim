@@ -21,18 +21,18 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_X86_ENCODE_H
-#define AVIAN_CODEGEN_ASSEMBLER_X86_ENCODE_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_X86_ENCODE_H
+#define SHIM_CODEGEN_ASSEMBLER_X86_ENCODE_H
 
 #include <stdint.h>
 
-#include "avian/common.h"
+#include "shim/common.h"
 
-#include <avian/codegen/lir.h>
+#include <shim/codegen/lir.h>
 
 #include "registers.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -142,6 +142,6 @@ void moveCR2(Context* c,
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_X86_ENCODE_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_X86_ENCODE_H

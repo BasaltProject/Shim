@@ -21,15 +21,15 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_SITE_H
-#define AVIAN_CODEGEN_COMPILER_SITE_H
+#ifndef SHIM_CODEGEN_COMPILER_SITE_H
+#define SHIM_CODEGEN_COMPILER_SITE_H
 
-#include <avian/codegen/architecture.h>
+#include <shim/codegen/architecture.h>
 
 #include "codegen/compiler/value.h"
 #include "codegen/compiler/context.h"
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -379,6 +379,6 @@ MemorySite* frameSite(Context* c, int frameIndex);
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_SITE_H
+#endif  // SHIM_CODEGEN_COMPILER_SITE_H

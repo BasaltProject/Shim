@@ -12,7 +12,7 @@
 
 if (MSVC)
   #todo: support mingw compiler
-  add_library(avian_system windows.cpp windows/crash.cpp)
+  add_library(shim_system windows.cpp windows/crash.cpp)
 else()
-  add_library(avian_system posix.cpp posix/crash.cpp)
+  add_library(shim_system posix.cpp posix/crash.cpp)
 endif()

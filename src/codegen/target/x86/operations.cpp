@@ -21,15 +21,15 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
-#include "avian/alloc-vector.h"
-#include "avian/util/allocator.h"
-#include "avian/zone.h"
+#include "shim/target.h"
+#include "shim/alloc-vector.h"
+#include "shim/util/allocator.h"
+#include "shim/zone.h"
 
-#include <avian/util/abort.h>
+#include <shim/util/abort.h>
 
-#include <avian/codegen/assembler.h>
-#include <avian/codegen/promise.h>
+#include <shim/codegen/assembler.h>
+#include <shim/codegen/promise.h>
 
 #include "context.h"
 #include "encode.h"
@@ -39,9 +39,9 @@
 #include "padding.h"
 #include "fixup.h"
 
-using namespace avian::util;
+using namespace shim::util;
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -1769,4 +1769,4 @@ void absoluteRR(Context* c,
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

@@ -373,7 +373,7 @@ public class LinkedList<T> extends AbstractSequentialList<T> implements Deque<T>
 
   @Override
   public String toString() {
-    return avian.Data.toString(this);
+    return shim.Data.toString(this);
   }
 
   @Override

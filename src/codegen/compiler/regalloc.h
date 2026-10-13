@@ -21,15 +21,15 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_COMPILER_REGALLOC_H
-#define AVIAN_CODEGEN_COMPILER_REGALLOC_H
+#ifndef SHIM_CODEGEN_COMPILER_REGALLOC_H
+#define SHIM_CODEGEN_COMPILER_REGALLOC_H
 
-#include "avian/common.h"
+#include "shim/common.h"
 
-#include <avian/codegen/lir.h>
-#include <avian/codegen/registers.h>
+#include <shim/codegen/lir.h>
+#include <shim/codegen/registers.h>
 
-namespace avian {
+namespace shim {
 
 namespace util {
 class Aborter;
@@ -38,7 +38,7 @@ class Aborter;
 namespace codegen {
 namespace compiler {
 
-using namespace avian::util;
+using namespace shim::util;
 
 class Context;
 class Value;
@@ -137,6 +137,6 @@ Target pickTarget(Context* c,
 
 }  // namespace regalloc
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_COMPILER_REGALLOC_H
+#endif  // SHIM_CODEGEN_COMPILER_REGALLOC_H

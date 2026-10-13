@@ -21,12 +21,12 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_CODEGEN_ASSEMBLER_X86_DETECT_H
-#define AVIAN_CODEGEN_ASSEMBLER_X86_DETECT_H
+#ifndef SHIM_CODEGEN_ASSEMBLER_X86_DETECT_H
+#define SHIM_CODEGEN_ASSEMBLER_X86_DETECT_H
 
-#include <avian/codegen/assembler.h>
+#include <shim/codegen/assembler.h>
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -36,6 +36,6 @@ bool useSSE(ArchitectureContext* c);
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_CODEGEN_ASSEMBLER_X86_DETECT_H
+#endif  // SHIM_CODEGEN_ASSEMBLER_X86_DETECT_H

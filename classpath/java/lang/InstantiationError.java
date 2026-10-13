@@ -24,7 +24,7 @@
 package java.lang;
 
 /**
- * TODO : current Avian runtime doesn't check, need to be implemented.
+ * TODO : current Basalt Shim runtime doesn't check, need to be implemented.
  *
  */
 public class InstantiationError extends IncompatibleClassChangeError {

@@ -27,7 +27,7 @@ import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.Iterator;
 
-import avian.Atomic;
+import shim.Atomic;
 
 public class ConcurrentLinkedQueue<T> extends AbstractQueue<T> {
   private static final long QueueHead;

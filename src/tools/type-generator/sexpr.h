@@ -21,10 +21,10 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#ifndef AVIAN_TOOLS_TYPE_GENERATOR_SEXPR_H
-#define AVIAN_TOOLS_TYPE_GENERATOR_SEXPR_H
+#ifndef SHIM_TOOLS_TYPE_GENERATOR_SEXPR_H
+#define SHIM_TOOLS_TYPE_GENERATOR_SEXPR_H
 
-namespace avian {
+namespace shim {
 namespace tools {
 namespace typegenerator {
 
@@ -119,6 +119,6 @@ class List {
 
 }  // namespace typegenerator
 }  // namespace tools
-}  // namespace avian
+}  // namespace shim
 
-#endif  // AVIAN_TOOLS_TYPE_GENERATOR_SEXPR_H
+#endif  // SHIM_TOOLS_TYPE_GENERATOR_SEXPR_H

@@ -22,7 +22,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
+#include "shim/target.h"
 
 #include "context.h"
 
@@ -58,7 +58,7 @@ static int __get_cpuid(unsigned int __level,
 
 #endif  // ndef __arm__
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace x86 {
 
@@ -93,4 +93,4 @@ bool useSSE(ArchitectureContext* c)
 
 }  // namespace x86
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

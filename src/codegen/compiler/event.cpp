@@ -21,9 +21,9 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/target.h"
-#include <avian/util/runtime-array.h>
-#include <avian/util/math.h>
+#include "shim/target.h"
+#include <shim/util/runtime-array.h>
+#include <shim/util/math.h>
 
 #include "codegen/compiler/context.h"
 #include "codegen/compiler/event.h"
@@ -34,9 +34,9 @@
 #include "codegen/compiler/frame.h"
 #include "codegen/compiler/ir.h"
 
-using namespace avian::util;
+using namespace shim::util;
 
-namespace avian {
+namespace shim {
 namespace codegen {
 namespace compiler {
 
@@ -385,7 +385,7 @@ class CallEvent : public Event {
         popIndex(0),
         stackArgumentIndex(0),
         flags(flags),
-        stackArgumentFootprint(callingConvention == ir::CallingConvention::Avian
+        stackArgumentFootprint(callingConvention == ir::CallingConvention::Shim
                                    ? arguments.count
                                    : 0)
   {
@@ -467,7 +467,7 @@ class CallEvent : public Event {
 
     Stack* stack = stackBefore;
 
-    if (callingConvention == ir::CallingConvention::Avian) {
+    if (callingConvention == ir::CallingConvention::Shim) {
       for (size_t i = 0; i < arguments.count; i++) {
         stack = stack->next;
       }
@@ -2203,4 +2203,4 @@ void appendDummy(Context* c)
 
 }  // namespace compiler
 }  // namespace codegen
-}  // namespace avian
+}  // namespace shim

@@ -23,7 +23,7 @@
 
 package java.util;
 
-import avian.Data;
+import shim.Data;
 
 public class Collections {
 

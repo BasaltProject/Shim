@@ -26,10 +26,10 @@
 #include "string.h"
 #include "jni.h"
 
-#include <avian/system/system.h>
-#include "avian/finder.h"
+#include <shim/system/system.h>
+#include "shim/finder.h"
 
-#include <avian/util/runtime-array.h>
+#include <shim/util/runtime-array.h>
 
 #if (defined __MINGW32__) || (defined _MSC_VER)
 #define PATH_SEPARATOR ';'
@@ -75,7 +75,7 @@ const char* mainClass(const char* jar)
 
   System* system = makeSystem();
 
-  class MyAllocator : public avian::util::Alloc {
+  class MyAllocator : public shim::util::Alloc {
    public:
     MyAllocator(System* s) : s(s)
     {
@@ -177,7 +177,7 @@ int main(int ac, const char** av)
     } else if (strcmp(av[i], "-client") == 0 or strcmp(av[i], "-server") == 0) {
       // ignore
     } else if (strcmp(av[i], "-version") == 0) {
-      fprintf(stderr, "Avian " AVIAN_VERSION "\n");
+      fprintf(stderr, "Basalt Shim " SHIM_VERSION "\n");
       exit(0);
     } else {
       if (jar == 0) {
@@ -221,20 +221,20 @@ int main(int ac, const char** av)
 
 #ifdef BOOT_IMAGE
   vmArgs.options[optionIndex++].optionString
-      = const_cast<char*>("-Davian.bootimage=bootimageBin");
+      = const_cast<char*>("-Dshim.bootimage=bootimageBin");
 
   vmArgs.options[optionIndex++].optionString
-      = const_cast<char*>("-Davian.codeimage=codeimageBin");
+      = const_cast<char*>("-Dshim.codeimage=codeimageBin");
 #endif
 
 #ifdef BOOT_LIBRARY
   vmArgs.options[optionIndex++].optionString
-      = const_cast<char*>("-Davian.bootstrap=" BOOT_LIBRARY);
+      = const_cast<char*>("-Dshim.bootstrap=" BOOT_LIBRARY);
 #endif
 
 #ifdef BOOT_BUILTINS
   vmArgs.options[optionIndex++].optionString
-      = const_cast<char*>("-Davian.builtins=" BOOT_BUILTINS);
+      = const_cast<char*>("-Dshim.builtins=" BOOT_BUILTINS);
 #endif
 
 #define CLASSPATH_PROPERTY "-Djava.class.path="

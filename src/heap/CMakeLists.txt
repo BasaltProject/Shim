@@ -10,4 +10,4 @@
 # SPDX-License-Identifier: ISC AND MIT
 
 
-add_library(avian_heap heap.cpp)
+add_library(shim_heap heap.cpp)

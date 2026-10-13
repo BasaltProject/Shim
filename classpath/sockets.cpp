@@ -23,12 +23,12 @@
 
 /*
  * This file implements a simple cross-platform JNI sockets API
- * It is used from different classes of the default Avian classpath
+ * It is used from different classes of the default Basalt Shim classpath
  */
 
 #include "sockets.h"
 
-namespace avian {
+namespace shim {
 namespace classpath {
 namespace sockets {
 

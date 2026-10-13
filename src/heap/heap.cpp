@@ -21,15 +21,15 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/heap/heap.h>
-#include <avian/system/system.h>
-#include "avian/common.h"
-#include "avian/arch.h"
+#include <shim/heap/heap.h>
+#include <shim/system/system.h>
+#include "shim/common.h"
+#include "shim/arch.h"
 
-#include <avian/util/math.h>
+#include <shim/util/math.h>
 
 using namespace vm;
-using namespace avian::util;
+using namespace shim::util;
 
 namespace {
 

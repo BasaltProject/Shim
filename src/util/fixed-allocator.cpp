@@ -21,11 +21,11 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include <avian/util/fixed-allocator.h>
+#include <shim/util/fixed-allocator.h>
 
-#include <avian/common.h>
+#include <shim/common.h>
 
-namespace avian {
+namespace shim {
 namespace util {
 
 FixedAllocator::FixedAllocator(Aborter* a, Slice<uint8_t> memory)
@@ -64,4 +64,4 @@ void FixedAllocator::free(const void* p, size_t size)
 }
 
 }  // namespace util
-}  // namespace avian
+}  // namespace shim

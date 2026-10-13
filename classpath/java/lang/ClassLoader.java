@@ -124,8 +124,8 @@ public abstract class ClassLoader {
       throw new IndexOutOfBoundsException();
     }
 
-    return avian.SystemClassLoader.getClass
-      (avian.Classes.defineVMClass(this, b, offset, length));
+    return shim.SystemClassLoader.getClass
+      (shim.Classes.defineVMClass(this, b, offset, length));
   }
 
   protected Class defineClass(String name, byte[] b, int offset, int length,
@@ -174,7 +174,7 @@ public abstract class ClassLoader {
   }
 
   protected void resolveClass(Class c) {
-    avian.Classes.link(c.vmClass, this);
+    shim.Classes.link(c.vmClass, this);
   }
 
   public final ClassLoader getParent() {

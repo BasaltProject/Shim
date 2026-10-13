@@ -35,11 +35,11 @@
 #undef max
 #undef min
 
-#include "avian/arch.h"
-#include <avian/system/system.h>
-#include <avian/system/signal.h>
-#include <avian/util/runtime-array.h>
-#include <avian/append.h>
+#include "shim/arch.h"
+#include <shim/system/system.h>
+#include <shim/system/signal.h>
+#include <shim/util/runtime-array.h>
+#include <shim/append.h>
 
 #if defined(WINAPI_FAMILY)
 
@@ -908,7 +908,7 @@ class MySystem : public System {
     return SO_SUFFIX;
   }
 
-  virtual const char* toAbsolutePath(avian::util::AllocOnly* allocator,
+  virtual const char* toAbsolutePath(shim::util::AllocOnly* allocator,
                                      const char* name)
   {
 #if !defined(WINAPI_FAMILY) || WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
@@ -1017,7 +1017,7 @@ class MySystem : public System {
 
   virtual void abort()
   {
-    avian::system::crash();
+    shim::system::crash();
   }
 
   virtual void dispose()
@@ -1038,7 +1038,7 @@ class MySystem : public System {
 
 namespace vm {
 
-AVIAN_EXPORT System* makeSystem(bool reentrant)
+SHIM_EXPORT System* makeSystem(bool reentrant)
 {
   return new (malloc(sizeof(MySystem))) MySystem(reentrant);
 }

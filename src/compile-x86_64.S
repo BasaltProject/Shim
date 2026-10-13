@@ -21,8 +21,8 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#include "avian/types.h"
-#include "avian/target-fields.h"
+#include "shim/types.h"
+#include "shim/target-fields.h"
 
 #define LOCAL(x) .L##x
 
@@ -37,7 +37,7 @@
 
 #ifdef __x86_64__
 
-#ifdef AVIAN_USE_FRAME_POINTER
+#ifdef SHIM_USE_FRAME_POINTER
 #  define ALIGNMENT_ADJUSTMENT 0
 #else
 #  define ALIGNMENT_ADJUSTMENT 8
@@ -113,9 +113,9 @@ GLOBAL(vmInvoke_returnAddress):
 .globl GLOBAL(vmInvoke_safeStack)
 GLOBAL(vmInvoke_safeStack):
 
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
 #  include "continuations-x86.S"
-#endif // AVIAN_CONTINUATIONS
+#endif // SHIM_CONTINUATIONS
 
    // restore callee-saved registers
    movq   0(%rsp),%rbx
@@ -134,7 +134,7 @@ GLOBAL(vmInvoke_safeStack):
       
 .globl GLOBAL(vmJumpAndInvoke)
 GLOBAL(vmJumpAndInvoke):
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
    //     %rcx: thread
    //     %rdx: address
    //     %r8 : stack
@@ -172,11 +172,11 @@ LOCAL(vmJumpAndInvoke_argumentTest):
    movq   %r8,%rsp
    
    jmp    *%rdx
-#else // not AVIAN_CONTINUATIONS
+#else // not SHIM_CONTINUATIONS
    // vmJumpAndInvoke should only be called when continuations are
    // enabled
    int3
-#endif // not AVIAN_CONTINUATIONS
+#endif // not SHIM_CONTINUATIONS
 
 #else // not __MINGW32__ || __CYGWIN32__
 
@@ -245,9 +245,9 @@ GLOBAL(vmInvoke_returnAddress):
 .globl GLOBAL(vmInvoke_safeStack)
 GLOBAL(vmInvoke_safeStack):
 
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
 #  include "continuations-x86.S"
-#endif // AVIAN_CONTINUATIONS
+#endif // SHIM_CONTINUATIONS
 
    // restore callee-saved registers
    movq   0(%rsp),%rbx
@@ -264,7 +264,7 @@ GLOBAL(vmInvoke_safeStack):
    
 .globl GLOBAL(vmJumpAndInvoke)
 GLOBAL(vmJumpAndInvoke):
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
    //    %rdi: thread
    //    %rsi: address
    //    %rdx: stack
@@ -300,17 +300,17 @@ LOCAL(vmJumpAndInvoke_argumentTest):
    movq   %rdx,%rsp
    
    jmp    *%rsi
-#else // not AVIAN_CONTINUATIONS
+#else // not SHIM_CONTINUATIONS
    // vmJumpAndInvoke should only be called when continuations are
    // enabled
    int3
-#endif // not AVIAN_CONTINUATIONS
+#endif // not SHIM_CONTINUATIONS
 
 #endif // not __MINGW32__ || __CYGWIN32__
    
 #elif defined __i386__
 
-#ifdef AVIAN_USE_FRAME_POINTER
+#ifdef SHIM_USE_FRAME_POINTER
 #  define ALIGNMENT_ADJUSTMENT 0
 #else
 #  define ALIGNMENT_ADJUSTMENT 12
@@ -380,9 +380,9 @@ GLOBAL(vmInvoke_returnAddress):
 .globl GLOBAL(vmInvoke_safeStack)
 GLOBAL(vmInvoke_safeStack):
 
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
 #  include "continuations-x86.S"
-#endif // AVIAN_CONTINUATIONS
+#endif // SHIM_CONTINUATIONS
    
    // restore callee-saved registers
    movl   0(%esp),%ebx
@@ -403,7 +403,7 @@ LOCAL(getPC):
    
 .globl GLOBAL(vmJumpAndInvoke)
 GLOBAL(vmJumpAndInvoke):
-#ifdef AVIAN_CONTINUATIONS
+#ifdef SHIM_CONTINUATIONS
    //  4(%esp): thread
    //  8(%esp): address
    // 12(%esp): stack
@@ -457,11 +457,11 @@ LOCAL(vmJumpAndInvoke_argumentTest):
    movl   %ecx,%esp
 
    jmp    *%esi
-#else // not AVIAN_CONTINUATIONS
+#else // not SHIM_CONTINUATIONS
    // vmJumpAndInvoke should only be called when continuations are
    // enabled
    int3
-#endif // AVIAN_CONTINUATIONS
+#endif // SHIM_CONTINUATIONS
    
 #else
 #error unsupported architecture

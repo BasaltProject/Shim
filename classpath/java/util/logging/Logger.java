@@ -152,7 +152,7 @@ public class Logger {
     return logger.getLevel();
   }
       
-  private void log(Level level, avian.VMMethod caller, String message,
+  private void log(Level level, shim.VMMethod caller, String message,
                    Throwable exception) {
     
     if (level.intValue() < getEffectiveLevel().intValue()) {

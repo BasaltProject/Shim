@@ -33,7 +33,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.Writer;
 
-import avian.FormatString;
+import shim.FormatString;
 
 public class Formatter implements Closeable, Flushable, AutoCloseable {
 

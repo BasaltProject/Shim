@@ -77,7 +77,7 @@ public class Constructor<T> extends AccessibleObject implements Member {
     return method.getDeclaredAnnotations();
   }
 
-  private static native Object make(avian.VMClass c);
+  private static native Object make(shim.VMClass c);
 
   public T newInstance(Object ... arguments)
     throws InvocationTargetException, InstantiationException,

@@ -9,4 +9,4 @@
 #
 # SPDX-License-Identifier: ISC AND MIT
 
-add_library(avian_util arg-parser.cpp fixed-allocator.cpp)
+add_library(shim_util arg-parser.cpp fixed-allocator.cpp)
