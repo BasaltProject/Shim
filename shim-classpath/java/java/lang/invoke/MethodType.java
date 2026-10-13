@@ -29,6 +29,7 @@ import shim.Assembler;
 import shim.Classes;
 import shim.SystemClassLoader;
 import shim.VMClass;
+import shim.Utf8;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -52,8 +53,7 @@ public final class MethodType implements java.io.Serializable {
 
   MethodType(String spec) {
     this.loader = SystemClassLoader.appLoader();
-    this.spec = new byte[spec.length() + 1];
-    spec.getBytes(0, spec.length(), this.spec, 0);
+    this.spec = descriptorBytes(spec);
   }
 
   public String toMethodDescriptorString() {
@@ -119,8 +119,7 @@ public final class MethodType implements java.io.Serializable {
     result = new Result(spec, rtype, type(spec).return_);
 
     String descriptor = sb.toString();
-    this.spec = new byte[descriptor.length() + 1];
-    descriptor.getBytes(0, descriptor.length(), this.spec, 0);
+    this.spec = descriptorBytes(descriptor);
   }
 
   public static MethodType methodType(Class rtype) {
@@ -355,76 +354,97 @@ public final class MethodType implements java.io.Serializable {
     return array;
   }
 
+  private static byte[] descriptorBytes(String descriptor) {
+    byte[] encoded = Utf8.encode(descriptor.toCharArray(), 0, descriptor.length());
+    byte[] terminated = new byte[encoded.length + 1];
+    System.arraycopy(encoded, 0, terminated, 0, encoded.length);
+    return terminated;
+  }
+
+  public static MethodType fromMethodDescriptorString(String descriptor, ClassLoader loader) {
+    if (descriptor == null) throw new NullPointerException();
+    MethodType result = new MethodType(loader == null ? ClassLoader.getSystemClassLoader() : loader,
+                                       descriptorBytes(descriptor));
+    result.parameters(); // Resolve component types without initializing them.
+    return result;
+  }
+
+  private static int descriptorEnd(String descriptor, int start, boolean allowVoid) {
+    if (start >= descriptor.length()) throw new IllegalArgumentException("Missing descriptor type");
+    int index = start;
+    while (index < descriptor.length() && descriptor.charAt(index) == '[') ++index;
+    if (index - start > 255 || index == descriptor.length()) {
+      throw new IllegalArgumentException("Invalid array descriptor");
+    }
+    char code = descriptor.charAt(index);
+    if (code == 'L') {
+      int end = descriptor.indexOf(';', index + 1);
+      if (end < 0) throw new IllegalArgumentException("Invalid class descriptor");
+      for (int i = index + 1; i < end; ++i) {
+        char c = descriptor.charAt(i);
+        if (c == '.' || c == '[' || c == '\u0000') {
+          throw new IllegalArgumentException("Invalid class name");
+        }
+      }
+      return end + 1;
+    }
+    if ("ZBCSIFJD".indexOf(code) >= 0 || (code == 'V' && allowVoid && index == start)) {
+      return index + 1;
+    }
+    throw new IllegalArgumentException("Invalid descriptor type");
+  }
+
+  private static Class descriptorClass(String descriptor, ClassLoader loader) {
+    if (descriptor.length() == 1) {
+      return SystemClassLoader.getClass(Classes.primitiveClass(descriptor.charAt(0)));
+    }
+    String name = descriptor.charAt(0) == 'L'
+        ? descriptor.substring(1, descriptor.length() - 1) : descriptor;
+    name = name.replace('/', '.');
+    try {
+      return Class.forName(name, false, loader);
+    } catch (ClassNotFoundException error) {
+      throw new TypeNotPresentException(name, error);
+    }
+  }
+
   public Iterable<Parameter> parameters() {
     if (parameters == null) {
-      List<Parameter> list = new ArrayList();
-      int i;
-      int index = 0;
-      int position = 0;
-      for (i = 1; spec[i] != ')'; ++i) {
-        int start = i;
-        switch (spec[i]) {
-        case 'L': {
-          ++ i;
-          while (spec[i] != ';') ++ i;
-        } break;
-
-        case '[': {
-          ++ i;
-          while (spec[i] == '[') ++ i;
-
-          switch (spec[i]) {
-          case 'L':
-            ++ i;
-            while (spec[i] != ';') ++ i;
-            break;
-
-          default:
-            break;
-          }
-        } break;
-
-        case 'Z':
-        case 'B':
-        case 'S':
-        case 'C':
-        case 'I':
-        case 'F':
-        case 'J':
-        case 'D':
-          break;
-
-        default: throw new AssertionError();
-        }
-
-        String paramSpec = Classes.makeString(spec, start, (i - start) + 1);
-        Type type = type(paramSpec);
-
-        list.add(new Parameter
-                 (index,
-                  position,
-                  paramSpec,
-                  Classes.forCanonicalName(loader, paramSpec),
-                  type.load));
-
-        ++ index;
-        position += type.size;
+      String descriptor = toMethodDescriptorString();
+      if (descriptor.length() < 3 || descriptor.charAt(0) != '(') {
+        throw new IllegalArgumentException("Invalid method descriptor");
       }
-
+      // Validate the entire grammar before loading any component class.
+      int index = 1;
+      int slots = 0;
+      while (index < descriptor.length() && descriptor.charAt(index) != ')') {
+        int end = descriptorEnd(descriptor, index, false);
+        slots += type(descriptor.substring(index, end)).size;
+        if (slots > 255) throw new IllegalArgumentException("too many parameter slots");
+        index = end;
+      }
+      if (index >= descriptor.length() || descriptorEnd(descriptor, index + 1, true) != descriptor.length()) {
+        throw new IllegalArgumentException("Invalid method return descriptor");
+      }
+      int returnStart = index + 1;
+      List<Parameter> list = new ArrayList<Parameter>();
+      index = 1;
+      int position = 0;
+      while (index < returnStart - 1) {
+        int end = descriptorEnd(descriptor, index, false);
+        String component = descriptor.substring(index, end);
+        Type kind = type(component);
+        list.add(new Parameter(list.size(), position, component,
+                               descriptorClass(component, loader), kind.load));
+        position += kind.size;
+        index = end;
+      }
+      String component = descriptor.substring(returnStart);
+      Result parsedResult = new Result(component, descriptorClass(component, loader), type(component).return_);
       footprint = position;
-
-      ++ i;
-
-      String paramSpec = Classes.makeString(spec, i, spec.length - i - 1);
-      Type type = type(paramSpec);
-
-      result = new Result(paramSpec,
-                          Classes.forCanonicalName(loader, paramSpec),
-                          type.return_);
-
-      parameters = list;
+      result = parsedResult;
+      parameters = Collections.unmodifiableList(list);
     }
-
     return parameters;
   }
 
