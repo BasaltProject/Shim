@@ -42,6 +42,8 @@ def generate(directory, major):
         invocation = add(18, u2(0) + u2(add(12, u2(utf("call")) + u2(method_descriptor))))
         interface = ref("java/lang/Runnable", "run", "()V", 11)
         array = class_("[[I")
+        deep_array = class_("[" * 255 + "Ljava/lang/Object;")
+        near_limit_array = class_("[" * 254 + "Ljava/lang/Object;")
         wide_interface = ref("java/util/function/LongUnaryOperator", "applyAsLong", "(J)J", 11)
         array_interface = ref("java/util/function/Consumer", "accept", "(Ljava/lang/Object;)V", 11)
         table = b"\x03\xaa\x00\x00" + i4(23) + i4(0) + i4(1) + i4(23) + i4(23) + b"\xb1"
@@ -55,6 +57,14 @@ def generate(directory, major):
             "ValidDynamicLong": b"\x14" + u2(dynamic_long) + b"\x58\xb1",
             "ValidTable": table,
             "ValidLookup": lookup,
+            "ValidMultiFull": b"\x03\x03\xc5" + u2(array) + b"\x02\x57\xb1",
+            "ValidArrayLimit": b"\x03\xbd" + u2(near_limit_array) + b"\x57\xb1",
+            "ValidNewObject": b"\xbb" + u2(super_) + b"\x57\xb1",
+            "ValidMultiPartial": b"\x03\xc5" + u2(array) + b"\x01\x57\xb1",
+            "MultiExcess": b"\x03\x03\x03\xc5" + u2(array) + b"\x03\x57\xb1",
+            "MultiScalar": b"\x03\xc5" + u2(super_) + b"\x01\x57\xb1",
+            "NewArrayClass": b"\xbb" + u2(array) + b"\x57\xb1",
+            "ArrayDimensionLimit": b"\x03\xbd" + u2(deep_array) + b"\x57\xb1",
             "ValidInterface": b"\x01\xb9" + u2(interface) + b"\x01\x00\xb1",
             "ValidWideInterface": b"\x01\x09\xb9" + u2(wide_interface) + b"\x03\x00\x58\xb1",
             "ValidReferenceInterface": b"\x01\x01\xb9" + u2(array_interface) + b"\x02\x00\xb1",
@@ -124,7 +134,7 @@ def generate(directory, major):
             payload = u2(1) + b"\x42\x07" + u2(class_("java/lang/Throwable"))
             attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
         locals_ = 2 if case == "ValidLocals" else (1 if case == "WideLocalStride" else 0)
-        body = struct.pack(">HHI", 3 if case in ("ValidWideInterface", "WideInterfaceCount") else 2, locals_, len(code)) + code + u2(bool(handlers)) + handlers + u2(bool(attributes)) + attributes
+        body = struct.pack(">HHI", 3 if case in ("ValidWideInterface", "WideInterfaceCount", "MultiExcess") else 2, locals_, len(code)) + code + u2(bool(handlers)) + handlers + u2(bool(attributes)) + attributes
         method = struct.pack(">HHHHHI", 0x0009, method_name, method_descriptor, 1, code_name, len(body)) + body
         bootstrap_name = utf("BootstrapMethods")
         bootstrap_body = u2(1) + u2(handle) + u2(0)
@@ -134,12 +144,12 @@ def generate(directory, major):
         data += u2(1) + u2(bootstrap_name) + struct.pack(">I", len(bootstrap_body)) + bootstrap_body
         (directory / (name + ".class")).write_bytes(data)
 
-    controls = ("ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong", "ValidTable", "ValidLookup", "ValidLocals", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface")
+    controls = ("ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong", "ValidTable", "ValidLookup", "ValidLocals", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface", "ValidMultiFull", "ValidMultiPartial", "ValidArrayLimit", "ValidNewObject")
     invalid = ("LdcLong", "LdcWideDouble", "Ldc2Int", "Ldc2String", "LdcUtf", "LdcZero", "LdcOutside", "LdcReserved",
                "DynamicNarrowLong", "DynamicWideInt", "TruncatedLdc", "TruncatedWide", "IllegalWide", "ReservedOpcode",
                "BranchOperand", "BranchOutside", "TruncatedSwitch", "NegativePairs", "InvalidRange", "UnsortedKeys",
                "DynamicReserved", "WrongFieldRef", "WrongClassRef", "BadArrayType", "ZeroDimensions", "InterfaceReserved",
-               "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "InterfaceCount", "WideInterfaceCount", "EmptyCode", "OversizeCode")
+               "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "InterfaceCount", "WideInterfaceCount", "MultiExcess", "MultiScalar", "NewArrayClass", "ArrayDimensionLimit", "EmptyCode", "OversizeCode")
     handlers = ("ValidHandler", "ValidHandlerEnd", "HandlerEmpty", "HandlerReverse", "HandlerEndOutside",
                 "HandlerTargetOutside", "HandlerCatchOutside", "HandlerCatchTag", "HandlerStartOperand",
                 "HandlerEndOperand", "HandlerTargetOperand")
