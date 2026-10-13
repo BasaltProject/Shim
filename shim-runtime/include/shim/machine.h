@@ -2716,6 +2716,11 @@ inline GcMethod* findInterfaceMethod(Thread* t,
     resolveSystemClass(t, roots(t)->bootLoader(), class_->name());
   }
 
+  // Interface method resolution can select a public method from Object.
+  if ((method->class_()->flags() & ACC_INTERFACE) == 0) {
+    return findVirtualMethod(t, method, class_);
+  }
+
   GcClass* interface = method->class_();
   GcArray* itable = cast<GcArray>(t, class_->interfaceTable());
   for (unsigned i = 0; i < itable->length(); i += 2) {
