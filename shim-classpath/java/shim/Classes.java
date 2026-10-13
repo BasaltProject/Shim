@@ -304,7 +304,7 @@ public class Classes {
     throws ClassNotFoundException
   {
     if (loader == null) {
-      loader = Class.class.getClassLoader();
+      loader = SystemClassLoader.bootLoader();
     }
     Class c = loader.loadClass(name.replace('/', '.'));
     VMClass vmc = SystemClassLoader.vmClass(c);

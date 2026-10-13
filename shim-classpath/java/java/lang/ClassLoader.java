@@ -40,7 +40,7 @@ public abstract class ClassLoader {
 
   protected ClassLoader(ClassLoader parent) {
     if (parent == null) {
-      this.parent = Class.class.getClassLoader();
+      this.parent = shim.SystemClassLoader.bootLoader();
     } else {
       this.parent = parent;
     }
@@ -176,7 +176,7 @@ public abstract class ClassLoader {
   }
 
   public final ClassLoader getParent() {
-    return parent;
+    return parent == shim.SystemClassLoader.bootLoader() ? null : parent;
   }
 
   protected URL findResource(String path) {

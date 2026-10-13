@@ -35,6 +35,8 @@ import java.util.NoSuchElementException;
 public class SystemClassLoader extends ClassLoader {
   public static native ClassLoader appLoader();
 
+  public static native ClassLoader bootLoader();
+
   private native VMClass findVMClass(String name)
     throws ClassNotFoundException;
 
