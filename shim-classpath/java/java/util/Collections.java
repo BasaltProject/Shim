@@ -368,6 +368,19 @@ public class Collections {
       this.list = list;
     }
 
+    public boolean equals(Object other) {
+      if (other == this) return true;
+      synchronized (lock) {
+        return list.equals(other);
+      }
+    }
+
+    public int hashCode() {
+      synchronized (lock) {
+        return list.hashCode();
+      }
+    }
+
     @Override
     public T get(int index) {
       synchronized (lock) {
@@ -533,6 +546,14 @@ public class Collections {
 
     UnmodifiableList(List<T> l) {
       this.inner = l;
+    }
+
+    public boolean equals(Object other) {
+      return other == this || inner.equals(other);
+    }
+
+    public int hashCode() {
+      return inner.hashCode();
     }
 
     public T get(int index) {
