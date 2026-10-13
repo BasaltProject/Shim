@@ -1300,6 +1300,7 @@ vm-sources = \
 	$(runtime-src)/finder.cpp \
 	$(runtime-src)/machine.cpp \
 	$(runtime-src)/bootstrap.cpp \
+	$(runtime-src)/verify.cpp \
 	$(runtime-src)/util.cpp \
 	$(heap-src)/heap.cpp \
 	$(runtime-src)/$(process).cpp \

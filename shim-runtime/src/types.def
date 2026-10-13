@@ -264,6 +264,8 @@
 
 (type linkageError java/lang/LinkageError)
 
+(type verifyError java/lang/VerifyError)
+
 (type classFormatError java/lang/ClassFormatError)
 
 (type bootstrapMethodError java/lang/BootstrapMethodError)
