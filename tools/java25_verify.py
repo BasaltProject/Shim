@@ -87,14 +87,37 @@ def generate(directory, major):
             "EmptyCode": b"",
             "OversizeCode": b"\x00" * 65535 + b"\xb1",
         }
-        code = variants[case]
+        handler_cases = {
+            "ValidHandler": (0, 2, 2, 0),
+            "ValidHandlerEnd": (0, 4, 2, 0),
+            "HandlerEmpty": (0, 0, 2, 0),
+            "HandlerReverse": (2, 1, 2, 0),
+            "HandlerEndOutside": (0, 5, 2, 0),
+            "HandlerTargetOutside": (0, 2, 4, 0),
+            "HandlerCatchOutside": (0, 2, 2, 65535),
+            "HandlerCatchTag": (0, 2, 2, raw),
+            "HandlerStartOperand": (1, 2, 2, 0),
+            "HandlerEndOperand": (0, 1, 2, 0),
+            "HandlerTargetOperand": (0, 2, 1, 0),
+        }
+        handlers = b""
+        if case in handler_cases:
+            code = b"\x01\xbf\x57\xb1"
+            if case in ("HandlerStartOperand", "HandlerEndOperand", "HandlerTargetOperand"):
+                code = b"\x10\x00\x57\xb1"
+            handlers = struct.pack(">HHHH", *handler_cases[case])
+        else:
+            code = variants[case]
         attributes = b""
         if case in ("ValidTable", "ValidLookup", "UnsortedKeys"):
             position = 24 if case == "ValidTable" else 28
             payload = u2(1) + bytes([position])
             attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
+        if handlers:
+            payload = u2(1) + b"\x42\x07" + u2(class_("java/lang/Throwable"))
+            attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
         locals_ = 2 if case == "ValidLocals" else (1 if case == "WideLocalStride" else 0)
-        body = struct.pack(">HHI", 2, locals_, len(code)) + code + u2(0) + u2(bool(attributes)) + attributes
+        body = struct.pack(">HHI", 2, locals_, len(code)) + code + u2(bool(handlers)) + handlers + u2(bool(attributes)) + attributes
         method = struct.pack(">HHHHHI", 0x0009, method_name, method_descriptor, 1, code_name, len(body)) + body
         bootstrap_name = utf("BootstrapMethods")
         bootstrap_body = u2(1) + u2(handle) + u2(0)
@@ -110,5 +133,8 @@ def generate(directory, major):
                "BranchOperand", "BranchOutside", "TruncatedSwitch", "NegativePairs", "InvalidRange", "UnsortedKeys",
                "DynamicReserved", "WrongFieldRef", "WrongClassRef", "BadArrayType", "ZeroDimensions", "InterfaceReserved",
                "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "EmptyCode", "OversizeCode")
-    for case in controls + invalid:
+    handlers = ("ValidHandler", "ValidHandlerEnd", "HandlerEmpty", "HandlerReverse", "HandlerEndOutside",
+                "HandlerTargetOutside", "HandlerCatchOutside", "HandlerCatchTag", "HandlerStartOperand",
+                "HandlerEndOperand", "HandlerTargetOperand")
+    for case in controls + invalid + handlers:
         build("Verify" + case, case)

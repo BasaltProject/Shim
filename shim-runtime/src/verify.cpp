@@ -164,6 +164,17 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags)
     for (unsigned pc = 0; pc < code->length();) {
         pc = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts));
     }
+    GcExceptionHandlerTable* handlers = cast<GcExceptionHandlerTable>(t, code->exceptionHandlerTable());
+    if (handlers) {
+        for (unsigned i = 0; i < handlers->length(); ++i) {
+            uint64_t entry = handlers->body()[i];
+            if (!RUNTIME_ARRAY_BODY(starts)[exceptionHandlerStart(entry)]
+                || (exceptionHandlerEnd(entry) != code->length() && !RUNTIME_ARRAY_BODY(starts)[exceptionHandlerEnd(entry)])
+                || !RUNTIME_ARRAY_BODY(starts)[exceptionHandlerIp(entry)]) {
+                throwNew(t, GcClassFormatError::Type, "Exception handler offset is not an instruction boundary");
+            }
+        }
+    }
 }
 
 } // namespace vm

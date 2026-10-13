@@ -17,7 +17,7 @@ public class BytecodeValidation {
 
     public static void main(String[] args) throws Exception {
         String[] controls = {"ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong",
-                "ValidTable", "ValidLookup", "ValidLocals"};
+                "ValidTable", "ValidLookup", "ValidLocals", "ValidHandler", "ValidHandlerEnd"};
         for (String name : controls) {
             Class.forName("Verify" + name);
             System.out.println("valid " + name);
@@ -33,6 +33,11 @@ public class BytecodeValidation {
         for (String name : new String[] {"EmptyCode", "OversizeCode"}) {
             try { Class.forName("Verify" + name); throw new AssertionError(name); }
             catch (ClassFormatError expected) { System.out.println("format " + name); }
+        }
+        for (String name : new String[] {"HandlerEmpty", "HandlerReverse", "HandlerEndOutside", "HandlerTargetOutside",
+                "HandlerCatchOutside", "HandlerCatchTag", "HandlerStartOperand", "HandlerEndOperand", "HandlerTargetOperand"}) {
+            try { Class.forName("Verify" + name); throw new AssertionError(name); }
+            catch (LinkageError expected) { System.out.println(name + " " + expected.getClass().getSimpleName()); }
         }
         System.out.println(bootstraps);
     }
