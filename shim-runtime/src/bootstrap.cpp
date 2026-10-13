@@ -94,7 +94,7 @@ object resolveLoadableConstant(Thread* t, GcClassLoader* loader, GcSingleton* po
     return value;
 }
 
-GcCallSite* resolveDynamic(Thread* t, GcInvocation* invocation)
+static GcCallSite* linkDynamic(Thread* t, GcInvocation* invocation)
 {
     PROTECT(t, invocation);
     GcClass* caller = invocation->class_();
@@ -167,6 +167,51 @@ GcCallSite* resolveDynamic(Thread* t, GcInvocation* invocation)
     if (!cast<GcInt>(t, matches)->value()) {
         throwNew(t, GcBootstrapMethodError::Type, "CallSite target type does not match invocation type");
     }
+    return site;
+}
+
+namespace {
+
+uint64_t runLinkDynamic(Thread* t, uintptr_t* arguments)
+{
+    return reinterpret_cast<uintptr_t>(linkDynamic(t,
+        reinterpret_cast<GcInvocation*>(arguments[0])));
+}
+
+} // namespace
+
+GcCallSite* resolveDynamic(Thread* t, GcInvocation* invocation)
+{
+    PROTECT(t, invocation);
+    {
+        ACQUIRE(t, t->m->classLock);
+        if (invocation->site()) return invocation->site();
+        if (invocation->failure()) throw_(t, invocation->failure());
+    }
+
+    uintptr_t arguments[] = {reinterpret_cast<uintptr_t>(invocation)};
+    GcCallSite* site = reinterpret_cast<GcCallSite*>(runRaw(t, runLinkDynamic, arguments));
+    PROTECT(t, site);
+    GcThrowable* failure = t->exception;
+    t->exception = 0;
+    PROTECT(t, failure);
+    if (failure && !instanceOf(t, type(t, GcError::Type), failure)) {
+        failure = makeThrowable(t, GcBootstrapMethodError::Type, 0, 0, failure);
+    }
+
+    // Bootstrap execution may race, but only one result is installed. Do not
+    // hold the class lock while running arbitrary Java bootstrap code.
+    ACQUIRE(t, t->m->classLock);
+    if (invocation->site()) return invocation->site();
+    if (invocation->failure()) throw_(t, invocation->failure());
+    if (failure) {
+        invocation->setFailure(t, failure);
+        storeStoreMemoryBarrier();
+        throw_(t, failure);
+    }
+    site->setInvocation(t, invocation);
+    invocation->setSite(t, site);
+    storeStoreMemoryBarrier();
     return site;
 }
 
