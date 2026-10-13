@@ -2382,7 +2382,7 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool)
             length);
   }
 
-  GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
+  GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
   s.read(code->body().begin(), length);
   PROTECT(t, code);
 
@@ -3475,7 +3475,7 @@ void boot(Thread* t)
   m->processor->boot(t, 0, 0);
 
   {
-    GcCode* bootCode = makeCode(t, 0, 0, 0, 0, 0, 0, 0, 0, 1);
+    GcCode* bootCode = makeCode(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
     bootCode->body()[0] = impdep1;
     object bootMethod
         = makeMethod(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, bootCode);

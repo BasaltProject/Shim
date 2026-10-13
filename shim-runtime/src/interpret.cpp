@@ -1999,7 +1999,7 @@ loop:
 
     ip += 2;
 
-    GcInvocation* invocation = cast<GcInvocation>(t, singletonObject(t, code->pool(), index - 1));
+    GcInvocation* invocation = dynamicInvocation(t, frameMethod(t, frame), code, index - 1, ip - 5);
 
     GcCallSite* site = invocation->site();
 

@@ -162,6 +162,26 @@ public class LoadableConstants {
         System.out.println(errorFailures);
         System.out.println(nullFailures);
         System.out.println(checkedFailures);
+        int beforeShared = bootstrapCalls;
+        System.out.println(constant(data, "sharedFirstCall"));
+        System.out.println(constant(data, "sharedSecondCall"));
+        System.out.println(bootstrapCalls - beforeShared);
+        beforeShared = bootstrapCalls;
+        System.out.println(constant(data, "twoSharedCalls"));
+        System.out.println(bootstrapCalls - beforeShared);
+        beforeShared = bootstrapCalls;
+        System.out.println(constant(data, "twoSharedCalls"));
+        System.out.println(bootstrapCalls - beforeShared);
+        int beforeAlias = bootstrapCalls;
+        for (int i = 0; i < 2; ++i) {
+            try {
+                constant(data, "mismatchAliasCall");
+                throw new AssertionError();
+            } catch (InvocationTargetException expected) {
+                System.out.println(expected.getCause() instanceof BootstrapMethodError);
+            }
+        }
+        System.out.println(bootstrapCalls - beforeAlias);
         checkConcurrent(data, "concurrentCall", false);
         checkConcurrent(data, "failConcurrentCall", true);
         int attempts = concurrentFailures.get();

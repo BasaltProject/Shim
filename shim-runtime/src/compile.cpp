@@ -5139,9 +5139,8 @@ loop:
       uint16_t poolIndex = codeReadInt16(t, code, ip);
       ip += 2;
 
-      GcInvocation* invocation = cast<GcInvocation>(
-          t,
-          singletonObject(t, context->method->code()->pool(), poolIndex - 1));
+      GcInvocation* invocation = dynamicInvocation(t, context->method,
+          context->method->code(), poolIndex - 1, ip - 5);
 
       PROTECT(t, invocation);
 
@@ -7280,6 +7279,7 @@ void finish(MyThread* t, FixedAllocator* allocator, Context* context)
 
     code = makeCode(t,
                     0,
+                    code->dynamicSites(),
                     0,
                     newExceptionHandlerTable,
                     newLineNumberTable,
