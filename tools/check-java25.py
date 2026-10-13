@@ -8,6 +8,7 @@
 
 import argparse
 import os
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -21,6 +22,31 @@ def run(command):
     return subprocess.run(command, capture_output=True, text=True, timeout=30)
 
 
+def constant_pool_offsets(data):
+    count = struct.unpack_from(">H", data, 8)[0]
+    index, position = 1, 10
+    entries = {}
+    while index < count:
+        tag = data[position]
+        entries[index] = (tag, position)
+        position += 1
+        if tag == 1:
+            position += 2 + struct.unpack_from(">H", data, position)[0]
+        elif tag in (5, 6):
+            position += 8
+            index += 1
+        elif tag in (3, 4, 9, 10, 11, 12, 17, 18):
+            position += 4
+        elif tag == 15:
+            position += 3
+        elif tag in (7, 8, 16, 19, 20):
+            position += 2
+        else:
+            raise RuntimeError("Unexpected fixture constant pool tag")
+        index += 1
+    return entries
+
+
 def check_versions(java, runtimes, directory):
     original = (directory / "ClassFileValidation.class").read_bytes()
     variants = [
@@ -32,6 +58,12 @@ def check_versions(java, runtimes, directory):
         ("legacy-minor", 52, 1, None),
         ("bad-magic", 69, 0, "ClassFormatError"),
         ("truncated", 69, 0, "ClassFormatError"),
+        ("truncated-pool", 69, 0, "ClassFormatError"),
+        ("bad-pool-size", 69, 0, "ClassFormatError"),
+        ("bad-pool-tag", 69, 0, "ClassFormatError"),
+        ("long-without-slot", 69, 0, "ClassFormatError"),
+        ("cyclic-class", 69, 0, "ClassFormatError"),
+        ("wrong-reference-tag", 69, 0, "ClassFormatError"),
     ]
     failures = 0
     for name, major, minor, error in variants:
@@ -43,6 +75,22 @@ def check_versions(java, runtimes, directory):
             data[0] = 0
         elif name == "truncated":
             data = data[:7]
+        elif name == "truncated-pool":
+            data = data[:12]
+        elif name == "bad-pool-size":
+            struct.pack_into(">H", data, 8, 0)
+        elif name == "bad-pool-tag":
+            data[10] = 0
+        elif name == "long-without-slot":
+            struct.pack_into(">H", data, 8, 2)
+            data[10] = 5
+        elif name in ("cyclic-class", "wrong-reference-tag"):
+            entries = constant_pool_offsets(data)
+            class_index = next(index for index, (tag, _) in entries.items() if tag == 7)
+            position = entries[class_index][1]
+            target = class_index if name == "cyclic-class" else next(
+                index for index, (tag, _) in entries.items() if tag == 10)
+            struct.pack_into(">H", data, position + 1, target)
         (output / "ClassFileValidation.class").write_bytes(data)
         reference = run([java, "-cp", str(output), "ClassFileValidation"])
         if error:
@@ -85,6 +133,9 @@ def main():
     failures = 0
     for release in args.release or [8, 17, 21, 25]:
         for source in fixtures:
+            minimum = re.search(r"Minimum release:\s*(\d+)", source.read_text())
+            if minimum and release < int(minimum.group(1)):
+                continue
             output = ROOT / "build/java25-tests" / str(release) / source.stem
             if output.exists():
                 shutil.rmtree(output)

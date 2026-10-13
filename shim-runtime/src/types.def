@@ -99,6 +99,7 @@
   (int32_t index)
   (class class)
   (singleton pool)
+  (byteArray poolTags)
   (method template)
   (field array bootstrapMethodTable)
   (callSite site))
@@ -258,6 +259,8 @@
 (type linkageError java/lang/LinkageError)
 
 (type classFormatError java/lang/ClassFormatError)
+
+(type bootstrapMethodError java/lang/BootstrapMethodError)
 
 (type unsupportedClassVersionError java/lang/UnsupportedClassVersionError)
 

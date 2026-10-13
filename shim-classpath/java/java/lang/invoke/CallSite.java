@@ -23,10 +23,23 @@
 
 package java.lang.invoke;
 
-public class CallSite {
+public abstract class CallSite {
   private final MethodHandle target;
 
-  CallSite(MethodHandle target) {
+  protected CallSite(MethodHandle target) {
+    if (target == null) {
+      throw new NullPointerException();
+    }
     this.target = target;
   }
+
+  protected final MethodHandle target() {
+    return target;
+  }
+
+  public abstract MethodHandle getTarget();
+
+  public abstract void setTarget(MethodHandle target);
+
+  public abstract MethodHandle dynamicInvoker();
 }
