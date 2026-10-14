@@ -27,6 +27,7 @@
 #include "stdio.h"
 #include "jni.h"
 #include "jni-util.h"
+#include "floating-format.h"
 #include "errno.h"
 #include "fcntl.h"
 #include "ctype.h"
@@ -1255,9 +1256,37 @@ extern "C" JNIEXPORT jint JNICALL
                                                jbyteArray buffer,
                                                jint bufferSize)
 {
-  jboolean isCopy;
-  jbyte* buf = e->GetByteArrayElements(buffer, &isCopy);
-  jint count = snprintf(reinterpret_cast<char*>(buf), bufferSize, "%g", val);
-  e->ReleaseByteArrayElements(buffer, buf, 0);
+  if (!buffer) {
+    e->ThrowNew(e->FindClass("java/lang/NullPointerException"), "Null decimal buffer");
+    return 0;
+  }
+  uint64_t bits;
+  memcpy(&bits, &val, sizeof(bits));
+  char text[40];
+  unsigned count = shim::decimal::format(bits, 52, 11, 1023, text);
+  if (bufferSize < 0 || unsigned(bufferSize) < count || e->GetArrayLength(buffer) < bufferSize) {
+    e->ThrowNew(e->FindClass("java/lang/IllegalArgumentException"), "Decimal buffer is too small");
+    return 0;
+  }
+  e->SetByteArrayRegion(buffer, 0, count, reinterpret_cast<const jbyte*>(text));
+  return count;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+    Java_java_lang_Float_fillBufferWithFloat(JNIEnv* e, jclass, jfloat value, jbyteArray buffer)
+{
+  uint32_t bits;
+  memcpy(&bits, &value, sizeof(bits));
+  char text[40];
+  unsigned count = shim::decimal::format(bits, 23, 8, 127, text);
+  if (!buffer) {
+    e->ThrowNew(e->FindClass("java/lang/NullPointerException"), "Null decimal buffer");
+    return 0;
+  }
+  if (e->GetArrayLength(buffer) < int(count)) {
+    e->ThrowNew(e->FindClass("java/lang/IllegalArgumentException"), "Decimal buffer is too small");
+    return 0;
+  }
+  e->SetByteArrayRegion(buffer, 0, count, reinterpret_cast<const jbyte*>(text));
   return count;
 }

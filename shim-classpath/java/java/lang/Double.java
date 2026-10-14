@@ -65,8 +65,8 @@ public final class Double extends Number {
   }
 
   public static String toString(double v) {
-    byte[] buffer = new byte[20];
-    int numChars = fillBufferWithDouble(v, buffer, 20);
+    byte[] buffer = new byte[32];
+    int numChars = fillBufferWithDouble(v, buffer, buffer.length);
     return new String(buffer, 0, numChars, false);
   }
 
