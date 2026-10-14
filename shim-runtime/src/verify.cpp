@@ -252,6 +252,53 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsi
             }
         }
     }
+    // Legacy subroutine return addresses need a separate flow model.
+    if (major < 51) return;
+    THREAD_RUNTIME_ARRAY(t, uint8_t, reached, code->length());
+    THREAD_RUNTIME_ARRAY(t, unsigned, pending, code->length());
+    memset(RUNTIME_ARRAY_BODY(reached), 0, code->length());
+    unsigned head = 0, tail = 0;
+    auto enqueue = [&](unsigned pc) {
+        require(t, pc < code->length(), "Execution falls outside Code array");
+        if (!RUNTIME_ARRAY_BODY(reached)[pc]) {
+            RUNTIME_ARRAY_BODY(reached)[pc] = 1;
+            RUNTIME_ARRAY_BODY(pending)[tail++] = pc;
+        }
+    };
+    enqueue(0);
+    while (head < tail) {
+        unsigned pc = RUNTIME_ARRAY_BODY(pending)[head++];
+        const uint8_t* bytes = code->body().begin();
+        unsigned opcode = bytes[pc];
+        unsigned next = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts), major);
+        if (handlers) {
+            for (unsigned i = 0; i < handlers->length(); ++i) {
+                uint64_t entry = handlers->body()[i];
+                if (pc >= exceptionHandlerStart(entry) && pc < exceptionHandlerEnd(entry)) {
+                    enqueue(exceptionHandlerIp(entry));
+                }
+            }
+        }
+        if ((opcode >= 153 && opcode <= 168) || opcode == 198 || opcode == 199) {
+            enqueue(pc + static_cast<int16_t>(word16(bytes + pc + 1)));
+        } else if (opcode == 200 || opcode == 201) {
+            enqueue(pc + word32(bytes + pc + 1));
+        } else if (opcode == 170 || opcode == 171) {
+            unsigned position = (pc + 4) & ~3u;
+            enqueue(pc + word32(bytes + position));
+            unsigned count = opcode == 170 ? word32(bytes + position + 8) - word32(bytes + position + 4) + 1
+                : word32(bytes + position + 4);
+            unsigned stride = opcode == 170 ? 4 : 8;
+            position += opcode == 170 ? 12 : 8;
+            for (unsigned i = 0; i < count; ++i) {
+                enqueue(pc + word32(bytes + position + i * stride + (opcode == 171 ? 4 : 0)));
+            }
+        }
+        bool terminal = opcode == 167 || opcode == 200 || opcode == 170 || opcode == 171
+            || (opcode >= 172 && opcode <= 177) || opcode == 191 || opcode == 169
+            || (opcode == 196 && bytes[pc + 1] == 169);
+        if (!terminal) enqueue(next);
+    }
 }
 
 } // namespace vm
