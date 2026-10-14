@@ -17,7 +17,7 @@ public class BytecodeValidation {
 
     public static void main(String[] args) throws Exception {
         String[] controls = {"ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong",
-                "ValidTable", "ValidLookup", "ValidLocals", "ValidHandler", "ValidHandlerEnd", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface", "ValidMultiFull", "ValidMultiPartial", "ValidArrayLimit", "ValidNewObject", "ValidStaticArguments", "ValidInstanceArguments", "ValidNativeMethod", "ValidAbstractMethod"};
+                "ValidTable", "ValidLookup", "ValidLocals", "ValidHandler", "ValidHandlerEnd", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface", "ValidMultiFull", "ValidMultiPartial", "ValidArrayLimit", "ValidNewObject", "ValidStaticArguments", "ValidInstanceArguments", "ValidNativeMethod", "ValidAbstractMethod", "HandleStatic52", "HandleSpecial52"};
         for (String name : controls) {
             Class.forName("Verify" + name);
             System.out.println("valid " + name);
@@ -43,7 +43,7 @@ public class BytecodeValidation {
                 "DescriptorNoReturn", "DescriptorReturn", "DescriptorTrailing", "DescriptorDotted", "DescriptorDimensions",
                 "DescriptorSlots", "DescriptorMethodType", "DescriptorReference", "ArgumentsStatic", "ArgumentsWide",
                 "ArgumentsReceiver", "ArgumentsInstance", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero", "HandleNewMethod", "HandleStaticInit",
-                "HandleVirtualInit", "HandleSpecialInit", "HandleStaticClinit"}) {
+                "HandleVirtualInit", "HandleSpecialInit", "HandleStaticClinit", "HandleStatic51", "HandleSpecial51"}) {
             try { Class.forName("Verify" + name); throw new AssertionError(name); }
             catch (ClassFormatError expected) { System.out.println("descriptor " + name); }
         }
