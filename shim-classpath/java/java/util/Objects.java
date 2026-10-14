@@ -93,6 +93,25 @@ public final class Objects {
       return value;
   }
 
+  public static boolean isNull(Object value) { return value == null; }
+
+  public static boolean nonNull(Object value) { return value != null; }
+
+  public static <T> T requireNonNull(T value, java.util.function.Supplier<String> messageSupplier) {
+    if (value == null) {
+      throw new NullPointerException(messageSupplier == null ? null : messageSupplier.get());
+    }
+    return value;
+  }
+
+  public static <T> T requireNonNullElse(T value, T defaultValue) {
+    return value != null ? value : requireNonNull(defaultValue, "defaultObj");
+  }
+
+  public static <T> T requireNonNullElseGet(T value, java.util.function.Supplier<? extends T> supplier) {
+    return value != null ? value : requireNonNull(requireNonNull(supplier, "supplier").get(), "supplier.get()");
+  }
+
   public static String toString(final Object value) {
     return String.valueOf(value);
   }

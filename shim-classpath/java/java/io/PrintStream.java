@@ -54,7 +54,7 @@ public class PrintStream extends OutputStream {
 
   public synchronized void print(String s) {
     try {
-      out.write(s.getBytes());
+      out.write((s == null ? "null" : s).getBytes());
       if (autoFlush) flush();
     } catch (IOException e) { }
   }
@@ -114,7 +114,7 @@ public class PrintStream extends OutputStream {
 
   public synchronized void println(String s) {
     try {
-      out.write(s.getBytes());    
+      out.write((s == null ? "null" : s).getBytes());
       out.write(Static.newline);
       if (autoFlush) flush();
     } catch (IOException e) { }
