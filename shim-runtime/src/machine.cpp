@@ -2614,7 +2614,11 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
           if (code || !needsCode) {
             throwNew(t, GcClassFormatError::Type, "Unexpected or duplicate Code attribute");
           }
+          unsigned codeStart = s.position();
           code = parseCode(t, s, pool, tags);
+          if (s.position() - codeStart != length) {
+            throwNew(t, GcClassFormatError::Type, "Incorrect Code attribute length");
+          }
           if (code->maxLocals() < argumentSlots) {
             throwNew(t, GcClassFormatError::Type, "Method arguments exceed max_locals");
           }

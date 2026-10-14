@@ -27,7 +27,7 @@ def generate(directory, major):
             signature = add(12, u2(utf(method)) + u2(utf(descriptor)))
             return add(tag, u2(owner_index) + u2(signature))
         this, super_ = class_(name), class_("java/lang/Object")
-        code_cases = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode")
+        code_cases = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
         bad_descriptors = {
             "DescriptorEmpty": "", "DescriptorVoidParameter": "(V)V", "DescriptorVoidArray": "([V)V",
             "DescriptorUnknown": "(Q)V", "DescriptorNoReturn": "()", "DescriptorReturn": "()Q",
@@ -158,7 +158,8 @@ def generate(directory, major):
         if case in code_cases:
             flags = 0x0109 if case in ("ValidNativeMethod", "NativeCode") else (0x0401 if case in ("ValidAbstractMethod", "AbstractCode") else 0x0009)
             count = 0 if case in ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode") else (2 if case == "DuplicateCode" else 1)
-            attribute = u2(code_name) + struct.pack(">I", len(body)) + body
+            declared = 0 if case == "CodeLengthZero" else len(body) + (-1 if case == "CodeLengthShort" else (1 if case == "CodeLengthLong" else 0))
+            attribute = u2(code_name) + struct.pack(">I", declared) + body
             method = struct.pack(">HHHH", flags, method_name, method_descriptor, count) + attribute * count
         bootstrap_name = utf("BootstrapMethods")
         bootstrap_body = u2(1) + u2(handle) + u2(0)
@@ -182,6 +183,6 @@ def generate(directory, major):
                    "DescriptorDimensions", "DescriptorSlots", "DescriptorMethodType", "DescriptorReference")
     arguments = ("ValidStaticArguments", "ValidInstanceArguments", "ArgumentsStatic", "ArgumentsWide",
                  "ArgumentsReceiver", "ArgumentsInstance")
-    code_attributes = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode")
+    code_attributes = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode", "CodeLengthShort", "CodeLengthLong", "CodeLengthZero")
     for case in controls + invalid + handlers + descriptors + arguments + code_attributes:
         build("Verify" + case, case)
