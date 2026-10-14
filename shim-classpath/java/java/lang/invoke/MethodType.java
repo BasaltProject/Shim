@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
 
-public final class MethodType implements java.io.Serializable {
+public final class MethodType implements java.io.Serializable, TypeDescriptor.OfMethod<Class<?>, MethodType> {
   private static final char[] Primitives = new char[] {
     'V', 'Z', 'B', 'C', 'S', 'I', 'F', 'J', 'D'
   };
