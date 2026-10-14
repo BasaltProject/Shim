@@ -2599,6 +2599,9 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
 
       addendum = 0;
       code = 0;
+      bool needsCode = !(flags & (ACC_NATIVE | ACC_ABSTRACT))
+          || vm::strcmp(reinterpret_cast<const int8_t*>("<clinit>"),
+                        cast<GcByteArray>(t, singletonObject(t, pool, name - 1))->body().begin()) == 0;
 
       unsigned attributeCount = s.read2();
       for (unsigned j = 0; j < attributeCount; ++j) {
@@ -2608,6 +2611,9 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
 
         if (vm::strcmp(reinterpret_cast<const int8_t*>("Code"),
                        attributeName->body().begin()) == 0) {
+          if (code || !needsCode) {
+            throwNew(t, GcClassFormatError::Type, "Unexpected or duplicate Code attribute");
+          }
           code = parseCode(t, s, pool, tags);
           if (code->maxLocals() < argumentSlots) {
             throwNew(t, GcClassFormatError::Type, "Method arguments exceed max_locals");
@@ -2666,6 +2672,10 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
         } else {
           s.skip(length);
         }
+      }
+
+      if (needsCode && !code) {
+        throwNew(t, GcClassFormatError::Type, "Missing Code attribute");
       }
 
       const char* specString = reinterpret_cast<const char*>(

@@ -27,6 +27,7 @@ def generate(directory, major):
             signature = add(12, u2(utf(method)) + u2(utf(descriptor)))
             return add(tag, u2(owner_index) + u2(signature))
         this, super_ = class_(name), class_("java/lang/Object")
+        code_cases = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode")
         bad_descriptors = {
             "DescriptorEmpty": "", "DescriptorVoidParameter": "(V)V", "DescriptorVoidArray": "([V)V",
             "DescriptorUnknown": "(Q)V", "DescriptorNoReturn": "()", "DescriptorReturn": "()Q",
@@ -141,7 +142,7 @@ def generate(directory, major):
                 code = b"\x10\x00\x57\xb1"
             handlers = struct.pack(">HHHH", *handler_cases[case])
         else:
-            code = b"\xb1" if case in bad_descriptors or case in ("DescriptorMethodType", "DescriptorReference") else variants[case]
+            code = b"\xb1" if case in code_cases or case in bad_descriptors or case in ("DescriptorMethodType", "DescriptorReference") else variants[case]
         attributes = b""
         if case in ("ValidTable", "ValidLookup", "UnsortedKeys"):
             position = 24 if case == "ValidTable" else 28
@@ -154,11 +155,16 @@ def generate(directory, major):
         if case in argument_cases: locals_ = argument_cases[case][1]
         body = struct.pack(">HHI", 3 if case in ("ValidWideInterface", "WideInterfaceCount", "MultiExcess") else 2, locals_, len(code)) + code + u2(bool(handlers)) + handlers + u2(bool(attributes)) + attributes
         method = struct.pack(">HHHHHI", argument_cases[case][2] if case in argument_cases else 0x0009, method_name, method_descriptor, 1, code_name, len(body)) + body
+        if case in code_cases:
+            flags = 0x0109 if case in ("ValidNativeMethod", "NativeCode") else (0x0401 if case in ("ValidAbstractMethod", "AbstractCode") else 0x0009)
+            count = 0 if case in ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode") else (2 if case == "DuplicateCode" else 1)
+            attribute = u2(code_name) + struct.pack(">I", len(body)) + body
+            method = struct.pack(">HHHH", flags, method_name, method_descriptor, count) + attribute * count
         bootstrap_name = utf("BootstrapMethods")
         bootstrap_body = u2(1) + u2(handle) + u2(0)
         data = struct.pack(">IHHH", 0xcafebabe, 0, major, len(entries) + 1)
         data += b"".join(entry for entry in entries if entry is not None)
-        data += struct.pack(">HHHHHH", 0x0021, this, super_, 0, 0, 1) + method
+        data += struct.pack(">HHHHHH", 0x0421 if case in ("ValidAbstractMethod", "AbstractCode") else 0x0021, this, super_, 0, 0, 1) + method
         data += u2(1) + u2(bootstrap_name) + struct.pack(">I", len(bootstrap_body)) + bootstrap_body
         (directory / (name + ".class")).write_bytes(data)
 
@@ -176,5 +182,6 @@ def generate(directory, major):
                    "DescriptorDimensions", "DescriptorSlots", "DescriptorMethodType", "DescriptorReference")
     arguments = ("ValidStaticArguments", "ValidInstanceArguments", "ArgumentsStatic", "ArgumentsWide",
                  "ArgumentsReceiver", "ArgumentsInstance")
-    for case in controls + invalid + handlers + descriptors + arguments:
+    code_attributes = ("ValidNativeMethod", "ValidAbstractMethod", "MissingCode", "DuplicateCode", "NativeCode", "AbstractCode")
+    for case in controls + invalid + handlers + descriptors + arguments + code_attributes:
         build("Verify" + case, case)
