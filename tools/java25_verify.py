@@ -67,6 +67,10 @@ def generate(directory, major):
         table = b"\x03\xaa\x00\x00" + i4(23) + i4(0) + i4(1) + i4(23) + i4(23) + b"\xb1"
         lookup = b"\x03\xab\x00\x00" + i4(27) + i4(2) + i4(1) + i4(27) + i4(2) + i4(27) + b"\xb1"
         variants = {
+            "ModernJsr": b"\xa8\x00\x04\xb1\x4b\xa9\x00",
+            "ModernJsrWide": b"\xc9\x00\x00\x00\x06\xb1\x4b\xa9\x00",
+            "ModernRet": b"\xa9\x00",
+            "ModernWideRet": b"\xc4\xa9\x00\x00",
             "ValidInt": b"\x12" + bytes([integer]) + b"\x57\xb1",
             "ValidLong": b"\x14" + u2(long_) + b"\x58\xb1",
             "ValidType": b"\x12" + bytes([method_type]) + b"\x57\xb1",
@@ -152,6 +156,7 @@ def generate(directory, major):
             payload = u2(1) + b"\x42\x07" + u2(class_("java/lang/Throwable"))
             attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
         locals_ = 2 if case == "ValidLocals" else (1 if case == "WideLocalStride" else 0)
+        if case.startswith("Modern"): locals_ = 1
         if case in argument_cases: locals_ = argument_cases[case][1]
         body = struct.pack(">HHI", 3 if case in ("ValidWideInterface", "WideInterfaceCount", "MultiExcess") else 2, locals_, len(code)) + code + u2(bool(handlers)) + handlers + u2(bool(attributes)) + attributes
         method = struct.pack(">HHHHHI", argument_cases[case][2] if case in argument_cases else 0x0009, method_name, method_descriptor, 1, code_name, len(body)) + body
@@ -174,7 +179,7 @@ def generate(directory, major):
                "DynamicNarrowLong", "DynamicWideInt", "TruncatedLdc", "TruncatedWide", "IllegalWide", "ReservedOpcode",
                "BranchOperand", "BranchOutside", "TruncatedSwitch", "NegativePairs", "InvalidRange", "UnsortedKeys",
                "DynamicReserved", "WrongFieldRef", "WrongClassRef", "BadArrayType", "ZeroDimensions", "InterfaceReserved",
-               "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "InterfaceCount", "WideInterfaceCount", "MultiExcess", "MultiScalar", "NewArrayClass", "ArrayDimensionLimit", "EmptyCode", "OversizeCode")
+               "LocalOutside", "ImplicitLocalOutside", "WideLocalOutside", "WideLocalStride", "InterfaceCount", "WideInterfaceCount", "MultiExcess", "MultiScalar", "NewArrayClass", "ArrayDimensionLimit", "EmptyCode", "OversizeCode", "ModernJsr", "ModernJsrWide", "ModernRet", "ModernWideRet")
     handlers = ("ValidHandler", "ValidHandlerEnd", "HandlerEmpty", "HandlerReverse", "HandlerEndOutside",
                 "HandlerTargetOutside", "HandlerCatchOutside", "HandlerCatchTag", "HandlerStartOperand",
                 "HandlerEndOperand", "HandlerTargetOperand")

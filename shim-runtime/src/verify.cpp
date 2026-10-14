@@ -218,7 +218,7 @@ unsigned validateMethodDescriptor(Thread* t, GcByteArray* descriptor, bool insta
     return slots;
 }
 
-void verifyCode(Thread* t, GcCode* code, GcByteArray* tags)
+void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major)
 {
     PROTECT(t, code);
     PROTECT(t, tags);
@@ -226,6 +226,10 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags)
     memset(RUNTIME_ARRAY_BODY(starts), 0, code->length());
     for (unsigned pc = 0; pc < code->length();) {
         RUNTIME_ARRAY_BODY(starts)[pc] = 1;
+        unsigned opcode = code->body()[pc];
+        require(t, major < 51 || (opcode != 168 && opcode != 169 && opcode != 201
+            && !(opcode == 196 && pc + 1 < code->length() && code->body()[pc + 1] == 169)),
+            "Subroutine instruction requires class file version below 51");
         pc = instruction(t, code, tags, pc, 0);
     }
     for (unsigned pc = 0; pc < code->length();) {
