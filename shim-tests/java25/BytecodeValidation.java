@@ -17,7 +17,7 @@ public class BytecodeValidation {
 
     public static void main(String[] args) throws Exception {
         String[] controls = {"ValidInt", "ValidLong", "ValidType", "ValidHandle", "ValidDynamicInt", "ValidDynamicLong",
-                "ValidTable", "ValidLookup", "ValidLocals", "ValidHandler", "ValidHandlerEnd", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface", "ValidMultiFull", "ValidMultiPartial", "ValidArrayLimit", "ValidNewObject"};
+                "ValidTable", "ValidLookup", "ValidLocals", "ValidHandler", "ValidHandlerEnd", "ValidInterface", "ValidWideInterface", "ValidReferenceInterface", "ValidMultiFull", "ValidMultiPartial", "ValidArrayLimit", "ValidNewObject", "ValidStaticArguments", "ValidInstanceArguments"};
         for (String name : controls) {
             Class.forName("Verify" + name);
             System.out.println("valid " + name);
@@ -41,7 +41,8 @@ public class BytecodeValidation {
         }
         for (String name : new String[] {"DescriptorEmpty", "DescriptorVoidParameter", "DescriptorVoidArray", "DescriptorUnknown",
                 "DescriptorNoReturn", "DescriptorReturn", "DescriptorTrailing", "DescriptorDotted", "DescriptorDimensions",
-                "DescriptorSlots", "DescriptorMethodType", "DescriptorReference"}) {
+                "DescriptorSlots", "DescriptorMethodType", "DescriptorReference", "ArgumentsStatic", "ArgumentsWide",
+                "ArgumentsReceiver", "ArgumentsInstance"}) {
             try { Class.forName("Verify" + name); throw new AssertionError(name); }
             catch (ClassFormatError expected) { System.out.println("descriptor " + name); }
         }

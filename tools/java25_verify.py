@@ -33,6 +33,15 @@ def generate(directory, major):
             "DescriptorTrailing": "()VI", "DescriptorDotted": "(Ljava.lang.String;)V",
             "DescriptorDimensions": "(" + "[" * 256 + "I)V", "DescriptorSlots": "(" + "J" * 128 + ")V",
         }
+        argument_cases = {
+            "ValidStaticArguments": ("(J[DLjava/lang/Object;)V", 4, 0x0009),
+            "ValidInstanceArguments": ("(D[J)V", 4, 0x0001),
+            "ArgumentsStatic": ("(I)V", 0, 0x0009),
+            "ArgumentsWide": ("(J)V", 1, 0x0009),
+            "ArgumentsReceiver": ("()V", 0, 0x0001),
+            "ArgumentsInstance": ("(D[J)V", 3, 0x0001),
+        }
+        if case in argument_cases: bad_descriptors[case] = argument_cases[case][0]
         code_name, method_name, method_descriptor = utf("Code"), utf("test"), utf(bad_descriptors.get(case, "()V"))
         integer = add(3, i4(7))
         long_ = add(5, struct.pack(">q", 42))
@@ -142,8 +151,9 @@ def generate(directory, major):
             payload = u2(1) + b"\x42\x07" + u2(class_("java/lang/Throwable"))
             attributes = u2(utf("StackMapTable")) + struct.pack(">I", len(payload)) + payload
         locals_ = 2 if case == "ValidLocals" else (1 if case == "WideLocalStride" else 0)
+        if case in argument_cases: locals_ = argument_cases[case][1]
         body = struct.pack(">HHI", 3 if case in ("ValidWideInterface", "WideInterfaceCount", "MultiExcess") else 2, locals_, len(code)) + code + u2(bool(handlers)) + handlers + u2(bool(attributes)) + attributes
-        method = struct.pack(">HHHHHI", 0x0009, method_name, method_descriptor, 1, code_name, len(body)) + body
+        method = struct.pack(">HHHHHI", argument_cases[case][2] if case in argument_cases else 0x0009, method_name, method_descriptor, 1, code_name, len(body)) + body
         bootstrap_name = utf("BootstrapMethods")
         bootstrap_body = u2(1) + u2(handle) + u2(0)
         data = struct.pack(">IHHH", 0xcafebabe, 0, major, len(entries) + 1)
@@ -164,5 +174,7 @@ def generate(directory, major):
     descriptors = ("DescriptorEmpty", "DescriptorVoidParameter", "DescriptorVoidArray", "DescriptorUnknown",
                    "DescriptorNoReturn", "DescriptorReturn", "DescriptorTrailing", "DescriptorDotted",
                    "DescriptorDimensions", "DescriptorSlots", "DescriptorMethodType", "DescriptorReference")
-    for case in controls + invalid + handlers + descriptors:
+    arguments = ("ValidStaticArguments", "ValidInstanceArguments", "ArgumentsStatic", "ArgumentsWide",
+                 "ArgumentsReceiver", "ArgumentsInstance")
+    for case in controls + invalid + handlers + descriptors + arguments:
         build("Verify" + case, case)
