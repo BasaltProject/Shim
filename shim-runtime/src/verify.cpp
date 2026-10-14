@@ -218,7 +218,7 @@ unsigned validateMethodDescriptor(Thread* t, GcByteArray* descriptor, bool insta
     return slots;
 }
 
-void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major)
+void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsigned returnKind)
 {
     PROTECT(t, code);
     PROTECT(t, tags);
@@ -227,6 +227,12 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major)
     for (unsigned pc = 0; pc < code->length();) {
         RUNTIME_ARRAY_BODY(starts)[pc] = 1;
         unsigned opcode = code->body()[pc];
+        if (opcode >= 172 && opcode <= 177) {
+            unsigned expected = returnKind == 'V' ? 177 : (returnKind == 'J' ? 173
+                : (returnKind == 'F' ? 174 : (returnKind == 'D' ? 175
+                : (returnKind == 'L' || returnKind == '[' ? 176 : 172))));
+            require(t, opcode == expected, "Return instruction does not match method descriptor");
+        }
         require(t, major < 51 || (opcode != 168 && opcode != 169 && opcode != 201
             && !(opcode == 196 && pc + 1 < code->length() && code->body()[pc + 1] == 169)),
             "Subroutine instruction requires class file version below 51");

@@ -2405,7 +2405,7 @@ void disassembleCode(const char* prefix, uint8_t* code, unsigned length)
   }
 }
 
-GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, unsigned major)
+GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, unsigned major, unsigned returnKind)
 {
   PROTECT(t, pool);
   PROTECT(t, tags);
@@ -2445,7 +2445,7 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
 
     code->setExceptionHandlerTable(t, eht);
   }
-  verifyCode(t, code, tags, major);
+  verifyCode(t, code, tags, major, returnKind);
   if (DebugClassReader) {
     disassembleCode("      ", code->body().begin(), length);
   }
@@ -2629,7 +2629,10 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
             throwNew(t, GcClassFormatError::Type, "Unexpected or duplicate Code attribute");
           }
           unsigned codeStart = s.position();
-          code = parseCode(t, s, pool, tags, major);
+          const char* descriptor = reinterpret_cast<const char*>(
+              cast<GcByteArray>(t, singletonObject(t, pool, spec - 1))->body().begin());
+          unsigned returnKind = strchr(descriptor, ')')[1];
+          code = parseCode(t, s, pool, tags, major, returnKind);
           if (s.position() - codeStart != length) {
             throwNew(t, GcClassFormatError::Type, "Incorrect Code attribute length");
           }
