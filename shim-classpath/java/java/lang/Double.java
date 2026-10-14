@@ -78,6 +78,12 @@ public final class Double extends Number implements Comparable<Double> {
     return a == b ? 0 : (a < b ? -1 : 1);
   }
 
+  public static double sum(double first, double second) { return first + second; }
+
+  public static double min(double first, double second) { return Math.min(first, second); }
+
+  public static double max(double first, double second) { return Math.max(first, second); }
+
   public static boolean isFinite(double value) {
     return !isNaN(value) && !isInfinite(value);
   }
