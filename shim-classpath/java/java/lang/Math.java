@@ -151,6 +151,68 @@ public final class Math {
     return ((Float.floatToRawIntBits(value) >>> 23) & 0xff) - 127;
   }
 
+  public static float nextUp(float value) {
+    if (Float.isNaN(value) || value == Float.POSITIVE_INFINITY) return value;
+    if (value == 0) return Float.MIN_VALUE;
+    int bits = Float.floatToRawIntBits(value);
+    return Float.intBitsToFloat(value > 0 ? bits + 1 : bits - 1);
+  }
+
+  public static float nextDown(float value) {
+    if (Float.isNaN(value) || value == Float.NEGATIVE_INFINITY) return value;
+    if (value == 0) return Float.intBitsToFloat(0x80000001);
+    int bits = Float.floatToRawIntBits(value);
+    return Float.intBitsToFloat(value > 0 ? bits - 1 : bits + 1);
+  }
+
+  public static float nextAfter(float start, double direction) {
+    if (Float.isNaN(start) || Double.isNaN(direction)) return Float.NaN;
+    if (start == direction) return (float) direction;
+    return start < direction ? nextUp(start) : nextDown(start);
+  }
+
+  public static float ulp(float value) {
+    int exponent = getExponent(value);
+    if (exponent == Float.MAX_EXPONENT + 1) return abs(value);
+    if (exponent == Float.MIN_EXPONENT - 1) return Float.MIN_VALUE;
+    int distanceExponent = exponent - 23;
+    if (distanceExponent >= Float.MIN_EXPONENT) {
+      return Float.intBitsToFloat(((int) (distanceExponent + 127)) << 23);
+    }
+    return Float.intBitsToFloat((int) 1 << (distanceExponent - Float.MIN_EXPONENT + 23));
+  }
+
+  public static double nextUp(double value) {
+    if (Double.isNaN(value) || value == Double.POSITIVE_INFINITY) return value;
+    if (value == 0) return Double.MIN_VALUE;
+    long bits = Double.doubleToRawLongBits(value);
+    return Double.longBitsToDouble(value > 0 ? bits + 1 : bits - 1);
+  }
+
+  public static double nextDown(double value) {
+    if (Double.isNaN(value) || value == Double.NEGATIVE_INFINITY) return value;
+    if (value == 0) return Double.longBitsToDouble(0x8000000000000001L);
+    long bits = Double.doubleToRawLongBits(value);
+    return Double.longBitsToDouble(value > 0 ? bits - 1 : bits + 1);
+  }
+
+  public static double nextAfter(double start, double direction) {
+    if (Double.isNaN(start) || Double.isNaN(direction)) return Double.NaN;
+    if (start == direction) return (double) direction;
+    return start < direction ? nextUp(start) : nextDown(start);
+  }
+
+  public static double ulp(double value) {
+    int exponent = getExponent(value);
+    if (exponent == Double.MAX_EXPONENT + 1) return abs(value);
+    if (exponent == Double.MIN_EXPONENT - 1) return Double.MIN_VALUE;
+    int distanceExponent = exponent - 52;
+    if (distanceExponent >= Double.MIN_EXPONENT) {
+      return Double.longBitsToDouble(((long) (distanceExponent + 1023)) << 52);
+    }
+    return Double.longBitsToDouble((long) 1 << (distanceExponent - Double.MIN_EXPONENT + 52));
+  }
+
   public static double random() {
     return Static.random.nextDouble();
   }
