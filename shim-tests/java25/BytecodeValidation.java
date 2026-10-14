@@ -39,6 +39,12 @@ public class BytecodeValidation {
             try { Class.forName("Verify" + name); throw new AssertionError(name); }
             catch (LinkageError expected) { System.out.println(name + " " + expected.getClass().getSimpleName()); }
         }
+        for (String name : new String[] {"DescriptorEmpty", "DescriptorVoidParameter", "DescriptorVoidArray", "DescriptorUnknown",
+                "DescriptorNoReturn", "DescriptorReturn", "DescriptorTrailing", "DescriptorDotted", "DescriptorDimensions",
+                "DescriptorSlots", "DescriptorMethodType", "DescriptorReference"}) {
+            try { Class.forName("Verify" + name); throw new AssertionError(name); }
+            catch (ClassFormatError expected) { System.out.println("descriptor " + name); }
+        }
         System.out.println(bootstraps);
     }
 }

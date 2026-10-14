@@ -2397,6 +2397,8 @@ object resolveDynamicConstant(Thread* t, GcDynamicConstant* constant, GcClass* o
 uint64_t dynamicConstantBits(Thread* t, GcDynamicConstant* constant, object value);
 
 void verifyCode(Thread* t, GcCode* code, GcByteArray* tags);
+void validateFieldDescriptor(Thread* t, GcByteArray* descriptor);
+unsigned validateMethodDescriptor(Thread* t, GcByteArray* descriptor, bool instance);
 
 inline bool emptyMethod(Thread* t UNUSED, GcMethod* method)
 {

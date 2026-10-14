@@ -1042,6 +1042,10 @@ unsigned parsePoolEntry(Thread* t,
           = cast<GcReference>(t, singletonObject(t, pool, ci))->name();
       GcPair* nameAndType = cast<GcPair>(t, singletonObject(t, pool, nti));
 
+      GcByteArray* descriptor = cast<GcByteArray>(t, nameAndType->second());
+      if (tag == CONSTANT_Fieldref) validateFieldDescriptor(t, descriptor);
+      else validateMethodDescriptor(t, descriptor, false);
+
       object value = makeReference(t,
                                    0,
                                    className,
@@ -1107,6 +1111,7 @@ unsigned parsePoolEntry(Thread* t,
 
       parsePoolEntry(t, s, index, pool, invocations, tags, ni);
 
+      validateMethodDescriptor(t, cast<GcByteArray>(t, singletonObject(t, pool, ni)), false);
       pool->setBodyElement(
           t, i, reinterpret_cast<uintptr_t>(singletonObject(t, pool, ni)));
     }
@@ -1128,23 +1133,10 @@ unsigned parsePoolEntry(Thread* t,
       GcByteArray* spec = cast<GcByteArray>(t, nameAndType->second());
       PROTECT(t, spec);
       if (tag == CONSTANT_Dynamic) {
-        const char* field = reinterpret_cast<const char*>(spec->body().begin());
-        unsigned end = spec->length() - 1;
-        unsigned position = 0;
-        while (position < end && field[position] == '[') ++position;
-        bool valid = position <= 255 && position < end;
-        if (valid && field[position] == 'L') {
-          unsigned start = ++position;
-          while (position < end && field[position] != ';') {
-            if (field[position] == '.' || field[position] == '[') valid = false;
-            ++position;
-          }
-          valid = valid && position > start && position + 1 == end;
-        } else {
-          valid = valid && field[position] != 0 && strchr("ZBCSIFJD", field[position]) && position + 1 == end;
-        }
-        if (!valid) throwNew(t, GcClassFormatError::Type, "Invalid dynamic constant descriptor");
-        spec = makeByteArray(t, "()%s", field);
+        validateFieldDescriptor(t, spec);
+        spec = makeByteArray(t, "()%s", spec->body().begin());
+      } else {
+        validateMethodDescriptor(t, spec, false);
       }
       const char* specString = reinterpret_cast<const char*>(spec->body().begin());
 
@@ -1420,10 +1412,11 @@ void parseInterfaceTable(Thread* t,
   class_->setInterfaceTable(t, interfaceTable);
 }
 
-void parseFieldTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool)
+void parseFieldTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, GcByteArray* tags)
 {
   PROTECT(t, class_);
   PROTECT(t, pool);
+  PROTECT(t, tags);
 
   unsigned memberOffset = BytesPerWord;
   if (class_->super()) {
@@ -1450,6 +1443,9 @@ void parseFieldTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool)
       unsigned flags = s.read2();
       unsigned name = s.read2();
       unsigned spec = s.read2();
+      requireConstantTag(t, tags, name - 1, CONSTANT_Utf8);
+      requireConstantTag(t, tags, spec - 1, CONSTANT_Utf8);
+      validateFieldDescriptor(t, cast<GcByteArray>(t, singletonObject(t, pool, spec - 1)));
 
       unsigned value = 0;
 
@@ -2582,6 +2578,9 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
       unsigned flags = s.read2();
       unsigned name = s.read2();
       unsigned spec = s.read2();
+      requireConstantTag(t, tags, name - 1, CONSTANT_Utf8);
+      requireConstantTag(t, tags, spec - 1, CONSTANT_Utf8);
+      validateMethodDescriptor(t, cast<GcByteArray>(t, singletonObject(t, pool, spec - 1)), !(flags & ACC_STATIC));
 
       if (DebugClassReader) {
         fprintf(stderr,
@@ -4969,7 +4968,7 @@ GcClass* parseClass(Thread* t,
 
   parseInterfaceTable(t, s, class_, pool, throwType);
 
-  parseFieldTable(t, s, class_, pool);
+  parseFieldTable(t, s, class_, pool, poolTags);
 
   parseMethodTable(t, s, class_, pool, poolTags);
 

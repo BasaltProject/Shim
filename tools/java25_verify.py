@@ -27,14 +27,22 @@ def generate(directory, major):
             signature = add(12, u2(utf(method)) + u2(utf(descriptor)))
             return add(tag, u2(owner_index) + u2(signature))
         this, super_ = class_(name), class_("java/lang/Object")
-        code_name, method_name, method_descriptor = utf("Code"), utf("test"), utf("()V")
+        bad_descriptors = {
+            "DescriptorEmpty": "", "DescriptorVoidParameter": "(V)V", "DescriptorVoidArray": "([V)V",
+            "DescriptorUnknown": "(Q)V", "DescriptorNoReturn": "()", "DescriptorReturn": "()Q",
+            "DescriptorTrailing": "()VI", "DescriptorDotted": "(Ljava.lang.String;)V",
+            "DescriptorDimensions": "(" + "[" * 256 + "I)V", "DescriptorSlots": "(" + "J" * 128 + ")V",
+        }
+        code_name, method_name, method_descriptor = utf("Code"), utf("test"), utf(bad_descriptors.get(case, "()V"))
         integer = add(3, i4(7))
         long_ = add(5, struct.pack(">q", 42))
         double = add(6, struct.pack(">d", 3.5))
         raw = utf("text")
         string = add(8, u2(raw))
-        method_type = add(16, u2(method_descriptor))
+        type_descriptor = utf("(V)V") if case == "DescriptorMethodType" else utf("()V")
+        method_type = add(16, u2(type_descriptor))
         bootstrap_ref = ref("BytecodeValidation", "bootstrap",
+            "()Q" if case == "DescriptorReference" else
             "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;")
         handle = add(15, b"\x06" + u2(bootstrap_ref))
         dynamic_int = add(17, u2(0) + u2(add(12, u2(utf("intValue")) + u2(utf("I")))))
@@ -124,7 +132,7 @@ def generate(directory, major):
                 code = b"\x10\x00\x57\xb1"
             handlers = struct.pack(">HHHH", *handler_cases[case])
         else:
-            code = variants[case]
+            code = b"\xb1" if case in bad_descriptors or case in ("DescriptorMethodType", "DescriptorReference") else variants[case]
         attributes = b""
         if case in ("ValidTable", "ValidLookup", "UnsortedKeys"):
             position = 24 if case == "ValidTable" else 28
@@ -153,5 +161,8 @@ def generate(directory, major):
     handlers = ("ValidHandler", "ValidHandlerEnd", "HandlerEmpty", "HandlerReverse", "HandlerEndOutside",
                 "HandlerTargetOutside", "HandlerCatchOutside", "HandlerCatchTag", "HandlerStartOperand",
                 "HandlerEndOperand", "HandlerTargetOperand")
-    for case in controls + invalid + handlers:
+    descriptors = ("DescriptorEmpty", "DescriptorVoidParameter", "DescriptorVoidArray", "DescriptorUnknown",
+                   "DescriptorNoReturn", "DescriptorReturn", "DescriptorTrailing", "DescriptorDotted",
+                   "DescriptorDimensions", "DescriptorSlots", "DescriptorMethodType", "DescriptorReference")
+    for case in controls + invalid + handlers + descriptors:
         build("Verify" + case, case)
