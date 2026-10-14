@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public final class Float extends Number {
+public final class Float extends Number implements Comparable<Float> {
   public static final Class TYPE = shim.Classes.forCanonicalName("F");
   private static final int EXP_BIT_MASK = 0x7F800000;
   private static final int SIGNIF_BIT_MASK = 0x007FFFFF;
@@ -32,8 +32,15 @@ public final class Float extends Number {
   public static final float POSITIVE_INFINITY =  1.0f / 0.0f;
   public static final float NaN =  0.0f / 0.0f;
 
-  public static final float MIN_VALUE = 1.17549435082228750797e-38f;
+  public static final float MIN_VALUE = 0x0.000002p-126f;
   public static final float MAX_VALUE = 3.40282346638528859812e+38f;
+
+  public static final float MIN_NORMAL = 0x1.0p-126f;
+  public static final int MIN_EXPONENT = -126;
+  public static final int MAX_EXPONENT = 127;
+  public static final int SIZE = 32;
+  public static final int BYTES = 4;
+  public static final int PRECISION = 24;
 
   private final float value;  
 
@@ -54,11 +61,27 @@ public final class Float extends Number {
   }
 
   public boolean equals(Object o) {
-    return o instanceof Float && ((Float) o).value == value;
+    return o instanceof Float && floatToIntBits(((Float) o).value) == floatToIntBits(value);
   }
 
-  public int hashCode() {
-    return floatToRawIntBits(value);
+  public int hashCode() { return hashCode(value); }
+
+  public static int hashCode(float value) {
+    int bits = floatToIntBits(value);
+    return bits;
+  }
+
+  public int compareTo(Float other) { return compare(value, other.value); }
+
+  public static int compare(float first, float second) {
+    if (first < second) return -1;
+    if (first > second) return 1;
+    int a = floatToIntBits(first), b = floatToIntBits(second);
+    return a == b ? 0 : (a < b ? -1 : 1);
+  }
+
+  public static boolean isFinite(float value) {
+    return !isNaN(value) && !isInfinite(value);
   }
 
   public String toString() {

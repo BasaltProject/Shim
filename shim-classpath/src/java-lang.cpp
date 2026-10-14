@@ -1088,7 +1088,7 @@ extern "C" JNIEXPORT jstring JNICALL
 extern "C" JNIEXPORT jboolean JNICALL
     Java_java_lang_Double_isInfinite(JNIEnv*, jclass, jdouble val)
 {
-  return !isfinite(val);
+  return !isfinite(val) && !isnan(val);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -1122,7 +1122,7 @@ extern "C" JNIEXPORT jdouble JNICALL
 extern "C" JNIEXPORT jboolean JNICALL
     Java_java_lang_Float_isInfinite(JNIEnv*, jclass, jfloat val)
 {
-  return !isfinite(val);
+  return !isfinite(val) && !isnan(val);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
