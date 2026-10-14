@@ -93,6 +93,50 @@ public final class Objects {
       return value;
   }
 
+  public static int checkIndex(int index, int length) {
+    if (index < 0 || index >= length) {
+      throw new IndexOutOfBoundsException("Index " + index + " out of bounds for length " + length);
+    }
+    return index;
+  }
+
+  public static int checkFromToIndex(int from, int to, int length) {
+    if (from < 0 || from > to || to > length) {
+      throw new IndexOutOfBoundsException("Range [" + from + ", " + to + ") out of bounds for length " + length);
+    }
+    return from;
+  }
+
+  public static int checkFromIndexSize(int from, int size, int length) {
+    if (from < 0 || size < 0 || length < 0 || from > length - size) {
+      throw new IndexOutOfBoundsException("Range [" + from + ", " + from + " + " + size
+          + ") out of bounds for length " + length);
+    }
+    return from;
+  }
+
+  public static long checkIndex(long index, long length) {
+    if (index < 0 || index >= length) {
+      throw new IndexOutOfBoundsException("Index " + index + " out of bounds for length " + length);
+    }
+    return index;
+  }
+
+  public static long checkFromToIndex(long from, long to, long length) {
+    if (from < 0 || from > to || to > length) {
+      throw new IndexOutOfBoundsException("Range [" + from + ", " + to + ") out of bounds for length " + length);
+    }
+    return from;
+  }
+
+  public static long checkFromIndexSize(long from, long size, long length) {
+    if (from < 0 || size < 0 || length < 0 || from > length - size) {
+      throw new IndexOutOfBoundsException("Range [" + from + ", " + from + " + " + size
+          + ") out of bounds for length " + length);
+    }
+    return from;
+  }
+
   public static boolean isNull(Object value) { return value == null; }
 
   public static boolean nonNull(Object value) { return value != null; }
