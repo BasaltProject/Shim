@@ -113,4 +113,13 @@ public class MessageFormat extends Format {
   public String toPattern() {
     return pattern;
   }
+
+  public Object[] parse(String source, ParsePosition pos) {
+    return new Object[0];
+  }
+
+  @Override
+  public Object parseObject(String source, ParsePosition pos) {
+    return parse(source, pos);
+  }
 }

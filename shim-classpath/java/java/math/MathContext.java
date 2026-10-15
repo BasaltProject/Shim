@@ -48,6 +48,38 @@ public final class MathContext implements Serializable {
     this(precision, RoundingMode.HALF_UP);
   }
 
+  public MathContext(String val) {
+    if (val == null) {
+      throw new NullPointerException();
+    }
+    try {
+      int pIndex = val.indexOf("precision=");
+      int rIndex = val.indexOf("roundingMode=");
+      if (pIndex < 0 || rIndex < 0) {
+        throw new IllegalArgumentException("bad string format: " + val);
+      }
+      int pStart = pIndex + 10;
+      int pEnd = val.indexOf(' ', pStart);
+      if (pEnd < 0) {
+        pEnd = val.length();
+      }
+      this.precision = Integer.parseInt(val.substring(pStart, pEnd));
+      if (this.precision < 0) {
+        throw new IllegalArgumentException("precision < 0");
+      }
+      int rStart = rIndex + 13;
+      int rEnd = val.indexOf(' ', rStart);
+      if (rEnd < 0) {
+        rEnd = val.length();
+      }
+      this.roundingMode = RoundingMode.valueOf(val.substring(rStart, rEnd));
+    } catch (IllegalArgumentException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalArgumentException("bad string format: " + val, e);
+    }
+  }
+
   public int getPrecision() {
     return precision;
   }
