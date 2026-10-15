@@ -29,7 +29,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 public class MethodHandle implements java.lang.constant.Constable {
   public static final int REF_getField = 1;
@@ -156,6 +158,58 @@ public class MethodHandle implements java.lang.constant.Constable {
 
   public MethodHandle bindTo(Object x) {
     return new BoundMethodHandle(this, x);
+  }
+
+  public boolean isVarargsCollector() {
+    return false;
+  }
+
+  public MethodHandle asFixedArity() {
+    return this;
+  }
+
+  public MethodHandle asVarargsCollector(Class<?> arrayType) {
+    Objects.requireNonNull(arrayType, "arrayType");
+    if (!arrayType.isArray()) {
+      throw new IllegalArgumentException("not an array type: " + arrayType);
+    }
+    int paramCount = type().parameterCount();
+    if (paramCount == 0 || !type().parameterType(paramCount - 1).isAssignableFrom(arrayType)) {
+      throw new IllegalArgumentException("last parameter type not compatible with array type");
+    }
+    return new VarargsCollectorMethodHandle(this, arrayType);
+  }
+
+  public MethodHandle asSpreader(Class<?> arrayType, int arrayLength) {
+    Objects.requireNonNull(arrayType, "arrayType");
+    if (!arrayType.isArray()) {
+      throw new IllegalArgumentException("not an array type: " + arrayType);
+    }
+    MethodType targetType = type();
+    int paramCount = targetType.parameterCount();
+    if (arrayLength < 0 || arrayLength > paramCount) {
+      throw new IllegalArgumentException("bad spread length: " + arrayLength);
+    }
+    int spreadPos = paramCount - arrayLength;
+    MethodType newType = targetType.dropParameterTypes(spreadPos, paramCount).insertParameterTypes(spreadPos, arrayType);
+    return new SpreaderMethodHandle(this, newType, spreadPos, arrayLength);
+  }
+
+  public MethodHandle asCollector(Class<?> arrayType, int arrayLength) {
+    Objects.requireNonNull(arrayType, "arrayType");
+    if (!arrayType.isArray()) {
+      throw new IllegalArgumentException("not an array type: " + arrayType);
+    }
+    if (arrayLength < 0) {
+      throw new IllegalArgumentException("bad collector length: " + arrayLength);
+    }
+    MethodType targetType = type();
+    int collectPos = targetType.parameterCount() - 1;
+    Class<?> componentType = arrayType.getComponentType();
+    Class<?>[] paramTypes = new Class<?>[arrayLength];
+    Arrays.fill(paramTypes, componentType);
+    MethodType newType = targetType.dropParameterTypes(collectPos, collectPos + 1).insertParameterTypes(collectPos, paramTypes);
+    return new CollectorMethodHandle(this, newType, collectPos, arrayType, arrayLength);
   }
 
   public String toString() {
@@ -643,6 +697,213 @@ public class MethodHandle implements java.lang.constant.Constable {
       int idx = ((Number) arguments[1]).intValue();
       java.lang.reflect.Array.set(arguments[0], idx, arguments[2]);
       return null;
+    }
+  }
+
+  static class DynamicInvokerMethodHandle extends MethodHandle {
+    private final CallSite site;
+
+    DynamicInvokerMethodHandle(CallSite site) {
+      super(site.type());
+      this.site = site;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      MethodHandle currentTarget = site.getTarget();
+      if (currentTarget == null) {
+        throw new IllegalStateException("call site target is null");
+      }
+      return currentTarget.invokeWithArguments(arguments);
+    }
+  }
+
+  static class SwitchPointMethodHandle extends MethodHandle {
+    private final SwitchPoint sp;
+    private final MethodHandle target;
+    private final MethodHandle fallback;
+
+    SwitchPointMethodHandle(SwitchPoint sp, MethodHandle target, MethodHandle fallback) {
+      super(target.type());
+      this.sp = sp;
+      this.target = target;
+      this.fallback = fallback;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      if (!sp.hasBeenInvalidated()) {
+        return target.invokeWithArguments(arguments);
+      } else {
+        return fallback.invokeWithArguments(arguments);
+      }
+    }
+  }
+
+  static class SpreaderMethodHandle extends MethodHandle {
+    private final MethodHandle target;
+    private final int spreadPos;
+    private final int arrayLength;
+
+    SpreaderMethodHandle(MethodHandle target, MethodType newType, int spreadPos, int arrayLength) {
+      super(newType);
+      this.target = target;
+      this.spreadPos = spreadPos;
+      this.arrayLength = arrayLength;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      Object array = arguments[spreadPos];
+      int actualLen = array != null ? java.lang.reflect.Array.getLength(array) : 0;
+      if (actualLen != arrayLength) {
+        throw new IllegalArgumentException("array length " + actualLen + " != expected " + arrayLength);
+      }
+      Object[] targetArgs = new Object[arguments.length - 1 + arrayLength];
+      System.arraycopy(arguments, 0, targetArgs, 0, spreadPos);
+      for (int i = 0; i < arrayLength; i++) {
+        targetArgs[spreadPos + i] = java.lang.reflect.Array.get(array, i);
+      }
+      System.arraycopy(arguments, spreadPos + 1, targetArgs, spreadPos + arrayLength, arguments.length - spreadPos - 1);
+      return target.invokeWithArguments(targetArgs);
+    }
+  }
+
+  static class CollectorMethodHandle extends MethodHandle {
+    private final MethodHandle target;
+    private final int collectPos;
+    private final Class<?> componentType;
+    private final int arrayLength;
+
+    CollectorMethodHandle(MethodHandle target, MethodType newType, int collectPos, Class<?> arrayType, int arrayLength) {
+      super(newType);
+      this.target = target;
+      this.collectPos = collectPos;
+      this.componentType = arrayType.getComponentType();
+      this.arrayLength = arrayLength;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      Object array = java.lang.reflect.Array.newInstance(componentType, arrayLength);
+      for (int i = 0; i < arrayLength; i++) {
+        java.lang.reflect.Array.set(array, i, arguments[collectPos + i]);
+      }
+      Object[] targetArgs = new Object[arguments.length - arrayLength + 1];
+      System.arraycopy(arguments, 0, targetArgs, 0, collectPos);
+      targetArgs[collectPos] = array;
+      System.arraycopy(arguments, collectPos + arrayLength, targetArgs, collectPos + 1, arguments.length - collectPos - arrayLength);
+      return target.invokeWithArguments(targetArgs);
+    }
+  }
+
+  static class VarargsCollectorMethodHandle extends MethodHandle {
+    private final MethodHandle target;
+    private final Class<?> arrayType;
+    private final Class<?> componentType;
+
+    VarargsCollectorMethodHandle(MethodHandle target, Class<?> arrayType) {
+      super(target.type());
+      this.target = target;
+      this.arrayType = arrayType;
+      this.componentType = arrayType.getComponentType();
+    }
+
+    @Override
+    public boolean isVarargsCollector() {
+      return true;
+    }
+
+    @Override
+    public MethodHandle asFixedArity() {
+      return target;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      int paramCount = target.type().parameterCount();
+      int varargsPos = paramCount - 1;
+      if (arguments.length == paramCount && arguments[varargsPos] != null &&
+          arrayType.isInstance(arguments[varargsPos])) {
+        return target.invokeWithArguments(arguments);
+      }
+      int count = Math.max(0, arguments.length - varargsPos);
+      Object array = java.lang.reflect.Array.newInstance(componentType, count);
+      for (int i = 0; i < count; i++) {
+        java.lang.reflect.Array.set(array, i, arguments[varargsPos + i]);
+      }
+      Object[] targetArgs = new Object[paramCount];
+      System.arraycopy(arguments, 0, targetArgs, 0, varargsPos);
+      targetArgs[varargsPos] = array;
+      return target.invokeWithArguments(targetArgs);
+    }
+  }
+
+  static class CollectArgumentsMethodHandle extends MethodHandle {
+    private final MethodHandle target;
+    private final int pos;
+    private final MethodHandle filter;
+    private final int filterParamCount;
+
+    CollectArgumentsMethodHandle(MethodHandle target, int pos, MethodHandle filter) {
+      super(computeType(target, pos, filter));
+      this.target = target;
+      this.pos = pos;
+      this.filter = filter;
+      this.filterParamCount = filter.type().parameterCount();
+    }
+
+    private static MethodType computeType(MethodHandle target, int pos, MethodHandle filter) {
+      MethodType targetType = target.type();
+      MethodType filterType = filter.type();
+      Class<?> filterRet = filterType.returnType();
+      if (filterRet == void.class) {
+        return targetType.insertParameterTypes(pos, filterType.parameterList());
+      } else {
+        if (pos < 0 || pos >= targetType.parameterCount() || targetType.parameterType(pos) != filterRet) {
+          throw new IllegalArgumentException("target parameter type mismatch at " + pos);
+        }
+        MethodType dropped = targetType.dropParameterTypes(pos, pos + 1);
+        return dropped.insertParameterTypes(pos, filterType.parameterList());
+      }
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      Object[] filterArgs = new Object[filterParamCount];
+      System.arraycopy(arguments, pos, filterArgs, 0, filterParamCount);
+      Object filterRes = filter.invokeWithArguments(filterArgs);
+
+      Class<?> filterRet = filter.type().returnType();
+      if (filterRet == void.class) {
+        Object[] targetArgs = new Object[arguments.length - filterParamCount];
+        System.arraycopy(arguments, 0, targetArgs, 0, pos);
+        System.arraycopy(arguments, pos + filterParamCount, targetArgs, pos, arguments.length - pos - filterParamCount);
+        return target.invokeWithArguments(targetArgs);
+      } else {
+        Object[] targetArgs = new Object[arguments.length - filterParamCount + 1];
+        System.arraycopy(arguments, 0, targetArgs, 0, pos);
+        targetArgs[pos] = filterRes;
+        System.arraycopy(arguments, pos + filterParamCount, targetArgs, pos + 1, arguments.length - pos - filterParamCount);
+        return target.invokeWithArguments(targetArgs);
+      }
+    }
+  }
+
+  static class ExactInvokerMethodHandle extends MethodHandle {
+    ExactInvokerMethodHandle(MethodType targetType) {
+      super(targetType.insertParameterTypes(0, MethodHandle.class));
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      if (arguments == null || arguments.length < 1 || !(arguments[0] instanceof MethodHandle)) {
+        throw new IllegalArgumentException("First argument must be a MethodHandle");
+      }
+      MethodHandle mh = (MethodHandle) arguments[0];
+      Object[] targetArgs = new Object[arguments.length - 1];
+      System.arraycopy(arguments, 1, targetArgs, 0, arguments.length - 1);
+      return mh.invokeWithArguments(targetArgs);
     }
   }
 

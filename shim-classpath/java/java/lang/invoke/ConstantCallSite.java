@@ -7,20 +7,40 @@
 
 package java.lang.invoke;
 
+import java.util.Objects;
+
 public class ConstantCallSite extends CallSite {
-    public ConstantCallSite(MethodHandle target) {
-        super(target);
-    }
+  private final boolean isFrozen;
 
-    public final MethodHandle getTarget() {
-        return target();
-    }
+  public ConstantCallSite(MethodHandle target) {
+    super(target);
+    this.isFrozen = true;
+  }
 
-    public final void setTarget(MethodHandle target) {
-        throw new UnsupportedOperationException();
-    }
+  protected ConstantCallSite(MethodType targetType, MethodHandle createTargetHook) throws Throwable {
+    super(targetType);
+    Objects.requireNonNull(createTargetHook, "createTargetHook");
+    this.isFrozen = false;
+    MethodHandle boundTarget = (MethodHandle) createTargetHook.invokeWithArguments(this);
+    checkTargetChange(null, boundTarget);
+    this.target = boundTarget;
+  }
 
-    public final MethodHandle dynamicInvoker() {
-        return getTarget();
+  @Override
+  public final MethodHandle getTarget() {
+    if (target == null) {
+      throw new IllegalStateException("call site is not yet bound");
     }
+    return target;
+  }
+
+  @Override
+  public final void setTarget(MethodHandle target) {
+    throw new UnsupportedOperationException("ConstantCallSite target is permanent");
+  }
+
+  @Override
+  public final MethodHandle dynamicInvoker() {
+    return getTarget();
+  }
 }
