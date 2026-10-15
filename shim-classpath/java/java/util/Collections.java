@@ -59,6 +59,10 @@ public class Collections {
   private final static int SORT_SIZE_THRESHOLD = 16;
 
   public static <T> void sort(List<T> list, Comparator<? super T> comparator) {
+    if (comparator == null) {
+      sort(list);
+      return;
+    }
     int size = list.size();
     introSort(list, comparator, 0, size, size);
     insertionSort(list, comparator);
@@ -203,6 +207,34 @@ public class Collections {
   public static final <T> Set<T> emptySet() {
     return (Set<T>) new UnmodifiableSet<Object>(
       new HashSet<Object>(0));
+  }
+
+  private static final Iterator<Object> EMPTY_ITERATOR = new Iterator<Object>() {
+    @Override public boolean hasNext() { return false; }
+    @Override public Object next() { throw new NoSuchElementException(); }
+    @Override public void remove() { throw new IllegalStateException(); }
+  };
+
+  private static final ListIterator<Object> EMPTY_LIST_ITERATOR = new ListIterator<Object>() {
+    @Override public boolean hasNext() { return false; }
+    @Override public Object next() { throw new NoSuchElementException(); }
+    @Override public boolean hasPrevious() { return false; }
+    @Override public Object previous() { throw new NoSuchElementException(); }
+    @Override public int nextIndex() { return 0; }
+    @Override public int previousIndex() { return -1; }
+    @Override public void remove() { throw new IllegalStateException(); }
+    @Override public void set(Object e) { throw new IllegalStateException(); }
+    @Override public void add(Object e) { throw new UnsupportedOperationException(); }
+  };
+
+  @SuppressWarnings("unchecked")
+  public static <T> Iterator<T> emptyIterator() {
+    return (Iterator<T>) EMPTY_ITERATOR;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static <T> ListIterator<T> emptyListIterator() {
+    return (ListIterator<T>) EMPTY_LIST_ITERATOR;
   }
   
   public static <T> Enumeration<T> enumeration(Collection<T> c) {
@@ -537,6 +569,27 @@ public class Collections {
       } else {
         throw new IllegalStateException();
       }
+    }
+
+    public void set(T e) {
+      if (toRemove != -1) {
+        list.set(toRemove, e);
+      } else {
+        throw new IllegalStateException();
+      }
+    }
+
+    public void add(T e) {
+      list.add(++index, e);
+      toRemove = -1;
+    }
+
+    public int nextIndex() {
+      return index + 1;
+    }
+
+    public int previousIndex() {
+      return index;
     }
   }
 

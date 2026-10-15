@@ -116,7 +116,7 @@ public class ConcurrentHashMap<K,V>
     return cell == null ? null : cell.value;
   }
 
-  public boolean remove(K key, V value) {
+  public boolean remove(Object key, Object value) {
     Cell<K,V> cell = remove(key, RemoveCondition.IfEqual, value);
     return cell != null && cell.value.equals(value);
   }
@@ -243,7 +243,7 @@ public class ConcurrentHashMap<K,V>
   }
 
   private Cell<K,V> remove(Object key, RemoveCondition condition,
-                           V oldValue)
+                           Object oldValue)
   {
     Node<Cell<K,V>> node = new Node(key.hashCode());
 

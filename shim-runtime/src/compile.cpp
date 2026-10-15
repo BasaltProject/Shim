@@ -2544,7 +2544,11 @@ int64_t findVirtualMethodFromReference(MyThread* t,
 
   GcMethod* target = resolveMethod(t, pair);
 
-  target = findVirtualMethod(t, target, objectClass(t, instance));
+  if (target->class_()->flags() & ACC_INTERFACE) {
+    target = findInterfaceMethod(t, target, objectClass(t, instance));
+  } else {
+    target = findVirtualMethod(t, target, objectClass(t, instance));
+  }
 
   checkMethod(t, target, false);
 
@@ -5548,7 +5552,32 @@ loop:
         if (not intrinsic(t, frame, target)) {
           bool tailCall = isTailCall(t, code, ip, context->method, target);
 
-          if (LIKELY(methodVirtual(t, target))) {
+          if (target->class_()->flags() & ACC_INTERFACE) {
+            unsigned parameterFootprint = target->parameterFootprint();
+            int returnCode = target->returnCode();
+            unsigned rSize = resultSize(t, returnCode);
+
+            ir::Value* result = c->stackCall(
+                c->nativeCall(
+                    c->constant(getThunk(t, findInterfaceMethodFromInstanceThunk),
+                                ir::Type::iptr()),
+                    0,
+                    frame->trace(0, 0),
+                    ir::Type::iptr(),
+                    args(c->threadRegister(),
+                         frame->append(target),
+                         c->peek(1, parameterFootprint - 1))),
+                tailCall ? Compiler::TailJump : 0,
+                frame->trace(0, 0),
+                operandTypeForFieldCode(t, returnCode),
+                frame->peekMethodArguments(parameterFootprint));
+
+            frame->popFootprint(parameterFootprint);
+
+            if (rSize) {
+              frame->pushReturnValue(returnCode, result);
+            }
+          } else if (LIKELY(methodVirtual(t, target))) {
             unsigned parameterFootprint = target->parameterFootprint();
 
             unsigned offset = TargetClassVtable

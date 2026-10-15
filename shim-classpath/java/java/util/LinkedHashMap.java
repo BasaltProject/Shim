@@ -23,7 +23,7 @@
 
 package java.util;
 
-public class LinkedHashMap<K, V> extends HashMap<K, V> {
+public class LinkedHashMap<K, V> extends HashMap<K, V> implements SequencedMap<K, V> {
   private static class LinkedKey<K> {
     private final K key;
     private LinkedKey<K> previous, next;
@@ -274,6 +274,228 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> {
     public void remove() {
       LinkedHashMap.this.remove(current == null ?
         last.key : current.previous.key);
+    }
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public Entry<K, V> firstEntry() {
+    if (first == null) {
+      return null;
+    }
+    K k = (K) first.key;
+    return Map.entry(k, get(k));
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public Entry<K, V> lastEntry() {
+    if (last == null) {
+      return null;
+    }
+    K k = (K) last.key;
+    return Map.entry(k, get(k));
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public Entry<K, V> pollFirstEntry() {
+    if (first == null) {
+      return null;
+    }
+    K k = (K) first.key;
+    V v = remove(k);
+    return Map.entry(k, v);
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public Entry<K, V> pollLastEntry() {
+    if (last == null) {
+      return null;
+    }
+    K k = (K) last.key;
+    V v = remove(k);
+    return Map.entry(k, v);
+  }
+
+  @Override
+  public V putFirst(K key, V value) {
+    if (containsKey(key)) {
+      remove(key);
+    }
+    LinkedKey<K> k = new LinkedKey<K>(key);
+    if (first == null) {
+      first = last = k;
+    } else {
+      k.next = first;
+      first.previous = k;
+      first = k;
+    }
+    lookup.put(key, k);
+    return super.put(key, value);
+  }
+
+  @Override
+  public V putLast(K key, V value) {
+    return put(key, value);
+  }
+
+  @Override
+  public SequencedMap<K, V> reversed() {
+    return new ReversedView();
+  }
+
+  private class ReversedView extends AbstractMap<K, V> implements SequencedMap<K, V> {
+    @Override
+    public int size() {
+      return LinkedHashMap.this.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return LinkedHashMap.this.isEmpty();
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+      return LinkedHashMap.this.containsKey(key);
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+      return LinkedHashMap.this.containsValue(value);
+    }
+
+    @Override
+    public V get(Object key) {
+      return LinkedHashMap.this.get(key);
+    }
+
+    @Override
+    public V put(K key, V value) {
+      return LinkedHashMap.this.putFirst(key, value);
+    }
+
+    @Override
+    public V remove(Object key) {
+      return LinkedHashMap.this.remove(key);
+    }
+
+    @Override
+    public void clear() {
+      LinkedHashMap.this.clear();
+    }
+
+    @Override
+    public void putAll(Map<? extends K, ? extends V> m) {
+      for (Map.Entry<? extends K, ? extends V> e : m.entrySet()) {
+        put(e.getKey(), e.getValue());
+      }
+    }
+
+    @Override
+    public SequencedMap<K, V> reversed() {
+      return LinkedHashMap.this;
+    }
+
+    @Override
+    public Entry<K, V> firstEntry() {
+      return LinkedHashMap.this.lastEntry();
+    }
+
+    @Override
+    public Entry<K, V> lastEntry() {
+      return LinkedHashMap.this.firstEntry();
+    }
+
+    @Override
+    public Entry<K, V> pollFirstEntry() {
+      return LinkedHashMap.this.pollLastEntry();
+    }
+
+    @Override
+    public Entry<K, V> pollLastEntry() {
+      return LinkedHashMap.this.pollFirstEntry();
+    }
+
+    @Override
+    public V putFirst(K key, V value) {
+      return LinkedHashMap.this.putLast(key, value);
+    }
+
+    @Override
+    public V putLast(K key, V value) {
+      return LinkedHashMap.this.putFirst(key, value);
+    }
+
+    @Override
+    public Set<Entry<K, V>> entrySet() {
+      return new AbstractSet<Entry<K, V>>() {
+        @Override
+        public int size() {
+          return LinkedHashMap.this.size();
+        }
+
+        @Override
+        public Iterator<Entry<K, V>> iterator() {
+          return new Iterator<Entry<K, V>>() {
+            private LinkedKey current = last;
+
+            @Override
+            public boolean hasNext() {
+              return current != null;
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public Entry<K, V> next() {
+              if (!hasNext()) {
+                throw new NoSuchElementException();
+              }
+              Entry<K, V> res = find((K) current.key);
+              current = current.previous;
+              return res;
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public void remove() {
+              LinkedHashMap.this.remove((K) (current == null ? first.key : current.next.key));
+            }
+          };
+        }
+      };
+    }
+
+    @Override
+    public Set<K> keySet() {
+      return new AbstractSet<K>() {
+        @Override
+        public int size() {
+          return ReversedView.this.size();
+        }
+
+        @Override
+        public Iterator<K> iterator() {
+          return new shim.Data.KeyIterator(ReversedView.this.entrySet().iterator());
+        }
+      };
+    }
+
+    @Override
+    public Collection<V> values() {
+      return new AbstractCollection<V>() {
+        @Override
+        public int size() {
+          return ReversedView.this.size();
+        }
+
+        @Override
+        public Iterator<V> iterator() {
+          return new shim.Data.ValueIterator(ReversedView.this.entrySet().iterator());
+        }
+      };
     }
   }
 }

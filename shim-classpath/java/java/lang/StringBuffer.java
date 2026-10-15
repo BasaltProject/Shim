@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public class StringBuffer implements CharSequence {
+public class StringBuffer implements CharSequence, Appendable, Comparable<StringBuffer> {
   private final StringBuilder sb;
 
   public StringBuffer(String s) {
@@ -45,6 +45,11 @@ public class StringBuffer implements CharSequence {
 
   public synchronized StringBuffer append(CharSequence s) {
     sb.append(s);
+    return this;
+  }
+
+  public synchronized StringBuffer append(CharSequence s, int start, int end) {
+    sb.append(s, start, end);
     return this;
   }
 
@@ -168,5 +173,21 @@ public class StringBuffer implements CharSequence {
   
   public CharSequence subSequence(int start, int end) {
     return sb.subSequence(start, end);
+  }
+
+  public synchronized int compareTo(StringBuffer another) {
+    return CharSequence.compare(this, another);
+  }
+
+  public synchronized int codePointAt(int index) {
+    return sb.codePointAt(index);
+  }
+
+  public synchronized int codePointBefore(int index) {
+    return sb.codePointBefore(index);
+  }
+
+  public synchronized int codePointCount(int start, int end) {
+    return sb.codePointCount(start, end);
   }
 }

@@ -147,4 +147,12 @@ public final class Optional<T> {
   public String toString() {
     return value != null ? ("Optional[" + value + "]") : "Optional.empty";
   }
+
+  public java.util.stream.Stream<T> stream() {
+    if (value == null) {
+      return java.util.stream.Stream.empty();
+    } else {
+      return java.util.stream.Stream.of(value);
+    }
+  }
 }

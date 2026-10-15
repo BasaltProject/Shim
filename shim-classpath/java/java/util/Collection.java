@@ -40,9 +40,52 @@ public interface Collection<T> extends Iterable<T> {
 
   public boolean removeAll(Collection<?> c);
 
+  default boolean retainAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    boolean changed = false;
+    Iterator<T> it = iterator();
+    while (it.hasNext()) {
+      if (!c.contains(it.next())) {
+        it.remove();
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   public Object[] toArray();
 
   public <S> S[] toArray(S[] array);
 
   public void clear();
+
+  default boolean removeIf(java.util.function.Predicate<? super T> filter) {
+    Objects.requireNonNull(filter);
+    boolean removed = false;
+    Iterator<T> it = iterator();
+    while (it.hasNext()) {
+      if (filter.test(it.next())) {
+        it.remove();
+        removed = true;
+      }
+    }
+    return removed;
+  }
+
+  @Override
+  default Spliterator<T> spliterator() {
+    return Spliterators.spliterator(this, 0);
+  }
+
+  default java.util.stream.Stream<T> stream() {
+    return java.util.stream.StreamSupport.stream(spliterator(), false);
+  }
+
+  default java.util.stream.Stream<T> parallelStream() {
+    return java.util.stream.StreamSupport.stream(spliterator(), true);
+  }
+
+  default <T1> T1[] toArray(java.util.function.IntFunction<T1[]> generator) {
+    return toArray(generator.apply(0));
+  }
 }

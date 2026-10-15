@@ -206,6 +206,7 @@ const unsigned ContinuationFlag = 1 << 11;
 // method vmFlags:
 const unsigned ClassInitFlag = 1 << 0;
 const unsigned ConstructorFlag = 1 << 1;
+const unsigned InterfaceMethodFlag = 1 << 2;
 
 #ifndef JNI_VERSION_1_6
 #define JNI_VERSION_1_6 0x00010006

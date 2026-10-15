@@ -39,10 +39,19 @@ public class Utf8 {
     ByteArrayOutputStream buf = new ByteArrayOutputStream();
     for (int i = offset; i < offset+length; ++i) {
       char c = s16[i];
-      if (c == '\u0000') {     // null char
-        buf.write(0);
-        buf.write(0);
-      } else if (c < 0x080) {  // 1 byte char
+      if (c >= 0xD800 && c <= 0xDBFF && i + 1 < offset + length) {
+        char low = s16[i + 1];
+        if (low >= 0xDC00 && low <= 0xDFFF) {
+          int cp = (((c & 0x3FF) << 10) | (low & 0x3FF)) + 0x10000;
+          buf.write(0xF0 | ((cp >>> 18) & 0x07));
+          buf.write(0x80 | ((cp >>> 12) & 0x3F));
+          buf.write(0x80 | ((cp >>> 6) & 0x3F));
+          buf.write(0x80 | (cp & 0x3F));
+          ++i;
+          continue;
+        }
+      }
+      if (c < 0x080) {  // 1 byte char
         buf.write(c);
       } else if (c < 0x0800) { // 2 byte char
         buf.write(0x0c0 | (c >>> 6));
@@ -92,6 +101,22 @@ public class Utf8 {
         }
         int y = s8[i++]; int z = s8[i++];
         cram(buf, j++, ((x & 0xf) << 12) | ((y & 0x3f) << 6) | (z & 0x3f));
+      } else if ((x & 0x0f8) == 0x0f0) { // 4 byte char
+        if (i + 2 >= offset + length) {
+          return null;
+        }
+
+        if (!isMultiByte) {
+          buf = widen(buf, j, length);
+          isMultiByte = true;
+        }
+        int y = s8[i++]; int z = s8[i++]; int w = s8[i++];
+        int cp = ((x & 0x07) << 18) | ((y & 0x3f) << 12) | ((z & 0x3f) << 6) | (w & 0x3f);
+        int cpPrime = cp - 0x10000;
+        int high = 0xD800 | ((cpPrime >> 10) & 0x3FF);
+        int low = 0xDC00 | (cpPrime & 0x3FF);
+        cram(buf, j++, high);
+        cram(buf, j++, low);
       }
     }
 

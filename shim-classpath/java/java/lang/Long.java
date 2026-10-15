@@ -203,4 +203,102 @@ public final class Long extends Number implements Comparable<Long> {
 
     return number;
   }
+
+  public static int compareUnsigned(long x, long y) {
+    return compare(x + MIN_VALUE, y + MIN_VALUE);
+  }
+
+  public static long divideUnsigned(long dividend, long divisor) {
+    if (divisor < 0L) {
+      return (compareUnsigned(dividend, divisor)) < 0 ? 0L : 1L;
+    }
+    if (dividend >= 0) {
+      return dividend / divisor;
+    } else {
+      long q = ((dividend >>> 1) / divisor) << 1;
+      long r = dividend - q * divisor;
+      if (compareUnsigned(r, divisor) >= 0) {
+        q++;
+      }
+      return q;
+    }
+  }
+
+  public static long remainderUnsigned(long dividend, long divisor) {
+    if (dividend >= 0 && divisor > 0) {
+      return dividend % divisor;
+    } else {
+      long q = divideUnsigned(dividend, divisor);
+      return dividend - q * divisor;
+    }
+  }
+
+  public static String toUnsignedString(long i, int radix) {
+    if (i >= 0) {
+      return toString(i, radix);
+    }
+    if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+      radix = 10;
+    }
+    char[] buf = new char[65];
+    int charPos = 65;
+    long radixL = radix;
+    while (compareUnsigned(i, radixL) >= 0) {
+      long q = divideUnsigned(i, radixL);
+      long r = i - q * radixL;
+      buf[--charPos] = Character.forDigit((int) r, radix);
+      i = q;
+    }
+    buf[--charPos] = Character.forDigit((int) i, radix);
+    return new String(buf, charPos, 65 - charPos);
+  }
+
+  public static String toUnsignedString(long i) {
+    return toUnsignedString(i, 10);
+  }
+
+  public static long parseUnsignedLong(String s, int radix) {
+    if (s == null) {
+      throw new NumberFormatException("null");
+    }
+    int len = s.length();
+    if (len > 0) {
+      char firstChar = s.charAt(0);
+      if (firstChar == '-') {
+        throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s));
+      } else {
+        if (len <= 12 || (radix == 10 && len <= 18)) {
+          return parseLong(s, radix);
+        }
+        long first = parseUnsignedLong(s.substring(0, len - 1), radix);
+        int second = Character.digit(s.charAt(len - 1), radix);
+        if (second < 0) {
+          throw new NumberFormatException("Bad digit at end of " + s);
+        }
+        long result = first * radix + second;
+        if (compareUnsigned(result, first) < 0 || divideUnsigned(result - second, radix) != first) {
+          throw new NumberFormatException(String.format("String value %s exceeds range of unsigned long.", s));
+        }
+        return result;
+      }
+    } else {
+      throw new NumberFormatException("For input string: \"\"");
+    }
+  }
+
+  public static long parseUnsignedLong(String s) {
+    return parseUnsignedLong(s, 10);
+  }
+
+  public static long min(long a, long b) {
+    return Math.min(a, b);
+  }
+
+  public static long max(long a, long b) {
+    return Math.max(a, b);
+  }
+
+  public static long sum(long a, long b) {
+    return a + b;
+  }
 }

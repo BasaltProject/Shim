@@ -25,9 +25,14 @@ package java.lang;
 
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Formatter;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.StringJoiner;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import shim.Iso88591;
@@ -707,5 +712,315 @@ public final class String
     } else {
       throw new UnsupportedOperationException("toLowerCase("+locale+')');
     }
+  }
+
+  public int codePointBefore(int index) {
+    return Character.codePointBefore(this, index);
+  }
+
+  private int indexOfNonWhitespace() {
+    int i = 0;
+    while (i < length) {
+      int cp = codePointAt(i);
+      if (!Character.isWhitespace(cp)) {
+        return i;
+      }
+      i += Character.charCount(cp);
+    }
+    return length;
+  }
+
+  private int lastIndexOfNonWhitespace() {
+    int i = length;
+    while (i > 0) {
+      int cp = codePointBefore(i);
+      if (!Character.isWhitespace(cp)) {
+        return i;
+      }
+      i -= Character.charCount(cp);
+    }
+    return 0;
+  }
+
+  public String strip() {
+    int left = indexOfNonWhitespace();
+    if (left == length) {
+      return "";
+    }
+    int right = lastIndexOfNonWhitespace();
+    return (left == 0 && right == length) ? this : substring(left, right);
+  }
+
+  public String stripLeading() {
+    int left = indexOfNonWhitespace();
+    return left == 0 ? this : substring(left, length);
+  }
+
+  public String stripTrailing() {
+    int right = lastIndexOfNonWhitespace();
+    return right == length ? this : substring(0, right);
+  }
+
+  public boolean isBlank() {
+    return indexOfNonWhitespace() == length;
+  }
+
+  public String repeat(int count) {
+    if (count < 0) {
+      throw new IllegalArgumentException("count is negative: " + count);
+    }
+    if (count == 1) {
+      return this;
+    }
+    if (count == 0 || length == 0) {
+      return "";
+    }
+    long total = (long) length * (long) count;
+    if (total > Integer.MAX_VALUE) {
+      throw new OutOfMemoryError("Required array size too large");
+    }
+    char[] chars = new char[(int) total];
+    char[] src = toCharArray();
+    for (int i = 0; i < count; i++) {
+      System.arraycopy(src, 0, chars, i * length, length);
+    }
+    return new String(chars);
+  }
+
+  public <R> R transform(Function<? super String, ? extends R> f) {
+    return f.apply(this);
+  }
+
+  public String formatted(Object... args) {
+    return String.format(this, args);
+  }
+
+  private List<String> extractLines() {
+    List<String> result = new ArrayList<String>();
+    int len = length;
+    int index = 0;
+    while (index < len) {
+      int lineStart = index;
+      while (index < len && charAt(index) != '\n' && charAt(index) != '\r') {
+        index++;
+      }
+      result.add(substring(lineStart, index));
+      if (index < len) {
+        if (charAt(index) == '\r' && (index + 1) < len && charAt(index + 1) == '\n') {
+          index += 2;
+        } else {
+          index += 1;
+        }
+      }
+    }
+    return result;
+  }
+
+  public String indent(int n) {
+    if (isEmpty()) {
+      return "";
+    }
+    List<String> list = extractLines();
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < list.size(); i++) {
+      String line = list.get(i);
+      if (n > 0) {
+        for (int s = 0; s < n; s++) {
+          sb.append(' ');
+        }
+        sb.append(line);
+      } else if (n < 0) {
+        int left = line.indexOfNonWhitespace();
+        int toRemove = Math.min(-n, left);
+        sb.append(line.substring(toRemove));
+      } else {
+        sb.append(line);
+      }
+      sb.append('\n');
+    }
+    return sb.toString();
+  }
+
+  public String stripIndent() {
+    int len = length;
+    if (len == 0) {
+      return "";
+    }
+    char last = charAt(len - 1);
+    boolean hasTrailingNewline = (last == '\n' || last == '\r');
+    List<String> list = extractLines();
+    int outdent = hasTrailingNewline ? 0 : outdent(list);
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < list.size(); i++) {
+      String line = list.get(i);
+      int left = line.indexOfNonWhitespace();
+      int right = line.lastIndexOfNonWhitespace();
+      int from = Math.min(outdent, left);
+      if (left <= right) {
+        sb.append(line.substring(from, right));
+      }
+      if (i + 1 < list.size() || hasTrailingNewline) {
+        sb.append('\n');
+      }
+    }
+    return sb.toString();
+  }
+
+  private static int outdent(List<String> list) {
+    int min = Integer.MAX_VALUE;
+    for (int i = 0; i < list.size(); i++) {
+      String line = list.get(i);
+      int idx = line.indexOfNonWhitespace();
+      if (idx != line.length()) {
+        min = Math.min(min, idx);
+      }
+    }
+    String lastLine = list.get(list.size() - 1);
+    if (lastLine.isBlank()) {
+      min = Math.min(min, lastLine.length());
+    }
+    return min == Integer.MAX_VALUE ? 0 : min;
+  }
+
+  public String translateEscapes() {
+    int len = length;
+    if (len == 0) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder(len);
+    for (int i = 0; i < len; i++) {
+      char c = charAt(i);
+      if (c == '\\') {
+        if (i + 1 >= len) {
+          throw new IllegalArgumentException("Invalid escape sequence: \\ at end of string");
+        }
+        i++;
+        char next = charAt(i);
+        switch (next) {
+          case 'b':
+            sb.append('\b');
+            break;
+          case 't':
+            sb.append('\t');
+            break;
+          case 'n':
+            sb.append('\n');
+            break;
+          case 'f':
+            sb.append('\f');
+            break;
+          case 'r':
+            sb.append('\r');
+            break;
+          case '\"':
+            sb.append('\"');
+            break;
+          case '\'':
+            sb.append('\'');
+            break;
+          case '\\':
+            sb.append('\\');
+            break;
+          case '\n':
+            break;
+          case '\r':
+            if (i + 1 < len && charAt(i + 1) == '\n') {
+              i++;
+            }
+            break;
+          case '0': case '1': case '2': case '3':
+          case '4': case '5': case '6': case '7': {
+            int octal = next - '0';
+            int maxDigits = (next <= '3') ? 2 : 1;
+            for (int d = 0; d < maxDigits; d++) {
+              if (i + 1 < len) {
+                char ch = charAt(i + 1);
+                if (ch >= '0' && ch <= '7') {
+                  octal = (octal << 3) | (ch - '0');
+                  i++;
+                } else {
+                  break;
+                }
+              }
+            }
+            sb.append((char) octal);
+            break;
+          }
+          default:
+            throw new IllegalArgumentException("Invalid escape sequence: \\" + next);
+        }
+      } else {
+        sb.append(c);
+      }
+    }
+    return sb.toString();
+  }
+
+  public static String join(CharSequence delimiter, CharSequence... elements) {
+    Objects.requireNonNull(delimiter);
+    Objects.requireNonNull(elements);
+    StringJoiner joiner = new StringJoiner(delimiter);
+    for (int i = 0; i < elements.length; i++) {
+      joiner.add(elements[i]);
+    }
+    return joiner.toString();
+  }
+
+  public static String join(CharSequence delimiter, Iterable<? extends CharSequence> elements) {
+    Objects.requireNonNull(delimiter);
+    Objects.requireNonNull(elements);
+    StringJoiner joiner = new StringJoiner(delimiter);
+    for (CharSequence cs : elements) {
+      joiner.add(cs);
+    }
+    return joiner.toString();
+  }
+
+  public java.util.stream.Stream<String> lines() {
+    class LineIterator implements java.util.Iterator<String> {
+      private int next = 0;
+      private final int fence = length();
+      private String line = null;
+
+      @Override
+      public boolean hasNext() {
+        if (line != null) {
+          return true;
+        }
+        if (next > fence || next == fence) {
+          return false;
+        }
+        int i = next;
+        while (i < fence) {
+          char c = charAt(i);
+          if (c == '\n' || c == '\r') {
+            line = substring(next, i);
+            if (c == '\r' && i + 1 < fence && charAt(i + 1) == '\n') {
+              next = i + 2;
+            } else {
+              next = i + 1;
+            }
+            return true;
+          }
+          i++;
+        }
+        line = substring(next, fence);
+        next = fence;
+        return true;
+      }
+
+      @Override
+      public String next() {
+        if (!hasNext()) {
+          throw new java.util.NoSuchElementException();
+        }
+        String ret = line;
+        line = null;
+        return ret;
+      }
+    }
+    return java.util.stream.StreamSupport.stream(
+        java.util.Spliterators.spliteratorUnknownSize(new LineIterator(), java.util.Spliterator.ORDERED | java.util.Spliterator.NONNULL),
+        false);
   }
 }

@@ -473,4 +473,13 @@ public class LinkedList<T> extends AbstractSequentialList<T> implements Deque<T>
       }
     }
   }
+
+  @Override
+  public LinkedList<T> reversed() {
+    LinkedList<T> copy = new LinkedList<T>();
+    for (Cell<T> c = rear; c != null; c = c.prev) {
+      copy.add(c.value);
+    }
+    return copy;
+  }
 }

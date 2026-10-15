@@ -86,4 +86,20 @@ public final class Short extends Number implements Comparable<Short> {
   public double doubleValue() {
     return (double) value;
   }
+
+  public static int toUnsignedInt(short x) {
+    return ((int) x) & 0xffff;
+  }
+
+  public static long toUnsignedLong(short x) {
+    return ((long) x) & 0xffffL;
+  }
+
+  public static int compareUnsigned(short x, short y) {
+    return toUnsignedInt(x) - toUnsignedInt(y);
+  }
+
+  public static int compare(short x, short y) {
+    return x - y;
+  }
 }
