@@ -47,12 +47,32 @@ public class InetSocketAddress extends SocketAddress {
     this.port = port;
   }
 
+  public static InetSocketAddress createUnresolved(String host, int port) {
+    return new InetSocketAddress(host, port, false);
+  }
+
+  private InetSocketAddress(String host, int port, boolean resolve) {
+    if (port < 0 || port > 0xFFFF) throw new IllegalArgumentException("port out of range:" + port);
+    if (host == null) throw new IllegalArgumentException("hostname can't be null");
+    this.host = host;
+    this.address = null;
+    this.port = port;
+  }
+
   public InetAddress getAddress() {
     return address;
   }
   
   public String getHostName() {
     return host;
+  }
+
+  public final String getHostString() {
+    return host;
+  }
+
+  public final boolean isUnresolved() {
+    return address == null;
   }
 
   public int getPort() {
