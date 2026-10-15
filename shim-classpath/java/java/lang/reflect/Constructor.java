@@ -62,7 +62,31 @@ public class Constructor<T> extends Executable {
   }
 
   public String getName() {
-    return method.getName();
+    return getDeclaringClass().getName();
+  }
+
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    int mod = getModifiers() & Modifier.constructorModifiers();
+    if (mod != 0) {
+      sb.append(Modifier.toString(mod)).append(' ');
+    }
+    sb.append(getDeclaringClass().getName()).append('(');
+    Class<?>[] params = getParameterTypes();
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) sb.append(',');
+      sb.append(params[i].getName());
+    }
+    sb.append(')');
+    Class<?>[] exceptions = getExceptionTypes();
+    if (exceptions.length > 0) {
+      sb.append(" throws ");
+      for (int i = 0; i < exceptions.length; i++) {
+        if (i > 0) sb.append(',');
+        sb.append(exceptions[i].getName());
+      }
+    }
+    return sb.toString();
   }
 
   public <T extends Annotation> T getAnnotation(Class<T> class_) {

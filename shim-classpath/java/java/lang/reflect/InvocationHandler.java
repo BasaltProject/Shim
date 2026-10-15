@@ -23,6 +23,31 @@
 
 package java.lang.reflect;
 
+import java.util.Objects;
+
 public interface InvocationHandler {
   public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable;
+
+  public static Object invokeDefault(Object proxy, Method method, Object... args) throws Throwable {
+    Objects.requireNonNull(proxy, "proxy");
+    Objects.requireNonNull(method, "method");
+    if (!Proxy.isProxyClass(proxy.getClass())) {
+      throw new IllegalArgumentException("not a proxy instance");
+    }
+    if (!method.isDefault()) {
+      throw new IllegalArgumentException("not a default method");
+    }
+    if (!method.getDeclaringClass().isAssignableFrom(proxy.getClass())) {
+      throw new IllegalArgumentException("default method is not member of proxy interface: " + method);
+    }
+    try {
+      return method.invokeNonVirtual(proxy, args != null ? args : new Object[0]);
+    } catch (InvocationTargetException e) {
+      Throwable target = e.getTargetException();
+      if (target != null) {
+        throw target;
+      }
+      throw e;
+    }
+  }
 }

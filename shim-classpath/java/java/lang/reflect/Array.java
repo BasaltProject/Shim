@@ -140,4 +140,280 @@ public final class Array {
       return makeObjectArray(elementType, length);
     }
   }
+
+  public static boolean getBoolean(Object array, int index) {
+    if (array instanceof boolean[]) {
+      return ((boolean[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of type boolean");
+  }
+
+  public static byte getByte(Object array, int index) {
+    if (array instanceof byte[]) {
+      return ((byte[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of type byte");
+  }
+
+  public static char getChar(Object array, int index) {
+    if (array instanceof char[]) {
+      return ((char[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of type char");
+  }
+
+  public static short getShort(Object array, int index) {
+    if (array instanceof short[]) {
+      return ((short[]) array)[index];
+    }
+    if (array instanceof byte[]) {
+      return ((byte[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of type short or byte");
+  }
+
+  public static int getInt(Object array, int index) {
+    if (array instanceof int[]) {
+      return ((int[]) array)[index];
+    }
+    if (array instanceof byte[]) {
+      return ((byte[]) array)[index];
+    }
+    if (array instanceof short[]) {
+      return ((short[]) array)[index];
+    }
+    if (array instanceof char[]) {
+      return ((char[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of compatible integral type");
+  }
+
+  public static long getLong(Object array, int index) {
+    if (array instanceof long[]) {
+      return ((long[]) array)[index];
+    }
+    if (array instanceof int[]) {
+      return ((int[]) array)[index];
+    }
+    if (array instanceof byte[]) {
+      return ((byte[]) array)[index];
+    }
+    if (array instanceof short[]) {
+      return ((short[]) array)[index];
+    }
+    if (array instanceof char[]) {
+      return ((char[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of compatible integral type");
+  }
+
+  public static float getFloat(Object array, int index) {
+    if (array instanceof float[]) {
+      return ((float[]) array)[index];
+    }
+    if (array instanceof int[]) {
+      return ((int[]) array)[index];
+    }
+    if (array instanceof long[]) {
+      return ((long[]) array)[index];
+    }
+    if (array instanceof byte[]) {
+      return ((byte[]) array)[index];
+    }
+    if (array instanceof short[]) {
+      return ((short[]) array)[index];
+    }
+    if (array instanceof char[]) {
+      return ((char[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of compatible type");
+  }
+
+  public static double getDouble(Object array, int index) {
+    if (array instanceof double[]) {
+      return ((double[]) array)[index];
+    }
+    if (array instanceof float[]) {
+      return ((float[]) array)[index];
+    }
+    if (array instanceof long[]) {
+      return ((long[]) array)[index];
+    }
+    if (array instanceof int[]) {
+      return ((int[]) array)[index];
+    }
+    if (array instanceof byte[]) {
+      return ((byte[]) array)[index];
+    }
+    if (array instanceof short[]) {
+      return ((short[]) array)[index];
+    }
+    if (array instanceof char[]) {
+      return ((char[]) array)[index];
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of compatible type");
+  }
+
+  public static void setBoolean(Object array, int index, boolean z) {
+    if (array instanceof boolean[]) {
+      ((boolean[]) array)[index] = z;
+      return;
+    }
+    if (array == null) throw new NullPointerException();
+    throw new IllegalArgumentException("argument is not an array of type boolean");
+  }
+
+  public static void setByte(Object array, int index, byte b) {
+    if (array instanceof byte[]) {
+      ((byte[]) array)[index] = b;
+    } else if (array instanceof short[]) {
+      ((short[]) array)[index] = b;
+    } else if (array instanceof int[]) {
+      ((int[]) array)[index] = b;
+    } else if (array instanceof long[]) {
+      ((long[]) array)[index] = b;
+    } else if (array instanceof float[]) {
+      ((float[]) array)[index] = b;
+    } else if (array instanceof double[]) {
+      ((double[]) array)[index] = b;
+    } else if (array == null) {
+      throw new NullPointerException();
+    } else {
+      throw new IllegalArgumentException("argument is not an array of compatible type");
+    }
+  }
+
+  public static void setChar(Object array, int index, char c) {
+    if (array instanceof char[]) {
+      ((char[]) array)[index] = c;
+    } else if (array instanceof int[]) {
+      ((int[]) array)[index] = c;
+    } else if (array instanceof long[]) {
+      ((long[]) array)[index] = c;
+    } else if (array instanceof float[]) {
+      ((float[]) array)[index] = c;
+    } else if (array instanceof double[]) {
+      ((double[]) array)[index] = c;
+    } else if (array == null) {
+      throw new NullPointerException();
+    } else {
+      throw new IllegalArgumentException("argument is not an array of compatible type");
+    }
+  }
+
+  public static void setShort(Object array, int index, short s) {
+    if (array instanceof short[]) {
+      ((short[]) array)[index] = s;
+    } else if (array instanceof int[]) {
+      ((int[]) array)[index] = s;
+    } else if (array instanceof long[]) {
+      ((long[]) array)[index] = s;
+    } else if (array instanceof float[]) {
+      ((float[]) array)[index] = s;
+    } else if (array instanceof double[]) {
+      ((double[]) array)[index] = s;
+    } else if (array == null) {
+      throw new NullPointerException();
+    } else {
+      throw new IllegalArgumentException("argument is not an array of compatible type");
+    }
+  }
+
+  public static void setInt(Object array, int index, int i) {
+    if (array instanceof int[]) {
+      ((int[]) array)[index] = i;
+    } else if (array instanceof long[]) {
+      ((long[]) array)[index] = i;
+    } else if (array instanceof float[]) {
+      ((float[]) array)[index] = i;
+    } else if (array instanceof double[]) {
+      ((double[]) array)[index] = i;
+    } else if (array == null) {
+      throw new NullPointerException();
+    } else {
+      throw new IllegalArgumentException("argument is not an array of compatible type");
+    }
+  }
+
+  public static void setLong(Object array, int index, long l) {
+    if (array instanceof long[]) {
+      ((long[]) array)[index] = l;
+    } else if (array instanceof float[]) {
+      ((float[]) array)[index] = l;
+    } else if (array instanceof double[]) {
+      ((double[]) array)[index] = l;
+    } else if (array == null) {
+      throw new NullPointerException();
+    } else {
+      throw new IllegalArgumentException("argument is not an array of compatible type");
+    }
+  }
+
+  public static void setFloat(Object array, int index, float f) {
+    if (array instanceof float[]) {
+      ((float[]) array)[index] = f;
+    } else if (array instanceof double[]) {
+      ((double[]) array)[index] = f;
+    } else if (array == null) {
+      throw new NullPointerException();
+    } else {
+      throw new IllegalArgumentException("argument is not an array of compatible type");
+    }
+  }
+
+  public static void setDouble(Object array, int index, double d) {
+    if (array instanceof double[]) {
+      ((double[]) array)[index] = d;
+    } else if (array == null) {
+      throw new NullPointerException();
+    } else {
+      throw new IllegalArgumentException("argument is not an array of type double");
+    }
+  }
+
+  public static Object newInstance(Class componentType, int... dimensions)
+      throws IllegalArgumentException, NegativeArraySizeException {
+    if (componentType == null) {
+      throw new NullPointerException();
+    }
+    if (dimensions == null || dimensions.length == 0 || dimensions.length > 255) {
+      throw new IllegalArgumentException();
+    }
+    if (componentType == void.class) {
+      throw new IllegalArgumentException("Cannot create void array");
+    }
+    for (int d : dimensions) {
+      if (d < 0) {
+        throw new NegativeArraySizeException();
+      }
+    }
+    if (dimensions.length == 1) {
+      return newInstance(componentType, dimensions[0]);
+    }
+    return multiNewInstance(componentType, dimensions, 0);
+  }
+
+  private static Object multiNewInstance(Class componentType, int[] dimensions, int index) {
+    int length = dimensions[index];
+    if (index == dimensions.length - 1) {
+      return newInstance(componentType, length);
+    }
+    Class subArrayType = componentType;
+    for (int i = 0; i < dimensions.length - 1 - index; i++) {
+      subArrayType = subArrayType.arrayType();
+    }
+    Object[] result = (Object[]) makeObjectArray(subArrayType, length);
+    for (int i = 0; i < length; i++) {
+      result[i] = multiNewInstance(componentType, dimensions, index + 1);
+    }
+    return result;
+  }
 }

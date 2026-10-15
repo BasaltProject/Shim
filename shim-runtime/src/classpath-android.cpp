@@ -1280,6 +1280,17 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_reflect_Method_invokeNonVirtual(Thread* t,
+                                                   object,
+                                                   uintptr_t* arguments)
+{
+  return invokeMethodNonVirtual(t,
+                                cast<GcMethod>(t, reinterpret_cast<object>(arguments[0])),
+                                reinterpret_cast<object>(arguments[1]),
+                                reinterpret_cast<object>(arguments[2]));
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_reflect_Field_getObject(Thread*,
                                             object,
                                             uintptr_t* arguments)

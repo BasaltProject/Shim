@@ -875,6 +875,22 @@ int64_t invokeMethod(Thread* t, GcMethod* method, object instance, object args)
       t, returnCode, t->m->processor->invokeArray(t, method, instance, args)));
 }
 
+int64_t invokeMethodNonVirtual(Thread* t, GcMethod* method, object instance, object args)
+{
+  THREAD_RESOURCE0(t, {
+    if (t->exception) {
+      GcThrowable* exception = t->exception;
+      t->exception = makeThrowable(
+          t, GcInvocationTargetException::Type, 0, 0, exception);
+    }
+  });
+
+  unsigned returnCode = method->returnCode();
+
+  return reinterpret_cast<int64_t>(translateInvokeResult(
+      t, returnCode, t->m->processor->invokeArrayNonVirtual(t, method, instance, args)));
+}
+
 }  // namespace vm
 
 #endif  // CLASSPATH_COMMON_H

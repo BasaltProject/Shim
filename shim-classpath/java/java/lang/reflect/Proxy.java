@@ -85,10 +85,19 @@ public class Proxy {
   }
 
   public static boolean isProxyClass(Class c) {
-    return c.getName().startsWith("Proxy-");
+    if (c == null) {
+      throw new NullPointerException();
+    }
+    return Proxy.class.isAssignableFrom(c) && c != Proxy.class;
   }
 
   public static InvocationHandler getInvocationHandler(Object proxy) {
+    if (proxy == null) {
+      throw new NullPointerException();
+    }
+    if (!isProxyClass(proxy.getClass())) {
+      throw new IllegalArgumentException("not a proxy instance");
+    }
     return ((Proxy) proxy).h;
   }
 
@@ -252,14 +261,15 @@ public class Proxy {
     }
 
     write1(out, invokeinterface);
-    write2(out, ConstantPool.addMethodRef
+    write2(out, ConstantPool.addInterfaceMethodRef
            (pool, "java/lang/reflect/InvocationHandler",
             "invoke",
             "(Ljava/lang/Object;"
             + "Ljava/lang/reflect/Method;"
             + "[Ljava/lang/Object;)"
             + "Ljava/lang/Object;") + 1);
-    write2(out, 0); // this will be ignored by the VM
+    write1(out, 4);
+    write1(out, 0);
 
     switch (spec[si + 1]) {
     case 'L':

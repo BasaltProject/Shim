@@ -9227,6 +9227,42 @@ class MyProcessor : public Processor {
     return local::invoke(t, method, &list);
   }
 
+  virtual object invokeArrayNonVirtual(Thread* t,
+                                       GcMethod* method,
+                                       object this_,
+                                       object arguments)
+  {
+    assertT(t, t->exception == 0);
+
+    assertT(
+        t,
+        t->state == Thread::ActiveState or t->state == Thread::ExclusiveState);
+
+    assertT(t, ((method->flags() & ACC_STATIC) == 0) xor (this_ == 0));
+
+    const char* spec = reinterpret_cast<char*>(method->spec()->body().begin());
+
+    unsigned size = method->parameterFootprint();
+    THREAD_RUNTIME_ARRAY(t, uintptr_t, array, size);
+    THREAD_RUNTIME_ARRAY(t, bool, objectMask, size);
+    ArgumentList list(t,
+                      RUNTIME_ARRAY_BODY(array),
+                      size,
+                      RUNTIME_ARRAY_BODY(objectMask),
+                      this_,
+                      spec,
+                      arguments);
+
+    PROTECT(t, method);
+
+    compile(static_cast<MyThread*>(t),
+            local::codeAllocator(static_cast<MyThread*>(t)),
+            0,
+            method);
+
+    return local::invoke(t, method, &list);
+  }
+
   virtual object invokeArray(Thread* t,
                              GcMethod* method,
                              object this_,

@@ -25,6 +25,7 @@ package java.lang.invoke;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -72,6 +73,130 @@ public class MethodHandles {
     Objects.requireNonNull(target);
     Objects.requireNonNull(filter);
     return new MethodHandle.FilterReturnValueMethodHandle(target, filter);
+  }
+
+  public static MethodHandle insertArguments(MethodHandle target, int pos, Object... values) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(values);
+    return new MethodHandle.InsertArgumentsMethodHandle(target, pos, values);
+  }
+
+  public static MethodHandle filterArguments(MethodHandle target, int pos, MethodHandle... filters) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(filters);
+    return new MethodHandle.FilterArgumentsMethodHandle(target, pos, filters);
+  }
+
+  public static MethodHandle permuteArguments(MethodHandle target, MethodType newType, int... reorder) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(newType);
+    Objects.requireNonNull(reorder);
+    return new MethodHandle.PermuteArgumentsMethodHandle(target, newType, reorder);
+  }
+
+  public static MethodHandle foldArguments(MethodHandle target, MethodHandle combiner) {
+    return foldArguments(target, 0, combiner);
+  }
+
+  public static MethodHandle foldArguments(MethodHandle target, int pos, MethodHandle combiner) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(combiner);
+    return new MethodHandle.FoldArgumentsMethodHandle(target, pos, combiner);
+  }
+
+  public static MethodHandle guardWithTest(MethodHandle test, MethodHandle target, MethodHandle fallback) {
+    Objects.requireNonNull(test);
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(fallback);
+    return new MethodHandle.GuardWithTestMethodHandle(test, target, fallback);
+  }
+
+  public static MethodHandle catchException(MethodHandle target, Class<? extends Throwable> exType, MethodHandle handler) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(exType);
+    Objects.requireNonNull(handler);
+    return new MethodHandle.CatchExceptionMethodHandle(target, exType, handler);
+  }
+
+  public static MethodHandle throwException(Class<?> returnType, Class<? extends Throwable> exType) {
+    Objects.requireNonNull(returnType);
+    Objects.requireNonNull(exType);
+    return new MethodHandle.ThrowExceptionMethodHandle(returnType, exType);
+  }
+
+  public static MethodHandle dropReturn(MethodHandle target) {
+    Objects.requireNonNull(target);
+    return new MethodHandle.DropReturnMethodHandle(target);
+  }
+
+  public static MethodHandle zero(Class<?> type) {
+    Objects.requireNonNull(type);
+    if (type == void.class) {
+      return constant(void.class, null);
+    }
+    if (type == boolean.class) {
+      return constant(boolean.class, Boolean.FALSE);
+    }
+    if (type == byte.class) {
+      return constant(byte.class, Byte.valueOf((byte) 0));
+    }
+    if (type == short.class) {
+      return constant(short.class, Short.valueOf((short) 0));
+    }
+    if (type == char.class) {
+      return constant(char.class, Character.valueOf('\0'));
+    }
+    if (type == int.class) {
+      return constant(int.class, Integer.valueOf(0));
+    }
+    if (type == long.class) {
+      return constant(long.class, Long.valueOf(0L));
+    }
+    if (type == float.class) {
+      return constant(float.class, Float.valueOf(0.0f));
+    }
+    if (type == double.class) {
+      return constant(double.class, Double.valueOf(0.0d));
+    }
+    return constant(type, null);
+  }
+
+  public static MethodHandle empty(MethodType type) {
+    Objects.requireNonNull(type);
+    MethodHandle z = zero(type.returnType());
+    return dropArguments(z, 0, type.parameterList());
+  }
+
+  public static MethodHandle arrayConstructor(Class<?> arrayClass) {
+    Objects.requireNonNull(arrayClass);
+    if (!arrayClass.isArray()) {
+      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+    }
+    return new MethodHandle.ArrayConstructorMethodHandle(arrayClass);
+  }
+
+  public static MethodHandle arrayLength(Class<?> arrayClass) {
+    Objects.requireNonNull(arrayClass);
+    if (!arrayClass.isArray()) {
+      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+    }
+    return new MethodHandle.ArrayLengthMethodHandle(arrayClass);
+  }
+
+  public static MethodHandle arrayElementGetter(Class<?> arrayClass) {
+    Objects.requireNonNull(arrayClass);
+    if (!arrayClass.isArray()) {
+      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+    }
+    return new MethodHandle.ArrayElementGetterMethodHandle(arrayClass);
+  }
+
+  public static MethodHandle arrayElementSetter(Class<?> arrayClass) {
+    Objects.requireNonNull(arrayClass);
+    if (!arrayClass.isArray()) {
+      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+    }
+    return new MethodHandle.ArrayElementSetterMethodHandle(arrayClass);
   }
 
   public static Lookup privateLookupIn(Class<?> targetClass, Lookup lookup) throws IllegalAccessException {
@@ -299,9 +424,137 @@ public class MethodHandles {
       return Class.forName(targetName, false, loader);
     }
 
+    public boolean hasPrivateAccess() {
+      return (modes & PRIVATE) != 0;
+    }
+
+    public Class<?> accessClass(Class<?> targetClass) throws IllegalAccessException {
+      Objects.requireNonNull(targetClass, "targetClass");
+      return targetClass;
+    }
+
+    public Class<?> ensureInitialized(Class<?> targetClass) throws IllegalAccessException {
+      Objects.requireNonNull(targetClass, "targetClass");
+      if (targetClass.isPrimitive() || targetClass.isArray()) {
+        throw new IllegalArgumentException("targetClass is primitive or array: " + targetClass);
+      }
+      try {
+        Class.forName(targetClass.getName(), true, targetClass.getClassLoader());
+      } catch (ClassNotFoundException e) {
+        throw new NoClassDefFoundError(e.getMessage());
+      }
+      return targetClass;
+    }
+
+    public MethodHandle bind(Object receiver, String name, MethodType type)
+        throws NoSuchMethodException, IllegalAccessException {
+      Objects.requireNonNull(receiver, "receiver");
+      Objects.requireNonNull(name, "name");
+      Objects.requireNonNull(type, "type");
+      return findVirtual(receiver.getClass(), name, type).bindTo(receiver);
+    }
+
+    public MethodHandleInfo revealDirect(MethodHandle target) {
+      Objects.requireNonNull(target, "target");
+      if (target instanceof MethodHandle.FieldMethodHandle) {
+        MethodHandle.FieldMethodHandle fmh = (MethodHandle.FieldMethodHandle) target;
+        return new DirectMethodHandleInfo(fmh.kind, fmh.targetField);
+      }
+      if (target.method != null) {
+        return new DirectMethodHandleInfo(target.kind, target.method);
+      }
+      throw new IllegalArgumentException("not a direct method handle");
+    }
+
+    public Class<?> defineClass(byte[] bytes) throws IllegalAccessException {
+      Objects.requireNonNull(bytes, "bytes");
+      if (!hasFullPrivilegeAccess()) {
+        throw new IllegalAccessException("Lookup does not have full privilege access");
+      }
+      ClassLoader loader = lookupClass().getClassLoader();
+      if (loader == null) {
+        loader = ClassLoader.getSystemClassLoader();
+      }
+      return shim.SystemClassLoader.getClass(shim.Classes.defineVMClass(loader, bytes, 0, bytes.length));
+    }
+
     public String toString() {
       return "lookup[" + shim.SystemClassLoader.getClass(class_) + ", "
         + modes + "]";
+    }
+  }
+
+  static class DirectMethodHandleInfo implements MethodHandleInfo {
+    private final int kind;
+    private final Member member;
+    private final String name;
+    private final MethodType type;
+
+    DirectMethodHandleInfo(int kind, Field field) {
+      this.kind = kind;
+      this.member = field;
+      this.name = field.getName();
+      Class<?> fieldType = field.getType();
+      if (kind == REF_getField || kind == REF_getStatic) {
+        this.type = MethodType.methodType(fieldType);
+      } else {
+        this.type = MethodType.methodType(void.class, fieldType);
+      }
+    }
+
+    DirectMethodHandleInfo(int kind, shim.VMMethod vmMethod) {
+      this.kind = kind;
+      Method m = new Method(vmMethod);
+      if (kind == REF_newInvokeSpecial) {
+        this.member = new Constructor<>(m);
+        this.name = "<init>";
+        this.type = MethodType.methodType(void.class, m.getParameterTypes());
+      } else {
+        this.member = m;
+        this.name = m.getName();
+        this.type = MethodType.methodType(m.getReturnType(), m.getParameterTypes());
+      }
+    }
+
+    @Override
+    public int getReferenceKind() {
+      return kind;
+    }
+
+    @Override
+    public Class<?> getDeclaringClass() {
+      return member.getDeclaringClass();
+    }
+
+    @Override
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public MethodType getMethodType() {
+      return type;
+    }
+
+    @Override
+    public int getModifiers() {
+      return member.getModifiers();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends Member> T reflectAs(Class<T> expected, Lookup lookup) {
+      Objects.requireNonNull(expected, "expected");
+      Objects.requireNonNull(lookup, "lookup");
+      if (!expected.isInstance(member)) {
+        throw new ClassCastException("Cannot cast " + member.getClass().getName() + " to " + expected.getName());
+      }
+      return (T) member;
+    }
+
+    @Override
+    public String toString() {
+      return MethodHandleInfo.toString(kind, getDeclaringClass(), name, type);
     }
   }
 }
