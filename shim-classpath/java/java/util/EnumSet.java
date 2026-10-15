@@ -106,6 +106,35 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> {
     
     return enumSet;
   }
+
+  @SuppressWarnings("unchecked")
+  public static <E extends Enum<E>> EnumSet<E> copyOf(Collection<E> c) {
+    if (c instanceof EnumSet) {
+      return copyOf((EnumSet<E>) c);
+    }
+    if (c.isEmpty()) {
+      throw new IllegalArgumentException("Collection is empty");
+    }
+    Iterator<E> it = c.iterator();
+    E first = it.next();
+    EnumSet<E> result = of(first);
+    while (it.hasNext()) {
+      result.add(it.next());
+    }
+    return result;
+  }
+
+  public static <E extends Enum<E>> EnumSet<E> range(E from, E to) {
+    if (from.compareTo(to) > 0) {
+      throw new IllegalArgumentException(from + " > " + to);
+    }
+    EnumSet<E> result = noneOf(from.getDeclaringClass());
+    E[] constants = from.getDeclaringClass().getEnumConstants();
+    for (int i = from.ordinal(); i <= to.ordinal(); i++) {
+      result.add(constants[i]);
+    }
+    return result;
+  }
   
   private static <T extends Enum<T>>EnumSet<T> createEmptyEnumSet(Class<T> elementType) {
     T[] constants = elementType.getEnumConstants();

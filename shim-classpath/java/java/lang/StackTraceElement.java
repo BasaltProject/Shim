@@ -31,6 +31,13 @@ public class StackTraceElement {
   private String file;
   private int line;
 
+  public StackTraceElement(String classLoaderName, String moduleName, String moduleVersion,
+                           String declaringClass, String methodName, String fileName,
+                           int lineNumber)
+  {
+    this(declaringClass, methodName, fileName, lineNumber);
+  }
+
   public StackTraceElement(String class_, String method, String file,
                            int line)
   {
@@ -86,5 +93,17 @@ public class StackTraceElement {
 
   public boolean isNativeMethod() {
     return line == NativeLine;
+  }
+
+  public String getClassLoaderName() {
+    return null;
+  }
+
+  public String getModuleName() {
+    return null;
+  }
+
+  public String getModuleVersion() {
+    return null;
   }
 }

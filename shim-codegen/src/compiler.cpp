@@ -2137,7 +2137,7 @@ ForkState* saveState(Context* c)
     appendDummy(c);
   }
 
-  unsigned elementCount = frameFootprint(c, c->stack) + c->saved->count();
+  unsigned elementCount = frameFootprint(c, c->stack) + (c->saved ? c->saved->count() : 0);
 
   ForkState* state = new (c->zone->allocate(
       sizeof(ForkState) + (sizeof(ForkElement) * elementCount)))

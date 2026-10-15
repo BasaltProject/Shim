@@ -26,11 +26,15 @@ package java.lang;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Throwable implements Serializable {
   private String message;
   private Object trace;
   private Throwable cause;
+  private List<Throwable> suppressedExceptions;
+  private boolean suppressionEnabled = true;
 
   public Throwable(String message, Throwable cause) {
     this.message = message;
@@ -48,6 +52,19 @@ public class Throwable implements Serializable {
 
   public Throwable() {
     this(null, null);
+  }
+
+  protected Throwable(String message, Throwable cause,
+                      boolean enableSuppression,
+                      boolean writableStackTrace) {
+    this.message = message;
+    this.cause = cause;
+    this.suppressionEnabled = enableSuppression;
+    if (writableStackTrace) {
+      this.trace = trace(1);
+    } else {
+      this.trace = null;
+    }
   }
 
   public Throwable getCause() {
@@ -125,6 +142,13 @@ public class Throwable implements Serializable {
       sb.append("  at ").append(trace[i].toString()).append(nl);
     }
 
+    if (suppressedExceptions != null) {
+      for (Throwable se : suppressedExceptions) {
+        sb.append("Suppressed: ");
+        se.printStackTrace(sb, nl);
+      }
+    }
+
     Throwable printCause = getCause();
     if (printCause != null) {
       sb.append("caused by: ");
@@ -137,6 +161,26 @@ public class Throwable implements Serializable {
     return this;
   }
   
-  public void addSuppressed(Throwable exception) {
+  public synchronized final void addSuppressed(Throwable exception) {
+    if (exception == this) {
+      throw new IllegalArgumentException("Self-suppression not permitted");
+    }
+    if (exception == null) {
+      throw new NullPointerException("Cannot suppress a null exception");
+    }
+    if (!suppressionEnabled) {
+      return;
+    }
+    if (suppressedExceptions == null) {
+      suppressedExceptions = new ArrayList<Throwable>(2);
+    }
+    suppressedExceptions.add(exception);
+  }
+
+  public synchronized final Throwable[] getSuppressed() {
+    if (suppressedExceptions == null || suppressedExceptions.isEmpty()) {
+      return new Throwable[0];
+    }
+    return suppressedExceptions.toArray(new Throwable[suppressedExceptions.size()]);
   }
 }

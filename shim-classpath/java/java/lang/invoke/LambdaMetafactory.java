@@ -295,7 +295,15 @@ public class LambdaMetafactory {
     write2(out, localType.footprint() + 1); // max locals
     write4(out, 0); // length (we'll set the real value later)
 
-    write1(out, aload_0);
+    if (implementation.kind == MethodHandle.REF_newInvokeSpecial) {
+      write1(out, new_);
+      write2(out, ConstantPool.addClass
+             (pool,
+              Classes.makeString
+              (implementation.method.class_.name, 0,
+               implementation.method.class_.name.length - 1)) + 1);
+      write1(out, dup);
+    }
 
     Iterator<MethodType.Parameter> dst = implementation.type().parameters().iterator();
 
@@ -337,18 +345,7 @@ public class LambdaMetafactory {
       break;
 
     case MethodHandle.REF_invokeSpecial:
-      write1(out, invokespecial);
-      writeMethodReference(out, pool, implementation.method);
-      break;
-
     case MethodHandle.REF_newInvokeSpecial:
-      write1(out, new_);
-      write2(out, ConstantPool.addClass
-             (pool,
-              Classes.makeString
-              (implementation.method.class_.name, 0,
-               implementation.method.class_.name.length - 1)) + 1);
-      write1(out, dup);
       write1(out, invokespecial);
       writeMethodReference(out, pool, implementation.method);
       break;

@@ -30,7 +30,7 @@ import shim.Classes;
 
 import java.lang.annotation.Annotation;
 
-public class Method<T> extends AccessibleObject implements Member {
+public class Method<T> extends Executable {
   public final VMMethod vmMethod;
   private boolean accessible;
 
@@ -166,12 +166,83 @@ public class Method<T> extends AccessibleObject implements Member {
     return (getModifiers() & ACC_SYNTHETIC) != 0;
   }
 
+  public boolean isDefault() {
+    return ((getModifiers() & (Modifier.ABSTRACT | Modifier.STATIC | Modifier.PUBLIC)) == Modifier.PUBLIC)
+        && getDeclaringClass().isInterface();
+  }
+
   public Object getDefaultValue() {
     ClassLoader loader = getDeclaringClass().getClassLoader();
     return Classes.getAnnotationDefaultValue(loader, vmMethod.addendum);
   }
 
+  public Annotation[][] getParameterAnnotations() {
+    int count = getParameterCount();
+    if (vmMethod.addendum != null && vmMethod.addendum.parameterAnnotationTable != null) {
+      Object[] table = (Object[]) vmMethod.addendum.parameterAnnotationTable;
+      Annotation[][] result = new Annotation[count][];
+      for (int i = 0; i < count; i++) {
+        if (i < table.length && table[i] != null) {
+          Object[] paramTable = (Object[]) table[i];
+          result[i] = new Annotation[paramTable.length];
+          for (int j = 0; j < paramTable.length; j++) {
+            result[i][j] = Classes.getAnnotation(vmMethod.class_.loader, (Object[]) paramTable[j]);
+          }
+        } else {
+          result[i] = new Annotation[0];
+        }
+      }
+      return result;
+    }
+    return new Annotation[count][0];
+  }
+
   public Class<?>[] getExceptionTypes() {
-    throw new UnsupportedOperationException("not yet implemented");
+    if (vmMethod.addendum != null && vmMethod.addendum.exceptionTable != null) {
+      Object table = vmMethod.addendum.exceptionTable;
+      if (table instanceof Class<?>[]) {
+        return (Class<?>[]) table;
+      }
+      if (table instanceof Object[]) {
+        Object[] arr = (Object[]) table;
+        Class<?>[] classes = new Class<?>[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          if (arr[i] instanceof Class<?>) {
+            classes[i] = (Class<?>) arr[i];
+          } else if (arr[i] instanceof byte[]) {
+            byte[] bytes = (byte[]) arr[i];
+            classes[i] = Classes.forCanonicalName(vmMethod.class_.loader, Classes.makeString(bytes, 0, bytes.length));
+          }
+        }
+        return classes;
+      }
+    }
+    return new Class<?>[0];
+  }
+
+  public String toGenericString() {
+    StringBuilder sb = new StringBuilder();
+    int mod = getModifiers() & Modifier.methodModifiers();
+    if (mod != 0) {
+      sb.append(Modifier.toString(mod)).append(' ');
+    }
+    sb.append(getReturnType().getTypeName()).append(' ');
+    sb.append(getDeclaringClass().getTypeName()).append('.');
+    sb.append(getName()).append('(');
+    Class<?>[] params = getParameterTypes();
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) sb.append(',');
+      sb.append(params[i].getTypeName());
+    }
+    sb.append(')');
+    Class<?>[] exceptions = getExceptionTypes();
+    if (exceptions.length > 0) {
+      sb.append(" throws ");
+      for (int i = 0; i < exceptions.length; i++) {
+        if (i > 0) sb.append(',');
+        sb.append(exceptions[i].getTypeName());
+      }
+    }
+    return sb.toString();
   }
 }

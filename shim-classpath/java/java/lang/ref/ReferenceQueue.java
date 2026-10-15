@@ -26,24 +26,56 @@ package java.lang.ref;
 public class ReferenceQueue<T> {
   private Reference<? extends T> front;
 
-  public Reference<? extends T> poll() {
-    Reference<? extends T> r = front;
-    if (front != null) {
-      if (front == front.jNext) {
-        front = null;
-      } else {
-        front = front.jNext;
-      }
+  public synchronized Reference<? extends T> poll() {
+    if (front == null) {
+      return null;
     }
+    Reference<? extends T> r = front;
+    if (front == front.jNext) {
+      front = null;
+    } else {
+      front = front.jNext;
+    }
+    r.jNext = null;
     return r;
   }
 
-  void add(Reference<? extends T> r) {
+  public synchronized Reference<? extends T> remove(long timeout)
+      throws IllegalArgumentException, InterruptedException {
+    if (timeout < 0) {
+      throw new IllegalArgumentException("Negative timeout value");
+    }
+    if (front != null) {
+      return poll();
+    }
+    if (timeout == 0) {
+      while (front == null) {
+        wait(50);
+      }
+      return poll();
+    }
+    long start = System.currentTimeMillis();
+    while (front == null) {
+      long remaining = timeout - (System.currentTimeMillis() - start);
+      if (remaining <= 0) {
+        break;
+      }
+      wait(Math.min(remaining, 50));
+    }
+    return poll();
+  }
+
+  public Reference<? extends T> remove() throws InterruptedException {
+    return remove(0);
+  }
+
+  synchronized void add(Reference<? extends T> r) {
     if (front == null) {
       r.jNext = r;
     } else {
       r.jNext = front;
     }
     front = r;
+    notifyAll();
   }
 }
