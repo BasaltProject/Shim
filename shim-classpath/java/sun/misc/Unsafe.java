@@ -141,6 +141,14 @@ public final class Unsafe {
 
   public native long objectFieldOffset(Field field);
 
+  public long staticFieldOffset(Field field) {
+    return objectFieldOffset(field);
+  }
+
+  public Object staticFieldBase(Field field) {
+    return field.getDeclaringClass();
+  }
+
   public native void park(boolean absolute, long time);
 
   public native void unpark(Object target);

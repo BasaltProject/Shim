@@ -81,6 +81,12 @@ public abstract class System {
     return (String) Static.properties.put(name, value);
   }
 
+  public static String clearProperty(String key) {
+    if (key == null) throw new NullPointerException("key can't be null");
+    if (key.length() == 0) throw new IllegalArgumentException("key can't be empty");
+    return (String) Static.properties.remove(key);
+  }
+
   public static String lineSeparator() {
     String sep = getProperty("line.separator");
     return (sep != null) ? sep : "\n";
@@ -88,6 +94,39 @@ public abstract class System {
 
   public static Properties getProperties() {
     return Static.properties;
+  }
+
+  public static void setProperties(Properties props) {
+    if (props == null) {
+      props = makeProperties();
+    }
+    Static.properties = props;
+  }
+
+  public static java.io.Console console() {
+    return null;
+  }
+
+  private static void setField(String name, Object value) {
+    try {
+      java.lang.reflect.Field f = System.class.getDeclaredField(name);
+      f.setAccessible(true);
+      f.set(null, value);
+    } catch (Throwable e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static void setIn(InputStream in) {
+    setField("in", in);
+  }
+
+  public static void setOut(PrintStream out) {
+    setField("out", out);
+  }
+
+  public static void setErr(PrintStream err) {
+    setField("err", err);
   }
 
   private static Properties makeProperties() {

@@ -23,11 +23,14 @@
 
 package java.lang;
 
-public final class Byte extends Number implements Comparable<Byte> {
+public final class Byte extends Number implements Comparable<Byte>, java.lang.constant.Constable {
   public static final Class TYPE = shim.Classes.forCanonicalName("B");
 
   public static final byte MIN_VALUE = -128;
   public static final byte MAX_VALUE = 127;
+
+  public static final int SIZE = 8;
+  public static final int BYTES = 1;
 
   private final byte value;
 
@@ -44,7 +47,20 @@ public final class Byte extends Number implements Comparable<Byte> {
   }
 
   public int hashCode() {
-    return value;
+    return hashCode(value);
+  }
+
+  public static int hashCode(byte value) {
+    return (int) value;
+  }
+
+  @Override
+  public java.util.Optional<java.lang.constant.DynamicConstantDesc<Byte>> describeConstable() {
+    return java.util.Optional.of(java.lang.constant.DynamicConstantDesc.ofNamed(
+      java.lang.constant.ConstantDescs.BSM_EXPLICIT_CAST,
+      java.lang.constant.ConstantDescs.DEFAULT_NAME,
+      java.lang.constant.ConstantDescs.CD_byte,
+      intValue()));
   }
 
   public String toString() {

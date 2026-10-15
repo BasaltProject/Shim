@@ -56,6 +56,18 @@ public final class Boolean implements Comparable<Boolean>, java.lang.constant.Co
     return (x == y) ? 0 : (x ? 1 : -1);
   }
 
+  public static boolean logicalAnd(boolean a, boolean b) {
+    return a && b;
+  }
+
+  public static boolean logicalOr(boolean a, boolean b) {
+    return a || b;
+  }
+
+  public static boolean logicalXor(boolean a, boolean b) {
+    return a ^ b;
+  }
+
   public boolean equals(Object o) {
     return o instanceof Boolean && ((Boolean) o).value == value;
   }

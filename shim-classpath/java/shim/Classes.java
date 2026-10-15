@@ -605,6 +605,8 @@ public class Classes {
 
   public static native Method makeMethod(Class c, int slot);
 
+  public static native Class<?>[] getExceptionTypes(VMMethod method);
+
   public static native Field makeField(Class c, int slot);
 
   private static native void acquireClassLock();

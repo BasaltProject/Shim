@@ -60,4 +60,30 @@ public abstract class Executable extends AccessibleObject implements Member, Gen
   public Type[] getGenericExceptionTypes() {
     return getExceptionTypes();
   }
+
+  public AnnotatedType getAnnotatedReceiverType() {
+    return null;
+  }
+
+  public AnnotatedType getAnnotatedReturnType() {
+    return new AnnotatedTypeImpl(Void.TYPE);
+  }
+
+  public AnnotatedType[] getAnnotatedParameterTypes() {
+    Type[] types = getGenericParameterTypes();
+    AnnotatedType[] res = new AnnotatedType[types.length];
+    for (int i = 0; i < types.length; i++) {
+      res[i] = new AnnotatedTypeImpl(types[i]);
+    }
+    return res;
+  }
+
+  public AnnotatedType[] getAnnotatedExceptionTypes() {
+    Type[] types = getGenericExceptionTypes();
+    AnnotatedType[] res = new AnnotatedType[types.length];
+    for (int i = 0; i < types.length; i++) {
+      res[i] = new AnnotatedTypeImpl(types[i]);
+    }
+    return res;
+  }
 }

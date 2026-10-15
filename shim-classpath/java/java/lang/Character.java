@@ -23,11 +23,28 @@
 
 package java.lang;
 
-public final class Character implements Comparable<Character> {
+public final class Character implements Comparable<Character>, java.lang.constant.Constable {
   public static final int MIN_RADIX = 2;
   public static final int MAX_RADIX = 36;
 
   public static final Class TYPE = shim.Classes.forCanonicalName("C");
+
+  public static final char MIN_VALUE = '\u0000';
+  public static final char MAX_VALUE = '\uffff';
+
+  public static final int SIZE = 16;
+  public static final int BYTES = 2;
+
+  public static final char MIN_HIGH_SURROGATE = '\uD800';
+  public static final char MAX_HIGH_SURROGATE = '\uDBFF';
+  public static final char MIN_LOW_SURROGATE = '\uDC00';
+  public static final char MAX_LOW_SURROGATE = '\uDFFF';
+  public static final char MIN_SURROGATE = MIN_HIGH_SURROGATE;
+  public static final char MAX_SURROGATE = MAX_LOW_SURROGATE;
+
+  public static final int MIN_SUPPLEMENTARY_CODE_POINT = 0x010000;
+  public static final int MIN_CODE_POINT = 0x000000;
+  public static final int MAX_CODE_POINT = 0x10FFFF;
 
   private final char value;
 
@@ -48,7 +65,32 @@ public final class Character implements Comparable<Character> {
   }
 
   public int hashCode() {
+    return hashCode(value);
+  }
+
+  public static int hashCode(char value) {
     return (int) value;
+  }
+
+  public static boolean isSurrogate(char ch) {
+    return ch >= MIN_SURROGATE && ch <= MAX_SURROGATE;
+  }
+
+  public static char highSurrogate(int codePoint) {
+    return (char) ((codePoint >>> 10) + ('\uD800' - (0x010000 >>> 10)));
+  }
+
+  public static char lowSurrogate(int codePoint) {
+    return (char) ((codePoint & 0x3ff) + '\uDC00');
+  }
+
+  @Override
+  public java.util.Optional<java.lang.constant.DynamicConstantDesc<Character>> describeConstable() {
+    return java.util.Optional.of(java.lang.constant.DynamicConstantDesc.ofNamed(
+      java.lang.constant.ConstantDescs.BSM_EXPLICIT_CAST,
+      java.lang.constant.ConstantDescs.DEFAULT_NAME,
+      java.lang.constant.ConstantDescs.CD_char,
+      (int) value));
   }
 
   public String toString() {

@@ -267,5 +267,25 @@ public class SignatureParser {
     public String toString() {
       return name;
     }
+
+    @Override
+    public java.lang.annotation.Annotation[] getAnnotations() {
+      return new java.lang.annotation.Annotation[0];
+    }
+
+    @Override
+    public java.lang.annotation.Annotation[] getDeclaredAnnotations() {
+      return new java.lang.annotation.Annotation[0];
+    }
+
+    @Override
+    public boolean isAnnotationPresent(Class<? extends java.lang.annotation.Annotation> annotationClass) {
+      return false;
+    }
+
+    @Override
+    public <T extends java.lang.annotation.Annotation> T getAnnotation(Class<T> annotationClass) {
+      return null;
+    }
   }
 }

@@ -91,6 +91,10 @@ public class Field<T> extends AccessibleObject implements Member {
     return SignatureParser.parse(vmField.class_.loader, signature, getDeclaringClass());
   }
 
+  public AnnotatedType getAnnotatedType() {
+    return new AnnotatedTypeImpl(getGenericType());
+  }
+
   public Object get(Object instance) throws IllegalAccessException {
     Object target;
     if ((vmField.flags & Modifier.STATIC) != 0) {

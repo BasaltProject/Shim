@@ -769,8 +769,24 @@ public final class Class <T>
     return null;
   }
 
+  @SuppressWarnings("unchecked")
+  public <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
+    java.util.Objects.requireNonNull(annotationClass);
+    if (vmClass.addendum != null && vmClass.addendum.annotationTable != null) {
+      Classes.link(vmClass, vmClass.loader);
+      Object[] table = (Object[]) vmClass.addendum.annotationTable;
+      for (int i = 0; i < table.length; ++i) {
+        Object[] a = (Object[]) table[i];
+        if (a[1] == annotationClass) {
+          return (T) getAnnotation(vmClass, a);
+        }
+      }
+    }
+    return null;
+  }
+
   public Annotation[] getDeclaredAnnotations() {
-    if (vmClass.addendum.annotationTable != null) {
+    if (vmClass.addendum != null && vmClass.addendum.annotationTable != null) {
       Classes.link(vmClass);
 
       Object[] table = (Object[]) vmClass.addendum.annotationTable;
@@ -1033,4 +1049,17 @@ public final class Class <T>
     return loader.getUnnamedModule();
   }
 
+  public java.lang.reflect.AnnotatedType[] getAnnotatedInterfaces() {
+    Class<?>[] ifaces = getInterfaces();
+    java.lang.reflect.AnnotatedType[] res = new java.lang.reflect.AnnotatedType[ifaces.length];
+    for (int i = 0; i < ifaces.length; i++) {
+      res[i] = java.lang.reflect.AnnotatedType.of(ifaces[i]);
+    }
+    return res;
+  }
+
+  public java.lang.reflect.AnnotatedType getAnnotatedSuperclass() {
+    Class<?> sup = getSuperclass();
+    return sup == null ? null : java.lang.reflect.AnnotatedType.of(sup);
+  }
 }

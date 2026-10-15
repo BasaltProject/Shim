@@ -13,8 +13,17 @@
 
 package java.lang.reflect;
 
-public interface TypeVariable<D extends GenericDeclaration> extends Type {
+public interface TypeVariable<D extends GenericDeclaration> extends Type, AnnotatedElement {
   Type[] getBounds();
   D getGenericDeclaration();
   String getName();
+
+  default AnnotatedType[] getAnnotatedBounds() {
+    Type[] bounds = getBounds();
+    AnnotatedType[] res = new AnnotatedType[bounds.length];
+    for (int i = 0; i < bounds.length; i++) {
+      res[i] = new AnnotatedTypeImpl(bounds[i]);
+    }
+    return res;
+  }
 }

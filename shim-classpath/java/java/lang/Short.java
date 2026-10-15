@@ -23,11 +23,14 @@
 
 package java.lang;
 
-public final class Short extends Number implements Comparable<Short> {
+public final class Short extends Number implements Comparable<Short>, java.lang.constant.Constable {
   public static final Class TYPE = shim.Classes.forCanonicalName("S");
 
   public static final short MIN_VALUE = -32768;
   public static final short MAX_VALUE = 32767;
+
+  public static final int SIZE = 16;
+  public static final int BYTES = 2;
 
   private final short value;
 
@@ -48,7 +51,20 @@ public final class Short extends Number implements Comparable<Short> {
   }
 
   public int hashCode() {
-    return value;
+    return hashCode(value);
+  }
+
+  public static int hashCode(short value) {
+    return (int) value;
+  }
+
+  @Override
+  public java.util.Optional<java.lang.constant.DynamicConstantDesc<Short>> describeConstable() {
+    return java.util.Optional.of(java.lang.constant.DynamicConstantDesc.ofNamed(
+      java.lang.constant.ConstantDescs.BSM_EXPLICIT_CAST,
+      java.lang.constant.ConstantDescs.DEFAULT_NAME,
+      java.lang.constant.ConstantDescs.CD_short,
+      intValue()));
   }
 
   public String toString() {

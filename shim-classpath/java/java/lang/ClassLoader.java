@@ -36,19 +36,29 @@ import java.security.ProtectionDomain;
 
 public abstract class ClassLoader {
   private final ClassLoader parent;
+  private final String name;
   private Map<String, Package> packages;
   private Module unnamedModule;
 
-  protected ClassLoader(ClassLoader parent) {
+  protected ClassLoader(String name, ClassLoader parent) {
     if (parent == null) {
       this.parent = shim.SystemClassLoader.bootLoader();
     } else {
       this.parent = parent;
     }
+    this.name = name;
+  }
+
+  protected ClassLoader(ClassLoader parent) {
+    this(null, parent);
   }
 
   protected ClassLoader() {
-    this(getSystemClassLoader());
+    this(null, getSystemClassLoader());
+  }
+
+  public String getName() {
+    return name;
   }
 
   private Map<String, Package> packages() {
@@ -91,6 +101,34 @@ public abstract class ClassLoader {
       return packages().values().toArray(new Package[packages().size()]);
     }
   }
+
+  public Package getDefinedPackage(String name) {
+    synchronized (this) {
+      return packages().get(name);
+    }
+  }
+
+  public Package[] getDefinedPackages() {
+    synchronized (this) {
+      return packages().values().toArray(new Package[packages().size()]);
+    }
+  }
+
+  protected static boolean registerAsParallelCapable() {
+    return true;
+  }
+
+  public final boolean isRegisteredAsParallelCapable() {
+    return true;
+  }
+
+  public void setDefaultAssertionStatus(boolean enabled) {}
+
+  public void setPackageAssertionStatus(String packageName, boolean enabled) {}
+
+  public void setClassAssertionStatus(String className, boolean enabled) {}
+
+  public void clearAssertionStatus() {}
 
   protected Package definePackage(String name,
                                   String specificationTitle,
