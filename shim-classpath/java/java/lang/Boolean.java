@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public final class Boolean implements Comparable<Boolean> {
+public final class Boolean implements Comparable<Boolean>, java.lang.constant.Constable {
   public static final Class TYPE = shim.Classes.forCanonicalName("Z");
 
   public static final Boolean FALSE = new Boolean(false);
@@ -86,5 +86,10 @@ public final class Boolean implements Comparable<Boolean> {
 
   public static boolean parseBoolean(String string) {
     return string != null && string.equalsIgnoreCase("true");
+  }
+
+  @Override
+  public java.util.Optional<java.lang.constant.DynamicConstantDesc<Boolean>> describeConstable() {
+    return java.util.Optional.of(value ? java.lang.constant.ConstantDescs.TRUE : java.lang.constant.ConstantDescs.FALSE);
   }
 }

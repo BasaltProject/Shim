@@ -773,6 +773,43 @@ public class Collections {
       return inner.toString();
     }
   }
+
+  public static <K,V> SortedMap<K,V> unmodifiableSortedMap(SortedMap<K,V> m) {
+    return new UnmodifiableSortedMap<K, V>(m);
+  }
+
+  static class UnmodifiableSortedMap<K, V> extends UnmodifiableMap<K, V> implements SortedMap<K, V> {
+    private final SortedMap<K, V> sm;
+
+    UnmodifiableSortedMap(SortedMap<K, V> m) {
+      super(m);
+      this.sm = m;
+    }
+
+    public Comparator<? super K> comparator() {
+      return sm.comparator();
+    }
+
+    public SortedMap<K, V> subMap(K fromKey, K toKey) {
+      return new UnmodifiableSortedMap<K, V>(sm.subMap(fromKey, toKey));
+    }
+
+    public SortedMap<K, V> headMap(K toKey) {
+      return new UnmodifiableSortedMap<K, V>(sm.headMap(toKey));
+    }
+
+    public SortedMap<K, V> tailMap(K fromKey) {
+      return new UnmodifiableSortedMap<K, V>(sm.tailMap(fromKey));
+    }
+
+    public K firstKey() {
+      return sm.firstKey();
+    }
+
+    public K lastKey() {
+      return sm.lastKey();
+    }
+  }
   
   static class UnmodifiableIterator<T> implements Iterator<T> {
     private final Iterator<T> inner;

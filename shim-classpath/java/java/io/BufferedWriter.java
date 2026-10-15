@@ -59,6 +59,10 @@ public class BufferedWriter extends Writer {
     out.flush();
   }
 
+  public void newLine() throws IOException {
+    write(System.lineSeparator());
+  }
+
   public void close() throws IOException {
     flush();
     out.close();

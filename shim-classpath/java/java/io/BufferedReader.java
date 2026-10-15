@@ -111,4 +111,42 @@ public class BufferedReader extends Reader {
   public void close() throws IOException {
     in.close();
   }
+
+  public java.util.stream.Stream<String> lines() {
+    java.util.Iterator<String> iter = new java.util.Iterator<String>() {
+      private String nextLine = null;
+
+      @Override
+      public boolean hasNext() {
+        if (nextLine != null) {
+          return true;
+        }
+        try {
+          nextLine = readLine();
+          return nextLine != null;
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }
+
+      @Override
+      public String next() {
+        if (hasNext()) {
+          String line = nextLine;
+          nextLine = null;
+          return line;
+        }
+        throw new java.util.NoSuchElementException();
+      }
+    };
+    return java.util.stream.StreamSupport.stream(
+        java.util.Spliterators.spliteratorUnknownSize(iter, java.util.Spliterator.ORDERED | java.util.Spliterator.NONNULL),
+        false).onClose(() -> {
+          try {
+            close();
+          } catch (IOException e) {
+            throw new UncheckedIOException(e);
+          }
+        });
+  }
 }

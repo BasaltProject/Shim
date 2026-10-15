@@ -23,7 +23,8 @@
 
 package java.lang;
 
-public final class Long extends Number implements Comparable<Long> {
+public final class Long extends Number implements Comparable<Long>,
+    java.lang.constant.Constable, java.lang.constant.ConstantDesc {
   public static final long MIN_VALUE = -9223372036854775808l;
   public static final long MAX_VALUE =  9223372036854775807l;
 
@@ -300,5 +301,15 @@ public final class Long extends Number implements Comparable<Long> {
 
   public static long sum(long a, long b) {
     return a + b;
+  }
+
+  @Override
+  public java.util.Optional<Long> describeConstable() {
+    return java.util.Optional.of(this);
+  }
+
+  @Override
+  public Long resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
+    return this;
   }
 }

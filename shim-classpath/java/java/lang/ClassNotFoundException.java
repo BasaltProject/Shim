@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public class ClassNotFoundException extends Exception {
+public class ClassNotFoundException extends ReflectiveOperationException {
   private final Throwable cause2;
 
   public ClassNotFoundException(String message, Throwable cause) {

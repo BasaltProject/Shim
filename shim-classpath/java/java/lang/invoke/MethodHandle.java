@@ -31,7 +31,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
 
-public class MethodHandle {
+public class MethodHandle implements java.lang.constant.Constable {
   public static final int REF_getField = 1;
   public static final int REF_getStatic = 2;
   public static final int REF_putField = 3;
@@ -47,7 +47,7 @@ public class MethodHandle {
   final shim.VMMethod method;
   protected volatile MethodType type;
 
-  MethodHandle(int kind, ClassLoader loader, shim.VMMethod method) {
+  public MethodHandle(int kind, ClassLoader loader, shim.VMMethod method) {
     this.kind = kind;
     this.loader = loader;
     this.method = method;
@@ -74,6 +74,10 @@ public class MethodHandle {
 
   static MethodHandle makeFieldHandle(int kind, Field field) {
     return new FieldMethodHandle(kind, field);
+  }
+
+  public static MethodHandle makeFieldHandle(int kind, shim.VMField vmField) {
+    return new FieldMethodHandle(kind, new Field(vmField));
   }
 
   public MethodType type() {
@@ -317,5 +321,24 @@ public class MethodHandle {
     public Object invokeWithArguments(Object... arguments) throws Throwable {
       return arguments[0];
     }
+  }
+
+  @Override
+  public java.util.Optional<java.lang.constant.MethodHandleDesc> describeConstable() {
+    if (method != null && method.class_ != null) {
+      try {
+        boolean isInterface = (method.class_.flags & 0x0200) != 0;
+        java.lang.constant.DirectMethodHandleDesc.Kind k =
+            java.lang.constant.DirectMethodHandleDesc.Kind.valueOf(this.kind, isInterface);
+        Class<?> ownerClass = shim.SystemClassLoader.getClass(method.class_);
+        java.lang.constant.ClassDesc owner = ownerClass.describeConstable().orElse(null);
+        if (owner == null) return java.util.Optional.empty();
+        String name = java.lang.reflect.Method.getName(method);
+        String spec = java.lang.reflect.Method.getSpec(method);
+        java.lang.constant.MethodTypeDesc mtd = java.lang.constant.MethodTypeDesc.ofDescriptor(spec);
+        return java.util.Optional.of(java.lang.constant.MethodHandleDesc.ofMethod(k, owner, name, mtd));
+      } catch (Exception ignored) {}
+    }
+    return java.util.Optional.empty();
   }
 }

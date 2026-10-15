@@ -78,6 +78,11 @@ public abstract class System {
     return (String) Static.properties.put(name, value);
   }
 
+  public static String lineSeparator() {
+    String sep = getProperty("line.separator");
+    return (sep != null) ? sep : "\n";
+  }
+
   public static Properties getProperties() {
     return Static.properties;
   }

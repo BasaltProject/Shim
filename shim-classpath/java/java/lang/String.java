@@ -39,7 +39,8 @@ import shim.Iso88591;
 import shim.Utf8;
 
 public final class String
-  implements Comparable<String>, CharSequence, Serializable
+  implements Comparable<String>, CharSequence, Serializable,
+             java.lang.constant.Constable, java.lang.constant.ConstantDesc
 {
   private static final String UTF_8_ENCODING = "UTF-8";
   private static final String ISO_8859_1_ENCODING = "ISO-8859-1";
@@ -106,6 +107,24 @@ public final class String
     throws UnsupportedEncodingException
   {
     this(data, 0, data.length, charset);
+  }
+
+  public String(byte[] bytes, int offset, int length, java.nio.charset.Charset charset) {
+    this(decodeBytes(bytes, offset, length, charset));
+  }
+
+  public String(byte[] bytes, java.nio.charset.Charset charset) {
+    this(bytes, 0, bytes.length, charset);
+  }
+
+  private static String decodeBytes(byte[] bytes, int offset, int length, java.nio.charset.Charset charset) {
+    if (bytes == null) throw new NullPointerException();
+    if (charset == null) throw new NullPointerException();
+    try {
+      return new String(bytes, offset, length, charset.name());
+    } catch (java.io.UnsupportedEncodingException e) {
+      return new String(bytes, offset, length);
+    }
   }
 
   public String(byte bytes[], int highByte, int offset, int length) {
@@ -491,6 +510,15 @@ public final class String
     }
   }
 
+  public byte[] getBytes(java.nio.charset.Charset charset) {
+    if (charset == null) throw new NullPointerException();
+    try {
+      return getBytes(charset.name());
+    } catch (java.io.UnsupportedEncodingException e) {
+      return getBytes();
+    }
+  }
+
   public void getChars(int srcOffset, int srcEnd,
                        char[] dst, int dstOffset)
   {
@@ -699,19 +727,11 @@ public final class String
   }
 
   public String toUpperCase(Locale locale) {
-    if (locale == Locale.ENGLISH) {
-      return toUpperCase();
-    } else {
-      throw new UnsupportedOperationException("toUpperCase("+locale+')');
-    }
+    return toUpperCase();
   }
 
   public String toLowerCase(Locale locale) {
-    if (locale == Locale.ENGLISH) {
-      return toLowerCase();
-    } else {
-      throw new UnsupportedOperationException("toLowerCase("+locale+')');
-    }
+    return toLowerCase();
   }
 
   public int codePointBefore(int index) {
@@ -1022,5 +1042,15 @@ public final class String
     return java.util.stream.StreamSupport.stream(
         java.util.Spliterators.spliteratorUnknownSize(new LineIterator(), java.util.Spliterator.ORDERED | java.util.Spliterator.NONNULL),
         false);
+  }
+
+  @Override
+  public java.util.Optional<String> describeConstable() {
+    return java.util.Optional.of(this);
+  }
+
+  @Override
+  public String resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
+    return this;
   }
 }

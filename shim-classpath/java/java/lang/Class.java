@@ -58,7 +58,8 @@ import java.security.Permissions;
 import java.security.AllPermission;
 
 public final class Class <T>
-  implements Type, AnnotatedElement, GenericDeclaration, java.lang.invoke.TypeDescriptor.OfField<Class<?>>
+  implements Type, AnnotatedElement, GenericDeclaration, java.lang.invoke.TypeDescriptor.OfField<Class<?>>,
+             java.lang.constant.Constable
 {
   private static final int PrimitiveFlag = 1 <<  5;
   private static final int EnumFlag      = 1 << 14;
@@ -121,6 +122,10 @@ public final class Class <T>
 
   public Class componentType() {
     return getComponentType();
+  }
+
+  public java.util.Optional<java.lang.constant.ClassDesc> describeConstable() {
+    return java.util.Optional.of(java.lang.constant.ClassDesc.ofDescriptor(descriptorString()));
   }
 
   public Class arrayType() {

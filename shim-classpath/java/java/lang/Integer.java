@@ -23,7 +23,8 @@
 
 package java.lang;
 
-public final class Integer extends Number implements Comparable<Integer> {
+public final class Integer extends Number implements Comparable<Integer>,
+    java.lang.constant.Constable, java.lang.constant.ConstantDesc {
   public static final Class TYPE = shim.Classes.forCanonicalName("I");
 
   public static final int MIN_VALUE = 0x80000000;
@@ -235,5 +236,15 @@ public final class Integer extends Number implements Comparable<Integer> {
 
   public static int sum(int a, int b) {
     return a + b;
+  }
+
+  @Override
+  public java.util.Optional<Integer> describeConstable() {
+    return java.util.Optional.of(this);
+  }
+
+  @Override
+  public Integer resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
+    return this;
   }
 }

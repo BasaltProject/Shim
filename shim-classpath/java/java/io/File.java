@@ -347,4 +347,18 @@ public class File implements Serializable {
     }
   }
 
+  public java.nio.file.Path toPath() {
+    return java.nio.file.Path.of(this.path);
+  }
+
+  public java.net.URI toURI() {
+    String p = getAbsolutePath();
+    if (!p.startsWith("/")) {
+      p = "/" + p;
+    }
+    if (isDirectory() && !p.endsWith("/")) {
+      p = p + "/";
+    }
+    return java.net.URI.create("file:" + p);
+  }
 }

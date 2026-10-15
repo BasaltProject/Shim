@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public class InstantiationException extends Exception {
+public class InstantiationException extends ReflectiveOperationException {
   public InstantiationException(String message) {
     super(message);
   }
