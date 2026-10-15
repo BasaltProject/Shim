@@ -1045,6 +1045,62 @@ public class CompletableFuture<T> implements Future<T>, CompletionStage<T> {
   }
 
   @Override
+  public State state() {
+    Object r = result;
+    if (r == null) {
+      return State.RUNNING;
+    }
+    if (r instanceof AltResult) {
+      Throwable x = ((AltResult) r).ex;
+      if (x instanceof CancellationException) {
+        return State.CANCELLED;
+      }
+      if (x != null) {
+        return State.FAILED;
+      }
+    }
+    return State.SUCCESS;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public T resultNow() {
+    Object r = result;
+    if (r == null) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    if (r instanceof AltResult) {
+      Throwable x = ((AltResult) r).ex;
+      if (x instanceof CancellationException) {
+        throw new IllegalStateException("Task was cancelled");
+      }
+      if (x != null) {
+        throw new IllegalStateException("Task completed with exception: " + x);
+      }
+      return null;
+    }
+    return (T) r;
+  }
+
+  @Override
+  public Throwable exceptionNow() {
+    Object r = result;
+    if (r == null) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    if (r instanceof AltResult) {
+      Throwable x = ((AltResult) r).ex;
+      if (x instanceof CancellationException) {
+        throw new IllegalStateException("Task was cancelled");
+      }
+      if (x != null) {
+        return (x instanceof CompletionException && x.getCause() != null) ? x.getCause() : x;
+      }
+    }
+    throw new IllegalStateException("Task completed normally with a result");
+  }
+
+  @Override
   public CompletableFuture<T> toCompletableFuture() {
     return this;
   }

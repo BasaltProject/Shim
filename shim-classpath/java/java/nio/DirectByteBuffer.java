@@ -25,13 +25,13 @@ package java.nio;
 
 import sun.misc.Unsafe;
 
-class DirectByteBuffer extends ByteBuffer {
+public class DirectByteBuffer extends ByteBuffer {
   private static final Unsafe unsafe = Unsafe.getUnsafe();
   private static final int baseOffset = unsafe.arrayBaseOffset(byte[].class);
 
   protected final long address;
 
-  protected DirectByteBuffer(long address, int capacity, boolean readOnly) {
+  public DirectByteBuffer(long address, int capacity, boolean readOnly) {
     super(readOnly);
 
     this.address = address;
@@ -40,8 +40,17 @@ class DirectByteBuffer extends ByteBuffer {
     this.position = 0;
   }
 
-  protected DirectByteBuffer(long address, int capacity) {
+  public DirectByteBuffer(long address, int capacity) {
     this(address, capacity, false);
+  }
+
+  public long address() {
+    return address;
+  }
+
+  @Override
+  public boolean isDirect() {
+    return true;
   }
 
   public ByteBuffer asReadOnlyBuffer() {

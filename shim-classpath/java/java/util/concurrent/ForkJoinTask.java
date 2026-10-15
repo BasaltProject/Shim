@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 BasaltMC.
- *
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  * SPDX-License-Identifier: MIT
  */
 
@@ -193,6 +194,43 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
     if (status == CANCELLED) throw new CancellationException();
     if (status == EXCEPTIONAL) throw new ExecutionException(exception);
     return getRawResult();
+  }
+
+  @Override
+  public Future.State state() {
+    int s = status;
+    if (s == CANCELLED) return Future.State.CANCELLED;
+    if (s == EXCEPTIONAL) return Future.State.FAILED;
+    if (s == NORMAL) return Future.State.SUCCESS;
+    return Future.State.RUNNING;
+  }
+
+  @Override
+  public V resultNow() {
+    if (!isDone()) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    if (status == CANCELLED) {
+      throw new IllegalStateException("Task was cancelled");
+    }
+    if (status == EXCEPTIONAL) {
+      throw new IllegalStateException("Task completed exceptionally: " + exception);
+    }
+    return getRawResult();
+  }
+
+  @Override
+  public Throwable exceptionNow() {
+    if (!isDone()) {
+      throw new IllegalStateException("Task has not completed");
+    }
+    if (status == CANCELLED) {
+      throw new IllegalStateException("Task was cancelled");
+    }
+    if (status != EXCEPTIONAL) {
+      throw new IllegalStateException("Task completed normally with a result");
+    }
+    return exception;
   }
 
   private static final class AdaptedRunnableAction extends ForkJoinTask<Void> {

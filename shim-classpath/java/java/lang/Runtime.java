@@ -23,6 +23,7 @@
 
 package java.lang;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.FileInputStream;
@@ -373,6 +374,26 @@ public class Runtime {
       cmd[i] = t.nextToken();
     
     return exec(cmd);
+  }
+
+  public Process exec(String command, String[] envp) throws IOException {
+    return exec(command, envp, null);
+  }
+
+  public Process exec(String command, String[] envp, File dir) throws IOException {
+    StringTokenizer t = new StringTokenizer(command);
+    String[] cmd = new String[t.countTokens()];
+    for (int i = 0; i < cmd.length; i++)
+      cmd[i] = t.nextToken();
+    return exec(cmd, envp, dir);
+  }
+
+  public Process exec(String[] command, String[] envp) throws IOException {
+    return exec(command, envp, null);
+  }
+
+  public Process exec(String[] command, String[] envp, File dir) throws IOException {
+    return exec(command);
   }
 
   public Process exec(final String[] command) throws IOException {

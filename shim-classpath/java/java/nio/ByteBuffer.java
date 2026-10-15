@@ -54,6 +54,8 @@ public abstract class ByteBuffer
   
   public abstract ByteBuffer duplicate();
 
+  public abstract boolean isDirect();
+
   protected abstract void doPut(int offset, byte val);
 
   public abstract ByteBuffer put(byte[] arr, int offset, int len);

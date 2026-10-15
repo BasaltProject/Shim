@@ -312,4 +312,8 @@ public final class Character implements Comparable<Character> {
     }
     return count;
   }
+
+  public static char reverseBytes(char ch) {
+    return (char) (((ch & 0xFF00) >> 8) | (ch << 8));
+  }
 }

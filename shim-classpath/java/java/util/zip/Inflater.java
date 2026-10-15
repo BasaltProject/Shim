@@ -39,6 +39,8 @@ public class Inflater {
   private boolean needDictionary;
   private boolean finished;
   private final boolean nowrap;
+  private long bytesRead;
+  private long bytesWritten;
 
   public Inflater(boolean nowrap) {
     this.nowrap = nowrap;
@@ -72,6 +74,15 @@ public class Inflater {
   public int getRemaining() {
     return length;
   }
+
+  public int drainRemaining(byte[] dest, int off, int len) {
+    if (length <= 0) return 0;
+    int n = Math.min(len, length);
+    System.arraycopy(input, offset, dest, off, n);
+    offset += n;
+    length -= n;
+    return n;
+  }
   
   public void setInput(byte[] input) {
     setInput(input, 0, input.length);
@@ -89,6 +100,8 @@ public class Inflater {
     input = null;
     offset = length = 0;
     needDictionary = finished = false;
+    bytesRead = 0;
+    bytesWritten = 0;
   }
 
   public int inflate(byte[] output) throws DataFormatException {
@@ -106,12 +119,21 @@ public class Inflater {
       throw new IllegalStateException();      
     }
 
-    if (input == null || output == null) {
+    if (output == null) {
       throw new NullPointerException();
     }
 
+    byte[] in = this.input;
+    int inOffset = this.offset;
+    int inLength = this.length;
+    if (in == null) {
+      in = new byte[0];
+      inOffset = 0;
+      inLength = 0;
+    }
+
     int[] results = new int[3];
-    inflate(peer, input, this.offset, this.length,
+    inflate(peer, in, inOffset, inLength,
             output, offset, length, results);
 
     if (results[zlibResult] < 0) {
@@ -130,8 +152,26 @@ public class Inflater {
 
     this.offset += results[inputCount];
     this.length -= results[inputCount];
+    this.bytesRead += results[inputCount];
+    this.bytesWritten += results[outputCount];
     
     return results[outputCount];
+  }
+
+  public long getBytesRead() {
+    return bytesRead;
+  }
+
+  public int getTotalIn() {
+    return (int) bytesRead;
+  }
+
+  public long getBytesWritten() {
+    return bytesWritten;
+  }
+
+  public int getTotalOut() {
+    return (int) bytesWritten;
   }
 
   private static native void inflate

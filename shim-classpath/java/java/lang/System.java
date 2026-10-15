@@ -32,7 +32,10 @@ import java.io.FileOutputStream;
 import java.io.FileDescriptor;
 import java.util.Map;
 import java.util.Hashtable;
+import java.util.Objects;
 import java.util.Properties;
+import java.util.ResourceBundle;
+import java.util.function.Supplier;
 
 public abstract class System {
   private static class NanoTime {
@@ -183,4 +186,156 @@ public abstract class System {
 
   /** Returns the native process environment. */
   private static native String[] getEnvironment();
+
+  public interface Logger {
+    public enum Level {
+      ALL(Integer.MIN_VALUE, 0),
+      TRACE(400, 1),
+      DEBUG(500, 2),
+      INFO(800, 3),
+      WARNING(900, 4),
+      ERROR(1000, 5),
+      OFF(Integer.MAX_VALUE, 6);
+
+      private final int severity;
+      private final int level;
+
+      Level(int severity, int level) {
+        this.severity = severity;
+        this.level = level;
+      }
+
+      public final String getName() {
+        return name();
+      }
+
+      public final int getSeverity() {
+        return severity;
+      }
+    }
+
+    String getName();
+
+    boolean isLoggable(Level level);
+
+    default void log(Level level, String msg) {
+      log(level, (ResourceBundle) null, msg, (Object[]) null);
+    }
+
+    default void log(Level level, Supplier<String> msgSupplier) {
+      Objects.requireNonNull(msgSupplier, "msgSupplier");
+      if (isLoggable(level)) {
+        log(level, (ResourceBundle) null, msgSupplier.get(), (Object[]) null);
+      }
+    }
+
+    default void log(Level level, Object obj) {
+      Objects.requireNonNull(obj, "obj");
+      if (isLoggable(level)) {
+        log(level, (ResourceBundle) null, Objects.toString(obj), (Object[]) null);
+      }
+    }
+
+    default void log(Level level, String msg, Throwable thrown) {
+      log(level, (ResourceBundle) null, msg, thrown);
+    }
+
+    default void log(Level level, Supplier<String> msgSupplier, Throwable thrown) {
+      Objects.requireNonNull(msgSupplier, "msgSupplier");
+      if (isLoggable(level)) {
+        log(level, (ResourceBundle) null, msgSupplier.get(), thrown);
+      }
+    }
+
+    default void log(Level level, String format, Object... params) {
+      log(level, (ResourceBundle) null, format, params);
+    }
+
+    void log(Level level, ResourceBundle bundle, String msg, Throwable thrown);
+
+    void log(Level level, ResourceBundle bundle, String format, Object... params);
+  }
+
+  public static abstract class LoggerFinder {
+    private static final LoggerFinder DEFAULT = new DefaultLoggerFinder();
+
+    protected LoggerFinder() {
+    }
+
+    public abstract Logger getLogger(String name, Module module);
+
+    public Logger getLocalizedLogger(String name, ResourceBundle bundle, Module module) {
+      return getLogger(name, module);
+    }
+
+    public static LoggerFinder getLoggerFinder() {
+      return DEFAULT;
+    }
+  }
+
+  private static final class DefaultLoggerFinder extends LoggerFinder {
+    @Override
+    public Logger getLogger(String name, Module module) {
+      Objects.requireNonNull(name, "name");
+      Objects.requireNonNull(module, "module");
+      return new DefaultLogger(name);
+    }
+  }
+
+  private static final class DefaultLogger implements Logger {
+    private final String name;
+
+    DefaultLogger(String name) {
+      this.name = Objects.requireNonNull(name, "name");
+    }
+
+    @Override
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public boolean isLoggable(Level level) {
+      Objects.requireNonNull(level, "level");
+      return level.getSeverity() >= Level.INFO.getSeverity();
+    }
+
+    @Override
+    public void log(Level level, ResourceBundle bundle, String msg, Throwable thrown) {
+      Objects.requireNonNull(level, "level");
+      if (!isLoggable(level)) return;
+      System.err.println("[" + level.getName() + "] [" + name + "] " + (msg != null ? msg : ""));
+      if (thrown != null) {
+        thrown.printStackTrace(System.err);
+      }
+    }
+
+    @Override
+    public void log(Level level, ResourceBundle bundle, String format, Object... params) {
+      Objects.requireNonNull(level, "level");
+      if (!isLoggable(level)) return;
+      String formatted;
+      if (format != null && params != null && params.length > 0) {
+        try {
+          formatted = String.format(format, params);
+        } catch (Throwable ignored) {
+          formatted = format;
+        }
+      } else {
+        formatted = format;
+      }
+      System.err.println("[" + level.getName() + "] [" + name + "] " + (formatted != null ? formatted : ""));
+    }
+  }
+
+  public static Logger getLogger(String name) {
+    Objects.requireNonNull(name, "name");
+    return LoggerFinder.getLoggerFinder().getLogger(name, System.class.getModule());
+  }
+
+  public static Logger getLogger(String name, ResourceBundle bundle) {
+    Objects.requireNonNull(name, "name");
+    Objects.requireNonNull(bundle, "bundle");
+    return LoggerFinder.getLoggerFinder().getLocalizedLogger(name, bundle, System.class.getModule());
+  }
 }

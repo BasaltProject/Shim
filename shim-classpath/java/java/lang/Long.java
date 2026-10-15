@@ -331,6 +331,12 @@ public final class Long extends Number implements Comparable<Long>,
     return x == 0 ? 32 + Integer.numberOfTrailingZeros((int) (i >>> 32)) : Integer.numberOfTrailingZeros(x);
   }
 
+  public static long reverseBytes(long i) {
+    i = (i & 0x00ff00ff00ff00ffL) << 8 | (i >>> 8) & 0x00ff00ff00ff00ffL;
+    return (i << 48) | ((i & 0xffff0000L) << 16) |
+        ((i >>> 16) & 0xffff0000L) | (i >>> 48);
+  }
+
   @Override
   public java.util.Optional<Long> describeConstable() {
     return java.util.Optional.of(this);
