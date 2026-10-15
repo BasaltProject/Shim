@@ -143,4 +143,19 @@ public class Constructor<T> extends Executable {
     }
     return sb.toString();
   }
+
+  @Override
+  public Type[] getGenericParameterTypes() {
+    return method.getGenericParameterTypes();
+  }
+
+  @Override
+  public Type[] getGenericExceptionTypes() {
+    return method.getGenericExceptionTypes();
+  }
+
+  @Override
+  public TypeVariable<?>[] getTypeParameters() {
+    return method.getTypeParameters();
+  }
 }
