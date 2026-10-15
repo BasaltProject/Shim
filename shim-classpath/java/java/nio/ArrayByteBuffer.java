@@ -59,7 +59,13 @@ class ArrayByteBuffer extends ByteBuffer {
 
   public ByteBuffer slice() {
     return new ArrayByteBuffer
-      (array, arrayOffset + position, remaining(), true);
+      (array, arrayOffset + position, remaining(), isReadOnly());
+  }
+
+  public ByteBuffer slice(int index, int length) {
+    java.util.Objects.checkFromIndexSize(index, length, limit());
+    return new ArrayByteBuffer
+      (array, arrayOffset + index, length, isReadOnly());
   }
 
   public int arrayOffset() {

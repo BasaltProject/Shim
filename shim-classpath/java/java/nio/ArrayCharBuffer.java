@@ -52,9 +52,33 @@ class ArrayCharBuffer extends CharBuffer {
     return array;
   }
 
+  public boolean isDirect() {
+    return false;
+  }
+
   public CharBuffer slice() {
     return new ArrayCharBuffer
-      (array, arrayOffset + position, remaining(), true);
+      (array, arrayOffset + position, remaining(), isReadOnly());
+  }
+
+  public CharBuffer slice(int index, int length) {
+    java.util.Objects.checkFromIndexSize(index, length, limit());
+    return new ArrayCharBuffer
+      (array, arrayOffset + index, length, isReadOnly());
+  }
+
+  public CharBuffer duplicate() {
+    CharBuffer b = new ArrayCharBuffer(array, arrayOffset, capacity, isReadOnly());
+    b.limit(this.limit());
+    b.position(this.position());
+    return b;
+  }
+
+  public CharBuffer subSequence(int start, int end) {
+    if (start < 0 || end < start || end > remaining()) {
+      throw new IndexOutOfBoundsException();
+    }
+    return new ArrayCharBuffer(array, arrayOffset + position + start, end - start, isReadOnly());
   }
 
   public int arrayOffset() {
@@ -95,11 +119,8 @@ class ArrayCharBuffer extends CharBuffer {
     return array[arrayOffset+position];
   }
 
+  @Override
   public String toString() {
-    return "(ArrayCharBuffer with array: " + array
-      + " arrayOffset: " + arrayOffset
-      + " position: " + position
-      + " limit: " + limit
-      + " capacity: " + capacity + ")";
+    return new String(array, arrayOffset + position, remaining());
   }
 }

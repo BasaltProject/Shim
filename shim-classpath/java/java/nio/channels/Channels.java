@@ -11,22 +11,20 @@
  * SPDX-License-Identifier: ISC AND MIT
  */
 
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
-
 package java.nio.channels;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Reader;
+import java.io.Writer;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CoderResult;
+import java.util.Objects;
 
 public class Channels {
   public static InputStream newInputStream(ReadableByteChannel channel) {
@@ -43,6 +41,30 @@ public class Channels {
 
   public static WritableByteChannel newChannel(OutputStream stream) {
     return new OutputStreamChannel(stream);
+  }
+
+  public static Reader newReader(ReadableByteChannel ch, CharsetDecoder dec, int minBufferCap) {
+    return new ChannelReader(ch, dec, minBufferCap);
+  }
+
+  public static Reader newReader(ReadableByteChannel ch, String csName) {
+    return newReader(ch, Charset.forName(csName).newDecoder(), -1);
+  }
+
+  public static Reader newReader(ReadableByteChannel ch, Charset charset) {
+    return newReader(ch, Objects.requireNonNull(charset, "charset").newDecoder(), -1);
+  }
+
+  public static Writer newWriter(WritableByteChannel ch, CharsetEncoder enc, int minBufferCap) {
+    return new ChannelWriter(ch, enc, minBufferCap);
+  }
+
+  public static Writer newWriter(WritableByteChannel ch, String csName) {
+    return newWriter(ch, Charset.forName(csName).newEncoder(), -1);
+  }
+
+  public static Writer newWriter(WritableByteChannel ch, Charset charset) {
+    return newWriter(ch, Objects.requireNonNull(charset, "charset").newEncoder(), -1);
   }
 
   private static class MyInputStream extends InputStream {
@@ -113,14 +135,22 @@ public class Channels {
     }
 
     public int read(ByteBuffer b) throws IOException {
-      int c = stream.read
-        (b.array(), b.arrayOffset() + b.position(), b.remaining());
-      
-      if (c > 0) {
-        b.position(b.position() + c);
+      if (b.hasArray()) {
+        int c = stream.read
+          (b.array(), b.arrayOffset() + b.position(), b.remaining());
+        if (c > 0) {
+          b.position(b.position() + c);
+        }
+        return c;
+      } else {
+        int len = Math.min(b.remaining(), 8192);
+        byte[] buf = new byte[len];
+        int c = stream.read(buf, 0, len);
+        if (c > 0) {
+          b.put(buf, 0, c);
+        }
+        return c;
       }
-
-      return c;
     }
   }
 
@@ -143,13 +173,161 @@ public class Channels {
     }
 
     public int write(ByteBuffer b) throws IOException {
-      stream.write(b.array(), b.arrayOffset() + b.position(), b.remaining());
+      if (b.hasArray()) {
+        stream.write(b.array(), b.arrayOffset() + b.position(), b.remaining());
+        int c = b.remaining();
+        b.position(b.limit());
+        return c;
+      } else {
+        int c = b.remaining();
+        byte[] buf = new byte[Math.min(c, 8192)];
+        int total = 0;
+        while (b.hasRemaining()) {
+          int len = Math.min(b.remaining(), buf.length);
+          b.get(buf, 0, len);
+          stream.write(buf, 0, len);
+          total += len;
+        }
+        return total;
+      }
+    }
+  }
 
-      int c = b.remaining();
+  private static class ChannelReader extends Reader {
+    private final ReadableByteChannel ch;
+    private final CharsetDecoder dec;
+    private final ByteBuffer bb;
+    private final CharBuffer cb;
+    private boolean eof = false;
 
-      b.position(b.limit());
-      
-      return c;
+    ChannelReader(ReadableByteChannel ch, CharsetDecoder dec, int minBufferCap) {
+      this.ch = Objects.requireNonNull(ch, "ch");
+      this.dec = Objects.requireNonNull(dec, "dec");
+      int cap = minBufferCap > 0 ? minBufferCap : 8192;
+      this.bb = ByteBuffer.allocate(cap);
+      this.bb.flip();
+      this.cb = CharBuffer.allocate((int) Math.max(16, cap * dec.averageCharsPerByte()));
+      this.cb.flip();
+    }
+
+    @Override
+    public int read(char[] cbuf, int off, int len) throws IOException {
+      if (len == 0) return 0;
+      Objects.checkFromIndexSize(off, len, cbuf.length);
+
+      int readCount = 0;
+      while (readCount < len) {
+        if (cb.hasRemaining()) {
+          int count = Math.min(len - readCount, cb.remaining());
+          cb.get(cbuf, off + readCount, count);
+          readCount += count;
+          if (readCount == len) break;
+        }
+
+        if (!bb.hasRemaining() && !eof) {
+          bb.compact();
+          int n = ch.read(bb);
+          bb.flip();
+          if (n < 0) {
+            eof = true;
+          }
+        }
+
+        cb.clear();
+        CoderResult cr = dec.decode(bb, cb, eof);
+        cb.flip();
+
+        if (cr.isError()) {
+          cr.throwException();
+        }
+
+        if (!cb.hasRemaining() && eof && !bb.hasRemaining()) {
+          cb.clear();
+          CoderResult flushCr = dec.flush(cb);
+          cb.flip();
+          if (flushCr.isError()) {
+            flushCr.throwException();
+          }
+          if (!cb.hasRemaining()) {
+            return readCount > 0 ? readCount : -1;
+          }
+        }
+      }
+      return readCount;
+    }
+
+    @Override
+    public void close() throws IOException {
+      ch.close();
+    }
+  }
+
+  private static class ChannelWriter extends Writer {
+    private final WritableByteChannel ch;
+    private final CharsetEncoder enc;
+    private final ByteBuffer bb;
+    private final CharBuffer cb;
+
+    ChannelWriter(WritableByteChannel ch, CharsetEncoder enc, int minBufferCap) {
+      this.ch = Objects.requireNonNull(ch, "ch");
+      this.enc = Objects.requireNonNull(enc, "enc");
+      int cap = minBufferCap > 0 ? minBufferCap : 8192;
+      this.bb = ByteBuffer.allocate(cap);
+      this.cb = CharBuffer.allocate(cap);
+    }
+
+    @Override
+    public void write(char[] cbuf, int off, int len) throws IOException {
+      Objects.checkFromIndexSize(off, len, cbuf.length);
+      int p = off;
+      int end = off + len;
+      while (p < end) {
+        int count = Math.min(end - p, cb.remaining());
+        cb.put(cbuf, p, count);
+        p += count;
+        drain();
+      }
+    }
+
+    private void drain() throws IOException {
+      cb.flip();
+      while (cb.hasRemaining()) {
+        CoderResult cr = enc.encode(cb, bb, false);
+        if (cr.isError()) {
+          cr.throwException();
+        }
+        writeOut();
+        if (cr.isUnderflow()) break;
+      }
+      cb.compact();
+    }
+
+    private void writeOut() throws IOException {
+      bb.flip();
+      while (bb.hasRemaining()) {
+        ch.write(bb);
+      }
+      bb.clear();
+    }
+
+    @Override
+    public void flush() throws IOException {
+      drain();
+      writeOut();
+    }
+
+    @Override
+    public void close() throws IOException {
+      drain();
+      cb.flip();
+      CoderResult cr = enc.encode(cb, bb, true);
+      if (cr.isError()) cr.throwException();
+      writeOut();
+      cb.clear();
+      CoderResult flushCr = enc.flush(bb);
+      if (flushCr.isError()) flushCr.throwException();
+      writeOut();
+      ch.close();
     }
   }
 }

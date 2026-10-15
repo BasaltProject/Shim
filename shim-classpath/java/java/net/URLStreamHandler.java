@@ -91,4 +91,12 @@ public abstract class URLStreamHandler {
   }
 
   protected abstract URLConnection openConnection(URL url) throws IOException;
+
+  protected URLConnection openConnection(URL url, Proxy proxy) throws IOException {
+    return openConnection(url);
+  }
+
+  protected int getDefaultPort() {
+    return -1;
+  }
 }

@@ -57,7 +57,13 @@ class FixedArrayByteBuffer extends DirectByteBuffer {
 
   public ByteBuffer slice() {
     return new FixedArrayByteBuffer
-      (address + position, array, arrayOffset + position, remaining(), true);
+      (address + position, array, arrayOffset + position, remaining(), isReadOnly());
+  }
+
+  public ByteBuffer slice(int index, int length) {
+    java.util.Objects.checkFromIndexSize(index, length, limit());
+    return new FixedArrayByteBuffer
+      (address + index, array, arrayOffset + index, length, isReadOnly());
   }
   
   @Override
