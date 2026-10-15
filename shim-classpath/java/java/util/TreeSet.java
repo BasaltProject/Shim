@@ -23,205 +23,208 @@
 
 package java.util;
 
-import shim.PersistentSet;
-import shim.Cell;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 
-public class TreeSet<T> extends AbstractSet<T> implements Collection<T> {
-  private PersistentSet<Cell<T>> set;
+public class TreeSet<E> extends AbstractSet<E>
+    implements NavigableSet<E>, Cloneable, Serializable {
 
-  public TreeSet(final Comparator<T> comparator) {
-    set = new PersistentSet(new Comparator<Cell<T>>() {
-      public int compare(Cell<T> a, Cell<T> b) {
-        return comparator.compare(a.value, b.value);
-      }
-    });
+  public static final long serialVersionUID = -2479143000061671589L;
+
+  private static final Object PRESENT = new Object();
+
+  private transient NavigableMap<E, Object> m;
+
+  TreeSet(NavigableMap<E, Object> m) {
+    this.m = m;
   }
 
   public TreeSet() {
-    this(new Comparator<T>() {
-        public int compare(T a, T b) {
-          return ((Comparable) a).compareTo(b);
-        }
-    });
+    this(new TreeMap<E, Object>());
   }
 
-  public TreeSet(Collection<? extends T> collection) {
+  public TreeSet(Comparator<? super E> comparator) {
+    this(new TreeMap<E, Object>(comparator));
+  }
+
+  public TreeSet(Collection<? extends E> c) {
     this();
-
-    for (T item: collection) {
-      add(item);
-    }
+    addAll(c);
   }
 
-  public T first() {
-    if (isEmpty()) throw new NoSuchElementException();
-
-    return set.first().value().value;
+  public TreeSet(SortedSet<E> s) {
+    this(s.comparator());
+    addAll(s);
   }
 
-  public T last() {
-    if (isEmpty()) throw new NoSuchElementException();
-
-    return set.last().value().value;
-  }
-  
-  public Iterator<T> iterator() {
-    return new MyIterator<T>(set.first());
+  @Override
+  public Iterator<E> iterator() {
+    return m.navigableKeySet().iterator();
   }
 
-  public Iterator<T> descendingIterator() {
-    return new MyIterator<T>(set.last(), true);
+  @Override
+  public Iterator<E> descendingIterator() {
+    return m.descendingKeySet().iterator();
   }
 
-  public String toString() {
-    return shim.Data.toString(this);
+  @Override
+  public NavigableSet<E> descendingSet() {
+    return new TreeSet<E>(m.descendingMap());
   }
 
-  public boolean add(T value) {
-    PersistentSet.Path<Cell<T>> p = set.find(new Cell(value, null));
-    if (p.fresh()) {
-      set = p.add();
-      return true;
-    }
-    return false;
-  }
-
-  T addAndReplace(T value) {
-    PersistentSet.Path<Cell<T>> p = set.find(new Cell(value, null));
-    if (p.fresh()) {
-      set = p.add();
-      return null;
-    } else {
-      T old = p.value().value;
-      set = p.replaceWith(new Cell(value, null));
-      return old;
-    }
-  }
-    
-  T find(T value) {
-    PersistentSet.Path<Cell<T>> p = set.find(new Cell(value, null));
-    return p.fresh() ? null : p.value().value;
-  }
-
-  T removeAndReturn(T value) {
-    Cell<T> cell = removeCell(value);
-    return cell == null ? null : cell.value;
-  }
-
-  private Cell<T> removeCell(Object value) {
-    PersistentSet.Path<Cell<T>> p = set.find(new Cell(value, null));
-    if (p.fresh()) {
-      return null;
-    } else {
-      Cell<T> old = p.value();
-
-      if (p.value().next != null) {
-        set = p.replaceWith(p.value().next);
-      } else {
-        set = p.remove();
-      }
-
-      return old;
-    }
-  }
-
-  public boolean remove(Object value) {
-    return removeCell(value) != null;
-  }
-
+  @Override
   public int size() {
-    return set.size();
+    return m.size();
   }
 
+  @Override
   public boolean isEmpty() {
-    return set.size() == 0;
+    return m.isEmpty();
   }
 
-  public boolean contains(Object value) {
-    return !set.find(new Cell(value, null)).fresh();
+  @Override
+  public boolean contains(Object o) {
+    return m.containsKey(o);
   }
 
+  @Override
+  public boolean add(E e) {
+    return m.put(e, PRESENT) == null;
+  }
+
+  @Override
+  public boolean remove(Object o) {
+    return m.remove(o) == PRESENT;
+  }
+
+  @Override
   public void clear() {
-    set = new PersistentSet(set.comparator());
+    m.clear();
   }
 
-  private class MyIterator<T> implements java.util.Iterator<T> {
-    private PersistentSet.Path<Cell<T>> path;
-    private PersistentSet.Path<Cell<T>> nextPath;
-    private Cell<T> cell;
-    private Cell<T> prevCell;
-    private Cell<T> prevPrevCell;
-    private boolean canRemove = false;
-    private final boolean reversed;
-
-    private MyIterator(PersistentSet.Path<Cell<T>> path) {
-      this(path, false);
-    }
-
-    private MyIterator(PersistentSet.Path<Cell<T>> path, boolean reversed) {
-      this.path = path;
-      this.reversed = reversed;
-      if (path != null) {
-        cell = path.value();
-        nextPath = nextPath();
+  @Override
+  public boolean addAll(Collection<? extends E> c) {
+    boolean modified = false;
+    for (E e : c) {
+      if (add(e)) {
+        modified = true;
       }
     }
+    return modified;
+  }
 
-    private MyIterator(MyIterator<T> start) {
-      path = start.path;
-      nextPath = start.nextPath;
-      cell = start.cell;
-      prevCell = start.prevCell;
-      prevPrevCell = start.prevPrevCell;
-      canRemove = start.canRemove;
-      reversed = start.reversed;
+  @Override
+  public NavigableSet<E> subSet(
+      E fromElement, boolean fromInclusive, E toElement, boolean toInclusive) {
+    return new TreeSet<E>(
+        m.subMap(fromElement, fromInclusive, toElement, toInclusive));
+  }
+
+  @Override
+  public NavigableSet<E> headSet(E toElement, boolean inclusive) {
+    return new TreeSet<E>(m.headMap(toElement, inclusive));
+  }
+
+  @Override
+  public NavigableSet<E> tailSet(E fromElement, boolean inclusive) {
+    return new TreeSet<E>(m.tailMap(fromElement, inclusive));
+  }
+
+  @Override
+  public SortedSet<E> subSet(E fromElement, E toElement) {
+    return subSet(fromElement, true, toElement, false);
+  }
+
+  @Override
+  public SortedSet<E> headSet(E toElement) {
+    return headSet(toElement, false);
+  }
+
+  @Override
+  public SortedSet<E> tailSet(E fromElement) {
+    return tailSet(fromElement, true);
+  }
+
+  @Override
+  public Comparator<? super E> comparator() {
+    return m.comparator();
+  }
+
+  @Override
+  public E first() {
+    return m.firstKey();
+  }
+
+  @Override
+  public E last() {
+    return m.lastKey();
+  }
+
+  @Override
+  public E lower(E e) {
+    return m.lowerKey(e);
+  }
+
+  @Override
+  public E floor(E e) {
+    return m.floorKey(e);
+  }
+
+  @Override
+  public E ceiling(E e) {
+    return m.ceilingKey(e);
+  }
+
+  @Override
+  public E higher(E e) {
+    return m.higherKey(e);
+  }
+
+  @Override
+  public E pollFirst() {
+    Map.Entry<E, Object> e = m.pollFirstEntry();
+    return (e == null) ? null : e.getKey();
+  }
+
+  @Override
+  public E pollLast() {
+    Map.Entry<E, Object> e = m.pollLastEntry();
+    return (e == null) ? null : e.getKey();
+  }
+
+  @Override
+  public Object clone() {
+    TreeSet<E> clone;
+    try {
+      clone = (TreeSet<E>) super.clone();
+    } catch (CloneNotSupportedException e) {
+      throw new InternalError();
     }
+    clone.m = new TreeMap<E, Object>(m);
+    return clone;
+  }
 
-    public boolean hasNext() {
-      return cell != null || nextPath != null;
+  private void writeObject(ObjectOutputStream out) throws IOException {
+    out.defaultWriteObject();
+    out.writeObject(m.comparator());
+    out.writeInt(m.size());
+    for (E e : m.keySet()) {
+      out.writeObject(e);
     }
+  }
 
-    public T next() {
-      if (cell == null) {
-        path = nextPath;
-        nextPath = nextPath();
-        cell = path.value();
-      }
-      prevPrevCell = prevCell;
-      prevCell = cell;
-      cell = cell.next;
-      canRemove = true;
-      return prevCell.value;
+  @SuppressWarnings("unchecked")
+  private void readObject(ObjectInputStream in)
+      throws IOException, ClassNotFoundException {
+    in.defaultReadObject();
+    Comparator<? super E> c = (Comparator<? super E>) in.readObject();
+    TreeMap<E, Object> tm = new TreeMap<E, Object>(c);
+    int size = in.readInt();
+    for (int i = 0; i < size; i++) {
+      tm.put((E) in.readObject(), PRESENT);
     }
-
-    private PersistentSet.Path nextPath() {
-      return reversed ? path.predecessor() : path.successor();
-    }
-
-    public void remove() {
-      if (! canRemove) throw new IllegalStateException();
-
-      if (prevPrevCell != null && prevPrevCell.next == prevCell) {
-        // cell to remove is not the first in the list.
-        prevPrevCell.next = prevCell.next;
-        prevCell = prevPrevCell;
-      } else if (prevCell.next == cell && cell != null) {
-        // cell to remove is the first in the list, but not the last.
-        set = (PersistentSet) path.replaceWith(cell);
-        prevCell = null;
-      } else {
-        // cell is alone in the list.
-        set = (PersistentSet) path.remove();
-        path = nextPath;
-        if (path != null) {
-          prevCell = null;
-          cell = path.value();
-          path = (PersistentSet.Path) set.find((Cell) cell);
-          nextPath = nextPath();
-        }
-      }
-
-      canRemove = false;
-    }
-  }    
+    this.m = tm;
+  }
 }

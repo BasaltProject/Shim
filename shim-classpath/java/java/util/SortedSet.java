@@ -23,11 +23,41 @@
 
 package java.util;
 
-public interface SortedSet<T> extends Collection<T>, Iterable<T>, Set<T> {
+public interface SortedSet<T> extends Set<T>, SequencedSet<T> {
   public Comparator<? super T> comparator();
+
   public T first();
+
   public SortedSet<T> headSet(T toElement);
+
   public T last();
+
   public SortedSet<T> subSet(T fromElement, T toElement);
+
   public SortedSet<T> tailSet(T fromElement);
+
+  @Override
+  default void addFirst(T element) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  default void addLast(T element) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  default T getFirst() {
+    return first();
+  }
+
+  @Override
+  default T getLast() {
+    return last();
+  }
+
+  @Override
+  default SortedSet<T> reversed() {
+    throw new UnsupportedOperationException();
+  }
 }

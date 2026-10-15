@@ -24,13 +24,80 @@
 package java.util.concurrent;
 
 import java.util.Deque;
+import java.util.Iterator;
 
 public interface BlockingDeque<T> extends Deque<T>, BlockingQueue<T> {
-  public T takeFirst() throws InterruptedException;
-  
-  public T takeLast() throws InterruptedException;
-  
-  public T pollFirst(long timeout, TimeUnit unit) throws InterruptedException;
-  
-  public T pollLast(long timeout, TimeUnit unit) throws InterruptedException;
+  void addFirst(T e);
+
+  void addLast(T e);
+
+  boolean offerFirst(T e);
+
+  boolean offerLast(T e);
+
+  void putFirst(T e) throws InterruptedException;
+
+  void putLast(T e) throws InterruptedException;
+
+  boolean offerFirst(T e, long timeout, TimeUnit unit) throws InterruptedException;
+
+  boolean offerLast(T e, long timeout, TimeUnit unit) throws InterruptedException;
+
+  T takeFirst() throws InterruptedException;
+
+  T takeLast() throws InterruptedException;
+
+  T pollFirst(long timeout, TimeUnit unit) throws InterruptedException;
+
+  T pollLast(long timeout, TimeUnit unit) throws InterruptedException;
+
+  boolean removeFirstOccurrence(Object o);
+
+  boolean removeLastOccurrence(Object o);
+
+  @Override
+  boolean add(T e);
+
+  @Override
+  boolean offer(T e);
+
+  @Override
+  void put(T e) throws InterruptedException;
+
+  @Override
+  boolean offer(T e, long timeout, TimeUnit unit) throws InterruptedException;
+
+  @Override
+  T remove();
+
+  @Override
+  T poll();
+
+  @Override
+  T take() throws InterruptedException;
+
+  @Override
+  T poll(long timeout, TimeUnit unit) throws InterruptedException;
+
+  @Override
+  T element();
+
+  @Override
+  T peek();
+
+  @Override
+  boolean remove(Object o);
+
+  @Override
+  boolean contains(Object o);
+
+  @Override
+  int size();
+
+  @Override
+  Iterator<T> iterator();
+
+  @Override
+  void push(T e);
 }
+

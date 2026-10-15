@@ -24,18 +24,17 @@
 package java.util;
 
 import java.io.Serializable;
+import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
-/**
- * @author zsombor
- * 
- */
 public class BitSet implements Serializable, Cloneable {
+  private static final long serialVersionUID = 7997698588984042384L;
 
-  final static int  BITS_PER_LONG       = 64;
-  final static int  BITS_PER_LONG_SHIFT = 6;
-  final static long MASK                = 0xFFFFFFFFFFFFFFFFL;
+  private static final int BITS_PER_LONG = 64;
+  private static final int BITS_PER_LONG_SHIFT = 6;
+  private static final long MASK = 0xFFFFFFFFFFFFFFFFL;
 
-  private long[]    bits;
+  private long[] bits;
 
   private static int longPosition(int index) {
     return index >> BITS_PER_LONG_SHIFT;
@@ -45,63 +44,22 @@ public class BitSet implements Serializable, Cloneable {
     return 1L << (index % BITS_PER_LONG);
   }
 
-  private static long getTrueMask(int fromIndex, int toIndex) {
-    int currentRange = toIndex - fromIndex;
-    return (MASK >>> (BITS_PER_LONG - currentRange)) << (fromIndex % BITS_PER_LONG);
-  }
-
-  public BitSet(int bitLength) {
-    if (bitLength % BITS_PER_LONG == 0) {
-      enlarge(longPosition(bitLength));
-    } else {
-      enlarge(longPosition(bitLength) + 1);
-    }
-  }
-
   public BitSet() {
-    enlarge(1);
+    this(BITS_PER_LONG);
   }
 
-  public void and(BitSet otherBits) {
-    int min = Math.min(bits.length, otherBits.bits.length);
-    for (int i = 0; i < min; i++) {
-      bits[i] &= otherBits.bits[i];
+  public BitSet(int nbits) {
+    if (nbits < 0) {
+      throw new NegativeArraySizeException("nbits < 0: " + nbits);
     }
-    for (int i = min; i < bits.length; i++) { 
-      bits[i] = 0;
-    }
-  }
-
-  public void andNot(BitSet otherBits) {
-    int max = Math.max(bits.length, otherBits.bits.length);
-    enlarge(max);
-    int min = Math.min(bits.length, otherBits.bits.length);
-    for (int i = 0; i < min; i++) {
-      bits[i] &= ~otherBits.bits[i];
-    }
-  }
-
-  public void or(BitSet otherBits) {
-    int max = Math.max(bits.length, otherBits.bits.length);
-    enlarge(max);
-    int min = Math.min(bits.length, otherBits.bits.length);
-    for (int i = 0; i < min; i++) {
-      bits[i] |= otherBits.bits[i];
-    }
-  }
-
-  public void xor(BitSet otherBits) {
-    int max = Math.max(bits.length, otherBits.bits.length);
-    enlarge(max);
-    int min = Math.min(bits.length, otherBits.bits.length);
-    for (int i = 0; i < min; i++) {
-      bits[i] ^= otherBits.bits[i];
-    }
+    int words = (nbits + BITS_PER_LONG - 1) >> BITS_PER_LONG_SHIFT;
+    this.bits = new long[Math.max(words, 1)];
   }
 
   private void enlarge(int newPartition) {
     if (bits == null || bits.length < (newPartition + 1)) {
-      long[] newBits = new long[newPartition + 1];
+      int newLen = Math.max(newPartition + 1, (bits == null) ? 1 : (bits.length * 2));
+      long[] newBits = new long[newLen];
       if (bits != null) {
         System.arraycopy(bits, 0, newBits, 0, bits.length);
       }
@@ -109,59 +67,232 @@ public class BitSet implements Serializable, Cloneable {
     }
   }
 
-  public boolean get(int index) {
-    int pos = longPosition(index);
+  public boolean get(int bitIndex) {
+    if (bitIndex < 0) {
+      throw new IndexOutOfBoundsException("bitIndex < 0: " + bitIndex);
+    }
+    int pos = longPosition(bitIndex);
     if (pos < bits.length) {
-      return (bits[pos] & bitPosition(index)) != 0;
+      return (bits[pos] & bitPosition(bitIndex)) != 0;
     }
     return false;
   }
 
-  public void flip(int index) {
-    flip(index, index+1);
+  public BitSet get(int fromIndex, int toIndex) {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
+      throw new IndexOutOfBoundsException();
+    }
+    int len = length();
+    if (len <= fromIndex || fromIndex == toIndex) {
+      return new BitSet(0);
+    }
+    if (toIndex > len) {
+      toIndex = len;
+    }
+    BitSet result = new BitSet(toIndex - fromIndex);
+    for (int i = fromIndex; i < toIndex; i++) {
+      if (get(i)) {
+        result.set(i - fromIndex);
+      }
+    }
+    return result;
+  }
+
+  public void set(int bitIndex) {
+    if (bitIndex < 0) {
+      throw new IndexOutOfBoundsException("bitIndex < 0: " + bitIndex);
+    }
+    int pos = longPosition(bitIndex);
+    enlarge(pos);
+    bits[pos] |= bitPosition(bitIndex);
+  }
+
+  public void set(int bitIndex, boolean value) {
+    if (value) {
+      set(bitIndex);
+    } else {
+      clear(bitIndex);
+    }
+  }
+
+  public void set(int fromIndex, int toIndex) {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
+      throw new IndexOutOfBoundsException();
+    }
+    if (fromIndex == toIndex) {
+      return;
+    }
+    int startWord = longPosition(fromIndex);
+    int endWord = longPosition(toIndex - 1);
+    enlarge(endWord);
+
+    long firstWordMask = MASK << (fromIndex % BITS_PER_LONG);
+    long lastWordMask = MASK >>> (BITS_PER_LONG - (toIndex % BITS_PER_LONG == 0 ? BITS_PER_LONG : toIndex % BITS_PER_LONG));
+
+    if (startWord == endWord) {
+      bits[startWord] |= (firstWordMask & lastWordMask);
+    } else {
+      bits[startWord] |= firstWordMask;
+      for (int i = startWord + 1; i < endWord; i++) {
+        bits[i] = MASK;
+      }
+      bits[endWord] |= lastWordMask;
+    }
+  }
+
+  public void set(int fromIndex, int toIndex, boolean value) {
+    if (value) {
+      set(fromIndex, toIndex);
+    } else {
+      clear(fromIndex, toIndex);
+    }
+  }
+
+  public void clear(int bitIndex) {
+    if (bitIndex < 0) {
+      throw new IndexOutOfBoundsException("bitIndex < 0: " + bitIndex);
+    }
+    int pos = longPosition(bitIndex);
+    if (pos < bits.length) {
+      bits[pos] &= ~bitPosition(bitIndex);
+    }
+  }
+
+  public void clear(int fromIndex, int toIndex) {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
+      throw new IndexOutOfBoundsException();
+    }
+    if (fromIndex == toIndex) {
+      return;
+    }
+    int startWord = longPosition(fromIndex);
+    if (startWord >= bits.length) {
+      return;
+    }
+    int endWord = longPosition(toIndex - 1);
+    if (endWord >= bits.length) {
+      endWord = bits.length - 1;
+    }
+
+    long firstWordMask = MASK << (fromIndex % BITS_PER_LONG);
+    long lastWordMask = MASK >>> (BITS_PER_LONG - (toIndex % BITS_PER_LONG == 0 ? BITS_PER_LONG : toIndex % BITS_PER_LONG));
+
+    if (startWord == endWord) {
+      bits[startWord] &= ~(firstWordMask & lastWordMask);
+    } else {
+      bits[startWord] &= ~firstWordMask;
+      for (int i = startWord + 1; i < endWord; i++) {
+        bits[i] = 0;
+      }
+      bits[endWord] &= ~lastWordMask;
+    }
+  }
+
+  public void clear() {
+    for (int i = 0; i < bits.length; i++) {
+      bits[i] = 0;
+    }
+  }
+
+  public void flip(int bitIndex) {
+    if (bitIndex < 0) {
+      throw new IndexOutOfBoundsException("bitIndex < 0: " + bitIndex);
+    }
+    int pos = longPosition(bitIndex);
+    enlarge(pos);
+    bits[pos] ^= bitPosition(bitIndex);
   }
 
   public void flip(int fromIndex, int toIndex) {
-    if (fromIndex > toIndex || fromIndex < 0 || toIndex < 0) {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
       throw new IndexOutOfBoundsException();
-    } else if (fromIndex != toIndex) {
-      MaskInfoIterator iter = new MaskInfoIterator(fromIndex, toIndex);
-      enlarge(iter.getLastPartition());
-      while (iter.hasNext()) {
-        MaskInfo info = iter.next();
-        bits[info.partitionIndex] ^= info.mask;
+    }
+    if (fromIndex == toIndex) {
+      return;
+    }
+    int startWord = longPosition(fromIndex);
+    int endWord = longPosition(toIndex - 1);
+    enlarge(endWord);
+
+    long firstWordMask = MASK << (fromIndex % BITS_PER_LONG);
+    long lastWordMask = MASK >>> (BITS_PER_LONG - (toIndex % BITS_PER_LONG == 0 ? BITS_PER_LONG : toIndex % BITS_PER_LONG));
+
+    if (startWord == endWord) {
+      bits[startWord] ^= (firstWordMask & lastWordMask);
+    } else {
+      bits[startWord] ^= firstWordMask;
+      for (int i = startWord + 1; i < endWord; i++) {
+        bits[i] ^= MASK;
+      }
+      bits[endWord] ^= lastWordMask;
+    }
+  }
+
+  public void and(BitSet set) {
+    if (this == set) {
+      return;
+    }
+    int common = Math.min(bits.length, set.bits.length);
+    for (int i = 0; i < common; i++) {
+      bits[i] &= set.bits[i];
+    }
+    for (int i = common; i < bits.length; i++) {
+      bits[i] = 0;
+    }
+  }
+
+  public void or(BitSet set) {
+    if (this == set) {
+      return;
+    }
+    int common = Math.min(bits.length, set.bits.length);
+    if (set.bits.length > bits.length) {
+      enlarge(set.bits.length - 1);
+    }
+    for (int i = 0; i < common; i++) {
+      bits[i] |= set.bits[i];
+    }
+    if (set.bits.length > common) {
+      System.arraycopy(set.bits, common, bits, common, set.bits.length - common);
+    }
+  }
+
+  public void xor(BitSet set) {
+    int common = Math.min(bits.length, set.bits.length);
+    if (set.bits.length > bits.length) {
+      enlarge(set.bits.length - 1);
+    }
+    for (int i = 0; i < common; i++) {
+      bits[i] ^= set.bits[i];
+    }
+    if (set.bits.length > common) {
+      System.arraycopy(set.bits, common, bits, common, set.bits.length - common);
+    }
+  }
+
+  public void andNot(BitSet set) {
+    int common = Math.min(bits.length, set.bits.length);
+    for (int i = 0; i < common; i++) {
+      bits[i] &= ~set.bits[i];
+    }
+  }
+
+  public boolean intersects(BitSet set) {
+    int common = Math.min(bits.length, set.bits.length);
+    for (int i = 0; i < common; i++) {
+      if ((bits[i] & set.bits[i]) != 0) {
+        return true;
       }
     }
+    return false;
   }
 
-  public void set(int index) {
-    int pos = longPosition(index);
-    enlarge(pos);
-    bits[pos] |= bitPosition(index);
-  }
-
-  public void set(int start, int end) {
-    MaskInfoIterator iter = new MaskInfoIterator(start, end);
-    enlarge(iter.getLastPartition());
-    while (iter.hasNext()) {
-      MaskInfo info = iter.next();
-      bits[info.partitionIndex] |= info.mask;
+  public int cardinality() {
+    int sum = 0;
+    for (int i = 0; i < bits.length; i++) {
+      sum += Long.bitCount(bits[i]);
     }
-  }
-
-  public void clear(int index) {
-    int pos = longPosition(index);
-    if (pos < bits.length) {
-      bits[pos] &= (MASK ^ bitPosition(index));
-    }
-  }
-
-  public void clear(int start, int end) {
-    MaskInfoIterator iter = new MaskInfoIterator(start, end);
-    while (iter.hasNext()) {
-      MaskInfo info = iter.next();
-      bits[info.partitionIndex] &= (MASK ^ info.mask);
-    }
+    return sum;
   }
 
   public boolean isEmpty() {
@@ -173,108 +304,266 @@ public class BitSet implements Serializable, Cloneable {
     return true;
   }
 
-  public boolean intersects(BitSet otherBits) {
-    int max = Math.max(bits.length, otherBits.bits.length);
-    for (int i = 0; i < max; i++) {
-      if ((bits[i] & otherBits.bits[i]) != 0) {
-        return true;
+  public int length() {
+    for (int i = bits.length - 1; i >= 0; i--) {
+      if (bits[i] != 0) {
+        return (i << BITS_PER_LONG_SHIFT) + (BITS_PER_LONG - Long.numberOfLeadingZeros(bits[i]));
       }
     }
-    return false;
+    return 0;
   }
 
-  public int length() {
+  public int size() {
     return bits.length << BITS_PER_LONG_SHIFT;
   }
 
   public int nextSetBit(int fromIndex) {
-    return nextBit(fromIndex, false);
-  }
-
-  private int nextBit(int fromIndex, boolean bitClear) {
-    int pos = longPosition(fromIndex);
-    if (pos >= bits.length) {
+    if (fromIndex < 0) {
+      throw new IndexOutOfBoundsException("fromIndex < 0: " + fromIndex);
+    }
+    int u = longPosition(fromIndex);
+    if (u >= bits.length) {
       return -1;
     }
-    int current = fromIndex;
-    do {
-      long currValue = bits[pos];
-      if (currValue == 0) {
-        pos++;
-        current = pos << BITS_PER_LONG_SHIFT;
-      } else {
-        do {
-          long bitPos = bitPosition(current);
-          if (((currValue & bitPos) != 0) ^ bitClear) {
-            return current;
-          } else {
-            current++;
-          }
-        } while (current % BITS_PER_LONG != 0);
+    long word = bits[u] & (MASK << (fromIndex % BITS_PER_LONG));
+    while (true) {
+      if (word != 0) {
+        return (u << BITS_PER_LONG_SHIFT) + Long.numberOfTrailingZeros(word);
       }
-      pos++;
-    } while (pos < bits.length);
-
-    return -1;
+      if (++u >= bits.length) {
+        return -1;
+      }
+      word = bits[u];
+    }
   }
 
   public int nextClearBit(int fromIndex) {
-    return nextBit(fromIndex, true);
-  }
-
-  public int cardinality() {
-    int numSetBits = 0;
-    for (int i = nextSetBit(0); i >= 0; i = nextSetBit(i+1)) {
-      ++numSetBits;
+    if (fromIndex < 0) {
+      throw new IndexOutOfBoundsException("fromIndex < 0: " + fromIndex);
     }
-    
-    return numSetBits;
-  }
-
-  private static class MaskInfoIterator implements Iterator<MaskInfo> {
-    private int basePartition;
-    private int numPartitionsToTraverse;
-    private int currentPartitionOffset;
-    private int toIndex;
-    private int currentFirstIndex;
-
-    public MaskInfoIterator(int fromIndex, int toIndex) {
-      this.basePartition = longPosition(fromIndex);
-      this.numPartitionsToTraverse = longPosition(toIndex - 1) - basePartition + 1;
-      this.currentPartitionOffset = 0;
-      this.toIndex = toIndex;
-      this.currentFirstIndex = fromIndex;
+    int u = longPosition(fromIndex);
+    if (u >= bits.length) {
+      return fromIndex;
     }
-
-    public MaskInfo next() {
-      int currentToIndex = Math.min(toIndex, (basePartition + currentPartitionOffset + 1) * BITS_PER_LONG);
-      long mask = getTrueMask(currentFirstIndex, currentToIndex);
-      MaskInfo info = new MaskInfo(mask, basePartition + currentPartitionOffset);
-      currentFirstIndex = currentToIndex;
-      currentPartitionOffset++;
-      return info;
-    }
-
-    public boolean hasNext() {
-      return currentPartitionOffset < numPartitionsToTraverse;
-    }
-
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
-
-    public int getLastPartition() {
-      return basePartition + numPartitionsToTraverse - 1;
+    long word = (~bits[u]) & (MASK << (fromIndex % BITS_PER_LONG));
+    while (true) {
+      if (word != 0) {
+        return (u << BITS_PER_LONG_SHIFT) + Long.numberOfTrailingZeros(word);
+      }
+      if (++u >= bits.length) {
+        return u << BITS_PER_LONG_SHIFT;
+      }
+      word = ~bits[u];
     }
   }
 
-  private static class MaskInfo {
-    public long mask;
-    public int partitionIndex;
-
-    public MaskInfo(long mask, int partitionIndex) {
-      this.mask = mask;
-      this.partitionIndex = partitionIndex;
+  public int previousSetBit(int fromIndex) {
+    if (fromIndex < 0) {
+      if (fromIndex == -1) {
+        return -1;
+      }
+      throw new IndexOutOfBoundsException("fromIndex < -1: " + fromIndex);
     }
+    int u = longPosition(fromIndex);
+    if (u >= bits.length) {
+      u = bits.length - 1;
+      if (u < 0) {
+        return -1;
+      }
+      fromIndex = (u + 1) * BITS_PER_LONG - 1;
+    }
+    long word = bits[u] & (MASK >>> (BITS_PER_LONG - 1 - (fromIndex % BITS_PER_LONG)));
+    while (true) {
+      if (word != 0) {
+        return (u << BITS_PER_LONG_SHIFT) + (BITS_PER_LONG - 1 - Long.numberOfLeadingZeros(word));
+      }
+      if (u == 0) {
+        return -1;
+      }
+      word = bits[--u];
+    }
+  }
+
+  public int previousClearBit(int fromIndex) {
+    if (fromIndex < 0) {
+      if (fromIndex == -1) {
+        return -1;
+      }
+      throw new IndexOutOfBoundsException("fromIndex < -1: " + fromIndex);
+    }
+    int u = longPosition(fromIndex);
+    if (u >= bits.length) {
+      return fromIndex;
+    }
+    long word = (~bits[u]) & (MASK >>> (BITS_PER_LONG - 1 - (fromIndex % BITS_PER_LONG)));
+    while (true) {
+      if (word != 0) {
+        return (u << BITS_PER_LONG_SHIFT) + (BITS_PER_LONG - 1 - Long.numberOfLeadingZeros(word));
+      }
+      if (u == 0) {
+        return -1;
+      }
+      word = ~bits[--u];
+    }
+  }
+
+  public long[] toLongArray() {
+    int wordsInUse = 0;
+    for (int i = bits.length - 1; i >= 0; i--) {
+      if (bits[i] != 0) {
+        wordsInUse = i + 1;
+        break;
+      }
+    }
+    return Arrays.copyOf(bits, wordsInUse);
+  }
+
+  public byte[] toByteArray() {
+    int wordsInUse = 0;
+    for (int i = bits.length - 1; i >= 0; i--) {
+      if (bits[i] != 0) {
+        wordsInUse = i + 1;
+        break;
+      }
+    }
+    if (wordsInUse == 0) {
+      return new byte[0];
+    }
+    int len = 8 * (wordsInUse - 1);
+    for (long x = bits[wordsInUse - 1]; x != 0; x >>>= 8) {
+      len++;
+    }
+    byte[] bytes = new byte[len];
+    for (int i = 0; i < len; i++) {
+      bytes[i] = (byte) ((bits[i / 8] >>> (8 * (i % 8))) & 0xff);
+    }
+    return bytes;
+  }
+
+  public static BitSet valueOf(long[] longs) {
+    if (longs == null) {
+      throw new NullPointerException();
+    }
+    int n;
+    for (n = longs.length; n > 0 && longs[n - 1] == 0; n--);
+    BitSet bs = new BitSet(0);
+    bs.bits = Arrays.copyOf(longs, Math.max(n, 1));
+    return bs;
+  }
+
+  public static BitSet valueOf(byte[] bytes) {
+    if (bytes == null) {
+      throw new NullPointerException();
+    }
+    int n = (bytes.length + 7) / 8;
+    long[] longs = new long[Math.max(n, 1)];
+    for (int i = 0; i < bytes.length; i++) {
+      longs[i / 8] |= ((long) (bytes[i] & 0xff)) << (8 * (i % 8));
+    }
+    return valueOf(longs);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder b = new StringBuilder();
+    b.append('{');
+    int i = nextSetBit(0);
+    if (i != -1) {
+      b.append(i);
+      while (true) {
+        if (++i < 0) {
+          break;
+        }
+        i = nextSetBit(i);
+        if (i < 0) {
+          break;
+        }
+        int endOfRun = nextClearBit(i);
+        do {
+          b.append(", ").append(i);
+        } while (++i != endOfRun);
+      }
+    }
+    b.append('}');
+    return b.toString();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (!(obj instanceof BitSet)) {
+      return false;
+    }
+    BitSet other = (BitSet) obj;
+    int common = Math.min(bits.length, other.bits.length);
+    for (int i = 0; i < common; i++) {
+      if (bits[i] != other.bits[i]) {
+        return false;
+      }
+    }
+    for (int i = common; i < bits.length; i++) {
+      if (bits[i] != 0) {
+        return false;
+      }
+    }
+    for (int i = common; i < other.bits.length; i++) {
+      if (other.bits[i] != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    long h = 1234;
+    int wordsInUse = 0;
+    for (int i = bits.length - 1; i >= 0; i--) {
+      if (bits[i] != 0) {
+        wordsInUse = i + 1;
+        break;
+      }
+    }
+    for (int i = wordsInUse; --i >= 0; ) {
+      h ^= bits[i] * (i + 1);
+    }
+    return (int) ((h >> 32) ^ h);
+  }
+
+  @Override
+  public Object clone() {
+    try {
+      BitSet result = (BitSet) super.clone();
+      result.bits = bits.clone();
+      return result;
+    } catch (CloneNotSupportedException e) {
+      throw new InternalError(e);
+    }
+  }
+
+  public IntStream stream() {
+    PrimitiveIterator.OfInt it = new PrimitiveIterator.OfInt() {
+      private int next = nextSetBit(0);
+
+      @Override
+      public boolean hasNext() {
+        return next != -1;
+      }
+
+      @Override
+      public int nextInt() {
+        if (next == -1) {
+          throw new NoSuchElementException();
+        }
+        int ret = next;
+        next = (ret == Integer.MAX_VALUE) ? -1 : nextSetBit(ret + 1);
+        return ret;
+      }
+    };
+    return StreamSupport.intStream(
+        Spliterators.spliteratorUnknownSize(it, Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.SORTED),
+        false);
   }
 }
