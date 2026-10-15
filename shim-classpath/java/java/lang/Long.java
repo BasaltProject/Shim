@@ -48,7 +48,11 @@ public final class Long extends Number implements Comparable<Long> {
   }
 
   public int compareTo(Long o) {
-    return value > o.value ? 1 : (value < o.value ? -1 : 0);
+    return compare(value, o.value);
+  }
+
+  public static int compare(long x, long y) {
+    return (x < y) ? -1 : ((x == y) ? 0 : 1);
   }
 
   public boolean equals(Object o) {
@@ -56,7 +60,11 @@ public final class Long extends Number implements Comparable<Long> {
   }
 
   public int hashCode() {
-    return (int) ((value >> 32) ^ (value & 0xFF));
+    return hashCode(value);
+  }
+
+  public static int hashCode(long value) {
+    return (int) (value ^ (value >>> 32));
   }
 
   public String toString() {

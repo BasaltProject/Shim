@@ -851,9 +851,20 @@ extern "C" JNIEXPORT jobjectArray JNICALL
     Java_java_lang_System_getNativeProperties(JNIEnv* e, jclass)
 {
   jobjectArray array
-      = e->NewObjectArray(32, e->FindClass("java/lang/String"), 0);
+      = e->NewObjectArray(64, e->FindClass("java/lang/String"), 0);
 
   unsigned index = 0;
+
+  e->SetObjectArrayElement(
+      array, index++, e->NewStringUTF("java.specification.version=25"));
+  e->SetObjectArrayElement(
+      array, index++, e->NewStringUTF("java.vm.specification.version=25"));
+  e->SetObjectArrayElement(
+      array, index++, e->NewStringUTF("java.version=25"));
+  e->SetObjectArrayElement(
+      array, index++, e->NewStringUTF("java.runtime.version=25"));
+  e->SetObjectArrayElement(
+      array, index++, e->NewStringUTF("java.class.version=69.0"));
 
 #ifdef ARCH_x86_32
   e->SetObjectArrayElement(array, index++, e->NewStringUTF("os.arch=x86"));

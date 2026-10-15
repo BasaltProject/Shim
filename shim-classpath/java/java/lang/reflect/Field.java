@@ -42,7 +42,7 @@ public class Field<T> extends AccessibleObject implements Member {
   private static final int BooleanField = 8;
   private static final int ObjectField = 9;
 
-  private final VMField vmField;
+  public final VMField vmField;
   private boolean accessible = true;
 
   public Field(VMField vmField) {

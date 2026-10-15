@@ -209,6 +209,10 @@ public class Collections {
     return new IteratorEnumeration<T> (c.iterator());
   }
 
+  public static <T> Comparator<T> reverseOrder() {
+    return (c1, c2) -> ((Comparable) c2).compareTo(c1);
+  }
+
   public static <T> Comparator<T> reverseOrder(Comparator<T> cmp) {
     return new ReverseComparator<T>(cmp);
   }
@@ -556,6 +560,10 @@ public class Collections {
       return inner.hashCode();
     }
 
+    public String toString() {
+      return inner.toString();
+    }
+
     public T get(int index) {
       return inner.get(index);
     }
@@ -699,6 +707,18 @@ public class Collections {
     public Collection<V> values() {
       return unmodifiableCollection(inner.values());
     }
+
+    public boolean equals(Object o) {
+      return o == this || inner.equals(o);
+    }
+
+    public int hashCode() {
+      return inner.hashCode();
+    }
+
+    public String toString() {
+      return inner.toString();
+    }
   }
   
   static class UnmodifiableIterator<T> implements Iterator<T> {
@@ -812,6 +832,21 @@ public class Collections {
     public void clear() {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public boolean equals(Object o) {
+      return o == this || inner.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+      return inner.hashCode();
+    }
+
+    @Override
+    public String toString() {
+      return inner.toString();
+    }
   }
   
   public static <T> UnmodifiableCollection<T> unmodifiableCollection(Collection<T> collection) {
@@ -846,5 +881,17 @@ public class Collections {
     ArrayList<T> list = new ArrayList<T>(1);
     list.add(o);
     return new UnmodifiableList(list);
+  }
+
+  public static <T> Set<T> singleton(T o) {
+    Set<T> set = new HashSet<T>(1);
+    set.add(o);
+    return unmodifiableSet(set);
+  }
+
+  public static <K, V> Map<K, V> singletonMap(K key, V value) {
+    Map<K, V> map = new HashMap<K, V>(1);
+    map.put(key, value);
+    return unmodifiableMap(map);
   }
 }

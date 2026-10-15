@@ -37,6 +37,7 @@ import java.security.ProtectionDomain;
 public abstract class ClassLoader {
   private final ClassLoader parent;
   private Map<String, Package> packages;
+  private Module unnamedModule;
 
   protected ClassLoader(ClassLoader parent) {
     if (parent == null) {
@@ -113,6 +114,17 @@ public abstract class ClassLoader {
 
   public static ClassLoader getSystemClassLoader() {
     return shim.SystemClassLoader.appLoader();
+  }
+
+  public static ClassLoader getPlatformClassLoader() {
+    return shim.SystemClassLoader.bootLoader();
+  }
+
+  public synchronized Module getUnnamedModule() {
+    if (unnamedModule == null) {
+      unnamedModule = new Module(this);
+    }
+    return unnamedModule;
   }
 
   protected Class defineClass(String name, byte[] b, int offset, int length) {

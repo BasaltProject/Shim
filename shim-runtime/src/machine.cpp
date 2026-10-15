@@ -1343,7 +1343,7 @@ GcClassAddendum* getClassAddendum(Thread* t, GcClass* class_, GcSingleton* pool)
   if (addendum == 0) {
     PROTECT(t, class_);
 
-    addendum = makeClassAddendum(t, pool, 0, 0, 0, 0, -1, 0, 0);
+    addendum = makeClassAddendum(t, pool, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0);
     setField(t, class_, ClassAddendum, addendum);
   }
   return addendum;
@@ -2913,11 +2913,19 @@ void parseAttributeTable(Thread* t,
                          Stream& s,
                          GcClass* class_,
                          GcSingleton* pool,
+                         GcByteArray* poolTags,
+                         unsigned major,
                          GcList* invocations)
 {
   PROTECT(t, class_);
   PROTECT(t, pool);
+  PROTECT(t, poolTags);
   PROTECT(t, invocations);
+
+  bool nestHostSeen = false;
+  bool nestMembersSeen = false;
+  bool recordSeen = false;
+  bool permittedSubclassesSeen = false;
 
   unsigned attributeCount = s.read2();
   for (unsigned j = 0; j < attributeCount; ++j) {
@@ -3010,6 +3018,130 @@ void parseAttributeTable(Thread* t,
           enclosingMethod
               ? cast<GcPair>(t, singletonObject(t, pool, enclosingMethod - 1))
               : 0);
+    } else if (major >= 55 && vm::strcmp(reinterpret_cast<const int8_t*>("NestHost"),
+                                         name->body().begin()) == 0) {
+      if (nestHostSeen) {
+        throwNew(t, GcClassFormatError::Type, "Multiple NestHost attributes in class file");
+      }
+      if (nestMembersSeen) {
+        throwNew(t, GcClassFormatError::Type, "Conflicting NestHost and NestMembers attributes in class file");
+      }
+      if (length != 2) {
+        throwNew(t, GcClassFormatError::Type, "Wrong NestHost attribute length in class file");
+      }
+      uint16_t hostIndex = s.read2();
+      if (hostIndex == 0 || hostIndex > poolTags->length() / 2
+          || poolTags->body()[hostIndex - 1] != CONSTANT_Class) {
+        throwNew(t, GcClassFormatError::Type, "Nest-host class_info_index has bad constant type in class file");
+      }
+      GcReference* hostRef = cast<GcReference>(t, singletonObject(t, pool, hostIndex - 1));
+      GcClassAddendum* addendum = getClassAddendum(t, class_, pool);
+      addendum->setNestHost(t, hostRef->name());
+      nestHostSeen = true;
+    } else if (major >= 55 && vm::strcmp(reinterpret_cast<const int8_t*>("NestMembers"),
+                                         name->body().begin()) == 0) {
+      if (nestMembersSeen) {
+        throwNew(t, GcClassFormatError::Type, "Multiple NestMembers attributes in class file");
+      }
+      if (nestHostSeen) {
+        throwNew(t, GcClassFormatError::Type, "Conflicting NestHost and NestMembers attributes in class file");
+      }
+      if (length < 2) {
+        throwNew(t, GcClassFormatError::Type, "Wrong NestMembers attribute length in class file");
+      }
+      uint16_t count = s.read2();
+      if (length != 2 + 2 * count) {
+        throwNew(t, GcClassFormatError::Type, "Wrong NestMembers attribute length in class file");
+      }
+      GcArray* array = makeArray(t, count);
+      PROTECT(t, array);
+      for (unsigned i = 0; i < count; ++i) {
+        uint16_t memberIndex = s.read2();
+        if (memberIndex == 0 || memberIndex > poolTags->length() / 2
+            || poolTags->body()[memberIndex - 1] != CONSTANT_Class) {
+          throwNew(t, GcClassFormatError::Type, "Nest member class_info_index has bad constant type in class file");
+        }
+        GcReference* memberRef = cast<GcReference>(t, singletonObject(t, pool, memberIndex - 1));
+        array->setBodyElement(t, i, memberRef->name());
+      }
+      GcClassAddendum* addendum = getClassAddendum(t, class_, pool);
+      addendum->setNestMembers(t, array);
+      nestMembersSeen = true;
+    } else if (major >= 61 && vm::strcmp(reinterpret_cast<const int8_t*>("PermittedSubclasses"),
+                                         name->body().begin()) == 0) {
+      if (permittedSubclassesSeen) {
+        throwNew(t, GcClassFormatError::Type, "Multiple PermittedSubclasses attributes in class file");
+      }
+      if (length < 2) {
+        throwNew(t, GcClassFormatError::Type, "Wrong PermittedSubclasses attribute length in class file");
+      }
+      uint16_t count = s.read2();
+      if (length != 2 + 2 * count) {
+        throwNew(t, GcClassFormatError::Type, "Wrong PermittedSubclasses attribute length in class file");
+      }
+      GcArray* array = makeArray(t, count);
+      PROTECT(t, array);
+      for (unsigned i = 0; i < count; ++i) {
+        uint16_t subIndex = s.read2();
+        if (subIndex == 0 || subIndex > poolTags->length() / 2
+            || poolTags->body()[subIndex - 1] != CONSTANT_Class) {
+          throwNew(t, GcClassFormatError::Type, "Permitted subclass class_info_index has bad constant type in class file");
+        }
+        GcReference* subRef = cast<GcReference>(t, singletonObject(t, pool, subIndex - 1));
+        array->setBodyElement(t, i, subRef->name());
+      }
+      GcClassAddendum* addendum = getClassAddendum(t, class_, pool);
+      addendum->setPermittedSubclasses(t, array);
+      permittedSubclassesSeen = true;
+    } else if (major >= 60 && vm::strcmp(reinterpret_cast<const int8_t*>("Record"),
+                                         name->body().begin()) == 0) {
+      if (recordSeen) {
+        throwNew(t, GcClassFormatError::Type, "Multiple Record attributes in class file");
+      }
+      if (length < 2) {
+        throwNew(t, GcClassFormatError::Type, "Record attribute has wrong length in class file");
+      }
+      unsigned startPos = s.position();
+      uint16_t count = s.read2();
+      GcArray* array = makeArray(t, count);
+      PROTECT(t, array);
+      for (unsigned i = 0; i < count; ++i) {
+        if (s.position() - startPos > length - 6) {
+          throwNew(t, GcClassFormatError::Type, "Record attribute has wrong length in class file");
+        }
+        uint16_t nameIndex = s.read2();
+        if (nameIndex == 0 || nameIndex > poolTags->length() / 2
+            || poolTags->body()[nameIndex - 1] != CONSTANT_Utf8) {
+          throwNew(t, GcClassFormatError::Type, "Invalid record component name index");
+        }
+        uint16_t descIndex = s.read2();
+        if (descIndex == 0 || descIndex > poolTags->length() / 2
+            || poolTags->body()[descIndex - 1] != CONSTANT_Utf8) {
+          throwNew(t, GcClassFormatError::Type, "Invalid record component descriptor index");
+        }
+        GcByteArray* desc = cast<GcByteArray>(t, singletonObject(t, pool, descIndex - 1));
+        validateFieldDescriptor(t, desc);
+        uint16_t attrCount = s.read2();
+        for (unsigned ai = 0; ai < attrCount; ++ai) {
+          if (s.position() - startPos > length - 6) {
+            throwNew(t, GcClassFormatError::Type, "Record attribute has wrong length in class file");
+          }
+          s.read2();
+          uint32_t aLen = s.read4();
+          if (aLen > length - (s.position() - startPos)) {
+            throwNew(t, GcClassFormatError::Type, "Record attribute has wrong length in class file");
+          }
+          s.skip(aLen);
+        }
+        GcByteArray* compName = cast<GcByteArray>(t, singletonObject(t, pool, nameIndex - 1));
+        array->setBodyElement(t, i, compName);
+      }
+      if (s.position() - startPos != length) {
+        throwNew(t, GcClassFormatError::Type, "Record attribute has wrong length in class file");
+      }
+      GcClassAddendum* addendum = getClassAddendum(t, class_, pool);
+      addendum->setRecordComponents(t, array);
+      recordSeen = true;
     } else {
       s.skip(length);
     }
@@ -5007,7 +5139,7 @@ GcClass* parseClass(Thread* t,
 
   parseMethodTable(t, s, class_, pool, poolTags, majorVer);
 
-  parseAttributeTable(t, s, class_, pool, invocations);
+  parseAttributeTable(t, s, class_, pool, poolTags, majorVer, invocations);
 
   GcArray* vtable = cast<GcArray>(t, class_->virtualTable());
   unsigned vtableLength = (vtable ? vtable->length() : 0);

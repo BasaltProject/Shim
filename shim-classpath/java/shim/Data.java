@@ -66,7 +66,7 @@ public class Data {
     for (Iterator it = c.iterator(); it.hasNext();) {
       sb.append(it.next());
       if (it.hasNext()) {
-        sb.append(",");
+        sb.append(", ");
       }
     }
     sb.append("]");
@@ -82,7 +82,7 @@ public class Data {
         .append("=")
         .append(e.getValue());
       if (it.hasNext()) {
-        sb.append(",");
+        sb.append(", ");
       }
     }
     sb.append("}");
