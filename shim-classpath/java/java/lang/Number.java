@@ -26,8 +26,14 @@ package java.lang;
 import java.io.Serializable;
 
 public abstract class Number implements Serializable {
-  public abstract byte byteValue();
-  public abstract short shortValue();
+  public byte byteValue() {
+    return (byte) intValue();
+  }
+
+  public short shortValue() {
+    return (short) intValue();
+  }
+
   public abstract int intValue();
   public abstract long longValue();
   public abstract float floatValue();

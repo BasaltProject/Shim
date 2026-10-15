@@ -73,6 +73,59 @@ public class AtomicBoolean implements java.io.Serializable {
     return booleanValue(intResult);
   }
   
+  public boolean getPlain() {
+    return booleanValue(value.getPlain());
+  }
+
+  public void setPlain(boolean newValue) {
+    value.setPlain(intValue(newValue));
+  }
+
+  public boolean getOpaque() {
+    return booleanValue(value.getOpaque());
+  }
+
+  public void setOpaque(boolean newValue) {
+    value.setOpaque(intValue(newValue));
+  }
+
+  public boolean getAcquire() {
+    return booleanValue(value.getAcquire());
+  }
+
+  public void setRelease(boolean newValue) {
+    value.setRelease(intValue(newValue));
+  }
+
+  public final boolean compareAndExchange(boolean expectedValue, boolean newValue) {
+    int cur = value.compareAndExchange(intValue(expectedValue), intValue(newValue));
+    return booleanValue(cur);
+  }
+
+  public final boolean compareAndExchangeAcquire(boolean expectedValue, boolean newValue) {
+    return compareAndExchange(expectedValue, newValue);
+  }
+
+  public final boolean compareAndExchangeRelease(boolean expectedValue, boolean newValue) {
+    return compareAndExchange(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetVolatile(boolean expectedValue, boolean newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetAcquire(boolean expectedValue, boolean newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetRelease(boolean expectedValue, boolean newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetPlain(boolean expectedValue, boolean newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
   @Override
   public String toString() {
     return Boolean.toString(get());

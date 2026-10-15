@@ -56,4 +56,18 @@ public class ThreadLocal<T> {
     }
     map.put(this, o);
   }
+
+  public void remove() {
+    Thread.currentThread().locals().remove(this);
+  }
+
+  public static <S> ThreadLocal<S> withInitial(java.util.function.Supplier<? extends S> supplier) {
+    java.util.Objects.requireNonNull(supplier);
+    return new ThreadLocal<S>() {
+      @Override
+      protected S initialValue() {
+        return supplier.get();
+      }
+    };
+  }
 }

@@ -64,6 +64,9 @@ class MyClasspath : public Classpath {
     const unsigned NewState = 0;
     const unsigned NormalPriority = 5;
 
+    static uint64_t nextThreadId = 1;
+    uint64_t tid = nextThreadId++;
+
     return vm::makeThread(t,
                           0,
                           0,
@@ -75,10 +78,12 @@ class MyClasspath : public Classpath {
                           0,
                           0,
                           0,
+                          0,
                           roots(t)->appLoader(),
                           0,
                           0,
                           group,
+                          tid,
                           0);
   }
 

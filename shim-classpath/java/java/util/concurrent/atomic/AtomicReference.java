@@ -24,6 +24,8 @@
 package java.util.concurrent.atomic;
 
 import java.lang.reflect.Field;
+import java.util.function.BinaryOperator;
+import java.util.function.UnaryOperator;
 
 import sun.misc.Unsafe;
 
@@ -81,6 +83,106 @@ public class AtomicReference<T> implements java.io.Serializable {
     }
   }
   
+  public final T getAndUpdate(UnaryOperator<T> updateFunction) {
+    while (true) {
+      T prev = get();
+      T next = updateFunction.apply(prev);
+      if (compareAndSet(prev, next)) {
+        return prev;
+      }
+    }
+  }
+
+  public final T updateAndGet(UnaryOperator<T> updateFunction) {
+    while (true) {
+      T prev = get();
+      T next = updateFunction.apply(prev);
+      if (compareAndSet(prev, next)) {
+        return next;
+      }
+    }
+  }
+
+  public final T getAndAccumulate(T x, BinaryOperator<T> accumulatorFunction) {
+    while (true) {
+      T prev = get();
+      T next = accumulatorFunction.apply(prev, x);
+      if (compareAndSet(prev, next)) {
+        return prev;
+      }
+    }
+  }
+
+  public final T accumulateAndGet(T x, BinaryOperator<T> accumulatorFunction) {
+    while (true) {
+      T prev = get();
+      T next = accumulatorFunction.apply(prev, x);
+      if (compareAndSet(prev, next)) {
+        return next;
+      }
+    }
+  }
+
+  public T getPlain() {
+    return value;
+  }
+
+  public void setPlain(T newValue) {
+    value = newValue;
+  }
+
+  public T getOpaque() {
+    return value;
+  }
+
+  public void setOpaque(T newValue) {
+    value = newValue;
+  }
+
+  public T getAcquire() {
+    return value;
+  }
+
+  public void setRelease(T newValue) {
+    lazySet(newValue);
+  }
+
+  public final T compareAndExchange(T expectedValue, T newValue) {
+    while (true) {
+      T cur = get();
+      if (cur != expectedValue) {
+        return cur;
+      }
+      if (compareAndSet(cur, newValue)) {
+        return expectedValue;
+      }
+    }
+  }
+
+  public final T compareAndExchangeAcquire(T expectedValue, T newValue) {
+    return compareAndExchange(expectedValue, newValue);
+  }
+
+  public final T compareAndExchangeRelease(T expectedValue, T newValue) {
+    return compareAndExchange(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetVolatile(T expectedValue, T newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetAcquire(T expectedValue, T newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetRelease(T expectedValue, T newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
+  public boolean weakCompareAndSetPlain(T expectedValue, T newValue) {
+    return compareAndSet(expectedValue, newValue);
+  }
+
   @Override
   public String toString() {
     return String.valueOf(value);

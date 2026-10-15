@@ -24,7 +24,9 @@
 package java.lang;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Thread implements Runnable {
   // set and accessed from within LockSupport
@@ -39,10 +41,15 @@ public class Thread implements Runnable {
   private final Runnable task;
   private Map<ThreadLocal, Object> locals;
   private Object sleepLock;
+  private Object interruptLock;
   private ClassLoader classLoader;
   private UncaughtExceptionHandler exceptionHandler;
   private String name;
   private ThreadGroup group;
+
+  private static final AtomicLong nextThreadId = new AtomicLong(1);
+  private final long tid;
+  private final boolean isVirtual;
 
   private static UncaughtExceptionHandler defaultExceptionHandler;
 
@@ -50,49 +57,110 @@ public class Thread implements Runnable {
   public static final int NORM_PRIORITY = 5;
   public static final int MAX_PRIORITY = 10;
 
-  public Thread(ThreadGroup group, Runnable task, String name, long stackSize)
-  {
-    this.group = (group == null ? Thread.currentThread().group : group);
+  public Thread(ThreadGroup group, Runnable task, String name, long stackSize, boolean isVirtual) {
+    this.isVirtual = isVirtual;
+    this.tid = nextThreadId.getAndIncrement();
+    this.group = (group == null ? (Thread.currentThread() != null ? Thread.currentThread().group : null) : group);
     this.task = task;
-    this.name = name;
-
-    Thread current = currentThread();
-
-    Map<ThreadLocal, Object> map = current.locals;
-    if (map != null) {
-      for (Map.Entry<ThreadLocal, Object> e: map.entrySet()) {
-        if (e.getKey() instanceof InheritableThreadLocal) {
-          InheritableThreadLocal itl = (InheritableThreadLocal) e.getKey();
-          locals().put(itl, itl.childValue(e.getValue()));
-        }
-      }
+    this.name = (name != null) ? name : (isVirtual ? "" : "Thread-" + tid);
+    if (isVirtual) {
+      this.daemon = true;
+      this.priority = (byte) NORM_PRIORITY;
+    } else {
+      this.priority = (byte) NORM_PRIORITY;
     }
 
-    classLoader = current.classLoader;
+    Thread current = currentThread();
+    if (current != null) {
+      Map<ThreadLocal, Object> map = current.locals;
+      if (map != null) {
+        for (Map.Entry<ThreadLocal, Object> e: map.entrySet()) {
+          if (e.getKey() instanceof InheritableThreadLocal) {
+            InheritableThreadLocal itl = (InheritableThreadLocal) e.getKey();
+            locals().put(itl, itl.childValue(e.getValue()));
+          }
+        }
+      }
+      classLoader = current.classLoader;
+    }
+  }
+
+  public Thread(ThreadGroup group, Runnable task, String name, long stackSize) {
+    this(group, task, name, stackSize, false);
   }
 
   public Thread(ThreadGroup group, Runnable task, String name) {
-    this(group, task, name, 0);
+    this(group, task, name, 0, false);
   }
 
   public Thread(ThreadGroup group, String name) {
-    this(null, null, name);
+    this(group, null, name, 0, false);
   }
 
   public Thread(Runnable task, String name) {
-    this(null, task, name);
+    this(null, task, name, 0, false);
   }
 
   public Thread(Runnable task) {
-    this(null, task, "Thread["+task+"]");
+    this(null, task, null, 0, false);
   }
 
   public Thread(String name) {
-    this(null, null, name);
+    this(null, null, name, 0, false);
   }
 
   public Thread() {
     this((Runnable) null);
+  }
+
+  public static void onSpinWait() {
+    // Hint to CPU
+  }
+
+  public final boolean isVirtual() {
+    return isVirtual;
+  }
+
+  public final long threadId() {
+    return tid != 0 ? tid : 1;
+  }
+
+  public long getId() {
+    return threadId();
+  }
+
+  public static Builder.OfPlatform ofPlatform() {
+    return new PlatformThreadBuilder();
+  }
+
+  public static Builder.OfVirtual ofVirtual() {
+    return new VirtualThreadBuilder();
+  }
+
+  public static Thread startVirtualThread(Runnable task) {
+    Objects.requireNonNull(task);
+    return ofVirtual().start(task);
+  }
+
+  public static void sleep(java.time.Duration duration) throws InterruptedException {
+    Objects.requireNonNull(duration);
+    if (duration.isNegative()) {
+      return;
+    }
+    long millis = duration.toMillis();
+    int nanos = duration.toNanosPart();
+    sleep(millis, nanos);
+  }
+
+  public final boolean join(java.time.Duration duration) throws InterruptedException {
+    Objects.requireNonNull(duration);
+    if (duration.isNegative()) {
+      return getState() == State.TERMINATED;
+    }
+    long millis = duration.toMillis();
+    int nanos = duration.toNanosPart();
+    join(millis, nanos);
+    return getState() == State.TERMINATED;
   }
 
   public synchronized void start() {
@@ -142,11 +210,11 @@ public class Thread implements Runnable {
     return classLoader;
   }
 
-  public void setContextClassLoader(ClassLoader v) {
-    classLoader = v;
+  public void setContextClassLoader(ClassLoader classLoader) {
+    this.classLoader = classLoader;
   }
 
-  public Map<ThreadLocal, Object> locals() {
+  Map<ThreadLocal, Object> locals() {
     if (locals == null) {
       locals = new WeakHashMap();
     }
@@ -252,10 +320,13 @@ public class Thread implements Runnable {
   }
 
   public int getPriority() {
-    return priority;
+    return isVirtual() ? NORM_PRIORITY : priority;
   }
 
   public void setPriority(int priority) {
+    if (isVirtual()) {
+      return;
+    }
     if (priority < MIN_PRIORITY || priority > MAX_PRIORITY) {
       throw new IllegalArgumentException();
     }
@@ -263,10 +334,16 @@ public class Thread implements Runnable {
   }
 
   public boolean isDaemon() {
-    return daemon;
+    return isVirtual() || daemon;
   }
 
   public synchronized void setDaemon(boolean v) {
+    if (isVirtual()) {
+      if (!v) {
+        throw new IllegalArgumentException("Virtual threads are always daemon");
+      }
+      return;
+    }
     if (getState() != State.NEW) {
       throw new IllegalStateException();
     }
@@ -309,10 +386,6 @@ public class Thread implements Runnable {
 
   public static native boolean holdsLock(Object o);
 
-  public long getId() {
-    return peer;
-  }
-
   public interface UncaughtExceptionHandler {
     public void uncaughtException(Thread t, Throwable e);
   }
@@ -320,5 +393,207 @@ public class Thread implements Runnable {
   public enum State {
     NEW, RUNNABLE, BLOCKED, WAITING, TIMED_WAITING, TERMINATED
   }
-  
+
+  public interface Builder {
+    Builder name(String name);
+    Builder name(String prefix, long start);
+    Builder inheritInheritableThreadLocals(boolean inheritInheritableThreadLocals);
+    Builder uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+    Thread unstarted(Runnable task);
+    Thread start(Runnable task);
+    java.util.concurrent.ThreadFactory factory();
+
+    public interface OfPlatform extends Builder {
+      @Override OfPlatform name(String name);
+      @Override OfPlatform name(String prefix, long start);
+      @Override OfPlatform inheritInheritableThreadLocals(boolean inheritInheritableThreadLocals);
+      @Override OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+      OfPlatform group(ThreadGroup group);
+      OfPlatform daemon(boolean on);
+      default OfPlatform daemon() { return daemon(true); }
+      OfPlatform priority(int priority);
+      OfPlatform stackSize(long stackSize);
+    }
+
+    public interface OfVirtual extends Builder {
+      @Override OfVirtual name(String name);
+      @Override OfVirtual name(String prefix, long start);
+      @Override OfVirtual inheritInheritableThreadLocals(boolean inheritInheritableThreadLocals);
+      @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+    }
+  }
+
+  private static class PlatformThreadBuilder implements Builder.OfPlatform {
+    private String name;
+    private String prefix;
+    private long counter = -1;
+    private boolean inheritLocals = true;
+    private UncaughtExceptionHandler ueh;
+    private ThreadGroup group;
+    private boolean daemon = false;
+    private int priority = NORM_PRIORITY;
+    private long stackSize = 0;
+
+    @Override
+    public Builder.OfPlatform name(String name) {
+      this.name = Objects.requireNonNull(name);
+      this.prefix = null;
+      return this;
+    }
+
+    @Override
+    public Builder.OfPlatform name(String prefix, long start) {
+      this.prefix = Objects.requireNonNull(prefix);
+      if (start < 0) throw new IllegalArgumentException("start < 0");
+      this.counter = start;
+      this.name = null;
+      return this;
+    }
+
+    @Override
+    public Builder.OfPlatform inheritInheritableThreadLocals(boolean inherit) {
+      this.inheritLocals = inherit;
+      return this;
+    }
+
+    @Override
+    public Builder.OfPlatform uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
+      this.ueh = Objects.requireNonNull(ueh);
+      return this;
+    }
+
+    @Override
+    public Builder.OfPlatform group(ThreadGroup group) {
+      this.group = Objects.requireNonNull(group);
+      return this;
+    }
+
+    @Override
+    public Builder.OfPlatform daemon(boolean on) {
+      this.daemon = on;
+      return this;
+    }
+
+    @Override
+    public Builder.OfPlatform priority(int priority) {
+      if (priority < MIN_PRIORITY || priority > MAX_PRIORITY) {
+        throw new IllegalArgumentException();
+      }
+      this.priority = priority;
+      return this;
+    }
+
+    @Override
+    public Builder.OfPlatform stackSize(long stackSize) {
+      if (stackSize < 0) throw new IllegalArgumentException();
+      this.stackSize = stackSize;
+      return this;
+    }
+
+    private String nextName() {
+      if (prefix != null) {
+        return prefix + (counter++);
+      }
+      return name;
+    }
+
+    @Override
+    public Thread unstarted(Runnable task) {
+      Objects.requireNonNull(task);
+      Thread t = new Thread(group, task, nextName(), stackSize, false);
+      t.daemon = daemon;
+      t.priority = (byte) priority;
+      if (ueh != null) {
+        t.setUncaughtExceptionHandler(ueh);
+      }
+      return t;
+    }
+
+    @Override
+    public Thread start(Runnable task) {
+      Thread t = unstarted(task);
+      t.start();
+      return t;
+    }
+
+    @Override
+    public java.util.concurrent.ThreadFactory factory() {
+      return new java.util.concurrent.ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+          return unstarted(r);
+        }
+      };
+    }
+  }
+
+  private static class VirtualThreadBuilder implements Builder.OfVirtual {
+    private String name;
+    private String prefix;
+    private long counter = -1;
+    private boolean inheritLocals = true;
+    private UncaughtExceptionHandler ueh;
+
+    @Override
+    public Builder.OfVirtual name(String name) {
+      this.name = Objects.requireNonNull(name);
+      this.prefix = null;
+      return this;
+    }
+
+    @Override
+    public Builder.OfVirtual name(String prefix, long start) {
+      this.prefix = Objects.requireNonNull(prefix);
+      if (start < 0) throw new IllegalArgumentException("start < 0");
+      this.counter = start;
+      this.name = null;
+      return this;
+    }
+
+    @Override
+    public Builder.OfVirtual inheritInheritableThreadLocals(boolean inherit) {
+      this.inheritLocals = inherit;
+      return this;
+    }
+
+    @Override
+    public Builder.OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
+      this.ueh = Objects.requireNonNull(ueh);
+      return this;
+    }
+
+    private String nextName() {
+      if (prefix != null) {
+        return prefix + (counter++);
+      }
+      return (name != null) ? name : "";
+    }
+
+    @Override
+    public Thread unstarted(Runnable task) {
+      Objects.requireNonNull(task);
+      Thread t = new Thread(null, task, nextName(), 0, true);
+      if (ueh != null) {
+        t.setUncaughtExceptionHandler(ueh);
+      }
+      return t;
+    }
+
+    @Override
+    public Thread start(Runnable task) {
+      Thread t = unstarted(task);
+      t.start();
+      return t;
+    }
+
+    @Override
+    public java.util.concurrent.ThreadFactory factory() {
+      return new java.util.concurrent.ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+          return unstarted(r);
+        }
+      };
+    }
+  }
 }

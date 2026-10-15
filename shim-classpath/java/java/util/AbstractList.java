@@ -81,6 +81,10 @@ public abstract class AbstractList<T> extends AbstractCollection<T>
     return new Collections.ArrayListIterator(this);
   }
 
+  public ListIterator<T> listIterator(int index) {
+    return new Collections.ArrayListIterator(this, index);
+  }
+
   public int indexOf(Object o) {
     int i = 0;
     for (T v: this) {
@@ -93,6 +97,16 @@ public abstract class AbstractList<T> extends AbstractCollection<T>
       }
 
       ++ i;
+    }
+    return -1;
+  }
+
+  public int lastIndexOf(Object o) {
+    for (int i = size() - 1; i >= 0; --i) {
+      T v = get(i);
+      if (o == null ? v == null : o.equals(v)) {
+        return i;
+      }
     }
     return -1;
   }
