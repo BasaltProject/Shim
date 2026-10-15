@@ -23,11 +23,15 @@
 
 package java.nio.channels;
 
+import java.io.Closeable;
 import java.io.IOException;
-import java.util.Set;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Consumer;
 
-public abstract class Selector {
+public abstract class Selector implements Closeable {
   protected final Set<SelectionKey> keys = new HashSet();
   protected final Set<SelectionKey> selectedKeys = new HashSet();
 
@@ -61,5 +65,33 @@ public abstract class Selector {
 
   public abstract int select() throws IOException;
 
-  public abstract void close();
+  public int select(Consumer<SelectionKey> action, long timeout) throws IOException {
+    Objects.requireNonNull(action, "action");
+    int n = select(timeout);
+    for (Iterator<SelectionKey> it = selectedKeys.iterator(); it.hasNext();) {
+      SelectionKey k = it.next();
+      action.accept(k);
+      it.remove();
+    }
+    return n;
+  }
+
+  public int select(Consumer<SelectionKey> action) throws IOException {
+    return select(action, 0);
+  }
+
+  public int selectNow(Consumer<SelectionKey> action) throws IOException {
+    Objects.requireNonNull(action, "action");
+    int n = selectNow();
+    for (Iterator<SelectionKey> it = selectedKeys.iterator(); it.hasNext();) {
+      SelectionKey k = it.next();
+      action.accept(k);
+      it.remove();
+    }
+    return n;
+  }
+
+  @Override
+  public abstract void close() throws IOException;
 }
+

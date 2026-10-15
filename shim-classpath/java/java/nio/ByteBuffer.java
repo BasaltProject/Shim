@@ -23,6 +23,8 @@
 
 package java.nio;
 
+import java.util.Objects;
+
 public abstract class ByteBuffer
   extends Buffer
   implements Comparable<ByteBuffer>
@@ -467,5 +469,588 @@ public abstract class ByteBuffer
     long base = (isDirect() && (this instanceof DirectByteBuffer))
       ? ((DirectByteBuffer) this).address() : 0;
     return (int) ((base + index) & (unitSize - 1));
+  }
+
+  public IntBuffer asIntBuffer() {
+    int cap = remaining() / 4;
+    return new ByteBufferAsIntBuffer(this, position, cap, readonly);
+  }
+
+  public LongBuffer asLongBuffer() {
+    int cap = remaining() / 8;
+    return new ByteBufferAsLongBuffer(this, position, cap, readonly);
+  }
+
+  public ShortBuffer asShortBuffer() {
+    int cap = remaining() / 2;
+    return new ByteBufferAsShortBuffer(this, position, cap, readonly);
+  }
+
+  public FloatBuffer asFloatBuffer() {
+    int cap = remaining() / 4;
+    return new ByteBufferAsFloatBuffer(this, position, cap, readonly);
+  }
+
+  public DoubleBuffer asDoubleBuffer() {
+    int cap = remaining() / 8;
+    return new ByteBufferAsDoubleBuffer(this, position, cap, readonly);
+  }
+
+  public CharBuffer asCharBuffer() {
+    int cap = remaining() / 2;
+    return new ByteBufferAsCharBuffer(this, position, cap, readonly);
+  }
+
+  private static class ByteBufferAsIntBuffer extends IntBuffer {
+    private final ByteBuffer bb;
+    private final int byteOffset;
+
+    ByteBufferAsIntBuffer(ByteBuffer bb, int byteOffset, int capacity, boolean readOnly) {
+      super(readOnly);
+      this.bb = bb;
+      this.byteOffset = byteOffset;
+      this.capacity = capacity;
+      this.limit = capacity;
+      this.position = 0;
+    }
+
+    @Override
+    public int get() {
+      checkGet(position, 1, false);
+      return bb.getInt(byteOffset + position++ * 4);
+    }
+
+    @Override
+    public IntBuffer put(int i) {
+      checkPut(position, 1, false);
+      bb.putInt(byteOffset + position++ * 4, i);
+      return this;
+    }
+
+    @Override
+    public int get(int index) {
+      checkGet(index, 1, true);
+      return bb.getInt(byteOffset + index * 4);
+    }
+
+    @Override
+    public IntBuffer put(int index, int i) {
+      checkPut(index, 1, true);
+      bb.putInt(byteOffset + index * 4, i);
+      return this;
+    }
+
+    @Override
+    public IntBuffer slice() {
+      return new ByteBufferAsIntBuffer(bb, byteOffset + position * 4, remaining(), isReadOnly());
+    }
+
+    @Override
+    public IntBuffer slice(int index, int length) {
+      Objects.checkFromIndexSize(index, length, limit);
+      return new ByteBufferAsIntBuffer(bb, byteOffset + index * 4, length, isReadOnly());
+    }
+
+    @Override
+    public IntBuffer duplicate() {
+      ByteBufferAsIntBuffer b = new ByteBufferAsIntBuffer(bb, byteOffset, capacity, isReadOnly());
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public IntBuffer asReadOnlyBuffer() {
+      ByteBufferAsIntBuffer b = new ByteBufferAsIntBuffer(bb.asReadOnlyBuffer(), byteOffset, capacity, true);
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public IntBuffer compact() {
+      if (isReadOnly()) throw new ReadOnlyBufferException();
+      int rem = remaining();
+      for (int i = 0; i < rem; i++) {
+        put(i, get(position + i));
+      }
+      position = rem;
+      limit = capacity;
+      mark = -1;
+      return this;
+    }
+
+    @Override
+    public boolean isDirect() {
+      return bb.isDirect();
+    }
+
+    @Override
+    public ByteOrder order() {
+      return bb.order();
+    }
+  }
+
+  private static class ByteBufferAsLongBuffer extends LongBuffer {
+    private final ByteBuffer bb;
+    private final int byteOffset;
+
+    ByteBufferAsLongBuffer(ByteBuffer bb, int byteOffset, int capacity, boolean readOnly) {
+      super(readOnly);
+      this.bb = bb;
+      this.byteOffset = byteOffset;
+      this.capacity = capacity;
+      this.limit = capacity;
+      this.position = 0;
+    }
+
+    @Override
+    public long get() {
+      checkGet(position, 1, false);
+      return bb.getLong(byteOffset + position++ * 8);
+    }
+
+    @Override
+    public LongBuffer put(long l) {
+      checkPut(position, 1, false);
+      bb.putLong(byteOffset + position++ * 8, l);
+      return this;
+    }
+
+    @Override
+    public long get(int index) {
+      checkGet(index, 1, true);
+      return bb.getLong(byteOffset + index * 8);
+    }
+
+    @Override
+    public LongBuffer put(int index, long l) {
+      checkPut(index, 1, true);
+      bb.putLong(byteOffset + index * 8, l);
+      return this;
+    }
+
+    @Override
+    public LongBuffer slice() {
+      return new ByteBufferAsLongBuffer(bb, byteOffset + position * 8, remaining(), isReadOnly());
+    }
+
+    @Override
+    public LongBuffer slice(int index, int length) {
+      Objects.checkFromIndexSize(index, length, limit);
+      return new ByteBufferAsLongBuffer(bb, byteOffset + index * 8, length, isReadOnly());
+    }
+
+    @Override
+    public LongBuffer duplicate() {
+      ByteBufferAsLongBuffer b = new ByteBufferAsLongBuffer(bb, byteOffset, capacity, isReadOnly());
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public LongBuffer asReadOnlyBuffer() {
+      ByteBufferAsLongBuffer b = new ByteBufferAsLongBuffer(bb.asReadOnlyBuffer(), byteOffset, capacity, true);
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public LongBuffer compact() {
+      if (isReadOnly()) throw new ReadOnlyBufferException();
+      int rem = remaining();
+      for (int i = 0; i < rem; i++) {
+        put(i, get(position + i));
+      }
+      position = rem;
+      limit = capacity;
+      mark = -1;
+      return this;
+    }
+
+    @Override
+    public boolean isDirect() {
+      return bb.isDirect();
+    }
+
+    @Override
+    public ByteOrder order() {
+      return bb.order();
+    }
+  }
+
+  private static class ByteBufferAsShortBuffer extends ShortBuffer {
+    private final ByteBuffer bb;
+    private final int byteOffset;
+
+    ByteBufferAsShortBuffer(ByteBuffer bb, int byteOffset, int capacity, boolean readOnly) {
+      super(readOnly);
+      this.bb = bb;
+      this.byteOffset = byteOffset;
+      this.capacity = capacity;
+      this.limit = capacity;
+      this.position = 0;
+    }
+
+    @Override
+    public short get() {
+      checkGet(position, 1, false);
+      return bb.getShort(byteOffset + position++ * 2);
+    }
+
+    @Override
+    public ShortBuffer put(short s) {
+      checkPut(position, 1, false);
+      bb.putShort(byteOffset + position++ * 2, s);
+      return this;
+    }
+
+    @Override
+    public short get(int index) {
+      checkGet(index, 1, true);
+      return bb.getShort(byteOffset + index * 2);
+    }
+
+    @Override
+    public ShortBuffer put(int index, short s) {
+      checkPut(index, 1, true);
+      bb.putShort(byteOffset + index * 2, s);
+      return this;
+    }
+
+    @Override
+    public ShortBuffer slice() {
+      return new ByteBufferAsShortBuffer(bb, byteOffset + position * 2, remaining(), isReadOnly());
+    }
+
+    @Override
+    public ShortBuffer slice(int index, int length) {
+      Objects.checkFromIndexSize(index, length, limit);
+      return new ByteBufferAsShortBuffer(bb, byteOffset + index * 2, length, isReadOnly());
+    }
+
+    @Override
+    public ShortBuffer duplicate() {
+      ByteBufferAsShortBuffer b = new ByteBufferAsShortBuffer(bb, byteOffset, capacity, isReadOnly());
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public ShortBuffer asReadOnlyBuffer() {
+      ByteBufferAsShortBuffer b = new ByteBufferAsShortBuffer(bb.asReadOnlyBuffer(), byteOffset, capacity, true);
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public ShortBuffer compact() {
+      if (isReadOnly()) throw new ReadOnlyBufferException();
+      int rem = remaining();
+      for (int i = 0; i < rem; i++) {
+        put(i, get(position + i));
+      }
+      position = rem;
+      limit = capacity;
+      mark = -1;
+      return this;
+    }
+
+    @Override
+    public boolean isDirect() {
+      return bb.isDirect();
+    }
+
+    @Override
+    public ByteOrder order() {
+      return bb.order();
+    }
+  }
+
+  private static class ByteBufferAsFloatBuffer extends FloatBuffer {
+    private final ByteBuffer bb;
+    private final int byteOffset;
+
+    ByteBufferAsFloatBuffer(ByteBuffer bb, int byteOffset, int capacity, boolean readOnly) {
+      super(readOnly);
+      this.bb = bb;
+      this.byteOffset = byteOffset;
+      this.capacity = capacity;
+      this.limit = capacity;
+      this.position = 0;
+    }
+
+    @Override
+    public float get() {
+      checkGet(position, 1, false);
+      return bb.getFloat(byteOffset + position++ * 4);
+    }
+
+    @Override
+    public FloatBuffer put(float f) {
+      checkPut(position, 1, false);
+      bb.putFloat(byteOffset + position++ * 4, f);
+      return this;
+    }
+
+    @Override
+    public float get(int index) {
+      checkGet(index, 1, true);
+      return bb.getFloat(byteOffset + index * 4);
+    }
+
+    @Override
+    public FloatBuffer put(int index, float f) {
+      checkPut(index, 1, true);
+      bb.putFloat(byteOffset + index * 4, f);
+      return this;
+    }
+
+    @Override
+    public FloatBuffer slice() {
+      return new ByteBufferAsFloatBuffer(bb, byteOffset + position * 4, remaining(), isReadOnly());
+    }
+
+    @Override
+    public FloatBuffer slice(int index, int length) {
+      Objects.checkFromIndexSize(index, length, limit);
+      return new ByteBufferAsFloatBuffer(bb, byteOffset + index * 4, length, isReadOnly());
+    }
+
+    @Override
+    public FloatBuffer duplicate() {
+      ByteBufferAsFloatBuffer b = new ByteBufferAsFloatBuffer(bb, byteOffset, capacity, isReadOnly());
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public FloatBuffer asReadOnlyBuffer() {
+      ByteBufferAsFloatBuffer b = new ByteBufferAsFloatBuffer(bb.asReadOnlyBuffer(), byteOffset, capacity, true);
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public FloatBuffer compact() {
+      if (isReadOnly()) throw new ReadOnlyBufferException();
+      int rem = remaining();
+      for (int i = 0; i < rem; i++) {
+        put(i, get(position + i));
+      }
+      position = rem;
+      limit = capacity;
+      mark = -1;
+      return this;
+    }
+
+    @Override
+    public boolean isDirect() {
+      return bb.isDirect();
+    }
+
+    @Override
+    public ByteOrder order() {
+      return bb.order();
+    }
+  }
+
+  private static class ByteBufferAsDoubleBuffer extends DoubleBuffer {
+    private final ByteBuffer bb;
+    private final int byteOffset;
+
+    ByteBufferAsDoubleBuffer(ByteBuffer bb, int byteOffset, int capacity, boolean readOnly) {
+      super(readOnly);
+      this.bb = bb;
+      this.byteOffset = byteOffset;
+      this.capacity = capacity;
+      this.limit = capacity;
+      this.position = 0;
+    }
+
+    @Override
+    public double get() {
+      checkGet(position, 1, false);
+      return bb.getDouble(byteOffset + position++ * 8);
+    }
+
+    @Override
+    public DoubleBuffer put(double d) {
+      checkPut(position, 1, false);
+      bb.putDouble(byteOffset + position++ * 8, d);
+      return this;
+    }
+
+    @Override
+    public double get(int index) {
+      checkGet(index, 1, true);
+      return bb.getDouble(byteOffset + index * 8);
+    }
+
+    @Override
+    public DoubleBuffer put(int index, double d) {
+      checkPut(index, 1, true);
+      bb.putDouble(byteOffset + index * 8, d);
+      return this;
+    }
+
+    @Override
+    public DoubleBuffer slice() {
+      return new ByteBufferAsDoubleBuffer(bb, byteOffset + position * 8, remaining(), isReadOnly());
+    }
+
+    @Override
+    public DoubleBuffer slice(int index, int length) {
+      Objects.checkFromIndexSize(index, length, limit);
+      return new ByteBufferAsDoubleBuffer(bb, byteOffset + index * 8, length, isReadOnly());
+    }
+
+    @Override
+    public DoubleBuffer duplicate() {
+      ByteBufferAsDoubleBuffer b = new ByteBufferAsDoubleBuffer(bb, byteOffset, capacity, isReadOnly());
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public DoubleBuffer asReadOnlyBuffer() {
+      ByteBufferAsDoubleBuffer b = new ByteBufferAsDoubleBuffer(bb.asReadOnlyBuffer(), byteOffset, capacity, true);
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public DoubleBuffer compact() {
+      if (isReadOnly()) throw new ReadOnlyBufferException();
+      int rem = remaining();
+      for (int i = 0; i < rem; i++) {
+        put(i, get(position + i));
+      }
+      position = rem;
+      limit = capacity;
+      mark = -1;
+      return this;
+    }
+
+    @Override
+    public boolean isDirect() {
+      return bb.isDirect();
+    }
+
+    @Override
+    public ByteOrder order() {
+      return bb.order();
+    }
+  }
+
+  private static class ByteBufferAsCharBuffer extends CharBuffer {
+    private final ByteBuffer bb;
+    private final int byteOffset;
+
+    ByteBufferAsCharBuffer(ByteBuffer bb, int byteOffset, int capacity, boolean readOnly) {
+      super(readOnly);
+      this.bb = bb;
+      this.byteOffset = byteOffset;
+      this.capacity = capacity;
+      this.limit = capacity;
+      this.position = 0;
+    }
+
+    @Override
+    public CharBuffer asReadOnlyBuffer() {
+      ByteBufferAsCharBuffer b = new ByteBufferAsCharBuffer(bb.asReadOnlyBuffer(), byteOffset, capacity, true);
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public CharBuffer slice() {
+      return new ByteBufferAsCharBuffer(bb, byteOffset + position * 2, remaining(), isReadOnly());
+    }
+
+    @Override
+    public CharBuffer slice(int index, int length) {
+      Objects.checkFromIndexSize(index, length, limit);
+      return new ByteBufferAsCharBuffer(bb, byteOffset + index * 2, length, isReadOnly());
+    }
+
+    @Override
+    public CharBuffer duplicate() {
+      ByteBufferAsCharBuffer b = new ByteBufferAsCharBuffer(bb, byteOffset, capacity, isReadOnly());
+      b.limit = limit;
+      b.position = position;
+      b.mark = mark;
+      return b;
+    }
+
+    @Override
+    public CharBuffer subSequence(int start, int end) {
+      if (start < 0 || end < start || end > remaining()) throw new IndexOutOfBoundsException();
+      return new ByteBufferAsCharBuffer(bb, byteOffset + (position + start) * 2, end - start, isReadOnly());
+    }
+
+    @Override
+    protected void doPut(int offset, char value) {
+      bb.putChar(byteOffset + offset * 2, value);
+    }
+
+    @Override
+    public CharBuffer put(char[] src, int offset, int length) {
+      checkPut(position, length, false);
+      for (int i = 0; i < length; i++) {
+        bb.putChar(byteOffset + (position + i) * 2, src[offset + i]);
+      }
+      position += length;
+      return this;
+    }
+
+    @Override
+    protected char doGet(int offset) {
+      return bb.getChar(byteOffset + offset * 2);
+    }
+
+    @Override
+    public CharBuffer get(char[] dst, int offset, int length) {
+      checkGet(position, length, false);
+      for (int i = 0; i < length; i++) {
+        dst[offset + i] = bb.getChar(byteOffset + (position + i) * 2);
+      }
+      position += length;
+      return this;
+    }
+
+    @Override
+    public boolean isDirect() {
+      return bb.isDirect();
+    }
+
+    @Override
+    public String toString() {
+      char[] chars = new char[remaining()];
+      for (int i = 0; i < chars.length; i++) {
+        chars[i] = doGet(position + i);
+      }
+      return new String(chars);
+    }
   }
 }

@@ -30,18 +30,36 @@ public class FileInputStream extends InputStream {
 
   private int fd;
   private int remaining;
+  private String path;
 
   public FileInputStream(FileDescriptor fd) {
     this.fd = fd.value;
   }
 
   public FileInputStream(String path) throws IOException {
+    this.path = path;
     fd = open(path);
     remaining = (int) new File(path).length();
   }
 
   public FileInputStream(File file) throws IOException {
     this(file.getPath());
+  }
+
+  public FileDescriptor getFD() throws IOException {
+    if (fd == -1) throw new IOException("closed");
+    return new FileDescriptor(fd);
+  }
+
+  public java.nio.channels.FileChannel getChannel() {
+    try {
+      RandomAccessFile raf = path != null
+          ? new RandomAccessFile(new File(path), "r")
+          : new RandomAccessFile(File.createTempFile("shim-fis", ".tmp"), "r");
+      return new java.nio.channels.FileChannelImpl(raf, true, false, false);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public int available() throws IOException {

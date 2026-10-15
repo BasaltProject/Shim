@@ -1018,3 +1018,52 @@ extern "C" JNIEXPORT void JNICALL
   CloseHandle(hFile);
 #endif
 }
+
+extern "C" JNIEXPORT void JNICALL
+    Java_java_io_RandomAccessFile_setLength(JNIEnv* e, jclass, jlong peer, jlong length)
+{
+#if !defined(WINAPI_FAMILY) || WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+#if defined(PLATFORM_WINDOWS)
+  int fd = (int)peer;
+  if (::_chsize(fd, (long)length) != 0) {
+    throwNewErrno(e, "java/io/IOException");
+  }
+#else
+  int fd = (int)peer;
+  if (::ftruncate(fd, length) == -1) {
+    throwNewErrno(e, "java/io/IOException");
+  }
+#endif
+#else
+  HANDLE hFile = (HANDLE)peer;
+  LARGE_INTEGER lPos;
+  lPos.QuadPart = length;
+  if (!SetFilePointerEx(hFile, lPos, nullptr, FILE_BEGIN) || !SetEndOfFile(hFile)) {
+    throwNewErrno(e, "java/io/IOException");
+  }
+#endif
+}
+
+extern "C" JNIEXPORT void JNICALL
+    Java_java_io_RandomAccessFile_sync(JNIEnv* e, jclass, jlong peer)
+{
+#if !defined(WINAPI_FAMILY) || WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+#if defined(PLATFORM_WINDOWS)
+  HANDLE h = (HANDLE)::_get_osfhandle((int)peer);
+  if (h != INVALID_HANDLE_VALUE) {
+    FlushFileBuffers(h);
+  }
+#else
+  int fd = (int)peer;
+  if (::fsync(fd) == -1) {
+    throwNewErrno(e, "java/io/IOException");
+  }
+#endif
+#else
+  HANDLE hFile = (HANDLE)peer;
+  if (!FlushFileBuffers(hFile)) {
+    throwNewErrno(e, "java/io/IOException");
+  }
+#endif
+}
+

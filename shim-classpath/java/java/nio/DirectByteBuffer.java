@@ -25,7 +25,7 @@ package java.nio;
 
 import sun.misc.Unsafe;
 
-public class DirectByteBuffer extends ByteBuffer {
+public class DirectByteBuffer extends MappedByteBuffer {
   private static final Unsafe unsafe = Unsafe.getUnsafe();
   private static final int baseOffset = unsafe.arrayBaseOffset(byte[].class);
 

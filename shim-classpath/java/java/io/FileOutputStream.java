@@ -29,6 +29,8 @@ public class FileOutputStream extends OutputStream {
   //   }
 
   private int fd;
+  private String path;
+  private boolean append;
 
   public FileOutputStream(FileDescriptor fd) {
     this.fd = fd.value;
@@ -39,9 +41,10 @@ public class FileOutputStream extends OutputStream {
   }
 
   public FileOutputStream(String path, boolean append) throws IOException {
+    this.path = path;
+    this.append = append;
     fd = open(path, append);
   }
-  
 
   public FileOutputStream(File file) throws IOException {
     this(file.getPath());
@@ -49,6 +52,22 @@ public class FileOutputStream extends OutputStream {
 
   public FileOutputStream(File file, boolean append) throws IOException {
     this(file.getPath(), append);
+  }
+
+  public FileDescriptor getFD() throws IOException {
+    if (fd == -1) throw new IOException("closed");
+    return new FileDescriptor(fd);
+  }
+
+  public java.nio.channels.FileChannel getChannel() {
+    try {
+      RandomAccessFile raf = path != null
+          ? new RandomAccessFile(new File(path), "rw")
+          : new RandomAccessFile(File.createTempFile("shim-fos", ".tmp"), "rw");
+      return new java.nio.channels.FileChannelImpl(raf, false, true, append);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static native int open(String path, boolean append) throws IOException;
