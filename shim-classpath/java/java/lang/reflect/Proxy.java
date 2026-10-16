@@ -402,6 +402,7 @@ public class Proxy {
           if (specs.contains(spec)) {
             continue;
           }
+          specs.add(spec);
           methodTable.add(new MethodData
             (Modifier.PUBLIC,
              ConstantPool.addUtf8(pool, Classes.toString(m.name)),
@@ -410,6 +411,25 @@ public class Proxy {
                             m.parameterFootprint, methodTable.size())));
           refs.add(Classes.makeMethod(m));
         }
+      }
+    }
+
+    shim.VMMethod[] objectTable = SystemClassLoader.vmClass(Object.class).virtualTable;
+    if (objectTable != null) {
+      for (shim.VMMethod m: objectTable) {
+        String spec = Classes.toString(m.name) + Classes.toString(m.spec);
+        if (!(spec.equals("toString()Ljava/lang/String;") || spec.equals("hashCode()I")
+              || spec.equals("equals(Ljava/lang/Object;)Z")) || specs.contains(spec)) {
+          continue;
+        }
+        specs.add(spec);
+        methodTable.add(new MethodData
+          (Modifier.PUBLIC,
+           ConstantPool.addUtf8(pool, Classes.toString(m.name)),
+           ConstantPool.addUtf8(pool, Classes.toString(m.spec)),
+           makeInvokeCode(pool, name, m.spec, m.parameterCount,
+                          m.parameterFootprint, methodTable.size())));
+        refs.add(Classes.makeMethod(m));
       }
     }
 

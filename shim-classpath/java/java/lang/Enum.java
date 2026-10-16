@@ -60,7 +60,7 @@ public abstract class Enum<E extends Enum<E>> implements Comparable<E>, java.lan
       throw new Error(ex);
     }
 
-    throw new IllegalArgumentException(enumType.getCanonicalName() + "." + name + " is not an enum constant.");
+    throw new IllegalArgumentException("No enum constant " + enumType.getCanonicalName() + "." + name);
   }
 
   public int ordinal() {

@@ -200,11 +200,13 @@ public class Method extends Executable {
 
   public Object getDefaultValue() {
     ClassLoader loader = getDeclaringClass().getClassLoader();
-    return Classes.getAnnotationDefaultValue(loader, vmMethod.addendum);
+    return shim.AnnotationInvocationHandler.convert(getReturnType(),
+        Classes.getAnnotationDefaultValue(loader, vmMethod.addendum));
   }
 
   public Annotation[][] getParameterAnnotations() {
     int count = getParameterCount();
+    Classes.parseParameterAnnotations(vmMethod.class_.loader, vmMethod.addendum);
     if (vmMethod.addendum != null && vmMethod.addendum.parameterAnnotationTable != null) {
       Object[] table = (Object[]) vmMethod.addendum.parameterAnnotationTable;
       Annotation[][] result = new Annotation[count][];

@@ -48,27 +48,21 @@ public interface AnnotatedElement {
     return null;
   }
 
-  @SuppressWarnings("unchecked")
   public default <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
     Objects.requireNonNull(annotationClass);
-    T direct = getAnnotation(annotationClass);
-    if (direct != null) {
-      T[] result = (T[]) Array.newInstance(annotationClass, 1);
-      result[0] = direct;
-      return result;
+    T[] result = getDeclaredAnnotationsByType(annotationClass);
+    if (result.length == 0 && this instanceof Class
+        && annotationClass.getDeclaredAnnotation(java.lang.annotation.Inherited.class) != null) {
+      Class<?> superClass = ((Class<?>) this).getSuperclass();
+      if (superClass != null) {
+        result = superClass.getAnnotationsByType(annotationClass);
+      }
     }
-    return (T[]) Array.newInstance(annotationClass, 0);
+    return result;
   }
 
-  @SuppressWarnings("unchecked")
   public default <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
     Objects.requireNonNull(annotationClass);
-    T direct = getDeclaredAnnotation(annotationClass);
-    if (direct != null) {
-      T[] result = (T[]) Array.newInstance(annotationClass, 1);
-      result[0] = direct;
-      return result;
-    }
-    return (T[]) Array.newInstance(annotationClass, 0);
+    return shim.AnnotationSupport.directlyAndIndirectlyPresent(getDeclaredAnnotations(), annotationClass);
   }
 }
