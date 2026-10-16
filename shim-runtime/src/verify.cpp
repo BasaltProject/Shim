@@ -7,9 +7,11 @@
 
 #include "shim/machine.h"
 #include "shim/constants.h"
+#include "verify-types.h"
 #include "shim/util/runtime-array.h"
 
 namespace vm {
+using namespace verification;
 namespace {
 
 void require(Thread* t, bool valid, const char* message)
@@ -320,10 +322,15 @@ void memberEffect(Thread* t, GcCode* code, unsigned pc, unsigned* pops, unsigned
 
 } // namespace
 
-void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsigned returnKind)
+void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, GcByteArray* descriptor,
+                bool instance, bool constructor, GcByteArray* stackMaps, GcClass* owner)
 {
     PROTECT(t, code);
     PROTECT(t, tags);
+    PROTECT(t, descriptor);
+    PROTECT(t, stackMaps);
+    PROTECT(t, owner);
+    unsigned returnKind = strchr(reinterpret_cast<const char*>(descriptor->body().begin()), ')')[1];
     THREAD_RUNTIME_ARRAY(t, uint8_t, starts, code->length());
     memset(RUNTIME_ARRAY_BODY(starts), 0, code->length());
     for (unsigned pc = 0; pc < code->length();) {
@@ -344,6 +351,7 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsi
         pc = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts), major);
     }
     GcExceptionHandlerTable* handlers = cast<GcExceptionHandlerTable>(t, code->exceptionHandlerTable());
+    PROTECT(t, handlers);
     if (handlers) {
         for (unsigned i = 0; i < handlers->length(); ++i) {
             uint64_t entry = handlers->body()[i];
@@ -356,6 +364,38 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsi
     }
     // Legacy subroutine return addresses need a separate flow model.
     if (major < 51) return;
+    GcArray* maps = readStackMaps(t, code, tags, stackMaps, descriptor, instance, constructor && owner->super(),
+                                 RUNTIME_ARRAY_BODY(starts));
+    PROTECT(t, maps);
+    auto needMap = [&](unsigned target) {
+        require(t, mapAt(t, maps, target) != 0, "Missing StackMapTable frame at control flow target");
+    };
+    if (handlers) {
+        for (unsigned i = 0; i < handlers->length(); ++i) needMap(exceptionHandlerIp(handlers->body()[i]));
+    }
+    for (unsigned pc = 0; pc < code->length();) {
+        const uint8_t* bytes = code->body().begin();
+        unsigned opcode = bytes[pc];
+        unsigned next = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts), major);
+        if ((opcode >= 153 && opcode <= 167) || opcode == 198 || opcode == 199) {
+            needMap(pc + static_cast<int16_t>(word16(bytes + pc + 1)));
+        } else if (opcode == 200) needMap(pc + word32(bytes + pc + 1));
+        else if (opcode == 170 || opcode == 171) {
+            unsigned position = (pc + 4) & ~3u;
+            needMap(pc + word32(bytes + position));
+            unsigned count = opcode == 170 ? word32(bytes + position + 8) - word32(bytes + position + 4) + 1
+                : word32(bytes + position + 4);
+            unsigned stride = opcode == 170 ? 4 : 8;
+            position += opcode == 170 ? 12 : 8;
+            for (unsigned i = 0; i < count; ++i) {
+                needMap(pc + word32(bytes + position + i * stride + (opcode == 171 ? 4 : 0)));
+            }
+        }
+        bool terminal = opcode == 167 || opcode == 200 || opcode == 170 || opcode == 171
+            || (opcode >= 172 && opcode <= 177) || opcode == 191;
+        if (terminal && next < code->length()) needMap(next);
+        pc = next;
+    }
     THREAD_RUNTIME_ARRAY(t, int32_t, depths, code->length());
     THREAD_RUNTIME_ARRAY(t, unsigned, pending, code->length());
     for (unsigned i = 0; i < code->length(); ++i) RUNTIME_ARRAY_BODY(depths)[i] = -1;
@@ -372,6 +412,10 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsi
         }
     };
     enqueue(0, 0);
+    for (unsigned i = 0; maps && i < maps->length(); ++i) {
+        GcByteArray* frame = cast<GcByteArray>(t, maps->body()[i]);
+        enqueue(mapPc(frame), mapStackCount(frame));
+    }
     while (head < tail) {
         unsigned pc = RUNTIME_ARRAY_BODY(pending)[head++];
         unsigned depth = RUNTIME_ARRAY_BODY(depths)[pc];
@@ -412,6 +456,12 @@ void verifyCode(Thread* t, GcCode* code, GcByteArray* tags, unsigned major, unsi
             || (opcode == 196 && bytes[pc + 1] == 169);
         if (!terminal) enqueue(next, after);
     }
+    for (unsigned pc = 0; pc < code->length();) {
+        unsigned next = instruction(t, code, tags, pc, RUNTIME_ARRAY_BODY(starts), major);
+        RUNTIME_ARRAY_BODY(pending)[pc] = next;
+        pc = next;
+    }
+    verifyStackTypes(t, code, tags, RUNTIME_ARRAY_BODY(depths), RUNTIME_ARRAY_BODY(pending), descriptor, instance, maps, constructor && owner->super(), owner);
 }
 
 } // namespace vm

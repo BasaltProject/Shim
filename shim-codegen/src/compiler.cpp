@@ -2690,15 +2690,18 @@ class MyCompiler : public Compiler {
     memset(newLocals, 0, footprint);
     c.locals = newLocals;
 
-    Event* e = c.logicalCode[logicalIp]->firstEvent;
+    // Dummy store events expose outgoing locals; handlers need the incoming snapshot.
+    Local* sourceLocals = c.logicalCode[logicalIp]->locals;
     for (int i = 0; i < static_cast<int>(c.localFootprint); ++i) {
-      Local* local = e->locals() + i;
+      Local* local = sourceLocals + i;
       if (local->value) {
         initLocalPart(i, local->value->type);
       }
     }
 
-    linkLocals(&c, e->locals(), newLocals);
+    linkLocals(&c, sourceLocals, newLocals);
+    // Publish the initialized snapshot for handlers protecting this handler.
+    c.logicalCode[c.logicalIp]->locals = newLocals;
   }
 
   virtual void storeLocal(ir::Value* src, unsigned index)

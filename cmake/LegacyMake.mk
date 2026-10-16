@@ -1301,6 +1301,8 @@ vm-sources = \
 	$(runtime-src)/machine.cpp \
 	$(runtime-src)/bootstrap.cpp \
 	$(runtime-src)/verify.cpp \
+	$(runtime-src)/verify-stack.cpp \
+	$(runtime-src)/verify-maps.cpp \
 	$(runtime-src)/util.cpp \
 	$(heap-src)/heap.cpp \
 	$(runtime-src)/$(process).cpp \

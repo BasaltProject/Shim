@@ -45,6 +45,11 @@ class AbstractStream {
     return position_;
   }
 
+  unsigned remaining()
+  {
+    return size - position_;
+  }
+
   void setPosition(unsigned p)
   {
     position_ = p;
