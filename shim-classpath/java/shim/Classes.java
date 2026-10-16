@@ -253,6 +253,8 @@ public class Classes {
   }
 
   public static void link(VMClass c, ClassLoader loader) {
+    // Symbolic signatures belong to the defining class, including delegated loads.
+    loader = c.loader;
     acquireClassLock();
     try {
       if ((c.vmFlags & LinkFlag) == 0) {
@@ -271,7 +273,7 @@ public class Classes {
 
         VMMethod[] methodTable = c.methodTable;
         if (methodTable != null) {
-          for (int i = 0; i < methodTable.length; ++i) {
+          for (int i = 0, count = declaredMethodCount(c); i < count; ++i) {
             VMMethod m = methodTable[i];
 
             for (int j = 1; j < m.spec.length;) {
@@ -310,9 +312,30 @@ public class Classes {
     if (loader == null) {
       loader = SystemClassLoader.bootLoader();
     }
-    Class c = loader.loadClass(name.replace('/', '.'));
-    VMClass vmc = SystemClassLoader.vmClass(c);
-    link(vmc, loader);
+    if (name.indexOf('/') != -1) throw new ClassNotFoundException(name);
+    Class c;
+    VMClass vmc;
+    if (name.startsWith("[")) {
+      int rank = 0;
+      while (rank < name.length() && name.charAt(rank) == '[') ++rank;
+      boolean valid = rank <= 255 && rank < name.length();
+      if (valid && name.charAt(rank) == 'L') {
+        valid = rank + 2 < name.length() && name.charAt(name.length() - 1) == ';'
+            && name.indexOf(';', rank) == name.length() - 1 && name.indexOf('[', rank) == -1;
+      } else if (valid) {
+        valid = rank + 1 == name.length() && "ZBCSIJFD".indexOf(name.charAt(rank)) != -1;
+      }
+      if (!valid) throw new ClassNotFoundException(name);
+      byte[] bytes = name.replace('.', '/').getBytes(java.nio.charset.StandardCharsets.UTF_8);
+      byte[] spec = new byte[bytes.length + 1];
+      System.arraycopy(bytes, 0, spec, 0, bytes.length);
+      vmc = resolveVMClass(loader, spec);
+      c = SystemClassLoader.getClass(vmc);
+    } else {
+      c = loader.loadClass(name);
+      vmc = SystemClassLoader.vmClass(c);
+    }
+    link(vmc, vmc.loader);
     if (initialize) {
       initialize(vmc);
     }
@@ -326,9 +349,9 @@ public class Classes {
   public static Class forCanonicalName(ClassLoader loader, String name) {
     try {
       if (name.startsWith("[")) {
-        return forName(name, true, loader);
+        return forName(name.replace('/', '.'), false, loader);
       } else if (name.startsWith("L")) {
-        return forName(name.substring(1, name.length() - 1), true, loader);
+        return forName(name.substring(1, name.length() - 1).replace('/', '.'), false, loader);
       } else {
         if (name.length() == 1) {
           return SystemClassLoader.getClass
@@ -367,16 +390,16 @@ public class Classes {
           int start = i + 1;
           i = next(';', spec, start);
           String name = spec.substring(start, i).replace('/', '.');
-          types[index++] = Class.forName(name, true, vmMethod.class_.loader);
+          types[index++] = Class.forName(name, false, vmMethod.class_.loader);
         } else if (c == '[') {
           int start = i;
           while (spec.charAt(i) == '[') ++i;
 
           if (spec.charAt(i) == 'L') {
             i = next(';', spec, i + 1);
-            String name = spec.substring(start, i).replace('/', '.');
+            String name = spec.substring(start, i + 1).replace('/', '.');
             types[index++] = Class.forName
-              (name, true, vmMethod.class_.loader);
+              (name, false, vmMethod.class_.loader);
           } else {
             String name = spec.substring(start, i + 1);
             types[index++] = forCanonicalName(vmMethod.class_.loader, name);
