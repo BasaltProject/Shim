@@ -625,6 +625,53 @@ public class MethodHandles {
       return new Lookup(class_, remaining);
     }
 
+    private boolean samePackage(Class<?> a, Class<?> b) {
+      return a.getClassLoader() == b.getClassLoader() && a.getPackageName().equals(b.getPackageName());
+    }
+
+    private boolean classAccessible(Class<?> c) {
+      while (c.isArray()) c = c.getComponentType();
+      if (c.isPrimitive() || Modifier.isPublic(c.getModifiers())) return true;
+      Class<?> from = lookupClass();
+      return c == from || ((modes & PACKAGE) != 0 && samePackage(from, c));
+    }
+
+    private void checkAccess(Class<?> refc, Class<?> declaring, int flags, String what) throws IllegalAccessException {
+      Class<?> from = lookupClass();
+      boolean allowed = classAccessible(refc);
+      if (allowed && !Modifier.isPublic(flags)) {
+        if (Modifier.isPrivate(flags)) {
+          allowed = (modes & PRIVATE) != 0 && from.isNestmateOf(declaring);
+        } else {
+          allowed = ((modes & PACKAGE) != 0 && samePackage(from, declaring))
+              || (Modifier.isProtected(flags) && (modes & PROTECTED) != 0 && declaring.isAssignableFrom(from));
+        }
+      }
+      if (!allowed) {
+        throw new IllegalAccessException("no access to " + what + " in " + declaring.getName() + " from " + from.getName());
+      }
+    }
+
+    private Method findMethod(Class<?> refc, String name, Class<?>[] parameters) throws NoSuchMethodException {
+      for (Class<?> c = refc; c != null; c = c.getSuperclass()) {
+        try {
+          return c.getDeclaredMethod(name, parameters);
+        } catch (NoSuchMethodException e) {
+        }
+      }
+      return refc.getMethod(name, parameters);
+    }
+
+    private Field findField(Class<?> refc, String name) throws NoSuchFieldException {
+      for (Class<?> c = refc; c != null; c = c.getSuperclass()) {
+        try {
+          return c.getDeclaredField(name);
+        } catch (NoSuchFieldException e) {
+        }
+      }
+      return refc.getField(name);
+    }
+
     public MethodHandle findVirtual(Class<?> refc, String name, MethodType type)
         throws NoSuchMethodException, IllegalAccessException {
       Objects.requireNonNull(refc);
@@ -633,13 +680,14 @@ public class MethodHandles {
       if (name.startsWith("<")) {
         throw new NoSuchMethodException(name);
       }
-      Method m = refc.getMethod(name, type.parameterArray());
+      Method m = findMethod(refc, name, type.parameterArray());
       if (!m.getReturnType().equals(type.returnType())) {
         throw new NoSuchMethodException(name);
       }
       if ((m.getModifiers() & Modifier.STATIC) != 0) {
         throw new IllegalAccessException("Method is static: " + name);
       }
+      checkAccess(refc, m.getDeclaringClass(), m.getModifiers(), name);
       int kind = refc.isInterface() ? MethodHandle.REF_invokeInterface : MethodHandle.REF_invokeVirtual;
       return new MethodHandle(kind, refc.getClassLoader(), m.vmMethod);
     }
@@ -652,18 +700,14 @@ public class MethodHandles {
       if (name.startsWith("<")) {
         throw new NoSuchMethodException(name);
       }
-      Method m = null;
-      try {
-        m = refc.getDeclaredMethod(name, type.parameterArray());
-      } catch (NoSuchMethodException e) {
-        m = refc.getMethod(name, type.parameterArray());
-      }
+      Method m = findMethod(refc, name, type.parameterArray());
       if (!m.getReturnType().equals(type.returnType())) {
         throw new NoSuchMethodException(name);
       }
       if ((m.getModifiers() & Modifier.STATIC) == 0) {
         throw new IllegalAccessException("Method is not static: " + name);
       }
+      checkAccess(refc, m.getDeclaringClass(), m.getModifiers(), name);
       return new MethodHandle(MethodHandle.REF_invokeStatic, refc.getClassLoader(), m.vmMethod);
     }
 
@@ -691,11 +735,13 @@ public class MethodHandles {
         throw new NoSuchMethodException("Constructor must return void");
       }
       Constructor<?> c = refc.getDeclaredConstructor(type.parameterArray());
+      checkAccess(refc, refc, c.getModifiers(), "<init>");
       return new MethodHandle(MethodHandle.REF_newInvokeSpecial, refc.getClassLoader(), c.method.vmMethod);
     }
 
     public MethodHandle unreflect(Method m) throws IllegalAccessException {
       Objects.requireNonNull(m);
+      if (!m.isAccessible()) checkAccess(m.getDeclaringClass(), m.getDeclaringClass(), m.getModifiers(), m.getName());
       if ((m.getModifiers() & Modifier.STATIC) != 0) {
         return new MethodHandle(MethodHandle.REF_invokeStatic, m.getDeclaringClass().getClassLoader(), m.vmMethod);
       }
@@ -711,47 +757,53 @@ public class MethodHandles {
 
     public MethodHandle unreflectConstructor(Constructor<?> c) throws IllegalAccessException {
       Objects.requireNonNull(c);
+      if (!c.isAccessible()) checkAccess(c.getDeclaringClass(), c.getDeclaringClass(), c.getModifiers(), "<init>");
       return new MethodHandle(MethodHandle.REF_newInvokeSpecial, c.getDeclaringClass().getClassLoader(), c.method.vmMethod);
     }
 
     public MethodHandle findGetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = refc.getField(name);
+      Field f = findField(refc, name);
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) != 0) {
         throw new NoSuchFieldException(name);
       }
+      checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_getField, f);
     }
 
     public MethodHandle findSetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = refc.getField(name);
+      Field f = findField(refc, name);
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) != 0) {
         throw new NoSuchFieldException(name);
       }
+      checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_putField, f);
     }
 
     public MethodHandle findStaticGetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = refc.getField(name);
+      Field f = findField(refc, name);
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) == 0) {
         throw new NoSuchFieldException(name);
       }
+      checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_getStatic, f);
     }
 
     public MethodHandle findStaticSetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = refc.getField(name);
+      Field f = findField(refc, name);
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) == 0) {
         throw new NoSuchFieldException(name);
       }
+      checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_putStatic, f);
     }
 
     public MethodHandle unreflectGetter(Field f) throws IllegalAccessException {
       Objects.requireNonNull(f);
+      if (!f.isAccessible()) checkAccess(f.getDeclaringClass(), f.getDeclaringClass(), f.getModifiers(), f.getName());
       int kind = (f.getModifiers() & Modifier.STATIC) != 0
           ? MethodHandle.REF_getStatic
           : MethodHandle.REF_getField;
@@ -760,6 +812,7 @@ public class MethodHandles {
 
     public MethodHandle unreflectSetter(Field f) throws IllegalAccessException {
       Objects.requireNonNull(f);
+      if (!f.isAccessible()) checkAccess(f.getDeclaringClass(), f.getDeclaringClass(), f.getModifiers(), f.getName());
       int kind = (f.getModifiers() & Modifier.STATIC) != 0
           ? MethodHandle.REF_putStatic
           : MethodHandle.REF_putField;
@@ -768,30 +821,22 @@ public class MethodHandles {
 
     public VarHandle findVarHandle(Class<?> recv, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f;
-      try {
-        f = recv.getField(name);
-      } catch (NoSuchFieldException e) {
-        f = recv.getDeclaredField(name);
-      }
+      Field f = findField(recv, name);
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) != 0) {
         throw new NoSuchFieldException(name);
       }
+      checkAccess(recv, f.getDeclaringClass(), f.getModifiers(), name);
       f.setAccessible(true);
       return VarHandle.makeFieldHandle(f, false);
     }
 
     public VarHandle findStaticVarHandle(Class<?> decl, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f;
-      try {
-        f = decl.getField(name);
-      } catch (NoSuchFieldException e) {
-        f = decl.getDeclaredField(name);
-      }
+      Field f = findField(decl, name);
       if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) == 0) {
         throw new NoSuchFieldException(name);
       }
+      checkAccess(decl, f.getDeclaringClass(), f.getModifiers(), name);
       f.setAccessible(true);
       return VarHandle.makeFieldHandle(f, true);
     }

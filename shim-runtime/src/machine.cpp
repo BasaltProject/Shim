@@ -5665,6 +5665,71 @@ GcClass* resolveClass(Thread* t,
   }
 }
 
+static bool samePackage(GcClass* a, GcClass* b)
+{
+  if (a->loader() != b->loader()) return false;
+  const int8_t* x = a->name()->body().begin();
+  const int8_t* y = b->name()->body().begin();
+  const int8_t* xs = x + a->name()->length() - 1;
+  const int8_t* ys = y + b->name()->length() - 1;
+  while (xs > x && *xs != '/') --xs;
+  while (ys > y && *ys != '/') --ys;
+  return (xs - x) == (ys - y) && memcmp(x, y, xs - x) == 0;
+}
+
+void setHiddenNestHost(Thread* t, GcClass* defined, GcClass* host)
+{
+  PROTECT(t, host);
+  PROTECT(t, defined);
+  getClassAddendum(t, defined, 0)->setHiddenNestHost(t, host);
+}
+
+GcClass* nestHostOf(Thread* t, GcClass* c)
+{
+  GcClassAddendum* addendum = c->addendum();
+  if (addendum == 0) return c;
+  if (addendum->hiddenNestHost()) return addendum->hiddenNestHost();
+  if (addendum->nestHost() == 0) return c;
+  PROTECT(t, c);
+  GcClass* host = resolveClass(t, c->loader(), cast<GcByteArray>(t, addendum->nestHost()), false);
+  if (t->exception) t->exception = 0;
+  if (host == 0 || host == c || !samePackage(host, c) || host->addendum() == 0
+      || host->addendum()->nestMembers() == 0) return c;
+  GcArray* members = cast<GcArray>(t, host->addendum()->nestMembers());
+  for (unsigned i = 0; i < members->length(); ++i) {
+    if (byteArrayEqual(t, members->body()[i], c->name())) return host;
+  }
+  return c;
+}
+
+static bool memberAccessible(Thread* t, GcClass* accessor, GcClass* declaring, unsigned flags)
+{
+  if (flags & ACC_PUBLIC) return true;
+  if (accessor == declaring) return true;
+  if (flags & ACC_PRIVATE) return nestHostOf(t, accessor) == nestHostOf(t, declaring);
+  if (samePackage(accessor, declaring)) return true;
+  return (flags & ACC_PROTECTED) && isAssignableFrom(t, declaring, accessor);
+}
+
+bool classAccessible(Thread* t, GcClass* accessor, GcClass* c)
+{
+  if (accessor == 0 || accessor->loader() == roots(t)->bootLoader()) return true;
+  while (c->arrayDimensions() && c->arrayElementClass()) c = c->arrayElementClass();
+  if (c->arrayDimensions() || c->vmFlags() & PrimitiveFlag) return true;
+  return (c->flags() & ACC_PUBLIC) || c == accessor || samePackage(accessor, c);
+}
+
+void checkClassAccess(Thread* t, GcClass* accessor, GcClass* c)
+{
+  if (not classAccessible(t, accessor, c)) {
+    throwNew(t,
+             GcIllegalAccessError::Type,
+             "class %s cannot access class %s",
+             accessor->name()->body().begin(),
+             c->name()->body().begin());
+  }
+}
+
 object resolveMember(Thread* t,
                      GcClassLoader* loader,
                      GcClass* class_,
@@ -5672,17 +5737,36 @@ object resolveMember(Thread* t,
                      GcByteArray* spec,
                      object (*find)(Thread*, GcClass*, GcByteArray*, GcByteArray*),
                      Gc::Type errorType,
-                     bool throw_)
+                     bool throw_,
+                     GcClass* accessor)
 {
   PROTECT(t, loader);
   PROTECT(t, class_);
+  PROTECT(t, accessor);
   PROTECT(t, name);
   PROTECT(t, spec);
+  if (accessor and not classAccessible(t, accessor, class_)) {
+    if (!throw_) return 0;
+    checkClassAccess(t, accessor, class_);
+  }
   object member = findInHierarchy(t, class_, name, spec, find, errorType, throw_);
   if (member) {
     PROTECT(t, member);
     GcClass* declaring = objectClass(t, member) == type(t, GcMethod::Type)
         ? cast<GcMethod>(t, member)->class_() : cast<GcField>(t, member)->class_();
+    PROTECT(t, declaring);
+    if (accessor && accessor->loader() != roots(t)->bootLoader()) {
+      bool isMethod = objectClass(t, member) == type(t, GcMethod::Type);
+      unsigned flags = isMethod ? cast<GcMethod>(t, member)->flags() : cast<GcField>(t, member)->flags();
+      if (!memberAccessible(t, accessor, declaring, flags)) {
+        if (!throw_) return 0;
+        throwNew(t,
+                 GcIllegalAccessError::Type,
+                 "class %s cannot access a member of class %s",
+                 accessor->name()->body().begin(),
+                 declaring->name()->body().begin());
+      }
+    }
     if (!throw_ && loader != declaring->loader()) return 0;
     imposeLoadingConstraints(t, loader, declaring->loader(), spec);
   }

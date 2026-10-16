@@ -272,7 +272,12 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   uint8_t* buffer = static_cast<uint8_t*>(t->m->heap->allocate(length));
   THREAD_RESOURCE2(t, uint8_t*, buffer, unsigned, length, t->m->heap->free(buffer, length));
   memcpy(buffer, bytes->body().begin(), length);
-  return reinterpret_cast<int64_t>(defineClass(t, loader, buffer, length, target));
+  GcClass* defined = defineClass(t, loader, buffer, length, target);
+  PROTECT(t, defined);
+  GcClass* host = nestHostOf(t, target);
+  PROTECT(t, host);
+  setHiddenNestHost(t, defined, host);
+  return reinterpret_cast<int64_t>(defined);
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL

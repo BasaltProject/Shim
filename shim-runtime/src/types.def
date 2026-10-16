@@ -284,6 +284,8 @@
 
 (type abstractMethodError java/lang/AbstractMethodError)
 
+(type illegalAccessError java/lang/IllegalAccessError)
+
 (type noSuchFieldError java/lang/NoSuchFieldError)
 
 (type noSuchMethodError java/lang/NoSuchMethodError)

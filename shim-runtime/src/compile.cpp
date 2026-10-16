@@ -2445,7 +2445,9 @@ GcMethod* resolveMethod(Thread* t, GcPair* pair)
                                         reference->name(),
                                         reference->spec(),
                                         findMethodInClass,
-                                        GcNoSuchMethodError::Type));
+                                        GcNoSuchMethodError::Type,
+                                        true,
+                                        cast<GcMethod>(t, pair->first())->class_()));
 }
 
 bool methodAbstract(Thread* t UNUSED, GcMethod* method)
@@ -2564,13 +2566,20 @@ int64_t getMethodAddress(MyThread* t, GcMethod* target)
   return prepareMethodForCall(t, target);
 }
 
+GcClass* resolveReferencedClass(Thread* t, GcPair* pair)
+{
+  GcClass* accessor = cast<GcMethod>(t, pair->first())->class_();
+  GcClass* c = resolveClass(t, accessor->loader(), cast<GcReference>(t, pair->second())->name());
+  PROTECT(t, c);
+  checkClassAccess(t, accessor, c);
+  return c;
+}
+
 int64_t getJClassFromReference(MyThread* t, GcPair* pair)
 {
   return reinterpret_cast<intptr_t>(getJClass(
       t,
-      resolveClass(t,
-                   cast<GcMethod>(t, pair->first())->class_()->loader(),
-                   cast<GcReference>(t, pair->second())->name())));
+      resolveReferencedClass(t, pair)));
 }
 
 int64_t getLoadableConstant(MyThread* t, GcPair* pair)
@@ -2702,9 +2711,7 @@ uint64_t makeBlankObjectArrayFromReference(MyThread* t,
 {
   return makeBlankObjectArray(
       t,
-      resolveClass(t,
-                   cast<GcMethod>(t, pair->first())->class_()->loader(),
-                   cast<GcReference>(t, pair->second())->name()),
+      resolveReferencedClass(t, pair),
       length);
 }
 
@@ -2888,9 +2895,7 @@ uint64_t makeMultidimensionalArrayFromReference(MyThread* t,
 {
   return makeMultidimensionalArray(
       t,
-      resolveClass(t,
-                   cast<GcMethod>(t, pair->first())->class_()->loader(),
-                   cast<GcReference>(t, pair->second())->name()),
+      resolveReferencedClass(t, pair),
       dimensions,
       offset);
 }
@@ -2927,7 +2932,8 @@ GcClass* loadedClassInPool(Thread* t, GcMethod* method, unsigned index)
 {
   object entry = singletonObject(t, method->code()->pool(), index);
   if (objectClass(t, entry) == type(t, GcReference::Type)) {
-    return findLoadedClass(t, method->class_()->loader(), cast<GcReference>(t, entry)->name());
+    GcClass* c = findLoadedClass(t, method->class_()->loader(), cast<GcReference>(t, entry)->name());
+    return c and classAccessible(t, method->class_(), c) ? c : 0;
   }
   return cast<GcClass>(t, entry);
 }
@@ -2964,9 +2970,7 @@ void checkCastFromReference(MyThread* t, GcPair* pair, object o)
   PROTECT(t, o);
 
   GcClass* c
-      = resolveClass(t,
-                     cast<GcMethod>(t, pair->first())->class_()->loader(),
-                     cast<GcReference>(t, pair->second())->name());
+      = resolveReferencedClass(t, pair);
 
   checkCast(t, c, o);
 }
@@ -2990,7 +2994,9 @@ GcField* resolveField(Thread* t, GcPair* pair)
                                        reference->name(),
                                        reference->spec(),
                                        findFieldInClass,
-                                       GcNoSuchFieldError::Type));
+                                       GcNoSuchFieldError::Type,
+                                       true,
+                                       cast<GcMethod>(t, pair->first())->class_()));
 }
 
 uint64_t getFieldValue(Thread* t, object target, GcField* field)
@@ -3172,9 +3178,7 @@ uint64_t instanceOfFromReference(Thread* t, GcPair* pair, object o)
   PROTECT(t, o);
 
   GcClass* c
-      = resolveClass(t,
-                     cast<GcMethod>(t, pair->first())->class_()->loader(),
-                     cast<GcReference>(t, pair->second())->name());
+      = resolveReferencedClass(t, pair);
 
   return instanceOf64(t, c, o);
 }
@@ -3200,9 +3204,7 @@ uint64_t makeNew64(Thread* t, GcClass* class_)
 uint64_t makeNewFromReference(Thread* t, GcPair* pair)
 {
   GcClass* class_
-      = resolveClass(t,
-                     cast<GcMethod>(t, pair->first())->class_()->loader(),
-                     cast<GcReference>(t, pair->second())->name());
+      = resolveReferencedClass(t, pair);
 
   PROTECT(t, class_);
 
