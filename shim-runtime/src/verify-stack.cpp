@@ -181,12 +181,12 @@ void shuffle(Stack& stack, unsigned opcode)
 
 unsigned invoke(Stack& stack, GcByteArray* descriptor, bool receiver, bool initialize = false)
 {
-    uint8_t arguments[255];
+    Value arguments[255];
     unsigned count = 0;
     unsigned position = 1;
     const int8_t* bytes = descriptor->body().begin();
     while (bytes[position] != ')') {
-        arguments[count++] = descriptorKind(bytes[position]);
+        arguments[count++] = descriptorValue(bytes + position);
         while (bytes[position] == '[') ++position;
         if (bytes[position] == 'L') while (bytes[position] != ';') ++position;
         ++position;
@@ -197,7 +197,7 @@ unsigned invoke(Stack& stack, GcByteArray* descriptor, bool receiver, bool initi
         if (initialize) { target = stack.take(); requireType(stack.t, isUninitialized(target)); }
         else stack.pop(kReference);
     }
-    unsigned result = descriptorKind(bytes[position + 1]);
+    unsigned result = descriptorValue(bytes + position + 1);
     if (result) stack.push(result);
     return target;
 }
@@ -224,8 +224,20 @@ bool declaresField(Thread* t, GcClass* owner, GcReference* reference)
     return false;
 }
 
+void requireArray(Thread* t, unsigned array, unsigned element)
+{
+    if (array == kNull) return;
+    requireType(t, isArrayKind(array));
+    if (element == 4) requireType(t, arrayRank(array) > 1 || arrayElement(array) == eObject);
+    else {
+        static const uint8_t elements[] = {eInt, eLong, eFloat, eDouble, eObject, eByte, eChar, eShort};
+        requireType(t, arrayRank(array) == 1 && (arrayElement(array) == elements[element]
+            || (element == 5 && arrayElement(array) == eBoolean)));
+    }
+}
+
 void transfer(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, Stack& stack, Locals& locals,
-              GcClass* owner, bool& uninitialized)
+              GcClass* owner, bool& uninitialized, unsigned returnType)
 {
     const uint8_t* bytes = code->body().begin();
     unsigned opcode = bytes[pc];
@@ -246,9 +258,8 @@ void transfer(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, Stack& st
         else if (tag == CONSTANT_Long) kind = kLong;
         else if (tag == CONSTANT_Double) kind = kDouble;
         else if (tag == CONSTANT_Dynamic) {
-            unsigned result = cast<GcDynamicConstant>(t, singletonObject(t, code->pool(), index))->template_()->returnCode();
-            kind = result == LongField ? kLong : (result == DoubleField ? kDouble
-                : (result == FloatField ? kFloat : (result == ObjectField ? kReference : kInt)));
+            GcMethod* method = cast<GcDynamicConstant>(t, singletonObject(t, code->pool(), index))->template_();
+            kind = descriptorValue(method->spec()->body().begin() + 2);
         }
         stack.push(kind);
     } else if (opcode >= 21 && opcode <= 45) {
@@ -258,7 +269,11 @@ void transfer(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, Stack& st
         stack.push(locals.load(index, kind));
     }
     else if (opcode >= 46 && opcode <= 53) {
-        stack.pop(kInt); stack.pop(kReference); stack.push(arrayKinds[opcode - 46]);
+        stack.pop(kInt);
+        unsigned array = stack.pop(kReference);
+        unsigned element = opcode - 46;
+        requireArray(t, array, element);
+        stack.push(element == 4 ? (array == kNull ? kNull : componentValue(array)) : arrayKinds[element]);
     } else if (opcode >= 54 && opcode <= 78) {
         unsigned index = opcode <= 58 ? (bytes[pc] == 196 ? read16(bytes + pc + 2) : bytes[pc + 1])
             : (opcode - 59) % 4;
@@ -266,7 +281,10 @@ void transfer(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, Stack& st
         locals.store(index, kind == kReference ? stack.popMovable() : stack.pop(kind));
     }
     else if (opcode >= 79 && opcode <= 86) {
-        stack.pop(arrayKinds[opcode - 79]); stack.pop(kInt); stack.pop(kReference);
+        unsigned element = opcode - 79;
+        stack.pop(arrayKinds[element]); stack.pop(kInt);
+        unsigned array = stack.pop(kReference);
+        requireArray(t, array, element);
     } else if (opcode >= 87 && opcode <= 95) shuffle(stack, opcode);
     else if (opcode >= 96 && opcode <= 119) {
         unsigned kind = kinds[(opcode - 96) % 4];
@@ -293,11 +311,11 @@ void transfer(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, Stack& st
         if (kind == kReference) { stack.popMovable(); stack.popMovable(); }
         else { stack.pop(kind); stack.pop(kind); }
     } else if (opcode == 177) requireType(t, !uninitialized);
-    else if (opcode >= 172 && opcode <= 176) stack.pop(kinds[opcode - 172]);
+    else if (opcode >= 172 && opcode <= 176) stack.pop(opcode == 176 ? returnType : kinds[opcode - 172]);
     else if (opcode >= 178 && opcode <= 185) {
         GcReference* reference = cast<GcReference>(t, singletonObject(t, code->pool(), read16(bytes + pc + 1) - 1));
         if (opcode <= 181) {
-            unsigned kind = descriptorKind(reference->spec()->body()[0]);
+            unsigned kind = descriptorValue(reference->spec()->body().begin());
             if (opcode == 179 || opcode == 181) stack.pop(kind);
             if (opcode == 180) stack.pop(kReference);
             else if (opcode == 181) {
@@ -330,14 +348,29 @@ void transfer(Thread* t, GcCode* code, GcByteArray* tags, unsigned pc, Stack& st
         // Match HotSpot's allocation-site identity, including asserted dead frames.
         stack.push(kAllocationBase + pc);
     }
-    else if (opcode == 188 || opcode == 189) { stack.pop(kInt); stack.push(kReference); }
-    else if (opcode == 190 || opcode == 193) { stack.pop(kReference); stack.push(kInt); }
+    else if (opcode == 188) {
+        static const uint8_t elements[] = {eBoolean, eChar, eFloat, eDouble, eByte, eShort, eInt, eLong};
+        stack.pop(kInt); stack.push(arrayKind(1, elements[bytes[pc + 1] - 4]));
+    } else if (opcode == 189) {
+        GcReference* reference = cast<GcReference>(t, singletonObject(t, code->pool(), read16(bytes + pc + 1) - 1));
+        unsigned component = classValue(reference->name());
+        stack.pop(kInt);
+        stack.push(isArrayKind(component) ? component + 16 : arrayKind(1, eObject));
+    } else if (opcode == 190) {
+        unsigned array = stack.pop(kReference);
+        requireType(t, array == kNull || isArrayKind(array));
+        stack.push(kInt);
+    } else if (opcode == 193) { stack.pop(kReference); stack.push(kInt); }
     else if (opcode == 191) stack.pop(kReference);
     else if (opcode == 194 || opcode == 195 || opcode == 198 || opcode == 199) stack.popMovable();
-    else if (opcode == 192) { stack.pop(kReference); stack.push(kReference); }
+    else if (opcode == 192) {
+        GcReference* reference = cast<GcReference>(t, singletonObject(t, code->pool(), read16(bytes + pc + 1) - 1));
+        stack.pop(kReference); stack.push(classValue(reference->name()));
+    }
     else if (opcode == 197) {
         for (unsigned i = 0; i < bytes[pc + 3]; ++i) stack.pop(kInt);
-        stack.push(kReference);
+        GcReference* reference = cast<GcReference>(t, singletonObject(t, code->pool(), read16(bytes + pc + 1) - 1));
+        stack.push(classValue(reference->name()));
     }
 }
 
@@ -351,6 +384,7 @@ void verifyStackTypes(Thread* t, GcCode* code, GcByteArray* tags, const int32_t*
     PROTECT(t, descriptor);
     PROTECT(t, maps);
     PROTECT(t, owner);
+    unsigned returnType = descriptorValue(reinterpret_cast<const int8_t*>(strchr(reinterpret_cast<const char*>(descriptor->body().begin()), ')') + 1));
     unsigned length = code->length();
     unsigned localLimit = code->maxLocals();
     size_t mappingSize = (localLimit + 1) * 2 * sizeof(uint16_t);
@@ -413,7 +447,7 @@ void verifyStackTypes(Thread* t, GcCode* code, GcByteArray* tags, const int32_t*
     if (instance) initial.store(slot++, constructor ? kUninitializedThis : kReference);
     const int8_t* parameters = descriptor->body().begin();
     for (unsigned position = 1; parameters[position] != ')';) {
-        unsigned kind = descriptorKind(parameters[position]);
+        unsigned kind = descriptorValue(parameters + position);
         initial.store(slot, kind);
         slot += isWideKind(kind) ? 2 : 1;
         while (parameters[position] == '[') ++position;
@@ -506,7 +540,7 @@ void verifyStackTypes(Thread* t, GcCode* code, GcByteArray* tags, const int32_t*
         if (initializing) memcpy(workLocals, states + offsets[pc], localCount * sizeof(Value));
         Stack stack(t, work, depth, code->maxStack());
         Locals locals(t, workLocals, mapping, localLimit, localCount);
-        transfer(t, code, tags, pc, stack, locals, owner, uninitialized);
+        transfer(t, code, tags, pc, stack, locals, owner, uninitialized, returnType);
         const uint8_t* bytes = code->body().begin();
         unsigned opcode = bytes[pc];
         if ((opcode >= 153 && opcode <= 166) || opcode == 167 || opcode == 198 || opcode == 199) {

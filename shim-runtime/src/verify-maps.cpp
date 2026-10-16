@@ -47,7 +47,7 @@ unsigned type(Thread* t, Reader& in, GcCode* code, GcByteArray* tags, bool const
     case 7: {
         unsigned index = in.word();
         format(t, index && index <= tags->length() / 2 && tags->body()[index - 1] == CONSTANT_Class);
-        return kReference;
+        return classValue(cast<GcReference>(t, singletonObject(t, code->pool(), index - 1))->name());
     }
     case 8: {
         unsigned pc = in.word();
@@ -96,7 +96,7 @@ GcArray* readStackMaps(Thread* t, GcCode* code, GcByteArray* tags, GcByteArray* 
     if (instance) push(t, locals, &localCount, localLimit, constructor ? kUninitializedThis : kReference);
     const int8_t* parameters = descriptor->body().begin();
     for (unsigned position = 1; parameters[position] != ')';) {
-        push(t, locals, &localCount, localLimit, descriptorKind(parameters[position]));
+        push(t, locals, &localCount, localLimit, descriptorValue(parameters + position));
         while (parameters[position] == '[') ++position;
         if (parameters[position] == 'L') while (parameters[position] != ';') ++position;
         ++position;
