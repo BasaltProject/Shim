@@ -47,6 +47,56 @@ public abstract class DateFormat extends Format {
   private static final String[] kTimePatterns = {"h:mm:ss" + kNarrowNoBreak + "a zzzz",
       "h:mm:ss" + kNarrowNoBreak + "a z", "h:mm:ss" + kNarrowNoBreak + "a", "h:mm" + kNarrowNoBreak + "a"};
 
+  public static class Field extends Format.Field {
+    private static final long serialVersionUID = 7441350119349544720L;
+
+    private static final java.util.Map<String, Field> instanceMap = new java.util.HashMap<String, Field>(18);
+    private static final Field[] calendarToFieldMapping = new Field[Calendar.FIELD_COUNT];
+
+    private final int calendarField;
+
+    public static Field ofCalendarField(int calendarField) {
+      if (calendarField < 0 || calendarField >= calendarToFieldMapping.length) {
+        throw new IllegalArgumentException("Unknown Calendar constant " + calendarField);
+      }
+      return calendarToFieldMapping[calendarField];
+    }
+
+    protected Field(String name, int calendarField) {
+      super(name);
+      this.calendarField = calendarField;
+      if (this.getClass() == DateFormat.Field.class) {
+        instanceMap.put(name, this);
+        if (calendarField >= 0) {
+          calendarToFieldMapping[calendarField] = this;
+        }
+      }
+    }
+
+    public int getCalendarField() {
+      return calendarField;
+    }
+
+    public static final Field ERA = new Field("era", Calendar.ERA);
+    public static final Field YEAR = new Field("year", Calendar.YEAR);
+    public static final Field MONTH = new Field("month", Calendar.MONTH);
+    public static final Field DAY_OF_MONTH = new Field("day of month", Calendar.DAY_OF_MONTH);
+    public static final Field HOUR_OF_DAY1 = new Field("hour of day 1", -1);
+    public static final Field HOUR_OF_DAY0 = new Field("hour of day", Calendar.HOUR_OF_DAY);
+    public static final Field MINUTE = new Field("minute", Calendar.MINUTE);
+    public static final Field SECOND = new Field("second", Calendar.SECOND);
+    public static final Field MILLISECOND = new Field("millisecond", Calendar.MILLISECOND);
+    public static final Field DAY_OF_WEEK = new Field("day of week", Calendar.DAY_OF_WEEK);
+    public static final Field DAY_OF_YEAR = new Field("day of year", Calendar.DAY_OF_YEAR);
+    public static final Field DAY_OF_WEEK_IN_MONTH = new Field("day of week in month", Calendar.DAY_OF_WEEK_IN_MONTH);
+    public static final Field WEEK_OF_YEAR = new Field("week of year", Calendar.WEEK_OF_YEAR);
+    public static final Field WEEK_OF_MONTH = new Field("week of month", Calendar.WEEK_OF_MONTH);
+    public static final Field AM_PM = new Field("am pm", Calendar.AM_PM);
+    public static final Field HOUR1 = new Field("hour 1", -1);
+    public static final Field HOUR0 = new Field("hour", Calendar.HOUR);
+    public static final Field TIME_ZONE = new Field("time zone", -1);
+  }
+
   protected Calendar calendar;
   protected NumberFormat numberFormat;
 

@@ -1374,3 +1374,15 @@ Java_java_lang_ProcessHandleImpl_destroy0(JNIEnv*, jclass, jlong pid, jboolean f
 #endif
 }
 
+
+extern "C" JNIEXPORT jint JNICALL Java_java_lang_Runtime_availableProcessors0(JNIEnv*, jclass)
+{
+#if defined(PLATFORM_WINDOWS)
+  SYSTEM_INFO info;
+  GetSystemInfo(&info);
+  return static_cast<jint>(info.dwNumberOfProcessors);
+#else
+  long n = sysconf(_SC_NPROCESSORS_ONLN);
+  return n > 0 ? static_cast<jint>(n) : 1;
+#endif
+}

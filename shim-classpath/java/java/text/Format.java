@@ -46,6 +46,36 @@ public abstract class Format implements Serializable, Cloneable {
 
   public abstract Object parseObject(String source, ParsePosition pos);
 
+  public AttributedCharacterIterator formatToCharacterIterator(Object obj) {
+    return createAttributedCharacterIterator(format(obj));
+  }
+
+  AttributedCharacterIterator createAttributedCharacterIterator(String s) {
+    return new AttributedString(s).getIterator();
+  }
+
+  AttributedCharacterIterator createAttributedCharacterIterator(AttributedCharacterIterator[] iterators) {
+    StringBuilder sb = new StringBuilder();
+    java.util.List<java.util.Map<AttributedCharacterIterator.Attribute, Object>> maps =
+        new java.util.ArrayList<java.util.Map<AttributedCharacterIterator.Attribute, Object>>();
+    for (AttributedCharacterIterator it : iterators) {
+      for (int i = it.getBeginIndex(); i < it.getEndIndex(); i++) {
+        it.setIndex(i);
+        sb.append(it.current());
+        maps.add(new java.util.HashMap<AttributedCharacterIterator.Attribute, Object>(it.getAttributes()));
+      }
+    }
+    return new AttributedString(sb.toString(), maps).getIterator();
+  }
+
+  public static class Field extends AttributedCharacterIterator.Attribute {
+    private static final long serialVersionUID = 276966692217360283L;
+
+    protected Field(String name) {
+      super(name);
+    }
+  }
+
   @Override
   public Object clone() {
     try {

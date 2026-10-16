@@ -282,7 +282,8 @@ public class Thread implements Runnable {
   public static native int enumerate(Thread[] array);
   
   public String getName() {
-    return name;
+    String n = name;
+    return n != null ? n : (tid == 1 ? "main" : "Thread-" + tid);
   }
 
   public void setName(String name) {

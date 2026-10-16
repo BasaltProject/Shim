@@ -47,6 +47,84 @@ public class MessageFormat extends Format {
     applyPattern(pattern);
   }
 
+  public static class Field extends Format.Field {
+    private static final long serialVersionUID = 7899943957617360810L;
+
+    protected Field(String name) {
+      super(name);
+    }
+
+    public static final Field ARGUMENT = new Field("message argument field");
+  }
+
+  @Override
+  public AttributedCharacterIterator formatToCharacterIterator(Object arguments) {
+    if (arguments == null) {
+      throw new NullPointerException("formatToCharacterIterator must be passed non-null object");
+    }
+    Object[] args = (Object[]) arguments;
+    StringBuilder text = new StringBuilder();
+    java.util.List<Object[]> spans = new java.util.ArrayList<Object[]>();
+    int lastOffset = 0;
+    for (int i = 0; i <= maxOffset; ++i) {
+      text.append(pattern, lastOffset, offsets[i]);
+      lastOffset = offsets[i];
+      int argumentNumber = argumentNumbers[i];
+      int start = text.length();
+      if (args == null || argumentNumber >= args.length) {
+        text.append('{').append(argumentNumber).append('}');
+        continue;
+      }
+      Object obj = args[argumentNumber];
+      Format sub = null;
+      String plain = null;
+      if (obj == null) {
+        plain = "null";
+      } else if (formats[i] != null) {
+        sub = formats[i];
+        if (sub instanceof ChoiceFormat) {
+          plain = formats[i].format(obj);
+          if (plain.indexOf('{') >= 0) {
+            sub = new MessageFormat(plain, locale);
+            obj = args;
+            plain = null;
+          } else {
+            sub = null;
+          }
+        }
+      } else if (obj instanceof Number) {
+        sub = NumberFormat.getInstance(locale);
+      } else if (obj instanceof Date) {
+        sub = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
+      } else {
+        plain = obj.toString();
+      }
+      if (sub != null) {
+        AttributedCharacterIterator it = sub.formatToCharacterIterator(obj);
+        for (int k = it.getBeginIndex(); k < it.getEndIndex(); k++) {
+          it.setIndex(k);
+          text.append(it.current());
+          for (java.util.Map.Entry<AttributedCharacterIterator.Attribute, Object> e : it.getAttributes().entrySet()) {
+            spans.add(new Object[] {e.getKey(), e.getValue(), start + (k - it.getBeginIndex()),
+                start + (k - it.getBeginIndex()) + 1});
+          }
+        }
+      } else {
+        text.append(plain);
+      }
+      spans.add(new Object[] {Field.ARGUMENT, Integer.valueOf(argumentNumber), start, text.length()});
+    }
+    text.append(pattern, lastOffset, pattern.length());
+    AttributedString result = new AttributedString(text.toString());
+    for (Object[] span : spans) {
+      if ((Integer) span[3] > (Integer) span[2]) {
+        result.addAttribute((AttributedCharacterIterator.Attribute) span[0], span[1], (Integer) span[2],
+            (Integer) span[3]);
+      }
+    }
+    return result.getIterator();
+  }
+
   public void setLocale(Locale locale) {
     this.locale = locale;
   }
