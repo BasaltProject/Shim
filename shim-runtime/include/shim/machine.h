@@ -1078,6 +1078,7 @@ class Machine {
   System::Monitor* heapLock;
   System::Monitor* classLock;
   unsigned long long hiddenClassSequence;
+  uint64_t threadIdSequence;
   System::Monitor* referenceLock;
   System::Monitor* shutdownLock;
   System::Library* libraries;
@@ -3799,6 +3800,8 @@ void populateMultiArray(Thread* t,
                         int32_t* counts,
                         unsigned index,
                         unsigned dimensions);
+
+uint64_t allocateThreadId(Thread* t);
 
 GcMethod* getCaller(Thread* t, unsigned target, bool skipMethodInvoke = false);
 

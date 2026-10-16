@@ -1587,6 +1587,9 @@ classpath-classes = \
 	$(call java-classes,$(classpath-sources),$(classpath-java),$(classpath-build))
 classpath-object = $(build)/classpath-jar.o
 classpath-dep = $(classpath-build).dep
+ifeq ($(classpath),shim)
+classpath-licenses = $(wildcard $(src)/shim-classpath/licenses/*)
+endif
 
 vm-classes = \
 	shim/*.class \
@@ -2070,8 +2073,12 @@ endif
 $(lzma-loader): $(tools-src)/lzma/load.cpp
 	$(compile-object)
 
-$(build)/classpath.jar: $(classpath-dep) $(classpath-jar-dep)
+$(build)/classpath.jar: $(classpath-dep) $(classpath-jar-dep) $(classpath-licenses)
 	@echo "creating $(@)"
+ifneq ($(strip $(classpath-licenses)),)
+	@mkdir -p $(classpath-build)/META-INF/licenses
+	@cp $(classpath-licenses) $(classpath-build)/META-INF/licenses/
+endif
 	(wd=$$(pwd) && \
 	 cd $(classpath-build) && \
 	 $(jar) c0f "$$($(native-path) "$${wd}/$(@)")" .)
