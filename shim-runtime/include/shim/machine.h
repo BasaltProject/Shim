@@ -3517,6 +3517,7 @@ inline object resolve(
   if (objectClass(t, o) == type(t, GcReference::Type)) {
     PROTECT(t, loader);
     PROTECT(t, pool);
+    PROTECT(t, accessor);
 
     GcReference* reference = cast<GcReference>(t, o);
     PROTECT(t, reference);

@@ -328,6 +328,13 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
     return stream.onClose(a::close).onClose(b::close);
   }
 
+  default <R> Stream<R> gather(Gatherer<? super T, ?, R> gatherer) {
+    java.util.Objects.requireNonNull(gatherer);
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    Spliterator<R> spliterator = GatherImpl.spliterator(spliterator(), (Gatherer) gatherer);
+    return StreamSupport.stream(spliterator, false).onClose(this::close);
+  }
+
   default <R> Stream<R> mapMulti(java.util.function.BiConsumer<? super T, ? super java.util.function.Consumer<R>> mapper) {
     java.util.Objects.requireNonNull(mapper);
     return flatMap(e -> {
