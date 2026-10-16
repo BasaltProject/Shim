@@ -4929,6 +4929,8 @@ bool isAssignableFrom(Thread* t, GcClass* a, GcClass* b)
 
   if (a->flags() & ACC_INTERFACE) {
     if (b->vmFlags() & BootstrapFlag) {
+      PROTECT(t, a);
+      PROTECT(t, b);
       uintptr_t arguments[] = {reinterpret_cast<uintptr_t>(b->name())};
 
       if (run(t, resolveBootstrap, arguments) == 0) {

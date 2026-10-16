@@ -850,11 +850,17 @@ loop:
     object value = popObject(t);
     int32_t index = popInt(t);
     object array = popObject(t);
+    PROTECT(t, array);
+    PROTECT(t, value);
 
     if (LIKELY(array)) {
       if (LIKELY(index >= 0
                  and static_cast<uintptr_t>(index)
                      < objectArrayLength(t, array))) {
+        if (value && !instanceOf(t, objectClass(t, array)->arrayElementClass(), value)) {
+          exception = makeThrowable(t, GcArrayStoreException::Type);
+          goto throw_;
+        }
         setField(t, array, ArrayBody + (index * BytesPerWord), value);
       } else {
         exception = makeThrowable(t,
@@ -1023,7 +1029,7 @@ loop:
         GcBooleanArray* a = cast<GcBooleanArray>(t, array);
         if (LIKELY(index >= 0
                    and static_cast<uintptr_t>(index) < a->length())) {
-          a->body()[index] = value;
+          a->body()[index] = value & 1;
         } else {
           exception = makeThrowable(t,
                                     GcArrayIndexOutOfBoundsException::Type,
@@ -2127,6 +2133,14 @@ loop:
   case ireturn:
   case freturn: {
     int32_t result = popInt(t);
+    if (instruction == ireturn) {
+      switch (frameMethod(t, frame)->returnCode()) {
+      case BooleanField: result &= 1; break;
+      case ByteField: result = static_cast<int8_t>(result); break;
+      case CharField: result = static_cast<uint16_t>(result); break;
+      case ShortField: result = static_cast<int16_t>(result); break;
+      }
+    }
     if (frame > base) {
       popFrame(t);
       pushInt(t, result);
@@ -2711,8 +2725,11 @@ loop:
         object o = popObject(t);
         if (LIKELY(o)) {
           switch (field->code()) {
-          case ByteField:
           case BooleanField:
+            fieldAtOffset<int8_t>(o, field->offset()) = value & 1;
+            break;
+
+          case ByteField:
             fieldAtOffset<int8_t>(o, field->offset()) = value;
             break;
 
@@ -2787,8 +2804,11 @@ loop:
     case IntField: {
       int32_t value = popInt(t);
       switch (field->code()) {
-      case ByteField:
       case BooleanField:
+        fieldAtOffset<int8_t>(table, field->offset()) = value & 1;
+        break;
+
+      case ByteField:
         fieldAtOffset<int8_t>(table, field->offset()) = value;
         break;
 

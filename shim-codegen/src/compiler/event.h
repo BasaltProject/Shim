@@ -207,8 +207,7 @@ void appendJump(Context* c,
                 bool cleanLocals = false);
 
 void appendBoundsCheck(Context* c,
-                       Value* object,
-                       unsigned lengthOffset,
+                       Value* length,
                        Value* index,
                        intptr_t handler);
 
