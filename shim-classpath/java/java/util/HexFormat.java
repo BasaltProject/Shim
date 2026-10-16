@@ -236,7 +236,7 @@ public final class HexFormat {
     if (ch >= 'a' && ch <= 'f') {
       return ch - 'a' + 10;
     }
-    throw new IllegalArgumentException("not a hexadecimal digit: \"" + (char) ch + "\" = " + ch);
+    throw new NumberFormatException("not a hexadecimal digit: \"" + (char) ch + "\" = " + ch);
   }
 
   public static int fromHexDigits(CharSequence string) {

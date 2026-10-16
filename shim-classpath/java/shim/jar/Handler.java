@@ -39,23 +39,117 @@ public class Handler extends URLStreamHandler {
     return new MyJarURLConnection(url);
   }
 
-  protected void parseURL(URL url, String s, int start, int end)
-    throws MalformedURLException
-  {
-    // skip "jar:"
-    s = s.toString().substring(4);
-    int index = s.indexOf("!/");
-    if (index < 0) {
-      throw new MalformedURLException();
-    }
+  @Override
+  protected int getDefaultPort() {
+    return -1;
+  }
 
-    URL file = new URL(s.substring(0, index));
-    if (! "file".equals(file.getProtocol())) {
-      throw new RuntimeException
-        ("protocol " + file.getProtocol() + " not yet supported");
+  @Override
+  protected void parseURL(URL url, String spec, int start, int limit) {
+    String file = null;
+    String ref = null;
+    int refPos = spec.indexOf('#', limit);
+    boolean refOnly = refPos == start;
+    if (refPos > -1) {
+      ref = spec.substring(refPos + 1, spec.length());
+      if (refOnly) {
+        file = url.getFile();
+      }
     }
+    boolean absoluteSpec = false;
+    if (spec.length() >= 4) {
+      absoluteSpec = spec.substring(0, 4).equalsIgnoreCase("jar:");
+    }
+    spec = spec.substring(start, limit);
+    if (absoluteSpec) {
+      file = parseAbsoluteSpec(spec);
+    } else if (!refOnly) {
+      file = parseContextSpec(url, spec);
+      int bangSlash = indexOfBangSlash(file);
+      String toBangSlash = file.substring(0, bangSlash);
+      String afterBangSlash = file.substring(bangSlash);
+      file = toBangSlash + canonize(afterBangSlash);
+    }
+    setURL(url, "jar", "", -1, file, ref);
+  }
 
-    url.set("jar", null, -1, s, null);
+  private static int indexOfBangSlash(String spec) {
+    int indexOfBang = spec.length();
+    while ((indexOfBang = spec.lastIndexOf('!', indexOfBang)) != -1) {
+      if ((indexOfBang != (spec.length() - 1)) && (spec.charAt(indexOfBang + 1) == '/')) {
+        return indexOfBang + 1;
+      } else {
+        indexOfBang--;
+      }
+    }
+    return -1;
+  }
+
+  private static String parseAbsoluteSpec(String spec) {
+    URL url = null;
+    int index = -1;
+    if ((index = indexOfBangSlash(spec)) == -1) {
+      throw new NullPointerException("no !/ in spec");
+    }
+    try {
+      String innerSpec = spec.substring(0, index - 1);
+      url = new URL(innerSpec);
+    } catch (MalformedURLException e) {
+      throw new NullPointerException("invalid url: " + spec + " (" + e + ")");
+    }
+    return spec;
+  }
+
+  private static String parseContextSpec(URL url, String spec) {
+    String ctxFile = url.getFile();
+    if (spec.startsWith("/")) {
+      int bangSlash = indexOfBangSlash(ctxFile);
+      if (bangSlash == -1) {
+        throw new NullPointerException("malformed context url:" + url + ": no !/");
+      }
+      ctxFile = ctxFile.substring(0, bangSlash);
+    }
+    if (!ctxFile.endsWith("/") && (!spec.startsWith("/"))) {
+      int lastSlash = ctxFile.lastIndexOf('/');
+      if (lastSlash == -1) {
+        throw new NullPointerException("malformed context url:" + url);
+      }
+      ctxFile = ctxFile.substring(0, lastSlash + 1);
+    }
+    return ctxFile + spec;
+  }
+
+  private static String canonize(String path) {
+    int i;
+    while ((i = path.indexOf("/./")) >= 0) {
+      path = path.substring(0, i) + path.substring(i + 2);
+    }
+    i = 0;
+    while ((i = path.indexOf("/../", i)) >= 0) {
+      int limit;
+      if (i > 0 && (limit = path.lastIndexOf('/', i - 1)) >= 0 && (path.indexOf("/../", limit) != 0)) {
+        path = path.substring(0, limit) + path.substring(i + 3);
+        i = 0;
+      } else {
+        i = i + 3;
+      }
+    }
+    while (path.endsWith("/..")) {
+      i = path.indexOf("/..");
+      int limit;
+      if ((limit = path.lastIndexOf('/', i - 1)) >= 0) {
+        path = path.substring(0, limit + 1);
+      } else {
+        break;
+      }
+    }
+    if (path.startsWith("./") && path.length() > 2) {
+      path = path.substring(2);
+    }
+    if (path.endsWith("/.")) {
+      path = path.substring(0, path.length() - 1);
+    }
+    return path;
   }
 
   private static class MyJarURLConnection extends JarURLConnection {

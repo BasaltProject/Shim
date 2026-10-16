@@ -120,6 +120,16 @@ public abstract class URLConnection {
     return getInputStream();
   }
 
+  public Object getContent(Class<?>[] classes) throws IOException {
+    Object content = getContent();
+    for (Class<?> c : classes) {
+      if (c.isInstance(content)) {
+        return content;
+      }
+    }
+    return null;
+  }
+
   public int getContentLength() {
     long len = getContentLengthLong();
     return len > Integer.MAX_VALUE ? -1 : (int) len;
@@ -273,21 +283,140 @@ public abstract class URLConnection {
     return Collections.emptyMap();
   }
 
+  private static volatile FileNameMap fileNameMap;
+
+  public static FileNameMap getFileNameMap() {
+    FileNameMap map = fileNameMap;
+    if (map == null) {
+      map = new FileNameMap() {
+        public String getContentTypeFor(String fileName) {
+          int i = fileName.lastIndexOf('#');
+          if (i > 0) {
+            fileName = fileName.substring(0, i - 1);
+          }
+          i = fileName.lastIndexOf('.');
+          i = Math.max(i, fileName.lastIndexOf('/'));
+          i = Math.max(i, fileName.lastIndexOf('?'));
+          String ext = "";
+          if (i != -1 && fileName.charAt(i) == '.') {
+            ext = fileName.substring(i).toLowerCase(java.util.Locale.ROOT);
+          }
+          String[] entries = ContentTypesData.kEntries;
+          for (int k = 0; k < entries.length; k += 2) {
+            if (entries[k].equals(ext)) {
+              return entries[k + 1];
+            }
+          }
+          return null;
+        }
+      };
+      fileNameMap = map;
+    }
+    return map;
+  }
+
+  public static void setFileNameMap(FileNameMap map) {
+    fileNameMap = map;
+  }
+
   public static String guessContentTypeFromName(String fname) {
-    if (fname == null) return null;
-    String lower = fname.toLowerCase();
-    if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html";
-    if (lower.endsWith(".txt")) return "text/plain";
-    if (lower.endsWith(".json")) return "application/json";
-    if (lower.endsWith(".png")) return "image/png";
-    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-    if (lower.endsWith(".gif")) return "image/gif";
-    if (lower.endsWith(".xml")) return "application/xml";
-    if (lower.endsWith(".zip")) return "application/zip";
-    return null;
+    return getFileNameMap().getContentTypeFor(fname);
   }
 
   public static String guessContentTypeFromStream(InputStream is) throws IOException {
+    if (!is.markSupported()) {
+      return null;
+    }
+    is.mark(16);
+    int c1 = is.read();
+    int c2 = is.read();
+    int c3 = is.read();
+    int c4 = is.read();
+    int c5 = is.read();
+    int c6 = is.read();
+    int c7 = is.read();
+    int c8 = is.read();
+    int c9 = is.read();
+    int c10 = is.read();
+    int c11 = is.read();
+    int c12 = is.read();
+    int c13 = is.read();
+    int c14 = is.read();
+    int c15 = is.read();
+    int c16 = is.read();
+    is.reset();
+    if (c1 == 0xCA && c2 == 0xFE && c3 == 0xBA && c4 == 0xBE) {
+      return "application/java-vm";
+    }
+    if (c1 == 0xAC && c2 == 0xED) {
+      return "application/x-java-serialized-object";
+    }
+    if (c1 == '<') {
+      if (c2 == '!' || ((c2 == 'h' && (c3 == 't' && c4 == 'm' || c3 == 'e' && c4 == 'a'))
+          || (c2 == 'b' && c3 == 'o' && c4 == 'd') || (c2 == 'H' && (c3 == 'T' && c4 == 'M' || c3 == 'E' && c4 == 'A'))
+          || (c2 == 'B' && c3 == 'O' && c4 == 'D'))) {
+        return "text/html";
+      }
+      if (c2 == '?' && c3 == 'x' && c4 == 'm' && c5 == 'l' && c6 == ' ') {
+        return "application/xml";
+      }
+    }
+    if (c1 == 0xef && c2 == 0xbb && c3 == 0xbf) {
+      if (c4 == '<' && c5 == '?' && c6 == 'x') {
+        return "application/xml";
+      }
+    }
+    if (c1 == 0xfe && c2 == 0xff) {
+      if (c3 == 0 && c4 == '<' && c5 == 0 && c6 == '?' && c7 == 0 && c8 == 'x') {
+        return "application/xml";
+      }
+    }
+    if (c1 == 0xff && c2 == 0xfe) {
+      if (c3 == '<' && c4 == 0 && c5 == '?' && c6 == 0 && c7 == 'x' && c8 == 0) {
+        return "application/xml";
+      }
+    }
+    if (c1 == 0x00 && c2 == 0x00 && c3 == 0xfe && c4 == 0xff) {
+      if (c5 == 0 && c6 == 0 && c7 == 0 && c8 == '<' && c9 == 0 && c10 == 0 && c11 == 0 && c12 == '?' && c13 == 0
+          && c14 == 0 && c15 == 0 && c16 == 'x') {
+        return "application/xml";
+      }
+    }
+    if (c1 == 0xff && c2 == 0xfe && c3 == 0x00 && c4 == 0x00) {
+      if (c5 == '<' && c6 == 0 && c7 == 0 && c8 == 0 && c9 == '?' && c10 == 0 && c11 == 0 && c12 == 0 && c13 == 'x'
+          && c14 == 0 && c15 == 0 && c16 == 0) {
+        return "application/xml";
+      }
+    }
+    if (c1 == 'G' && c2 == 'I' && c3 == 'F' && c4 == '8') {
+      return "image/gif";
+    }
+    if (c1 == '#' && c2 == 'd' && c3 == 'e' && c4 == 'f') {
+      return "image/x-bitmap";
+    }
+    if (c1 == '!' && c2 == ' ' && c3 == 'X' && c4 == 'P' && c5 == 'M' && c6 == '2') {
+      return "image/x-pixmap";
+    }
+    if (c1 == 137 && c2 == 80 && c3 == 78 && c4 == 71 && c5 == 13 && c6 == 10 && c7 == 26 && c8 == 10) {
+      return "image/png";
+    }
+    if (c1 == 0xFF && c2 == 0xD8 && c3 == 0xFF) {
+      if (c4 == 0xE0 || c4 == 0xEE) {
+        return "image/jpeg";
+      }
+      if ((c4 == 0xE1) && (c7 == 'E' && c8 == 'x' && c9 == 'i' && c10 == 'f' && c11 == 0)) {
+        return "image/jpeg";
+      }
+    }
+    if (c1 == 0x2E && c2 == 0x73 && c3 == 0x6E && c4 == 0x64) {
+      return "audio/basic";
+    }
+    if (c1 == 0x64 && c2 == 0x6E && c3 == 0x73 && c4 == 0x2E) {
+      return "audio/basic";
+    }
+    if (c1 == 'R' && c2 == 'I' && c3 == 'F' && c4 == 'F') {
+      return "audio/x-wav";
+    }
     return null;
   }
 }

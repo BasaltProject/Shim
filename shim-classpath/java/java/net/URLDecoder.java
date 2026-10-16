@@ -58,8 +58,13 @@ public class URLDecoder {
           }
           int pos = 0;
           while (((i + 2) < numChars) && (c == '%')) {
-            int v = Integer.parseInt(s.substring(i + 1, i + 3), 16);
-            bytes[pos++] = (byte) v;
+            try {
+              int v = java.util.HexFormat.fromHexDigits(s, i + 1, i + 3);
+              bytes[pos++] = (byte) v;
+            } catch (NumberFormatException e) {
+              throw new IllegalArgumentException("URLDecoder: Illegal hex characters in escape (%) pattern - "
+                  + e.getMessage());
+            }
             i += 3;
             if (i < numChars) {
               c = s.charAt(i);

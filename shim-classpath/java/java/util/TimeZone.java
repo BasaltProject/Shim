@@ -100,7 +100,7 @@ public abstract class TimeZone implements Serializable, Cloneable {
       throw new IllegalArgumentException("Illegal style: " + style);
     }
     String id = getID();
-    if (id.startsWith("GMT") && id.length() > 3) {
+    if (id.startsWith("GMT") && id.length() > 3 && (id.charAt(3) == '+' || id.charAt(3) == '-')) {
       return id;
     }
     switch (id) {
@@ -113,6 +113,11 @@ public abstract class TimeZone implements Serializable, Cloneable {
             : (daylight ? "Hawaii-Aleutian Daylight Time" : "Hawaii-Aleutian Standard Time");
       default:
         break;
+    }
+    String known = sun.util.locale.provider.ZoneNames.get(id, style == SHORT ? java.time.format.TextStyle.SHORT
+        : java.time.format.TextStyle.FULL, false, daylight);
+    if (known != null) {
+      return known;
     }
     ZoneId zone = toZoneId();
     ZoneRules rules = zone.getRules();

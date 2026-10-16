@@ -1565,7 +1565,12 @@ public final class DateTimeFormatterBuilder {
       if (custom != null) {
         text = custom.get(value);
       } else {
-        text = provider.getText(field, value, textStyle, context.getLocale());
+        java.time.chrono.Chronology chrono = context.getTemporal().query(java.time.temporal.TemporalQueries.chronology());
+        if (chrono == null || chrono == java.time.chrono.IsoChronology.INSTANCE) {
+          text = provider.getText(field, value, textStyle, context.getLocale());
+        } else {
+          text = provider.getText(chrono, field, value, textStyle, context.getLocale());
+        }
       }
       if (text == null) {
         return numberPrinterParser().format(context, buf);
@@ -2230,10 +2235,21 @@ public final class DateTimeFormatterBuilder {
       if (!(zone instanceof ZoneOffset)) {
         TemporalAccessor dt = context.getTemporal();
         boolean daylight = false;
-        if (!isGeneric && dt.isSupported(INSTANT_SECONDS)) {
-          daylight = zone.getRules().isDaylightSavings(Instant.from(dt));
+        boolean generic = true;
+        if (!isGeneric) {
+          if (dt.isSupported(INSTANT_SECONDS)) {
+            generic = false;
+            daylight = zone.getRules().isDaylightSavings(Instant.from(dt));
+          } else if (dt.isSupported(ChronoField.EPOCH_DAY) && dt.isSupported(ChronoField.NANO_OF_DAY)) {
+            java.time.LocalDateTime ldt = java.time.LocalDate.ofEpochDay(dt.getLong(ChronoField.EPOCH_DAY))
+                .atTime(java.time.LocalTime.ofNanoOfDay(dt.getLong(ChronoField.NANO_OF_DAY)));
+            if (zone.getRules().getTransition(ldt) == null) {
+              generic = false;
+              daylight = zone.getRules().isDaylightSavings(ldt.atZone(zone).toInstant());
+            }
+          }
         }
-        String name = ZoneNames.get(zname, textStyle, isGeneric, daylight);
+        String name = sun.util.locale.provider.ZoneNames.get(zname, textStyle, generic, daylight);
         if (name != null) {
           zname = name;
         }

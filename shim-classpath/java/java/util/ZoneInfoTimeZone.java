@@ -59,12 +59,44 @@ final class ZoneInfoTimeZone extends TimeZone {
     return rules;
   }
 
+  private static final long kUtc1900 = -2208988800L;
+
+  private transient volatile int tableState;
+  private transient int currentRaw;
+
   private static int millis(ZoneOffset offset) {
     return offset.getTotalSeconds() * 1000;
   }
 
+  private boolean hasTable() {
+    int state = tableState;
+    if (state == 0) {
+      boolean table = false;
+      for (ZoneOffsetTransition t : rules.getTransitions()) {
+        if (t.toEpochSecond() >= kUtc1900) {
+          table = true;
+          break;
+        }
+      }
+      currentRaw = millis(rules.getStandardOffset(Instant.ofEpochSecond(32503680000L)));
+      state = table ? 1 : 2;
+      tableState = state;
+    }
+    return state == 1;
+  }
+
+  private boolean rawOnly(long epochSecond) {
+    if (rules.isFixedOffset()) {
+      return false;
+    }
+    return !hasTable() || epochSecond < kUtc1900;
+  }
+
   @Override
   public int getOffset(long date) {
+    if (rawOnly(Math.floorDiv(date, 1000L))) {
+      return currentRaw + rawDelta;
+    }
     return millis(rules.getOffset(Instant.ofEpochMilli(date))) + rawDelta;
   }
 
@@ -73,6 +105,10 @@ final class ZoneInfoTimeZone extends TimeZone {
     Instant instant = Instant.ofEpochMilli(date);
     int std = millis(rules.getStandardOffset(instant)) + rawDelta;
     int total = millis(rules.getOffset(instant)) + rawDelta;
+    if (rawOnly(Math.floorDiv(date, 1000L))) {
+      std = currentRaw + rawDelta;
+      total = std;
+    }
     if (offsets != null) {
       offsets[0] = std;
       offsets[1] = total - std;
@@ -97,6 +133,10 @@ final class ZoneInfoTimeZone extends TimeZone {
     Instant instant = Instant.ofEpochSecond(seconds - chosen.getTotalSeconds());
     int std = millis(rules.getStandardOffset(instant)) + rawDelta;
     int total = millis(chosen) + rawDelta;
+    if (rawOnly(instant.getEpochSecond())) {
+      std = currentRaw + rawDelta;
+      total = std;
+    }
     if (offsets != null) {
       offsets[0] = std;
       offsets[1] = total - std;
@@ -150,6 +190,9 @@ final class ZoneInfoTimeZone extends TimeZone {
 
   @Override
   public boolean inDaylightTime(Date date) {
+    if (rawOnly(Math.floorDiv(date.getTime(), 1000L))) {
+      return false;
+    }
     return rules.isDaylightSavings(date.toInstant());
   }
 

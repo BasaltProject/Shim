@@ -159,7 +159,27 @@ public abstract class ZoneId implements Serializable {
   public String getDisplayName(TextStyle style, Locale locale) {
     Objects.requireNonNull(style, "style");
     Objects.requireNonNull(locale, "locale");
-    return getId();
+    return new java.time.format.DateTimeFormatterBuilder().appendZoneText(style).toFormatter(locale)
+        .format(new java.time.temporal.TemporalAccessor() {
+          @Override
+          public boolean isSupported(java.time.temporal.TemporalField field) {
+            return false;
+          }
+
+          @Override
+          public long getLong(java.time.temporal.TemporalField field) {
+            throw new java.time.temporal.UnsupportedTemporalTypeException("Unsupported field: " + field);
+          }
+
+          @SuppressWarnings("unchecked")
+          @Override
+          public <R> R query(java.time.temporal.TemporalQuery<R> query) {
+            if (query == java.time.temporal.TemporalQueries.zoneId()) {
+              return (R) ZoneId.this;
+            }
+            return java.time.temporal.TemporalAccessor.super.query(query);
+          }
+        });
   }
 
   public abstract ZoneRules getRules();

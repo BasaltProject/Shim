@@ -14,6 +14,29 @@ import java.util.Map;
 public abstract class AbstractChronology implements Chronology {
   protected AbstractChronology() { }
 
+  static java.util.List<Chronology> all() {
+    return java.util.Arrays.<Chronology>asList(IsoChronology.INSTANCE, MinguoChronology.INSTANCE,
+        ThaiBuddhistChronology.INSTANCE);
+  }
+
+  static Chronology byId(String id) {
+    for (Chronology c : all()) {
+      if (c.getId().equals(id)) {
+        return c;
+      }
+    }
+    return null;
+  }
+
+  static Chronology byType(String type) {
+    for (Chronology c : all()) {
+      if (c.getCalendarType().equals(type)) {
+        return c;
+      }
+    }
+    return null;
+  }
+
   @Override
   public ChronoLocalDate resolveDate(Map<TemporalField, Long> fieldValues, ResolverStyle resolverStyle) {
     throw new UnsupportedOperationException("resolveDate");

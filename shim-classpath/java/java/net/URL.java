@@ -15,24 +15,79 @@ package java.net;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.Locale;
 import java.util.Objects;
 
-public final class URL {
+public final class URL implements Serializable {
   private static final long serialVersionUID = -7627629688361524110L;
 
-  private final URLStreamHandler handler;
+  private static volatile URLStreamHandlerFactory factory;
+
   private String protocol;
   private String host;
   private int port = -1;
   private String file;
-  private String path;
-  private String query;
-  private String ref;
   private String authority;
-  private String userInfo;
+  private String ref;
+  private int hashCode = -1;
 
-  public URL(String s) throws MalformedURLException {
-    this(null, s);
+  private transient String userInfo;
+  private transient String path;
+  private transient String query;
+  transient URLStreamHandler handler;
+  private transient InetAddress hostAddress;
+
+  public URL(String protocol, String host, int port, String file) throws MalformedURLException {
+    this(protocol, host, port, file, null);
+  }
+
+  public URL(String protocol, String host, String file) throws MalformedURLException {
+    this(protocol, host, -1, file);
+  }
+
+  public URL(String protocol, String host, int port, String file, URLStreamHandler handler)
+      throws MalformedURLException {
+    if (protocol == null) {
+      throw new NullPointerException();
+    }
+    String lowerCaseProtocol = protocol.toLowerCase(Locale.ROOT);
+    this.protocol = lowerCaseProtocol;
+    if (host != null) {
+      if (host.indexOf(':') >= 0 && !host.startsWith("[")) {
+        host = "[" + host + "]";
+      }
+      this.host = host;
+      if (port < -1) {
+        throw new MalformedURLException("Invalid port number :" + port);
+      }
+      this.port = port;
+      authority = (port == -1) ? host : host + ":" + port;
+    }
+    String spec = file;
+    int hash = spec.indexOf('#');
+    if (hash >= 0) {
+      ref = spec.substring(hash + 1);
+      spec = spec.substring(0, hash);
+    }
+    int q = spec.lastIndexOf('?');
+    if (q != -1) {
+      query = spec.substring(q + 1);
+      path = spec.substring(0, q);
+    } else {
+      path = spec;
+    }
+    this.file = query != null ? path + "?" + query : path;
+    if (handler == null && (handler = findHandler(lowerCaseProtocol)) == null) {
+      throw new MalformedURLException("unknown protocol: " + lowerCaseProtocol);
+    }
+    this.handler = handler;
+  }
+
+  public URL(String spec) throws MalformedURLException {
+    this(null, spec);
   }
 
   public URL(URL context, String spec) throws MalformedURLException {
@@ -40,85 +95,170 @@ public final class URL {
   }
 
   public URL(URL context, String spec, URLStreamHandler handler) throws MalformedURLException {
-    Objects.requireNonNull(spec, "spec");
-    spec = spec.trim();
-    int colon = spec.indexOf(':');
-    int slash = spec.indexOf('/');
-    if (colon > 0 && (slash < 0 || colon < slash)) {
-      String proto = spec.substring(0, colon).toLowerCase();
-      this.handler = handler != null ? handler : findHandler(proto);
-      this.handler.parseURL(this, spec, colon + 1, spec.length());
-    } else if (context != null) {
-      this.handler = handler != null ? handler : context.handler;
-      this.handler.parseURL(this, spec, 0, spec.length());
-    } else {
-      throw new MalformedURLException("no protocol: " + spec);
-    }
-  }
-
-  public URL(String protocol, String host, int port, String file) throws MalformedURLException {
-    this(protocol, host, port, file, null);
-  }
-
-  public URL(String protocol, String host, String file) throws MalformedURLException {
-    this(protocol, host, -1, file, null);
-  }
-
-  public URL(String protocol, String host, int port, String file, URLStreamHandler handler)
-    throws MalformedURLException
-  {
-    if (protocol == null) throw new MalformedURLException("null protocol");
-    this.protocol = protocol.toLowerCase();
-    this.host = host;
-    this.port = port;
-    this.file = file;
-    this.handler = handler != null ? handler : findHandler(this.protocol);
-    if (file != null) {
-      int q = file.indexOf('?');
-      if (q != -1) {
-        this.query = file.substring(q + 1);
-        this.path = file.substring(0, q);
-      } else {
-        this.path = file;
+    String original = spec;
+    int i;
+    int limit;
+    int c;
+    int start = 0;
+    String newProtocol = null;
+    boolean aRef = false;
+    boolean isRelative = false;
+    try {
+      limit = spec.length();
+      while ((limit > 0) && (spec.charAt(limit - 1) <= ' ')) {
+        limit--;
       }
+      while ((start < limit) && (spec.charAt(start) <= ' ')) {
+        start++;
+      }
+      if (spec.regionMatches(true, start, "url:", 0, 4)) {
+        start += 4;
+      }
+      if (start < spec.length() && spec.charAt(start) == '#') {
+        aRef = true;
+      }
+      for (i = start; !aRef && (i < limit) && ((c = spec.charAt(i)) != '/'); i++) {
+        if (c == ':') {
+          String s = spec.substring(start, i).toLowerCase(Locale.ROOT);
+          if (isValidProtocol(s)) {
+            newProtocol = s;
+            start = i + 1;
+          }
+          break;
+        }
+      }
+      protocol = newProtocol;
+      if ((context != null) && ((newProtocol == null) || newProtocol.equalsIgnoreCase(context.protocol))) {
+        if (handler == null) {
+          handler = context.handler;
+        }
+        if (context.path != null && context.path.startsWith("/")) {
+          newProtocol = null;
+        }
+        if (newProtocol == null) {
+          protocol = context.protocol;
+          authority = context.authority;
+          userInfo = context.userInfo;
+          host = context.host;
+          port = context.port;
+          file = context.file;
+          path = context.path;
+          isRelative = true;
+        }
+      }
+      if (protocol == null) {
+        throw new MalformedURLException("no protocol: " + original);
+      }
+      if (handler == null && (handler = findHandler(protocol)) == null) {
+        throw new MalformedURLException("unknown protocol: " + protocol);
+      }
+      this.handler = handler;
+      i = spec.indexOf('#', start);
+      if (i >= 0) {
+        ref = spec.substring(i + 1, limit);
+        limit = i;
+      }
+      if (isRelative && start == limit) {
+        query = context.query;
+        if (ref == null) {
+          ref = context.ref;
+        }
+      }
+      handler.parseURL(this, spec, start, limit);
+    } catch (MalformedURLException e) {
+      throw e;
+    } catch (Exception e) {
+      MalformedURLException exception = new MalformedURLException(e.getMessage());
+      exception.initCause(e);
+      throw exception;
     }
   }
 
   public static URL of(URI uri, URLStreamHandler handler) throws MalformedURLException {
     Objects.requireNonNull(uri, "uri");
     if (!uri.isAbsolute()) {
-      throw new IllegalArgumentException("URI is not absolute: " + uri);
+      throw new IllegalArgumentException("URI is not absolute");
     }
-    return new URL(uri.getScheme(), uri.getHost(), uri.getPort(), uri.getPath(), handler);
+    return new URL(null, uri.toString(), handler);
   }
 
-  public URI toURI() throws URISyntaxException {
-    return new URI(toString());
+  private static boolean isValidProtocol(String protocol) {
+    int len = protocol.length();
+    if (len < 1) {
+      return false;
+    }
+    char c = protocol.charAt(0);
+    if (!Character.isLetter(c)) {
+      return false;
+    }
+    for (int i = 1; i < len; i++) {
+      c = protocol.charAt(i);
+      if (!Character.isLetterOrDigit(c) && c != '.' && c != '+' && c != '-') {
+        return false;
+      }
+    }
+    return true;
   }
 
-  public String getAuthority() {
-    if (authority != null) return authority;
-    if (host == null) return null;
-    return port == -1 ? host : host + ":" + port;
+  void set(String protocol, String host, int port, String file, String ref) {
+    synchronized (this) {
+      this.protocol = protocol;
+      this.host = host;
+      authority = port == -1 ? host : host + ":" + port;
+      this.port = port;
+      this.file = file;
+      this.ref = ref;
+      hashCode = -1;
+      hostAddress = null;
+      int q = file.lastIndexOf('?');
+      if (q != -1) {
+        query = file.substring(q + 1);
+        path = file.substring(0, q);
+      } else {
+        path = file;
+      }
+    }
+  }
+
+  void set(String protocol, String host, int port, String authority, String userInfo, String path, String query,
+      String ref) {
+    synchronized (this) {
+      this.protocol = protocol;
+      this.host = host;
+      this.port = port;
+      this.file = query == null ? path : path + "?" + query;
+      this.userInfo = userInfo;
+      this.path = path;
+      this.ref = ref;
+      hashCode = -1;
+      hostAddress = null;
+      this.query = query;
+      this.authority = authority;
+    }
+  }
+
+  public String getQuery() {
+    return query;
+  }
+
+  public String getPath() {
+    return path;
   }
 
   public String getUserInfo() {
     return userInfo;
   }
 
+  public String getAuthority() {
+    return authority;
+  }
+
+  public int getPort() {
+    return port;
+  }
+
   public int getDefaultPort() {
-    if ("http".equals(protocol)) return 80;
-    if ("https".equals(protocol)) return 443;
-    if ("ftp".equals(protocol)) return 21;
-    return handler != null ? handler.getDefaultPort() : -1;
-  }
-
-  public String toString() {
-    return handler.toExternalForm(this);
-  }
-
-  public String toExternalForm() {
-    return toString();
+    return handler.getDefaultPort();
   }
 
   public String getProtocol() {
@@ -129,10 +269,6 @@ public final class URL {
     return host;
   }
 
-  public int getPort() {
-    return port;
-  }
-
   public String getFile() {
     return file;
   }
@@ -140,13 +276,40 @@ public final class URL {
   public String getRef() {
     return ref;
   }
-  
-  public String getPath() {
-    return path;
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!(obj instanceof URL)) {
+      return false;
+    }
+    URL u2 = (URL) obj;
+    return handler.equals(this, u2);
   }
-  
-  public String getQuery() {
-    return query;
+
+  @Override
+  public synchronized int hashCode() {
+    if (hashCode != -1) {
+      return hashCode;
+    }
+    hashCode = handler.hashCode(this);
+    return hashCode;
+  }
+
+  public boolean sameFile(URL other) {
+    return handler.sameFile(this, other);
+  }
+
+  @Override
+  public String toString() {
+    return toExternalForm();
+  }
+
+  public String toExternalForm() {
+    return handler.toExternalForm(this);
+  }
+
+  public URI toURI() throws URISyntaxException {
+    return new URI(toString());
   }
 
   public URLConnection openConnection() throws IOException {
@@ -155,76 +318,106 @@ public final class URL {
 
   public URLConnection openConnection(Proxy proxy) throws IOException {
     if (proxy == null) {
-      throw new IllegalArgumentException("proxy == null");
+      throw new IllegalArgumentException("proxy can not be null");
     }
     return handler.openConnection(this, proxy);
   }
 
-  public InputStream openStream() throws IOException {
+  public final InputStream openStream() throws IOException {
     return openConnection().getInputStream();
   }
 
-  public Object getContent() throws IOException {
-    return openStream();
+  public final Object getContent() throws IOException {
+    return openConnection().getContent();
   }
 
-  private static URLStreamHandler findHandler(String protocol)
-    throws MalformedURLException
-  {
-    if ("http".equals(protocol) || "https".equals(protocol)) {
+  public final Object getContent(Class<?>[] classes) throws IOException {
+    return openConnection().getContent(classes);
+  }
+
+  public static void setURLStreamHandlerFactory(URLStreamHandlerFactory fac) {
+    synchronized (URL.class) {
+      if (factory != null) {
+        throw new Error("factory already defined");
+      }
+      factory = fac;
+    }
+  }
+
+  InetAddress getHostAddress() {
+    synchronized (this) {
+      if (hostAddress != null) {
+        return hostAddress;
+      }
+      if (host == null || host.isEmpty()) {
+        return null;
+      }
+      try {
+        hostAddress = InetAddress.getByName(host);
+      } catch (UnknownHostException ex) {
+        return null;
+      }
+      return hostAddress;
+    }
+  }
+
+  private static URLStreamHandler findHandler(String protocol) {
+    URLStreamHandlerFactory fac = factory;
+    if (fac != null) {
+      URLStreamHandler h = fac.createURLStreamHandler(protocol);
+      if (h != null) {
+        return h;
+      }
+    }
+    if ("http".equals(protocol)) {
       return new shim.http.Handler();
+    } else if ("https".equals(protocol)) {
+      return new shim.https.Handler();
     } else if ("shimvmresource".equals(protocol)) {
       return new shim.shimvmresource.Handler();
     } else if ("file".equals(protocol)) {
       return new shim.file.Handler();
     } else if ("jar".equals(protocol)) {
       return new shim.jar.Handler();
-    } else {
-      throw new MalformedURLException("unknown protocol: " + protocol);
+    } else if ("ftp".equals(protocol)) {
+      return new shim.ftp.Handler();
+    } else if ("mailto".equals(protocol)) {
+      return new shim.mailto.Handler();
+    } else if ("jrt".equals(protocol)) {
+      return new shim.jrt.Handler();
     }
+    return null;
   }
 
-  public void set(String protocol, String host, int port, String file,
-                  String ref)
-  {
-    this.protocol = protocol;
-    this.host = host;
-    this.port = port;
-    this.file = file;
-    this.ref = ref;
-    
-    int q = file == null ? -1 : file.lastIndexOf('?');
-    if (q != -1) {
-      this.query = file.substring(q + 1);
-      this.path = file.substring(0, q);
-    } else {
-      this.path = file;
+  private void writeObject(ObjectOutputStream s) throws IOException {
+    s.defaultWriteObject();
+  }
+
+  private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    URLStreamHandler h = findHandler(protocol);
+    if (h == null) {
+      throw new IOException("unknown protocol: " + protocol);
     }
-  }
-
-  public void set(String protocol, String host, int port, String authority,
-                  String userInfo, String path, String query, String ref)
-  {
-    this.protocol = protocol;
-    this.host = host;
-    this.port = port;
-    this.authority = authority;
-    this.userInfo = userInfo;
-    this.path = path;
-    this.query = query;
-    this.ref = ref;
-    this.file = (query == null) ? path : path + "?" + query;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (!(obj instanceof URL)) return false;
-    URL other = (URL) obj;
-    return handler.equals(this, other);
-  }
-
-  @Override
-  public int hashCode() {
-    return toString().hashCode();
+    handler = h;
+    hashCode = -1;
+    if (authority == null && ((host != null && !host.isEmpty()) || port != -1)) {
+      authority = (host != null && port == -1) ? host : (host == null ? "" : host) + ":" + port;
+    }
+    if (authority != null) {
+      int ind = authority.indexOf('@');
+      if (ind != -1) {
+        userInfo = authority.substring(0, ind);
+      }
+    }
+    if (file != null) {
+      int q = file.lastIndexOf('?');
+      if (q != -1) {
+        query = file.substring(q + 1);
+        path = file.substring(0, q);
+      } else {
+        path = file;
+      }
+    }
   }
 }

@@ -171,14 +171,31 @@ public final class Long extends Number implements Comparable<Long>,
   }
 
   public static long parseLong(CharSequence s, int beginIndex, int endIndex, int radix) {
+    return parseLong0(s, beginIndex, endIndex, radix, true);
+  }
+
+  private static NumberFormatException numberError(CharSequence s, int beginIndex, int endIndex, int radix,
+      int errorIndex, boolean seq) {
+    if (seq) {
+      return new NumberFormatException("Error at index " + (errorIndex - beginIndex) + " in: \""
+          + s.subSequence(beginIndex, endIndex) + "\"");
+    }
+    return new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\""
+        + (radix == 10 ? "" : " under radix " + radix));
+  }
+
+  private static long parseLong0(CharSequence s, int beginIndex, int endIndex, int radix, boolean seq) {
     java.util.Objects.requireNonNull(s);
     java.util.Objects.checkFromToIndex(beginIndex, endIndex, s.length());
-    if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
-      throw new NumberFormatException("radix " + radix + " not in [" + Character.MIN_RADIX + ", " + Character.MAX_RADIX + "]");
+    if (radix < Character.MIN_RADIX) {
+      throw new NumberFormatException("radix " + radix + " less than Character.MIN_RADIX");
+    }
+    if (radix > Character.MAX_RADIX) {
+      throw new NumberFormatException("radix " + radix + " greater than Character.MAX_RADIX");
     }
     int len = endIndex - beginIndex;
     if (len == 0) {
-      throw new NumberFormatException("For input string: \"\"");
+      throw numberError(s, beginIndex, endIndex, radix, beginIndex, false);
     }
     int i = beginIndex;
     char firstChar = s.charAt(i);
@@ -189,27 +206,25 @@ public final class Long extends Number implements Comparable<Long>,
         negative = true;
         limit = Long.MIN_VALUE;
       } else if (firstChar != '+') {
-        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+        throw numberError(s, beginIndex, endIndex, radix, i, seq);
       }
       if (len == 1) {
-        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+        throw numberError(s, beginIndex, endIndex, radix, i + 1, seq);
       }
       i++;
     }
     long multmin = limit / radix;
     long result = 0;
     while (i < endIndex) {
-      int digit = Character.digit(s.charAt(i++), radix);
-      if (digit < 0) {
-        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
-      }
-      if (result < multmin) {
-        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      int digit = Character.digit(s.charAt(i), radix);
+      if (digit < 0 || result < multmin) {
+        throw numberError(s, beginIndex, endIndex, radix, i, seq);
       }
       result *= radix;
       if (result < limit + digit) {
-        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+        throw numberError(s, beginIndex, endIndex, radix, i, seq);
       }
+      i++;
       result -= digit;
     }
     return negative ? result : -result;
@@ -217,9 +232,9 @@ public final class Long extends Number implements Comparable<Long>,
 
   public static long parseLong(String s, int radix) {
     if (s == null) {
-      throw new NumberFormatException("null");
+      throw new NumberFormatException("Cannot parse null string");
     }
-    return parseLong(s, 0, s.length(), radix);
+    return parseLong0(s, 0, s.length(), radix, false);
   }
 
   public static long parseLong(String s) {
@@ -314,7 +329,7 @@ public final class Long extends Number implements Comparable<Long>,
 
   public static long parseUnsignedLong(String s, int radix) {
     if (s == null) {
-      throw new NumberFormatException("null");
+      throw new NumberFormatException("Cannot parse null string");
     }
     return parseUnsignedLong(s, 0, s.length(), radix);
   }

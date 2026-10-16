@@ -44,6 +44,12 @@ import java.util.Map;
 
 public class Handler extends URLStreamHandler
 {
+    @Override
+    protected int getDefaultPort()
+    {
+        return 80;
+    }
+
     public URLConnection openConnection(URL url) throws IOException
     {
         return new HttpURLConnection(url);

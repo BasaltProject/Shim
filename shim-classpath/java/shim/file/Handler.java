@@ -38,20 +38,43 @@ public class Handler extends URLStreamHandler {
   }
 
   private static class FileURLConnection extends URLConnection {
+    private final File file;
+
     public FileURLConnection(URL url) {
       super(url);
+      this.file = new File(decode(url.getPath()));
+    }
+
+    private static String decode(String path) {
+      if (path.indexOf('%') < 0) {
+        return path;
+      }
+      return java.net.URLDecoder.decode(path.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8);
     }
 
     public int getContentLength() {
-      return (int) new File(url.getFile()).length();
+      long len = file.length();
+      return len > Integer.MAX_VALUE ? -1 : (int) len;
+    }
+
+    public long getContentLengthLong() {
+      return file.length();
+    }
+
+    public String getContentType() {
+      String type = guessContentTypeFromName(file.getName());
+      return type != null ? type : "content/unknown";
+    }
+
+    public long getLastModified() {
+      return file.lastModified();
     }
 
     public InputStream getInputStream() throws IOException {
-      return new FileInputStream(new File(url.getFile()));
+      return new FileInputStream(file);
     }
 
     public void connect() {
-      // ignore
     }
   }
 }
