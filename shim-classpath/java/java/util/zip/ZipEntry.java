@@ -48,7 +48,7 @@ import java.util.Calendar;
 import java.util.Date;
 
 
-public class ZipEntry {
+public class ZipEntry implements Cloneable {
   public static final int STORED = 0;
   public static final int DEFLATED = 8;
 
@@ -64,9 +64,35 @@ public class ZipEntry {
   byte[] extra;
   String comment;
   
+  ZipEntry() {
+    this((String) null);
+  }
+
   public ZipEntry(String name) {
     this.name = name;
     setTime(System.currentTimeMillis());
+  }
+
+  public ZipEntry(ZipEntry e) {
+    if (e == null) {
+      throw new NullPointerException("e");
+    }
+    this.name = e.name;
+    this.reqVersion = e.reqVersion;
+    this.compressionMethod = e.compressionMethod;
+    this.modTimeDate = e.modTimeDate;
+    this.millisTime = e.millisTime;
+    this.crc = e.crc;
+    this.compSize = e.compSize;
+    this.uncompSize = e.uncompSize;
+    this.offset = e.offset;
+    this.extra = e.extra != null ? e.extra.clone() : null;
+    this.comment = e.comment;
+  }
+
+  @Override
+  public Object clone() {
+    return new ZipEntry(this);
   }
 
   //Method to return name of the file

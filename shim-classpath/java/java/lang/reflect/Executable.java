@@ -49,6 +49,11 @@ public abstract class Executable extends AccessibleObject implements Member, Gen
     return (getModifiers() & ACC_SYNTHETIC) != 0;
   }
 
+  @Override
+  public java.util.Set<AccessFlag> accessFlags() {
+    return AccessFlag.maskToAccessFlags(getModifiers(), AccessFlag.Location.METHOD);
+  }
+
   public TypeVariable<?>[] getTypeParameters() {
     return new TypeVariable<?>[0];
   }

@@ -23,7 +23,9 @@
 
 package java.util.zip;
 
-public class CRC32 {
+import java.nio.ByteBuffer;
+
+public class CRC32 implements Checksum {
   private static final int Polynomial = 0x04C11DB7;
   private static final int Width = 32;
   private static final int Top = 1 << (Width - 1);
@@ -63,6 +65,10 @@ public class CRC32 {
 
   public void update(byte[] array) {
     update(array, 0, array.length);
+  }
+
+  public void update(ByteBuffer buffer) {
+    Checksum.super.update(buffer);
   }
 
   public long getValue() {

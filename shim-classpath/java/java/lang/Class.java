@@ -597,6 +597,14 @@ public final class Class <T>
     return vmClass.flags;
   }
 
+  public java.util.Set<java.lang.reflect.AccessFlag> accessFlags() {
+    boolean inner = isMemberClass() || isLocalClass() || isAnonymousClass() || isArray();
+    java.lang.reflect.AccessFlag.Location loc = inner ?
+        java.lang.reflect.AccessFlag.Location.INNER_CLASS : java.lang.reflect.AccessFlag.Location.CLASS;
+    int flags = (loc == java.lang.reflect.AccessFlag.Location.CLASS) ? vmClass.flags : getModifiers();
+    return java.lang.reflect.AccessFlag.maskToAccessFlags(flags, loc);
+  }
+
   public boolean isInterface() {
     return (vmClass.flags & Modifier.INTERFACE) != 0;
   }
