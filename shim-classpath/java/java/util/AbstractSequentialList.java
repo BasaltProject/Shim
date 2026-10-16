@@ -1,28 +1,64 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util;
 
-public abstract class AbstractSequentialList<T> extends AbstractList<T>
-  implements List<T>
-{ }
+public abstract class AbstractSequentialList<E> extends AbstractList<E> {
+  protected AbstractSequentialList() { }
+
+  public E get(int index) {
+    try {
+      return listIterator(index).next();
+    } catch (NoSuchElementException exc) {
+      throw new IndexOutOfBoundsException("Index: " + index);
+    }
+  }
+
+  public E set(int index, E element) {
+    try {
+      ListIterator<E> e = listIterator(index);
+      E oldVal = e.next();
+      e.set(element);
+      return oldVal;
+    } catch (NoSuchElementException exc) {
+      throw new IndexOutOfBoundsException("Index: " + index);
+    }
+  }
+
+  public void add(int index, E element) {
+    try {
+      listIterator(index).add(element);
+    } catch (NoSuchElementException exc) {
+      throw new IndexOutOfBoundsException("Index: " + index);
+    }
+  }
+
+  public E remove(int index) {
+    try {
+      ListIterator<E> e = listIterator(index);
+      E outCast = e.next();
+      e.remove();
+      return outCast;
+    } catch (NoSuchElementException exc) {
+      throw new IndexOutOfBoundsException("Index: " + index);
+    }
+  }
+
+  public boolean addAll(int index, Collection<? extends E> c) {
+    try {
+      boolean modified = false;
+      ListIterator<E> e1 = listIterator(index);
+      for (E e : c) {
+        e1.add(e);
+        modified = true;
+      }
+      return modified;
+    } catch (NoSuchElementException exc) {
+      throw new IndexOutOfBoundsException("Index: " + index);
+    }
+  }
+
+  public Iterator<E> iterator() {
+    return listIterator();
+  }
+
+  public abstract ListIterator<E> listIterator(int index);
+}

@@ -1,43 +1,39 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util;
 
-public class Stack<T> extends Vector<T> {
+public class Stack<E> extends Vector<E> {
+  public Stack() { }
+
+  public E push(E item) {
+    addElement(item);
+    return item;
+  }
+
+  public synchronized E pop() {
+    E obj;
+    int len = size();
+    obj = peek();
+    removeElementAt(len - 1);
+    return obj;
+  }
+
+  public synchronized E peek() {
+    int len = size();
+    if (len == 0) {
+      throw new EmptyStackException();
+    }
+    return elementAt(len - 1);
+  }
+
   public boolean empty() {
     return size() == 0;
   }
 
-  public T peek() {
-    return get(size() - 1);
-  }
-
-  public T pop() {
-    return remove(size() - 1);
-  }
-
-  public T push(T element) {
-    add(element);
-    return element;
+  public synchronized int search(Object o) {
+    int i = lastIndexOf(o);
+    if (i >= 0) {
+      return size() - i;
+    }
+    return -1;
   }
 }

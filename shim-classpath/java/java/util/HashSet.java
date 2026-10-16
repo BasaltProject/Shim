@@ -1,44 +1,39 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util;
 
-public class HashSet<T> extends AbstractSet<T> implements Set<T> {
-  private static final Object Value = new Object();
+import java.io.IOException;
+import java.io.InvalidObjectException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
-  private final HashMap<T, Object> map;
+public class HashSet<E> extends AbstractSet<E> implements Set<E>, Cloneable, java.io.Serializable {
+  transient HashMap<E, Object> map;
 
-  public HashSet(Collection<? extends T> c) {
-    map = new HashMap(c.size());
+  static final Object PRESENT = new Object();
+
+  public HashSet() {
+    map = new HashMap<>();
+  }
+
+  public HashSet(Collection<? extends E> c) {
+    map = HashMap.newHashMap(Math.max(c.size(), 12));
     addAll(c);
   }
 
-  public HashSet(int capacity) {
-    map = new HashMap(capacity);
+  public HashSet(int initialCapacity, float loadFactor) {
+    map = new HashMap<>(initialCapacity, loadFactor);
   }
 
-  public HashSet() {
-    this(0);
+  public HashSet(int initialCapacity) {
+    map = new HashMap<>(initialCapacity);
+  }
+
+  HashSet(int initialCapacity, float loadFactor, boolean dummy) {
+    map = new LinkedHashMap<>(initialCapacity, loadFactor);
+  }
+
+  public Iterator<E> iterator() {
+    return map.keySet().iterator();
   }
 
   public int size() {
@@ -49,53 +44,78 @@ public class HashSet<T> extends AbstractSet<T> implements Set<T> {
     return map.isEmpty();
   }
 
-  public boolean contains(Object element) {
-    return map.containsKey(element);
+  public boolean contains(Object o) {
+    return map.containsKey(o);
   }
 
-  public boolean add(T element) {
-    return map.put(element, Value) != Value;
+  public boolean add(E e) {
+    return map.put(e, PRESENT) == null;
   }
 
-  public boolean addAll(Collection<? extends T> collection) {
-    boolean change = false;
-    for (T t: collection) if (add(t)) change = true;
-    return change;
-  }
-
-  public boolean remove(Object element) {
-    return map.remove(element) != Value;
+  public boolean remove(Object o) {
+    return map.remove(o) == PRESENT;
   }
 
   public void clear() {
     map.clear();
   }
 
-  public Iterator<T> iterator() {
-    return new MyIterator(map.iterator());
+  @SuppressWarnings("unchecked")
+  public Object clone() {
+    try {
+      HashSet<E> newSet = (HashSet<E>) super.clone();
+      newSet.map = (HashMap<E, Object>) map.clone();
+      return newSet;
+    } catch (CloneNotSupportedException e) {
+      throw new InternalError(e);
+    }
   }
 
-  public String toString() {
-    return shim.Data.toString(this);
+  public Object[] toArray() {
+    return map.keySet().toArray();
   }
 
-  private static class MyIterator<T> implements Iterator<T> {
-    private final Iterator<Map.Entry<T, Object>> it;
+  public <T> T[] toArray(T[] a) {
+    return map.keySet().toArray(a);
+  }
 
-    public MyIterator(Iterator<Map.Entry<T, Object>> it) {
-      this.it = it;
+  public static <T> HashSet<T> newHashSet(int numElements) {
+    if (numElements < 0) {
+      throw new IllegalArgumentException("Negative number of elements: " + numElements);
     }
+    return new HashSet<>(HashMap.calculateHashMapCapacity(numElements));
+  }
 
-    public T next() {
-      return it.next().getKey();
+  private void writeObject(ObjectOutputStream s) throws IOException {
+    s.defaultWriteObject();
+    s.writeInt(map.capacity());
+    s.writeFloat(map.loadFactor());
+    s.writeInt(map.size());
+    for (E e : map.keySet()) {
+      s.writeObject(e);
     }
+  }
 
-    public boolean hasNext() {
-      return it.hasNext();
+  @SuppressWarnings("unchecked")
+  private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    int capacity = s.readInt();
+    if (capacity < 0) {
+      throw new InvalidObjectException("Illegal capacity: " + capacity);
     }
-
-    public void remove() {
-      it.remove();
+    float loadFactor = s.readFloat();
+    if (loadFactor <= 0 || Float.isNaN(loadFactor)) {
+      throw new InvalidObjectException("Illegal load factor: " + loadFactor);
+    }
+    int size = s.readInt();
+    if (size < 0) {
+      throw new InvalidObjectException("Illegal size: " + size);
+    }
+    map = (((HashSet<?>) this) instanceof LinkedHashSet ? new LinkedHashMap<E, Object>(capacity, loadFactor)
+                                                       : new HashMap<E, Object>(capacity, loadFactor));
+    for (int i = 0; i < size; i++) {
+      E e = (E) s.readObject();
+      map.put(e, PRESENT);
     }
   }
 }

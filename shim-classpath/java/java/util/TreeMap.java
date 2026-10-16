@@ -128,7 +128,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
   }
 
   final Entry<K, V> getEntry(Object key) {
-    if (key == null) {
+    if (key == null && comparator == null) {
       throw new NullPointerException("key is null");
     }
     Entry<K, V> p = root;
@@ -146,7 +146,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
   }
 
   final Entry<K, V> getCeilingEntry(K key) {
-    if (key == null) {
+    if (key == null && comparator == null) {
       throw new NullPointerException("key is null");
     }
     Entry<K, V> p = root;
@@ -178,7 +178,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
   }
 
   final Entry<K, V> getFloorEntry(K key) {
-    if (key == null) {
+    if (key == null && comparator == null) {
       throw new NullPointerException("key is null");
     }
     Entry<K, V> p = root;
@@ -210,7 +210,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
   }
 
   final Entry<K, V> getHigherEntry(K key) {
-    if (key == null) {
+    if (key == null && comparator == null) {
       throw new NullPointerException("key is null");
     }
     Entry<K, V> p = root;
@@ -240,7 +240,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
   }
 
   final Entry<K, V> getLowerEntry(K key) {
-    if (key == null) {
+    if (key == null && comparator == null) {
       throw new NullPointerException("key is null");
     }
     Entry<K, V> p = root;
@@ -271,7 +271,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
 
   @Override
   public V put(K key, V value) {
-    if (key == null) {
+    if (key == null && comparator == null) {
       throw new NullPointerException("key is null");
     }
     Entry<K, V> t = root;
@@ -1381,35 +1381,52 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
       return descendingMap().navigableKeySet();
     }
 
+    boolean inClosedRange(Object key) {
+      return (fromStart || m.compare(key, lo) >= 0) && (toEnd || m.compare(hi, key) >= 0);
+    }
+
+    boolean inRange(Object key, boolean inclusive) {
+      return inclusive ? inRange(key) : inClosedRange(key);
+    }
+
     @Override
     public NavigableMap<K, V> subMap(
         K fromKey, boolean fromInclusive, K toKey, boolean toInclusive) {
-      if (!inRange(fromKey)) {
+      if (!inRange(fromKey, fromInclusive)) {
         throw new IllegalArgumentException("fromKey out of range");
       }
-      if (!inRange(toKey)) {
+      if (!inRange(toKey, toInclusive)) {
         throw new IllegalArgumentException("toKey out of range");
       }
+      if (isDescending) {
+        return new SubMap<K, V>(m, false, toKey, toInclusive, false, fromKey, fromInclusive, true);
+      }
       return new SubMap<K, V>(
-          m, false, fromKey, fromInclusive, false, toKey, toInclusive, isDescending);
+          m, false, fromKey, fromInclusive, false, toKey, toInclusive, false);
     }
 
     @Override
     public NavigableMap<K, V> headMap(K toKey, boolean inclusive) {
-      if (!inRange(toKey)) {
+      if (!inRange(toKey, inclusive)) {
         throw new IllegalArgumentException("toKey out of range");
       }
+      if (isDescending) {
+        return new SubMap<K, V>(m, false, toKey, inclusive, toEnd, hi, hiInclusive, true);
+      }
       return new SubMap<K, V>(
-          m, fromStart, lo, loInclusive, false, toKey, inclusive, isDescending);
+          m, fromStart, lo, loInclusive, false, toKey, inclusive, false);
     }
 
     @Override
     public NavigableMap<K, V> tailMap(K fromKey, boolean inclusive) {
-      if (!inRange(fromKey)) {
+      if (!inRange(fromKey, inclusive)) {
         throw new IllegalArgumentException("fromKey out of range");
       }
+      if (isDescending) {
+        return new SubMap<K, V>(m, fromStart, lo, loInclusive, false, fromKey, inclusive, true);
+      }
       return new SubMap<K, V>(
-          m, false, fromKey, inclusive, toEnd, hi, hiInclusive, isDescending);
+          m, false, fromKey, inclusive, toEnd, hi, hiInclusive, false);
     }
 
     @Override

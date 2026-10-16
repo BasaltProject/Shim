@@ -85,6 +85,46 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> {
     return createEmptyEnumSet(elementType);
   }
   
+  public static <E extends Enum<E>> EnumSet<E> of(E e) {
+    EnumSet<E> result = noneOf(e.getDeclaringClass());
+    result.add(e);
+    return result;
+  }
+
+  public static <E extends Enum<E>> EnumSet<E> of(E e1, E e2) {
+    EnumSet<E> result = noneOf(e1.getDeclaringClass());
+    result.add(e1);
+    result.add(e2);
+    return result;
+  }
+
+  public static <E extends Enum<E>> EnumSet<E> of(E e1, E e2, E e3) {
+    EnumSet<E> result = noneOf(e1.getDeclaringClass());
+    result.add(e1);
+    result.add(e2);
+    result.add(e3);
+    return result;
+  }
+
+  public static <E extends Enum<E>> EnumSet<E> of(E e1, E e2, E e3, E e4) {
+    EnumSet<E> result = noneOf(e1.getDeclaringClass());
+    result.add(e1);
+    result.add(e2);
+    result.add(e3);
+    result.add(e4);
+    return result;
+  }
+
+  public static <E extends Enum<E>> EnumSet<E> of(E e1, E e2, E e3, E e4, E e5) {
+    EnumSet<E> result = noneOf(e1.getDeclaringClass());
+    result.add(e1);
+    result.add(e2);
+    result.add(e3);
+    result.add(e4);
+    result.add(e5);
+    return result;
+  }
+
   public static <T extends Enum<T>>EnumSet<T> of(T first, T ... rest) {
     EnumSet<T> enumSet = createEmptyEnumSet(first.getDeclaringClass());
     enumSet.add(first);

@@ -383,4 +383,58 @@ public class PriorityQueue<E> extends AbstractQueue<E> implements Serializable {
   public Spliterator<E> spliterator() {
     return Spliterators.spliterator(this, Spliterator.SIZED | Spliterator.NONNULL);
   }
+
+  public boolean removeIf(java.util.function.Predicate<? super E> filter) {
+    Objects.requireNonNull(filter);
+    return bulkRemove(filter);
+  }
+
+  public boolean removeAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    return bulkRemove(e -> c.contains(e));
+  }
+
+  public boolean retainAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    return bulkRemove(e -> !c.contains(e));
+  }
+
+  @SuppressWarnings("unchecked")
+  private boolean bulkRemove(java.util.function.Predicate<? super E> filter) {
+    final int expectedModCount = ++modCount;
+    final Object[] es = queue;
+    final int end = size;
+    int i;
+    for (i = 0; i < end && !filter.test((E) es[i]); i++) {
+      ;
+    }
+    if (i >= end) {
+      if (modCount != expectedModCount) {
+        throw new ConcurrentModificationException();
+      }
+      return false;
+    }
+    final int beg = i;
+    final boolean[] deathRow = new boolean[end - beg];
+    deathRow[0] = true;
+    for (i = beg + 1; i < end; i++) {
+      if (filter.test((E) es[i])) {
+        deathRow[i - beg] = true;
+      }
+    }
+    if (modCount != expectedModCount) {
+      throw new ConcurrentModificationException();
+    }
+    int w = beg;
+    for (i = beg; i < end; i++) {
+      if (!deathRow[i - beg]) {
+        es[w++] = es[i];
+      }
+    }
+    for (i = size = w; i < end; i++) {
+      es[i] = null;
+    }
+    heapify();
+    return true;
+  }
 }

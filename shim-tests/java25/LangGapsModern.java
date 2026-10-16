@@ -3,7 +3,7 @@
  * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  * SPDX-License-Identifier: MIT
- * Minimum release: 21
+ * Minimum release: 25
  */
 
 import java.util.*;

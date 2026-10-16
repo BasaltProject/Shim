@@ -34,7 +34,7 @@ public abstract class AbstractQueue<T> extends AbstractCollection<T> implements 
     if (offer(element)) {
       return true;
     } else {
-      throw new IllegalStateException();
+      throw new IllegalStateException("Queue full");
     }
   }
 
@@ -43,18 +43,22 @@ public abstract class AbstractQueue<T> extends AbstractCollection<T> implements 
     if (collection == null) {
       throw new NullPointerException();
     }
-
-    for (T element : collection) {
-      add(element);
+    if (collection == this) {
+      throw new IllegalArgumentException();
     }
-
-    return true;
+    boolean modified = false;
+    for (T element : collection) {
+      if (add(element)) {
+        modified = true;
+      }
+    }
+    return modified;
   }
 
   @Override
   public void clear() {
-    while (size() > 0) {
-      poll();
+    while (poll() != null) {
+      ;
     }
   }
 

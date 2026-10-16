@@ -1,315 +1,449 @@
-/*
- * Based on Avian (https://github.com/ReadyTalk/avian).
- * Original work Copyright (c) 2008-2015, Avian Contributors.
- * Original work licensed under ISC; see LICENSE.txt:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
- *
- * Modifications Copyright (c) 2026 BasaltMC.
- * Modifications licensed under MIT; see LICENSE:
- * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
- * SPDX-License-Identifier: ISC AND MIT
- */
-
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.util.concurrent;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
-public class LinkedBlockingQueue<T> extends AbstractQueue<T> 
-                                    implements BlockingQueue<T> {
-  private final Object collectionLock;
-  private final LinkedList<T> storage;
+public class LinkedBlockingQueue<E> extends AbstractQueue<E> implements BlockingQueue<E>, java.io.Serializable {
+  static class Node<E> {
+    E item;
+    Node<E> next;
+
+    Node(E x) {
+      item = x;
+    }
+  }
+
   private final int capacity;
-  
+  private int count;
+  private transient Node<E> head;
+  private transient Node<E> last;
+  private final Object lock = new Object();
+
   public LinkedBlockingQueue() {
     this(Integer.MAX_VALUE);
   }
-  
+
   public LinkedBlockingQueue(int capacity) {
-    collectionLock = new Object();
+    if (capacity <= 0) {
+      throw new IllegalArgumentException();
+    }
     this.capacity = capacity;
-    storage = new LinkedList<T>();
-  }
-  
-  // should be synchronized on collectionLock before calling
-  private void handleRemove() {
-    collectionLock.notifyAll();
-  }
-  
-  // should be synchronized on collectionLock before calling
-  private void handleAdd() {
-    collectionLock.notifyAll();
+    last = head = new Node<E>(null);
   }
 
-  // should be synchronized on collectionLock before calling
-  private void blockTillNotFull() throws InterruptedException {
-    blockTillNotFull(Long.MAX_VALUE);
-  }
-
-  // should be synchronized on collectionLock before calling
-  private void blockTillNotFull(long maxWaitInMillis) throws InterruptedException {
-    if (capacity > storage.size()) {
-      return;
-    }
-    
-    long startTime = 0;
-    if (maxWaitInMillis != Long.MAX_VALUE) {
-      startTime = System.currentTimeMillis();
-    }
-    long remainingWait = maxWaitInMillis;
-    while (remainingWait > 0) {
-      collectionLock.wait(remainingWait);
-      
-      if (capacity > storage.size()) {
-        return;
-      } else if (maxWaitInMillis != Long.MAX_VALUE) {
-        remainingWait = maxWaitInMillis - (System.currentTimeMillis() - startTime);
+  public LinkedBlockingQueue(Collection<? extends E> c) {
+    this(Integer.MAX_VALUE);
+    synchronized (lock) {
+      int n = 0;
+      for (E e : c) {
+        if (e == null) {
+          throw new NullPointerException();
+        }
+        if (n == capacity) {
+          throw new IllegalStateException("Queue full");
+        }
+        enqueue(new Node<E>(e));
+        ++n;
       }
+      count = n;
     }
   }
 
-  // should be synchronized on collectionLock before calling
-  private void blockTillNotEmpty() throws InterruptedException {
-    blockTillNotEmpty(Long.MAX_VALUE);
+  private void enqueue(Node<E> node) {
+    last = last.next = node;
   }
 
-  // should be synchronized on collectionLock before calling
-  private void blockTillNotEmpty(long maxWaitInMillis) throws InterruptedException {
-    if (! storage.isEmpty()) {
-      return;
+  private E dequeue() {
+    Node<E> h = head;
+    Node<E> first = h.next;
+    h.next = h;
+    head = first;
+    E x = first.item;
+    first.item = null;
+    return x;
+  }
+
+  void unlink(Node<E> p, Node<E> pred) {
+    p.item = null;
+    pred.next = p.next;
+    if (last == p) {
+      last = pred;
     }
-    
-    long startTime = 0;
-    if (maxWaitInMillis != Long.MAX_VALUE) {
-      startTime = System.currentTimeMillis();
+    count--;
+    lock.notifyAll();
+  }
+
+  public int size() {
+    synchronized (lock) {
+      return count;
     }
-    long remainingWait = maxWaitInMillis;
-    while (remainingWait > 0) {
-      collectionLock.wait(remainingWait);
-      
-      if (! storage.isEmpty()) {
-        return;
-      } else if (maxWaitInMillis != Long.MAX_VALUE) {
-        remainingWait = maxWaitInMillis - (System.currentTimeMillis() - startTime);
+  }
+
+  public int remainingCapacity() {
+    synchronized (lock) {
+      return capacity - count;
+    }
+  }
+
+  public void put(E e) throws InterruptedException {
+    if (e == null) {
+      throw new NullPointerException();
+    }
+    synchronized (lock) {
+      while (count == capacity) {
+        lock.wait();
       }
+      enqueue(new Node<E>(e));
+      count++;
+      lock.notifyAll();
     }
   }
 
-  @Override
-  public boolean offer(T element) {
-    synchronized (collectionLock) {
-      if (capacity > storage.size()) {
-        storage.addLast(element);
-        
-        handleAdd();
-        
-        return true;
-      } else {
+  public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
+    if (e == null) {
+      throw new NullPointerException();
+    }
+    long nanos = unit.toNanos(timeout);
+    long deadline = System.nanoTime() + nanos;
+    synchronized (lock) {
+      while (count == capacity) {
+        if (nanos <= 0L) {
+          return false;
+        }
+        waitNanos(nanos);
+        nanos = deadline - System.nanoTime();
+      }
+      enqueue(new Node<E>(e));
+      count++;
+      lock.notifyAll();
+      return true;
+    }
+  }
+
+  private void waitNanos(long nanos) throws InterruptedException {
+    long ms = nanos / 1000000L;
+    int ns = (int) (nanos % 1000000L);
+    lock.wait(ms, ns);
+  }
+
+  public boolean offer(E e) {
+    if (e == null) {
+      throw new NullPointerException();
+    }
+    synchronized (lock) {
+      if (count == capacity) {
         return false;
       }
+      enqueue(new Node<E>(e));
+      count++;
+      lock.notifyAll();
+      return true;
     }
   }
 
-  @Override
-  public boolean offer(T e, long timeout, TimeUnit unit) throws InterruptedException {
-    long timeoutInMillis = unit.toMillis(timeout);
-    synchronized (collectionLock) {
-      // block till we can add or have reached timeout
-      blockTillNotFull(timeoutInMillis);
-      
-      return offer(e);
-    }
-  }
-
-  @Override
-  public void put(T e) throws InterruptedException {
-    synchronized (collectionLock) {
-      // block till we have space
-      blockTillNotFull();
-      
-      storage.add(e);
-      handleAdd();
-    }
-  }
-
-  @Override
-  public boolean addAll(Collection<? extends T> c) {
-    synchronized (collectionLock) {
-      if (storage.size() + c.size() > capacity) {
-        throw new IllegalStateException("Not enough space");
+  public E take() throws InterruptedException {
+    synchronized (lock) {
+      while (count == 0) {
+        lock.wait();
       }
-      
-      if (c.isEmpty()) {
-        return false;
-      } else {
-        storage.addAll(c);
-        
-        return true;
-      }
+      E x = dequeue();
+      count--;
+      lock.notifyAll();
+      return x;
     }
   }
 
-  @Override
-  public T peek() {
-    synchronized (collectionLock) {
-      if (storage.isEmpty()) {
+  public E poll(long timeout, TimeUnit unit) throws InterruptedException {
+    long nanos = unit.toNanos(timeout);
+    long deadline = System.nanoTime() + nanos;
+    synchronized (lock) {
+      while (count == 0) {
+        if (nanos <= 0L) {
+          return null;
+        }
+        waitNanos(nanos);
+        nanos = deadline - System.nanoTime();
+      }
+      E x = dequeue();
+      count--;
+      lock.notifyAll();
+      return x;
+    }
+  }
+
+  public E poll() {
+    synchronized (lock) {
+      if (count == 0) {
         return null;
-      } else {
-        return storage.getFirst();
+      }
+      E x = dequeue();
+      count--;
+      lock.notifyAll();
+      return x;
+    }
+  }
+
+  public E peek() {
+    synchronized (lock) {
+      return (count > 0) ? head.next.item : null;
+    }
+  }
+
+  public boolean remove(Object o) {
+    if (o == null) {
+      return false;
+    }
+    synchronized (lock) {
+      for (Node<E> pred = head, p = pred.next; p != null; pred = p, p = p.next) {
+        if (o.equals(p.item)) {
+          unlink(p, pred);
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  public boolean contains(Object o) {
+    if (o == null) {
+      return false;
+    }
+    synchronized (lock) {
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        if (o.equals(p.item)) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  public Object[] toArray() {
+    synchronized (lock) {
+      int size = count;
+      Object[] a = new Object[size];
+      int k = 0;
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        a[k++] = p.item;
+      }
+      return a;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> T[] toArray(T[] a) {
+    synchronized (lock) {
+      int size = count;
+      if (a.length < size) {
+        a = (T[]) java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), size);
+      }
+      int k = 0;
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        a[k++] = (T) p.item;
+      }
+      if (a.length > k) {
+        a[k] = null;
+      }
+      return a;
+    }
+  }
+
+  public String toString() {
+    synchronized (lock) {
+      Node<E> p = head.next;
+      if (p == null) {
+        return "[]";
+      }
+      StringBuilder sb = new StringBuilder();
+      sb.append('[');
+      for (;;) {
+        E e = p.item;
+        sb.append(e == this ? "(this Collection)" : e);
+        p = p.next;
+        if (p == null) {
+          return sb.append(']').toString();
+        }
+        sb.append(',').append(' ');
       }
     }
   }
 
-  // should be synchronized on collectionLock before calling
-  private T removeFirst() {
-    T result = storage.removeFirst();
-    handleRemove();
-    
-    return result;
-  }
-
-  @Override
-  public T poll() {
-    synchronized (collectionLock) {
-      if (storage.isEmpty()) {
-        return null;
-      } else {
-        return removeFirst();
+  public void clear() {
+    synchronized (lock) {
+      for (Node<E> p, h = head; (p = h.next) != null; h = p) {
+        h.next = h;
+        p.item = null;
       }
+      head = last;
+      count = 0;
+      lock.notifyAll();
     }
   }
 
-  @Override
-  public T poll(long timeout, TimeUnit unit) throws InterruptedException {
-    long timeoutInMillis = unit.toMillis(timeout);
-    synchronized (collectionLock) {
-      // block till we available or timeout
-      blockTillNotEmpty(timeoutInMillis);
-      
-      return poll();
-    }
-  }
-
-  @Override
-  public T take() throws InterruptedException {
-    synchronized (collectionLock) {
-      // block till we available
-      blockTillNotEmpty();
-      
-      return removeFirst();
-    }
-  }
-
-  @Override
-  public int drainTo(Collection<? super T> c) {
+  public int drainTo(Collection<? super E> c) {
     return drainTo(c, Integer.MAX_VALUE);
   }
 
-  @Override
-  public int drainTo(Collection<? super T> c, int maxElements) {
-    int remainingElements = maxElements;
-    synchronized (collectionLock) {
-      while (remainingElements > 0 && ! storage.isEmpty()) {
-        c.add(storage.removeFirst());
-        remainingElements--;
+  public int drainTo(Collection<? super E> c, int maxElements) {
+    Objects.requireNonNull(c);
+    if (c == this) {
+      throw new IllegalArgumentException();
+    }
+    if (maxElements <= 0) {
+      return 0;
+    }
+    synchronized (lock) {
+      int n = Math.min(maxElements, count);
+      int i = 0;
+      while (i < n) {
+        c.add(head.next.item);
+        dequeue();
+        count--;
+        ++i;
       }
-      
-      if (remainingElements != maxElements) {
-        handleRemove();
+      if (i > 0) {
+        lock.notifyAll();
       }
-      
-      return maxElements - remainingElements;
+      return n;
     }
   }
 
-  @Override
-  public int remainingCapacity() {
-    synchronized (collectionLock) {
-      return capacity - storage.size();
-    }
+  public Iterator<E> iterator() {
+    return new Itr();
   }
 
-  @Override
-  public int size() {
-    synchronized (collectionLock) {
-      return storage.size();
-    }
-  }
+  private class Itr implements Iterator<E> {
+    private Node<E> next;
+    private E nextItem;
+    private Node<E> lastRet;
 
-  @Override
-  public boolean contains(Object element) {
-    synchronized (collectionLock) {
-      return storage.contains(element);
-    }
-  }
-
-  @Override
-  public boolean containsAll(Collection<?> c) {
-    synchronized (collectionLock) {
-      return storage.containsAll(c);
-    }
-  }
-
-  @Override
-  public boolean remove(Object element) {
-    synchronized (collectionLock) {
-      if (storage.remove(element)) {
-        handleRemove();
-        return true;
-      } else {
-        return false;
+    Itr() {
+      synchronized (lock) {
+        next = head.next;
+        if (next != null) {
+          nextItem = next.item;
+        }
       }
     }
+
+    public boolean hasNext() {
+      return next != null;
+    }
+
+    public E next() {
+      synchronized (lock) {
+        Node<E> p = next;
+        if (p == null) {
+          throw new NoSuchElementException();
+        }
+        lastRet = p;
+        E x = nextItem;
+        E nextItem = null;
+        for (;;) {
+          p = (p.next == p) ? head.next : p.next;
+          if (p == null || (nextItem = p.item) != null) {
+            break;
+          }
+        }
+        next = p;
+        this.nextItem = nextItem;
+        return x;
+      }
+    }
+
+    public void remove() {
+      if (lastRet == null) {
+        throw new IllegalStateException();
+      }
+      synchronized (lock) {
+        Node<E> node = lastRet;
+        lastRet = null;
+        for (Node<E> trail = head, p = trail.next; p != null; trail = p, p = p.next) {
+          if (p == node) {
+            unlink(p, trail);
+            break;
+          }
+        }
+      }
+    }
   }
 
-  @Override
+  public Spliterator<E> spliterator() {
+    return Spliterators.spliterator(this, Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT);
+  }
+
+  public void forEach(Consumer<? super E> action) {
+    Objects.requireNonNull(action);
+    for (Iterator<E> it = iterator(); it.hasNext();) {
+      action.accept(it.next());
+    }
+  }
+
+  public boolean removeIf(Predicate<? super E> filter) {
+    Objects.requireNonNull(filter);
+    return bulkRemove(filter);
+  }
+
   public boolean removeAll(Collection<?> c) {
-    synchronized (collectionLock) {
-      if (storage.removeAll(c)) {
-        handleRemove();
-        return true;
-      } else {
-        return false;
+    Objects.requireNonNull(c);
+    return bulkRemove(e -> c.contains(e));
+  }
+
+  public boolean retainAll(Collection<?> c) {
+    Objects.requireNonNull(c);
+    return bulkRemove(e -> !c.contains(e));
+  }
+
+  private boolean bulkRemove(Predicate<? super E> filter) {
+    boolean removed = false;
+    synchronized (lock) {
+      for (Node<E> pred = head, p = pred.next; p != null;) {
+        if (filter.test(p.item)) {
+          unlink(p, pred);
+          removed = true;
+          p = pred.next;
+        } else {
+          pred = p;
+          p = p.next;
+        }
       }
     }
+    return removed;
   }
 
-  @Override
-  public void clear() {
-    synchronized (collectionLock) {
-      storage.clear();
+  private void writeObject(ObjectOutputStream s) throws IOException {
+    synchronized (lock) {
+      s.defaultWriteObject();
+      for (Node<E> p = head.next; p != null; p = p.next) {
+        s.writeObject(p.item);
+      }
+      s.writeObject(null);
     }
   }
 
-  @Override
-  public Object[] toArray() {
-    synchronized (collectionLock) {
-      return storage.toArray();
+  @SuppressWarnings("unchecked")
+  private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    count = 0;
+    last = head = new Node<E>(null);
+    for (;;) {
+      E item = (E) s.readObject();
+      if (item == null) {
+        break;
+      }
+      enqueue(new Node<E>(item));
+      count++;
     }
-  }
-
-  @Override
-  public <S> S[] toArray(S[] array) {
-    synchronized (collectionLock) {
-      return storage.toArray(array);
-    }
-  }
-
-  @Override
-  public Iterator<T> iterator() {
-    throw new UnsupportedOperationException("Not implemented yet");
   }
 }
