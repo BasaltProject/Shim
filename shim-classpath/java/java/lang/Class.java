@@ -59,8 +59,10 @@ import java.security.AllPermission;
 
 public final class Class <T>
   implements Type, AnnotatedElement, GenericDeclaration, java.lang.invoke.TypeDescriptor.OfField<Class<?>>,
-             java.lang.constant.Constable
+             java.lang.constant.Constable, java.io.Serializable
 {
+  private static final long serialVersionUID = 3206093459760846163L;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = new java.io.ObjectStreamField[0];
   private static final int PrimitiveFlag = 1 <<  5;
   private static final int EnumFlag      = 1 << 14;
 

@@ -22,6 +22,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class ConcurrentLinkedDeque<E> extends AbstractCollection<E>
     implements Deque<E>, Serializable {
+  private static final long serialVersionUID = 876323262645176354L;
+
 
   static final class Node<E> {
     volatile E item;

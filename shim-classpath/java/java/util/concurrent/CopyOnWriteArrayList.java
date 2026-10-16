@@ -24,10 +24,33 @@ import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable, Serializable {
-  private static final long serialVersionUID = 8642910196726478905L;
+  private static final long serialVersionUID = 8673264195747942595L;
 
-  private final Object lock = new Object();
-  private volatile Object[] elements;
+  private transient Object lock = new Object();
+  private transient volatile Object[] elements;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    s.defaultWriteObject();
+    Object[] snapshot = getArray();
+    s.writeInt(snapshot.length);
+    for (Object element : snapshot) {
+      s.writeObject(element);
+    }
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    lock = new Object();
+    int len = s.readInt();
+    if (len < 0) {
+      throw new java.io.InvalidObjectException("Negative length: " + len);
+    }
+    Object[] newElements = new Object[len];
+    for (int i = 0; i < len; i++) {
+      newElements[i] = s.readObject();
+    }
+    setArray(newElements);
+  }
 
   public CopyOnWriteArrayList() {
     setArray(new Object[0]);

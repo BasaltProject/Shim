@@ -252,6 +252,11 @@ public class GregorianCalendar extends Calendar {
     return obj instanceof GregorianCalendar && super.equals(obj) && gregorianCutover == ((GregorianCalendar) obj).gregorianCutover;
   }
 
+  private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
+    stream.defaultReadObject();
+    setGregorianChange(gregorianCutover);
+  }
+
   @Override
   public int hashCode() {
     return super.hashCode() ^ (int) gregorianCutoverDate;

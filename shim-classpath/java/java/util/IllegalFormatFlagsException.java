@@ -8,6 +8,8 @@
 package java.util;
 
 public class IllegalFormatFlagsException extends IllegalFormatException {
+  private static final long serialVersionUID = 790824L;
+
   private final String flags;
 
   public IllegalFormatFlagsException(String flags) {

@@ -24,6 +24,8 @@
 package java.security;
 
 public class BasicPermission extends Permission {
+  private static final long serialVersionUID = 6279438298436773498L;
+
 
   public BasicPermission(String name) {
     super(name);

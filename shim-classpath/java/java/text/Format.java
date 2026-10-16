@@ -26,7 +26,7 @@ package java.text;
 import java.io.Serializable;
 
 public abstract class Format implements Serializable, Cloneable {
-  private static final long serialVersionUID = -2866970561809722305L;
+  private static final long serialVersionUID = -299282585814624189L;
 
   public final String format(Object o) {
     return format(o, new StringBuffer(), new FieldPosition(0)).toString();

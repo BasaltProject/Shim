@@ -8,6 +8,8 @@
 package java.util;
 
 public class FormatFlagsConversionMismatchException extends IllegalFormatException {
+  private static final long serialVersionUID = 19120414L;
+
   private final String flags;
   private final char conversion;
 

@@ -8,6 +8,8 @@
 package java.lang.invoke;
 
 public class StringConcatException extends Exception {
+  private static final long serialVersionUID = 301L;
+
     public StringConcatException(String message) {
         super(message);
     }

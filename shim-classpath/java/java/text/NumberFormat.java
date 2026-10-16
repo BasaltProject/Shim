@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class NumberFormat extends Format {
-  private static final long serialVersionUID = -2308460120365585849L;
+  private static final long serialVersionUID = -2308460125733713944L;
 
   public static final int INTEGER_FIELD = 0;
   public static final int FRACTION_FIELD = 1;

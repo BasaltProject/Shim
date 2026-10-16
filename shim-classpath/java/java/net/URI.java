@@ -12,6 +12,8 @@ import java.io.Serializable;
 import java.util.Objects;
 
 public final class URI implements Comparable<URI>, Serializable {
+  private static final long serialVersionUID = -6052424284110960213L;
+
   private final String string;
   private final String scheme;
   private final String schemeSpecificPart;

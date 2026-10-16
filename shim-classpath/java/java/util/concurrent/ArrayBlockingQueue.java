@@ -19,7 +19,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQueue<E>, Serializable {
-  private static final long serialVersionUID = -8179116326529734882L;
+  private static final long serialVersionUID = -817911632652898426L;
 
   final Object[] items;
   int takeIndex;

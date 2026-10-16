@@ -37,6 +37,8 @@ import java.util.Collections;
 
 public final class MethodType implements java.io.Serializable, TypeDescriptor.OfMethod<Class<?>, MethodType>,
     java.lang.constant.Constable {
+  private static final long serialVersionUID = 292L;
+
   private static final char[] Primitives = new char[] {
     'V', 'Z', 'B', 'C', 'S', 'I', 'F', 'J', 'D'
   };

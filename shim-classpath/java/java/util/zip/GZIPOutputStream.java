@@ -44,7 +44,7 @@ public class GZIPOutputStream extends DeflaterOutputStream {
       0, // flags
       0, 0, 0, 0, // mtime
       0, // xfl
-      0  // os
+      (byte) 0xff // os
     };
     out.write(header);
   }
@@ -57,9 +57,9 @@ public class GZIPOutputStream extends DeflaterOutputStream {
 
   @Override
   public void finish() throws IOException {
-    if (!deflater.finished()) {
-      deflater.finish();
-      while (!deflater.finished()) {
+    if (!def.finished()) {
+      def.finish();
+      while (!def.finished()) {
         deflate();
       }
       writeTrailer();
@@ -69,7 +69,7 @@ public class GZIPOutputStream extends DeflaterOutputStream {
   private void writeTrailer() throws IOException {
     byte[] trailer = new byte[TRAILER_SIZE];
     writeInt((int) crc.getValue(), trailer, 0);
-    writeInt((int) (deflater.getBytesRead() & 0xffffffffL), trailer, 4);
+    writeInt((int) (def.getBytesRead() & 0xffffffffL), trailer, 4);
     out.write(trailer);
   }
 
@@ -84,7 +84,7 @@ public class GZIPOutputStream extends DeflaterOutputStream {
   public void close() throws IOException {
     if (!closed) {
       finish();
-      deflater.end();
+      def.end();
       out.close();
       closed = true;
     }

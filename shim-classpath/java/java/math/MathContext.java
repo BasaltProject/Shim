@@ -26,6 +26,8 @@ package java.math;
 import java.io.Serializable;
 
 public final class MathContext implements Serializable {
+  private static final long serialVersionUID = 5579720004786848255L;
+
 
   public static final MathContext DECIMAL32  = new MathContext( 7, RoundingMode.HALF_EVEN);
   public static final MathContext DECIMAL64  = new MathContext(16, RoundingMode.HALF_EVEN);

@@ -42,6 +42,8 @@ public final class String
   implements Comparable<String>, CharSequence, Serializable,
              java.lang.constant.Constable, java.lang.constant.ConstantDesc
 {
+  private static final long serialVersionUID = -6849794470754667710L;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = new java.io.ObjectStreamField[0];
   private static final String UTF_8_ENCODING = "UTF-8";
   private static final String ISO_8859_1_ENCODING = "ISO-8859-1";
   private static final String LATIN_1_ENCODING = "LATIN-1";

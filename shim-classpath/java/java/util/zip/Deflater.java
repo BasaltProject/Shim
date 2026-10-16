@@ -23,30 +23,47 @@
 
 package java.util.zip;
 
-public class Deflater {
-  private static final int DEFAULT_LEVEL = 6; // default compression level (6 is default for gzip)
-  private static final int Z_OK = 0;
-  private static final int Z_STREAM_END = 1;
-  private static final int Z_NEED_DICT = 2;
+import java.nio.ByteBuffer;
 
-//   static {
-//     System.loadLibrary("natives");
-//   }
+public class Deflater {
+  public static final int DEFLATED = 8;
+  public static final int NO_COMPRESSION = 0;
+  public static final int BEST_SPEED = 1;
+  public static final int BEST_COMPRESSION = 9;
+  public static final int DEFAULT_COMPRESSION = -1;
+  public static final int FILTERED = 1;
+  public static final int HUFFMAN_ONLY = 2;
+  public static final int DEFAULT_STRATEGY = 0;
+  public static final int NO_FLUSH = 0;
+  public static final int SYNC_FLUSH = 2;
+  public static final int FULL_FLUSH = 3;
+
+  private static final int Z_NEED_DICT = 2;
+  private static final int Z_STREAM_END = 1;
+  private static final int Z_FINISH = 4;
 
   private long peer;
-  private byte[] input;
+  private byte[] input = new byte[0];
   private int offset;
   private int length;
-  private boolean needDictionary;
+  private ByteBuffer inputBuffer;
+  private int inputBufferStart;
   private boolean finished;
   private final boolean nowrap;
   private boolean finish;
+  private boolean setParams;
+  private int level;
+  private int strategy;
   private long bytesRead;
   private long bytesWritten;
 
   public Deflater(int level, boolean nowrap) {
+    if (level != DEFAULT_COMPRESSION && (level < 0 || level > 9)) {
+      throw new IllegalArgumentException("invalid compression level");
+    }
     this.nowrap = nowrap;
-    peer = make(nowrap, level);
+    this.level = level;
+    peer = make(nowrap, level, DEFAULT_STRATEGY);
   }
 
   public Deflater(int level) {
@@ -54,153 +71,219 @@ public class Deflater {
   }
 
   public Deflater() {
-    this(DEFAULT_LEVEL);
+    this(DEFAULT_COMPRESSION, false);
   }
 
-  private void check() {
+  private static native long make(boolean nowrap, int level, int strategy);
+
+  private void ensureOpen() {
     if (peer == 0) {
-      throw new IllegalStateException();      
+      throw new IllegalStateException("Deflater has been closed");
     }
   }
 
-  private static native long make(boolean nowrap, int level);
-
-  public boolean finished() {
+  public synchronized boolean finished() {
     return finished;
   }
 
   public boolean needsDictionary() {
-    return needDictionary;
+    return false;
   }
 
-  public boolean needsInput() {
-    return getRemaining() == 0;
+  public synchronized boolean needsInput() {
+    return length == 0;
   }
 
-  public int getRemaining() {
+  synchronized int getRemaining() {
     return length;
   }
-  
-  public void setLevel(int level) throws IllegalArgumentException {
-    if (level < 0 || level > 9) {
-      throw new IllegalArgumentException("Valid compression levels are 0-9");
-    }
 
-    dispose(peer);
-    peer = make(nowrap, level);
+  public synchronized void setLevel(int level) {
+    if (level != DEFAULT_COMPRESSION && (level < 0 || level > 9)) {
+      throw new IllegalArgumentException("invalid compression level");
+    }
+    ensureOpen();
+    if (this.level != level) {
+      this.level = level;
+      setParams = true;
+    }
   }
-  
+
+  public synchronized void setStrategy(int strategy) {
+    switch (strategy) {
+    case DEFAULT_STRATEGY:
+    case FILTERED:
+    case HUFFMAN_ONLY:
+      break;
+    default:
+      throw new IllegalArgumentException();
+    }
+    ensureOpen();
+    if (this.strategy != strategy) {
+      this.strategy = strategy;
+      setParams = true;
+    }
+  }
+
   public void setInput(byte[] input) {
     setInput(input, 0, input.length);
   }
 
-  public void setInput(byte[] input, int offset, int length) {
+  public synchronized void setInput(byte[] input, int offset, int length) {
+    java.util.Objects.checkFromIndexSize(offset, length, input.length);
     this.input = input;
     this.offset = offset;
     this.length = length;
+    this.inputBuffer = null;
   }
 
-  public void reset() {
-    dispose();
-    peer = make(nowrap, DEFAULT_LEVEL);
-    input = null;
+  public synchronized void setInput(ByteBuffer input) {
+    java.util.Objects.requireNonNull(input);
+    byte[] copy = new byte[input.remaining()];
+    inputBufferStart = input.position();
+    input.get(copy);
+    input.position(inputBufferStart);
+    this.input = copy;
+    this.offset = 0;
+    this.length = copy.length;
+    this.inputBuffer = input;
+  }
+
+  public synchronized void setDictionary(byte[] dictionary) {
+    setDictionary(dictionary, 0, dictionary.length);
+  }
+
+  public synchronized void setDictionary(byte[] dictionary, int off, int len) {
+    ensureOpen();
+    java.util.Objects.checkFromIndexSize(off, len, dictionary.length);
+    if (!setDictionary(peer, dictionary, off, len)) {
+      throw new IllegalArgumentException();
+    }
+  }
+
+  public synchronized void setDictionary(ByteBuffer dictionary) {
+    byte[] copy = new byte[dictionary.remaining()];
+    int pos = dictionary.position();
+    dictionary.get(copy);
+    dictionary.position(pos + copy.length);
+    setDictionary(copy, 0, copy.length);
+  }
+
+  public synchronized void reset() {
+    ensureOpen();
+    dispose(peer);
+    peer = make(nowrap, level, strategy);
+    setParams = false;
+    input = new byte[0];
     offset = length = 0;
+    inputBuffer = null;
     finish = false;
-    needDictionary = finished = false;
+    finished = false;
     bytesRead = 0;
     bytesWritten = 0;
   }
 
   public int deflate(byte[] output) {
-    return deflate(output, 0, output.length);
+    return deflate(output, 0, output.length, NO_FLUSH);
   }
 
   public int deflate(byte[] output, int offset, int length) {
-    final int zlibResult = 0;
-    final int inputCount = 1;
-    final int outputCount = 2;
-
-    if (peer == 0) {
-      throw new IllegalStateException();      
-    }
-
-    if (output == null) {
-      throw new NullPointerException();
-    }
-
-    byte[] in = this.input;
-    int inOffset = this.offset;
-    int inLength = this.length;
-    if (in == null) {
-      in = new byte[0];
-      inOffset = 0;
-      inLength = 0;
-    }
-
-    int[] results = new int[3];
-    deflate(peer, 
-            in, inOffset, inLength,
-            output, offset, length, finish, results);
-
-    if (results[zlibResult] < 0) {
-      throw new AssertionError();
-    }
-
-    switch (results[zlibResult]) {
-    case Z_NEED_DICT:
-      needDictionary = true;
-      break;
-
-    case Z_STREAM_END:
-      finished = true;
-      break;
-    }
-
-    this.offset += results[inputCount];
-    this.length -= results[inputCount];
-    this.bytesRead += results[inputCount];
-    this.bytesWritten += results[outputCount];
-    
-    return results[outputCount];
+    return deflate(output, offset, length, NO_FLUSH);
   }
 
-  public long getBytesRead() {
+  public synchronized int deflate(byte[] output, int off, int len, int flush) {
+    java.util.Objects.checkFromIndexSize(off, len, output.length);
+    if (flush != NO_FLUSH && flush != SYNC_FLUSH && flush != FULL_FLUSH) {
+      throw new IllegalArgumentException();
+    }
+    ensureOpen();
+    int[] results = new int[4];
+    deflate(peer, input, offset, length, output, off, len, finish ? Z_FINISH : flush, setParams, level, strategy,
+            results);
+    if (results[3] != 0) {
+      setParams = false;
+    }
+    if (results[0] == Z_STREAM_END) {
+      finished = true;
+    }
+    this.offset += results[1];
+    this.length -= results[1];
+    this.bytesRead += results[1];
+    this.bytesWritten += results[2];
+    if (inputBuffer != null) {
+      inputBuffer.position(inputBufferStart + this.offset);
+    }
+    return results[2];
+  }
+
+  public int deflate(ByteBuffer output) {
+    return deflate(output, NO_FLUSH);
+  }
+
+  public synchronized int deflate(ByteBuffer output, int flush) {
+    if (output.isReadOnly()) {
+      throw new java.nio.ReadOnlyBufferException();
+    }
+    byte[] tmp = new byte[output.remaining()];
+    int n = deflate(tmp, 0, tmp.length, flush);
+    output.put(tmp, 0, n);
+    return n;
+  }
+
+  public synchronized int getAdler() {
+    ensureOpen();
+    return getAdler(peer);
+  }
+
+  public synchronized int getTotalIn() {
+    return (int) getBytesRead();
+  }
+
+  public synchronized long getBytesRead() {
+    ensureOpen();
     return bytesRead;
   }
 
-  public int getTotalIn() {
-    return (int) bytesRead;
+  public synchronized int getTotalOut() {
+    return (int) getBytesWritten();
   }
 
-  public long getBytesWritten() {
+  public synchronized long getBytesWritten() {
+    ensureOpen();
     return bytesWritten;
   }
 
-  public int getTotalOut() {
-    return (int) bytesWritten;
+  public synchronized void finish() {
+    finish = true;
   }
 
-  public void finish() {
-    finish = true;
+  public synchronized void end() {
+    if (peer != 0) {
+      dispose(peer);
+      peer = 0;
+      input = new byte[0];
+      inputBuffer = null;
+    }
+  }
+
+  public void close() {
+    end();
+  }
+
+  public void dispose() {
+    end();
   }
 
   private static native void deflate
     (long peer,
      byte[] input, int inputOffset, int inputLength,
      byte[] output, int outputOffset, int outputLength,
-     boolean finish,
+     int flush, boolean setParams, int level, int strategy,
      int[] results);
 
-  public void end() {
-    dispose();
-  }
+  private static native boolean setDictionary(long peer, byte[] dictionary, int off, int len);
 
-  public void dispose() {
-    if (peer != 0) {
-      dispose(peer);
-      peer = 0;
-    }
-  }
+  private static native int getAdler(long peer);
 
   private static native void dispose(long peer);
 }

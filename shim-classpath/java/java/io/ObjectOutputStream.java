@@ -23,328 +23,882 @@
 
 package java.io;
 
-import java.util.ArrayList;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.IdentityHashMap;
 
-public class ObjectOutputStream extends OutputStream implements DataOutput {
-  final static short STREAM_MAGIC = (short)0xaced;
-  final static short STREAM_VERSION = 5;
-  final static byte TC_NULL = (byte)0x70;
-  final static byte TC_REFERENCE = (byte)0x71;
-  final static byte TC_CLASSDESC = (byte)0x72;
-  final static byte TC_OBJECT = (byte)0x73;
-  final static byte TC_STRING = (byte)0x74;
-  final static byte TC_ARRAY = (byte)0x75;
-  final static byte TC_CLASS = (byte)0x76;
-  final static byte TC_BLOCKDATA = (byte)0x77;
-  final static byte TC_ENDBLOCKDATA = (byte)0x78;
-  final static byte TC_RESET = (byte)0x79;
-  final static byte TC_BLOCKDATALONG = (byte)0x7a;
-  final static byte TC_EXCEPTION = (byte)0x7b;
-  final static byte TC_LONGSTRING = (byte)0x7c;
-  final static byte TC_PROXYCLASSDESC = (byte)0x7d;
-  final static byte TC_ENUM = (byte)0x7e;
-  final static byte SC_WRITE_METHOD = 0x01; //if SC_SERIALIZABLE
-  final static byte SC_BLOCK_DATA = 0x08;   //if SC_EXTERNALIZABLE
-  final static byte SC_SERIALIZABLE = 0x02;
-  final static byte SC_EXTERNALIZABLE = 0x04;
-  final static byte SC_ENUM = 0x10;
+public class ObjectOutputStream extends OutputStream implements ObjectOutput, ObjectStreamConstants {
+  private static final int kMaxBlock = 1024;
 
   private final OutputStream out;
+  private final byte[] block = new byte[kMaxBlock];
+  private int blockPos;
+  private boolean blockMode = true;
+  private final IdentityHashMap<Object, Integer> handles = new IdentityHashMap<Object, Integer>();
+  private int nextHandle;
+  private final boolean enableOverride;
+  private boolean enableReplace;
+  private int protocol = PROTOCOL_VERSION_2;
+  private int depth;
+  private Object curObj;
+  private ObjectStreamClass curDesc;
+  private PutFieldImpl curPut;
+  private final byte[] scratch = new byte[8];
 
   public ObjectOutputStream(OutputStream out) throws IOException {
+    if (out == null) {
+      throw new NullPointerException();
+    }
     this.out = out;
-    rawShort(STREAM_MAGIC);
-    rawShort(STREAM_VERSION);
+    this.enableOverride = false;
+    writeStreamHeader();
+    setBlockMode(true);
   }
 
-  public void write(int c) throws IOException {
-    out.write(c);
+  protected ObjectOutputStream() throws IOException, SecurityException {
+    this.out = null;
+    this.enableOverride = true;
   }
 
-  public void write(byte[] b, int offset, int length) throws IOException {
-    out.write(b, offset, length);
+  public void useProtocolVersion(int version) throws IOException {
+    if (nextHandle != 0) {
+      throw new IllegalStateException("stream non-empty");
+    }
+    switch (version) {
+      case PROTOCOL_VERSION_1:
+      case PROTOCOL_VERSION_2:
+        protocol = version;
+        break;
+      default:
+        throw new IllegalArgumentException("unknown version: " + version);
+    }
   }
 
+  int getProtocolVersion() {
+    return protocol;
+  }
+
+  public final void writeObject(Object obj) throws IOException {
+    if (enableOverride) {
+      writeObjectOverride(obj);
+      return;
+    }
+    try {
+      writeObject0(obj, false);
+    } catch (IOException ex) {
+      if (depth == 0) {
+        writeFatalException(ex);
+      }
+      throw ex;
+    }
+  }
+
+  protected void writeObjectOverride(Object obj) throws IOException { }
+
+  public void writeUnshared(Object obj) throws IOException {
+    try {
+      writeObject0(obj, true);
+    } catch (IOException ex) {
+      if (depth == 0) {
+        writeFatalException(ex);
+      }
+      throw ex;
+    }
+  }
+
+  public void defaultWriteObject() throws IOException {
+    Object curObj = this.curObj;
+    ObjectStreamClass curDesc = this.curDesc;
+    if (curObj == null || curDesc == null) {
+      throw new NotActiveException("not in call to writeObject");
+    }
+    setBlockMode(false);
+    try {
+      defaultWriteFields(curObj, curDesc);
+    } finally {
+      setBlockMode(true);
+    }
+  }
+
+  public ObjectOutputStream.PutField putFields() throws IOException {
+    if (curPut == null) {
+      Object curObj = this.curObj;
+      ObjectStreamClass curDesc = this.curDesc;
+      if (curObj == null || curDesc == null) {
+        throw new NotActiveException("not in call to writeObject");
+      }
+      curPut = new PutFieldImpl(curDesc);
+    }
+    return curPut;
+  }
+
+  public void writeFields() throws IOException {
+    if (curPut == null) {
+      throw new NotActiveException("no current PutField object");
+    }
+    setBlockMode(false);
+    try {
+      curPut.writeFields();
+    } finally {
+      setBlockMode(true);
+    }
+  }
+
+  public void reset() throws IOException {
+    if (depth != 0) {
+      throw new IOException("stream active");
+    }
+    setBlockMode(false);
+    writeByteRaw(TC_RESET);
+    clear();
+    setBlockMode(true);
+  }
+
+  protected void annotateClass(Class<?> cl) throws IOException { }
+
+  protected void annotateProxyClass(Class<?> cl) throws IOException { }
+
+  protected Object replaceObject(Object obj) throws IOException {
+    return obj;
+  }
+
+  protected boolean enableReplaceObject(boolean enable) throws SecurityException {
+    boolean old = enableReplace;
+    enableReplace = enable;
+    return old;
+  }
+
+  protected void writeStreamHeader() throws IOException {
+    writeShortRaw(STREAM_MAGIC);
+    writeShortRaw(STREAM_VERSION);
+  }
+
+  protected void writeClassDescriptor(ObjectStreamClass desc) throws IOException {
+    desc.writeNonProxy(this);
+  }
+
+  @Override
+  public void write(int val) throws IOException {
+    putByte(val);
+  }
+
+  @Override
+  public void write(byte[] buf) throws IOException {
+    write(buf, 0, buf.length);
+  }
+
+  @Override
+  public void write(byte[] buf, int off, int len) throws IOException {
+    if (buf == null) {
+      throw new NullPointerException();
+    }
+    java.util.Objects.checkFromIndexSize(off, len, buf.length);
+    putBytes(buf, off, len);
+  }
+
+  @Override
   public void flush() throws IOException {
+    drain();
     out.flush();
   }
 
+  protected void drain() throws IOException {
+    if (blockPos > 0 && blockMode) {
+      writeBlockHeader(blockPos);
+      out.write(block, 0, blockPos);
+      blockPos = 0;
+    } else if (blockPos > 0) {
+      out.write(block, 0, blockPos);
+      blockPos = 0;
+    }
+  }
+
+  @Override
   public void close() throws IOException {
+    flush();
     out.close();
   }
 
-  private void rawByte(int v) throws IOException {
-    out.write((byte)(v & 0xff));
+  public void writeBoolean(boolean val) throws IOException {
+    putByte(val ? 1 : 0);
   }
 
-  private void rawShort(int v) throws IOException {
-    rawByte(v >> 8);
-    rawByte(v);
+  public void writeByte(int val) throws IOException {
+    putByte(val);
   }
 
-  private void rawInt(int v) throws IOException {
-    rawShort(v >> 16);
-    rawShort(v);
+  public void writeShort(int val) throws IOException {
+    scratch[0] = (byte) (val >>> 8);
+    scratch[1] = (byte) val;
+    putBytes(scratch, 0, 2);
   }
 
-  private void rawLong(long v) throws IOException {
-    rawInt((int)(v >> 32));
-    rawInt((int)(v & 0xffffffffl));
+  public void writeChar(int val) throws IOException {
+    writeShort(val);
   }
 
-  private void blockData(int... bytes) throws IOException {
-    blockData(bytes, null, null);
+  public void writeInt(int val) throws IOException {
+    scratch[0] = (byte) (val >>> 24);
+    scratch[1] = (byte) (val >>> 16);
+    scratch[2] = (byte) (val >>> 8);
+    scratch[3] = (byte) val;
+    putBytes(scratch, 0, 4);
   }
 
-  private void blockData(int[] bytes, byte[] bytes2, char[] chars) throws IOException {
-    int count = (bytes == null ? 0 : bytes.length)
-      + (bytes2 == null ? 0 : bytes2.length)
-      + (chars == null ? 0 : chars.length * 2);
-    if (count < 0x100) {
-      rawByte(TC_BLOCKDATA);
-      rawByte(count);
+  public void writeFloat(float val) throws IOException {
+    writeInt(Float.floatToIntBits(val));
+  }
+
+  public void writeLong(long val) throws IOException {
+    for (int i = 0; i < 8; i++) {
+      scratch[i] = (byte) (val >>> (56 - 8 * i));
+    }
+    putBytes(scratch, 0, 8);
+  }
+
+  public void writeDouble(double val) throws IOException {
+    writeLong(Double.doubleToLongBits(val));
+  }
+
+  public void writeBytes(String str) throws IOException {
+    int len = str.length();
+    byte[] buf = new byte[len];
+    for (int i = 0; i < len; i++) {
+      buf[i] = (byte) str.charAt(i);
+    }
+    putBytes(buf, 0, len);
+  }
+
+  public void writeChars(String str) throws IOException {
+    int len = str.length();
+    for (int i = 0; i < len; i++) {
+      writeShort(str.charAt(i));
+    }
+  }
+
+  public void writeUTF(String str) throws IOException {
+    long utflen = utfLength(str);
+    if (utflen > 0xFFFF) {
+      throw new UTFDataFormatException("encoded string too long: " + utflen + " bytes");
+    }
+    writeShort((int) utflen);
+    writeUTFBody(str);
+  }
+
+  private static long utfLength(String s) {
+    long utflen = 0;
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (c >= 0x0001 && c <= 0x007F) {
+        utflen++;
+      } else if (c > 0x07FF) {
+        utflen += 3;
+      } else {
+        utflen += 2;
+      }
+    }
+    return utflen;
+  }
+
+  private void writeUTFBody(String s) throws IOException {
+    byte[] buf = new byte[512];
+    int pos = 0;
+    for (int i = 0; i < s.length(); i++) {
+      if (pos > buf.length - 3) {
+        putBytes(buf, 0, pos);
+        pos = 0;
+      }
+      char c = s.charAt(i);
+      if (c >= 0x0001 && c <= 0x007F) {
+        buf[pos++] = (byte) c;
+      } else if (c > 0x07FF) {
+        buf[pos++] = (byte) (0xE0 | ((c >> 12) & 0x0F));
+        buf[pos++] = (byte) (0x80 | ((c >> 6) & 0x3F));
+        buf[pos++] = (byte) (0x80 | (c & 0x3F));
+      } else {
+        buf[pos++] = (byte) (0xC0 | ((c >> 6) & 0x1F));
+        buf[pos++] = (byte) (0x80 | (c & 0x3F));
+      }
+    }
+    putBytes(buf, 0, pos);
+  }
+
+  /* ---- block data layer ---- */
+
+  private void putByte(int b) throws IOException {
+    if (blockPos >= kMaxBlock) {
+      drain();
+    }
+    block[blockPos++] = (byte) b;
+  }
+
+  private void putBytes(byte[] b, int off, int len) throws IOException {
+    while (len > 0) {
+      if (blockPos >= kMaxBlock) {
+        drain();
+      }
+      int n = Math.min(len, kMaxBlock - blockPos);
+      System.arraycopy(b, off, block, blockPos, n);
+      blockPos += n;
+      off += n;
+      len -= n;
+    }
+  }
+
+  private void writeBlockHeader(int len) throws IOException {
+    if (len <= 0xFF) {
+      out.write(TC_BLOCKDATA);
+      out.write(len);
     } else {
-      rawByte(TC_BLOCKDATALONG);
-      rawInt(count);
-    }
-    if (bytes != null) {
-      for (int b : bytes) {
-        rawByte(b);
-      }
-    }
-    if (bytes2 != null) {
-      for (byte b : bytes2) {
-        rawByte(b & 0xff);
-      }
-    }
-    if (chars != null) {
-      for (char c : chars) {
-        rawShort((short)c);
-      }
+      out.write(TC_BLOCKDATALONG);
+      out.write(len >>> 24);
+      out.write(len >>> 16);
+      out.write(len >>> 8);
+      out.write(len);
     }
   }
 
-  public void writeBoolean(boolean v) throws IOException {
-    blockData(v ? 1 : 0);
-  }
-
-  public void writeByte(int v) throws IOException {
-    blockData(v);
-  }
-
-  public void writeShort(int v) throws IOException {
-    blockData(v >> 8, v);
-  }
-
-  public void writeChar(int v) throws IOException {
-    blockData(v >> 8, v);
-  }
-
-  public void writeInt(int v) throws IOException {
-    blockData(v >> 24, v >> 16, v >> 8, v);
-  }
-
-  public void writeLong(long v) throws IOException {
-    int u = (int)(v >> 32), l = (int)(v & 0xffffffff);
-    blockData(u >> 24, u >> 16, u >> 8, u, l >> 24, l >> 16, l >> 8, l);
-  }
-
-  public void writeFloat(float v) throws IOException {
-    writeInt(Float.floatToIntBits(v));
-  }
-
-  public void writeDouble(double v) throws IOException {
-    writeLong(Double.doubleToLongBits(v));
-  }
-
-  public void writeBytes(String s) throws IOException {
-    blockData(null, s.getBytes(), null);
-  }
-
-  public void writeChars(String s) throws IOException {
-    blockData(null, null, s.toCharArray());
-  }
-
-  public void writeUTF(String s) throws IOException {
-    byte[] bytes = s.getBytes();
-    int length = bytes.length;
-    blockData(new int[] { length >> 8, length }, bytes, null);
-  }
-
-  private int classHandle;
-
-  private void string(String s) throws IOException {
-    int length = s.length();
-    rawShort(length);
-    for (byte b : s.getBytes()) {
-      rawByte(b);
+  private boolean setBlockMode(boolean mode) throws IOException {
+    if (blockMode == mode) {
+      return mode;
     }
+    drain();
+    blockMode = mode;
+    return !mode;
   }
 
-  private static char primitiveTypeChar(Class type) {
-    if (type == Byte.TYPE) {
-      return 'B';
-    } else if (type == Character.TYPE) {
-      return 'C';
-    } else if (type == Double.TYPE) {
-      return 'D';
-    } else if (type == Float.TYPE) {
-      return 'F';
-    } else if (type == Integer.TYPE) {
-      return 'I';
-    } else if (type == Long.TYPE) {
-      return 'J';
-    } else if (type == Short.TYPE) {
-      return 'S';
-    } else if (type == Boolean.TYPE) {
-      return 'Z';
+  private void writeByteRaw(int b) throws IOException {
+    drain();
+    out.write(b);
+  }
+
+  private void writeShortRaw(int v) throws IOException {
+    out.write(v >>> 8);
+    out.write(v);
+  }
+
+  private void writeIntRaw(int v) throws IOException {
+    out.write(v >>> 24);
+    out.write(v >>> 16);
+    out.write(v >>> 8);
+    out.write(v);
+  }
+
+  private void writeLongRaw(long v) throws IOException {
+    writeIntRaw((int) (v >>> 32));
+    writeIntRaw((int) v);
+  }
+
+  /* ---- object graph ---- */
+
+  private void clear() {
+    handles.clear();
+    nextHandle = 0;
+  }
+
+  private void assignHandle(Object obj, boolean unshared) {
+    if (!unshared) {
+      handles.put(obj, Integer.valueOf(nextHandle));
     }
-    throw new RuntimeException("Unhandled primitive type: " + type);
+    nextHandle++;
   }
 
-  private void classDesc(Class clazz, int scFlags) throws IOException {
-    rawByte(TC_CLASSDESC);
+  private boolean writeHandle(Object obj) throws IOException {
+    Integer h = handles.get(obj);
+    if (h == null) {
+      return false;
+    }
+    writeByteRaw(TC_REFERENCE);
+    writeIntRaw(baseWireHandle + h.intValue());
+    return true;
+  }
 
-    // class name
-    string(clazz.getName());
-
-    // serial version UID
-    long serialVersionUID = 1l;
+  private void writeObject0(Object obj, boolean unshared) throws IOException {
+    boolean oldMode = setBlockMode(false);
+    depth++;
     try {
-      Field field = clazz.getField("serialVersionUID");
-      serialVersionUID = field.getLong(null);
-    } catch (Exception ignored) {}
-    rawLong(serialVersionUID);
-
-    // handle
-    rawByte(SC_SERIALIZABLE | scFlags);
-
-    Field[] fields = getFields(clazz);
-    rawShort(fields.length);
-    for (Field field : fields) {
-      Class fieldType = field.getType();
-      if (fieldType.isPrimitive()) {
-        rawByte(primitiveTypeChar(fieldType));
-        string(field.getName());
+      Object orig = obj;
+      Class<?> cl;
+      ObjectStreamClass desc;
+      for (;;) {
+        if (obj == null) {
+          writeByteRaw(TC_NULL);
+          return;
+        }
+        if (!unshared && writeHandle(obj)) {
+          return;
+        }
+        cl = obj.getClass();
+        desc = ObjectStreamClass.lookup(cl, true);
+        if (desc.hasWriteReplaceMethod()) {
+          Object rep = desc.invokeWriteReplace(obj);
+          if (rep != null && rep.getClass() == cl) {
+            obj = rep;
+            break;
+          }
+          obj = rep;
+          if (rep == null) {
+            continue;
+          }
+          continue;
+        }
+        break;
+      }
+      if (enableReplace) {
+        Object rep = replaceObject(obj);
+        if (rep != obj && rep != null) {
+          cl = rep.getClass();
+          desc = ObjectStreamClass.lookup(cl, true);
+        }
+        obj = rep;
+      }
+      if (obj != orig) {
+        if (obj == null) {
+          writeByteRaw(TC_NULL);
+          return;
+        }
+        if (!unshared && writeHandle(obj)) {
+          return;
+        }
+      }
+      if (obj instanceof Class) {
+        writeClass((Class<?>) obj, unshared);
+      } else if (obj instanceof ObjectStreamClass) {
+        writeClassDesc((ObjectStreamClass) obj, unshared);
+      } else if (obj instanceof String) {
+        writeString((String) obj, unshared);
+      } else if (cl.isArray()) {
+        writeArray(obj, desc, unshared);
+      } else if (obj instanceof Enum) {
+        writeEnum((Enum<?>) obj, desc, unshared);
+      } else if (obj instanceof Serializable) {
+        writeOrdinaryObject(obj, desc, unshared);
       } else {
-        rawByte(fieldType.isArray() ? '[' : 'L');
-        string(field.getName());
-        rawByte(TC_STRING);
-        string("L" + fieldType.getName().replace('.', '/') + ";");
+        throw new NotSerializableException(cl.getName());
       }
+    } finally {
+      depth--;
+      setBlockMode(oldMode);
     }
-    rawByte(TC_ENDBLOCKDATA); // TODO: write annotation
-    rawByte(TC_NULL); // super class desc
   }
 
-  private void field(Object o, Field field) throws IOException {
-    try {
-      field.setAccessible(true);
-      Class type = field.getType();
-      if (!type.isPrimitive()) {
-        writeObject(field.get(o));
-      } else if (type == Byte.TYPE) {
-        rawByte(field.getByte(o));
-      } else if (type == Character.TYPE) {
-        char c = field.getChar(o);
-        rawShort((short)c);
-      } else if (type == Double.TYPE) {
-        double d = field.getDouble(o);
-        rawLong(Double.doubleToLongBits(d));
-      } else if (type == Float.TYPE) {
-        float f = field.getFloat(o);
-        rawInt(Float.floatToIntBits(f));
-      } else if (type == Integer.TYPE) {
-        int i = field.getInt(o);
-        rawInt(i);
-      } else if (type == Long.TYPE) {
-        long l = field.getLong(o);
-        rawLong(l);
-      } else if (type == Short.TYPE) {
-        short s = field.getShort(o);
-        rawShort(s);
-      } else if (type == Boolean.TYPE) {
-        boolean b = field.getBoolean(o);
-        rawByte(b ? 1 : 0);
+  private void writeClass(Class<?> cl, boolean unshared) throws IOException {
+    writeByteRaw(TC_CLASS);
+    writeClassDesc(ObjectStreamClass.lookup(cl, true), false);
+    assignHandle(cl, unshared);
+  }
+
+  private void writeClassDesc(ObjectStreamClass desc, boolean unshared) throws IOException {
+    if (desc == null) {
+      writeByteRaw(TC_NULL);
+    } else if (!unshared && writeHandle(desc)) {
+      return;
+    } else if (desc.isProxy()) {
+      writeProxyDesc(desc, unshared);
+    } else {
+      writeNonProxyDesc(desc, unshared);
+    }
+  }
+
+  private void writeProxyDesc(ObjectStreamClass desc, boolean unshared) throws IOException {
+    writeByteRaw(TC_PROXYCLASSDESC);
+    assignHandle(desc, false);
+    Class<?> cl = desc.forClass();
+    Class<?>[] ifaces = cl.getInterfaces();
+    writeIntRaw(ifaces.length);
+    for (int i = 0; i < ifaces.length; i++) {
+      writeUTFRaw(ifaces[i].getName());
+    }
+    setBlockMode(true);
+    annotateProxyClass(cl);
+    setBlockMode(false);
+    writeByteRaw(TC_ENDBLOCKDATA);
+    writeClassDesc(ObjectStreamClass.lookup(cl.getSuperclass(), true), false);
+  }
+
+  private void writeUTFRaw(String s) throws IOException {
+    boolean old = setBlockMode(false);
+    writeUTFDirect(s);
+    setBlockMode(old);
+  }
+
+  private void writeUTFDirect(String s) throws IOException {
+    writeUTF(s);
+  }
+
+  private void writeNonProxyDesc(ObjectStreamClass desc, boolean unshared) throws IOException {
+    writeByteRaw(TC_CLASSDESC);
+    assignHandle(desc, false);
+    writeClassDescriptor(desc);
+    Class<?> cl = desc.forClass();
+    setBlockMode(true);
+    annotateClass(cl);
+    setBlockMode(false);
+    writeByteRaw(TC_ENDBLOCKDATA);
+    writeClassDesc(desc.getSuperDesc(), false);
+  }
+
+  void writeTypeString(String str) throws IOException {
+    if (str == null) {
+      writeByteRaw(TC_NULL);
+    } else if (writeHandle(str)) {
+      return;
+    } else {
+      writeString(str, false);
+    }
+  }
+
+  private void writeString(String str, boolean unshared) throws IOException {
+    assignHandle(str, unshared);
+    long utflen = utfLength(str);
+    if (utflen <= 0xFFFF) {
+      writeByteRaw(TC_STRING);
+      writeUTFNoBlock(str, utflen);
+    } else {
+      writeByteRaw(TC_LONGSTRING);
+      drain();
+      writeLongRaw(utflen);
+      writeUTFBody(str);
+    }
+  }
+
+  private void writeUTFNoBlock(String str, long utflen) throws IOException {
+    drain();
+    writeShortRaw((int) utflen);
+    writeUTFBody(str);
+  }
+
+  private void writeArray(Object array, ObjectStreamClass desc, boolean unshared) throws IOException {
+    writeByteRaw(TC_ARRAY);
+    writeClassDesc(desc, false);
+    assignHandle(array, unshared);
+    Class<?> ccl = desc.forClass().getComponentType();
+    int len = Array.getLength(array);
+    drain();
+    writeIntRaw(len);
+    if (ccl.isPrimitive()) {
+      if (ccl == Integer.TYPE) {
+        int[] ia = (int[]) array;
+        for (int i = 0; i < len; i++) {
+          writeIntRaw(ia[i]);
+        }
+      } else if (ccl == Byte.TYPE) {
+        byte[] ba = (byte[]) array;
+        drain();
+        out.write(ba, 0, len);
+      } else if (ccl == Long.TYPE) {
+        long[] la = (long[]) array;
+        for (int i = 0; i < len; i++) {
+          writeLongRaw(la[i]);
+        }
+      } else if (ccl == Float.TYPE) {
+        float[] fa = (float[]) array;
+        for (int i = 0; i < len; i++) {
+          writeIntRaw(Float.floatToIntBits(fa[i]));
+        }
+      } else if (ccl == Double.TYPE) {
+        double[] da = (double[]) array;
+        for (int i = 0; i < len; i++) {
+          writeLongRaw(Double.doubleToLongBits(da[i]));
+        }
+      } else if (ccl == Short.TYPE) {
+        short[] sa = (short[]) array;
+        for (int i = 0; i < len; i++) {
+          writeShortRaw(sa[i]);
+        }
+      } else if (ccl == Character.TYPE) {
+        char[] ca = (char[]) array;
+        for (int i = 0; i < len; i++) {
+          writeShortRaw(ca[i]);
+        }
+      } else if (ccl == Boolean.TYPE) {
+        boolean[] za = (boolean[]) array;
+        for (int i = 0; i < len; i++) {
+          out.write(za[i] ? 1 : 0);
+        }
       } else {
-        throw new UnsupportedOperationException("Field '" + field.getName()
-          + "' has unsupported type: " + type);
+        throw new InternalError();
       }
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
-  }
-
-  private static Field[] getFields(Class clazz) {
-    ArrayList<Field> list = new ArrayList<Field>();
-    Field[] fields = clazz.getDeclaredFields();
-    for (Field field : fields) {
-      if (0 == (field.getModifiers() &
-          (Modifier.STATIC | Modifier.TRANSIENT))) {
-        list.add(field);
+    } else {
+      Object[] objs = (Object[]) array;
+      for (int i = 0; i < len; i++) {
+        writeObject0(objs[i], false);
       }
     }
-    return list.toArray(new Field[list.size()]);
   }
 
-  public void writeObject(Object o) throws IOException {
-    if (o == null) {
-      rawByte(TC_NULL);
-      return;
-    }
-    if (o instanceof String) {
-      byte[] bytes = ((String)o).getBytes("UTF-8");
-      rawByte(TC_STRING);
-      rawShort(bytes.length);
-      write(bytes);
-      return;
-    }
-    rawByte(TC_OBJECT);
-    Method writeObject = getReadOrWriteMethod(o, "writeObject");
-    if (writeObject == null) {
-      classDesc(o.getClass(), 0);
-      defaultWriteObject(o);
-    } else try {
-      classDesc(o.getClass(), SC_WRITE_METHOD);
-      current = o;
-      writeObject.invoke(o, this);
-      current = null;
-      rawByte(TC_ENDBLOCKDATA);
-    } catch (Exception e) {
-      throw new IOException(e);
+  private void writeEnum(Enum<?> en, ObjectStreamClass desc, boolean unshared) throws IOException {
+    writeByteRaw(TC_ENUM);
+    ObjectStreamClass sdesc = desc.getSuperDesc();
+    writeClassDesc((sdesc.forClass() == Enum.class) ? desc : sdesc, false);
+    assignHandle(en, unshared);
+    writeString(en.name(), false);
+  }
+
+  private void writeOrdinaryObject(Object obj, ObjectStreamClass desc, boolean unshared) throws IOException {
+    desc.checkSerialize();
+    writeByteRaw(TC_OBJECT);
+    writeClassDesc(desc, false);
+    assignHandle(obj, unshared);
+    if (desc.isExternalizable() && !desc.isProxy()) {
+      writeExternalData((Externalizable) obj);
+    } else {
+      writeSerialData(obj, desc);
     }
   }
 
-  static Method getReadOrWriteMethod(Object o, String methodName) {
+  private void writeExternalData(Externalizable obj) throws IOException {
+    Object oldObj = curObj;
+    ObjectStreamClass oldDesc = curDesc;
+    PutFieldImpl oldPut = curPut;
+    curObj = null;
+    curDesc = null;
+    curPut = null;
     try {
-      Method method = o.getClass().getDeclaredMethod(methodName,
-        new Class[] { methodName.startsWith("write") ?
-          ObjectOutputStream.class : ObjectInputStream.class });
-      method.setAccessible(true);
-      int modifiers = method.getModifiers();
-      if ((modifiers & Modifier.STATIC) == 0 ||
-          (modifiers & Modifier.PRIVATE) != 0) {
-        return method;
+      if (protocol == PROTOCOL_VERSION_1) {
+        setBlockMode(false);
+        obj.writeExternal(this);
+      } else {
+        setBlockMode(true);
+        obj.writeExternal(this);
+        setBlockMode(false);
+        writeByteRaw(TC_ENDBLOCKDATA);
       }
-    } catch (NoSuchMethodException ignored) { }
-    return null;
+    } finally {
+      curObj = oldObj;
+      curDesc = oldDesc;
+      curPut = oldPut;
+    }
   }
 
-  private Object current;
-
-  public void defaultWriteObject() throws IOException {
-    defaultWriteObject(current);
+  private void writeSerialData(Object obj, ObjectStreamClass desc) throws IOException {
+    ObjectStreamClass.ClassDataSlot[] slots = desc.getClassDataLayout();
+    for (int i = 0; i < slots.length; i++) {
+      ObjectStreamClass slotDesc = slots[i].desc;
+      if (slotDesc.hasWriteObjectMethod()) {
+        Object oldObj = curObj;
+        ObjectStreamClass oldDesc = curDesc;
+        PutFieldImpl oldPut = curPut;
+        curObj = obj;
+        curDesc = slotDesc;
+        curPut = null;
+        boolean oldMode = setBlockMode(true);
+        try {
+          slotDesc.invokeWriteObject(obj, this);
+        } finally {
+          curObj = oldObj;
+          curDesc = oldDesc;
+          curPut = oldPut;
+        }
+        setBlockMode(false);
+        writeByteRaw(TC_ENDBLOCKDATA);
+      } else {
+        defaultWriteFields(obj, slotDesc);
+      }
+    }
   }
 
-  private void defaultWriteObject(Object o) throws IOException {
-    for (Field field : getFields(o.getClass())) {
-      field(o, field);
+  private void defaultWriteFields(Object obj, ObjectStreamClass desc) throws IOException {
+    Class<?> cl = desc.forClass();
+    if (cl != null && obj != null && !cl.isInstance(obj)) {
+      throw new ClassCastException();
+    }
+    ObjectStreamField[] fields = desc.getFields(false);
+    int numPrim = fields.length - desc.getNumObjFields();
+    drain();
+    byte[] primVals = new byte[desc.getPrimDataSize()];
+    for (int i = 0; i < numPrim; i++) {
+      getPrimitiveField(obj, fields[i], primVals);
+    }
+    out.write(primVals, 0, primVals.length);
+    for (int i = numPrim; i < fields.length; i++) {
+      Object value = getObjectField(obj, fields[i]);
+      writeObject0(value, fields[i].isUnshared());
+    }
+  }
+
+  private static void getPrimitiveField(Object obj, ObjectStreamField f, byte[] buf) throws IOException {
+    int off = f.getOffset();
+    Field fld = f.getField();
+    try {
+      switch (f.getTypeCode()) {
+        case 'Z':
+          buf[off] = (byte) (fld.getBoolean(obj) ? 1 : 0);
+          break;
+        case 'B':
+          buf[off] = fld.getByte(obj);
+          break;
+        case 'C':
+          putShort(buf, off, fld.getChar(obj));
+          break;
+        case 'S':
+          putShort(buf, off, fld.getShort(obj));
+          break;
+        case 'I':
+          putInt(buf, off, fld.getInt(obj));
+          break;
+        case 'F':
+          putInt(buf, off, Float.floatToIntBits(fld.getFloat(obj)));
+          break;
+        case 'J':
+          putLong(buf, off, fld.getLong(obj));
+          break;
+        case 'D':
+          putLong(buf, off, Double.doubleToLongBits(fld.getDouble(obj)));
+          break;
+        default:
+          throw new InternalError();
+      }
+    } catch (IllegalAccessException e) {
+      throw new InternalError(e);
+    }
+  }
+
+  private static Object getObjectField(Object obj, ObjectStreamField f) throws IOException {
+    Field fld = f.getField();
+    if (fld == null) {
+      return null;
+    }
+    try {
+      return fld.get(obj);
+    } catch (IllegalAccessException e) {
+      throw new InternalError(e);
+    }
+  }
+
+  static void putShort(byte[] b, int off, int v) {
+    b[off] = (byte) (v >>> 8);
+    b[off + 1] = (byte) v;
+  }
+
+  static void putInt(byte[] b, int off, int v) {
+    b[off] = (byte) (v >>> 24);
+    b[off + 1] = (byte) (v >>> 16);
+    b[off + 2] = (byte) (v >>> 8);
+    b[off + 3] = (byte) v;
+  }
+
+  static void putLong(byte[] b, int off, long v) {
+    putInt(b, off, (int) (v >>> 32));
+    putInt(b, off + 4, (int) v);
+  }
+
+  private void writeFatalException(IOException ex) throws IOException {
+    clear();
+    boolean oldMode = setBlockMode(false);
+    try {
+      writeByteRaw(TC_EXCEPTION);
+      writeObject0(ex, false);
+      clear();
+    } finally {
+      setBlockMode(oldMode);
+    }
+  }
+
+  public abstract static class PutField {
+    public PutField() { }
+
+    public abstract void put(String name, boolean val);
+
+    public abstract void put(String name, byte val);
+
+    public abstract void put(String name, char val);
+
+    public abstract void put(String name, short val);
+
+    public abstract void put(String name, int val);
+
+    public abstract void put(String name, long val);
+
+    public abstract void put(String name, float val);
+
+    public abstract void put(String name, double val);
+
+    public abstract void put(String name, Object val);
+
+    @Deprecated
+    public abstract void write(ObjectOutput out) throws IOException;
+  }
+
+  private final class PutFieldImpl extends PutField {
+    private final ObjectStreamClass desc;
+    private final byte[] primVals;
+    private final Object[] objVals;
+
+    PutFieldImpl(ObjectStreamClass desc) {
+      this.desc = desc;
+      primVals = new byte[desc.getPrimDataSize()];
+      objVals = new Object[desc.getNumObjFields()];
+    }
+
+    public void put(String name, boolean val) {
+      primVals[getFieldOffset(name, Boolean.TYPE)] = (byte) (val ? 1 : 0);
+    }
+
+    public void put(String name, byte val) {
+      primVals[getFieldOffset(name, Byte.TYPE)] = val;
+    }
+
+    public void put(String name, char val) {
+      putShort(primVals, getFieldOffset(name, Character.TYPE), val);
+    }
+
+    public void put(String name, short val) {
+      putShort(primVals, getFieldOffset(name, Short.TYPE), val);
+    }
+
+    public void put(String name, int val) {
+      putInt(primVals, getFieldOffset(name, Integer.TYPE), val);
+    }
+
+    public void put(String name, float val) {
+      putInt(primVals, getFieldOffset(name, Float.TYPE), Float.floatToIntBits(val));
+    }
+
+    public void put(String name, long val) {
+      putLong(primVals, getFieldOffset(name, Long.TYPE), val);
+    }
+
+    public void put(String name, double val) {
+      putLong(primVals, getFieldOffset(name, Double.TYPE), Double.doubleToLongBits(val));
+    }
+
+    public void put(String name, Object val) {
+      objVals[getFieldOffset(name, Object.class)] = val;
+    }
+
+    public void write(ObjectOutput out) throws IOException {
+      if (ObjectOutputStream.this != out) {
+        throw new IllegalArgumentException("wrong stream");
+      }
+      out.write(primVals, 0, primVals.length);
+      ObjectStreamField[] fields = desc.getFields(false);
+      int numPrim = fields.length - objVals.length;
+      for (int i = 0; i < objVals.length; i++) {
+        if (fields[numPrim + i].isUnshared()) {
+          throw new IOException("cannot write unshared object");
+        }
+        out.writeObject(objVals[i]);
+      }
+    }
+
+    void writeFields() throws IOException {
+      drain();
+      ObjectOutputStream.this.out.write(primVals, 0, primVals.length);
+      ObjectStreamField[] fields = desc.getFields(false);
+      int numPrim = fields.length - objVals.length;
+      for (int i = 0; i < objVals.length; i++) {
+        writeObject0(objVals[i], fields[numPrim + i].isUnshared());
+      }
+    }
+
+    private int getFieldOffset(String name, Class<?> type) {
+      ObjectStreamField field = desc.getField(name, type);
+      if (field == null) {
+        throw new IllegalArgumentException("no such field " + name + " with type " + type);
+      }
+      return field.getOffset();
     }
   }
 }

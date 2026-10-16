@@ -21,6 +21,27 @@ public class PriorityQueue<E> extends AbstractQueue<E> implements Serializable {
   private final Comparator<? super E> comparator;
   private transient int modCount;
 
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    s.defaultWriteObject();
+    s.writeInt(Math.max(2, size + 1));
+    for (int i = 0; i < size; i++) {
+      s.writeObject(queue[i]);
+    }
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    s.readInt();
+    if (size < 0) {
+      throw new java.io.InvalidObjectException("Illegal size: " + size);
+    }
+    queue = new Object[Math.max(1, size)];
+    for (int i = 0; i < size; i++) {
+      queue[i] = s.readObject();
+    }
+    heapify();
+  }
+
   public PriorityQueue() {
     this(DEFAULT_INITIAL_CAPACITY, null);
   }

@@ -11,6 +11,8 @@ package java.time.format;
 import java.time.DateTimeException;
 
 public class DateTimeParseException extends DateTimeException {
+  private static final long serialVersionUID = 4304633501674722597L;
+
   private final String parsedData;
   private final int errorIndex;
 

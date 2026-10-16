@@ -29,7 +29,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-public class File implements Serializable {
+public class File implements Serializable, Comparable<File> {
+  private static final long serialVersionUID = 301077366599181567L;
+
   private static final String FileSeparator
     = System.getProperty("file.separator");
 
@@ -51,7 +53,34 @@ public class File implements Serializable {
   //     System.loadLibrary("natives");
   //   }
 
-  private final String path;
+  private String path;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws IOException {
+    s.defaultWriteObject();
+    s.writeChar(FileSeparator.charAt(0));
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException {
+    ObjectInputStream.GetField fields = s.readFields();
+    String pathField = (String) fields.get("path", null);
+    char sep = s.readChar();
+    if (sep != FileSeparator.charAt(0)) {
+      pathField = pathField.replace(sep, FileSeparator.charAt(0));
+    }
+    path = normalize(pathField);
+  }
+
+  public int compareTo(File other) {
+    return IsWindows ? path.compareToIgnoreCase(other.path) : path.compareTo(other.path);
+  }
+
+  public boolean equals(Object obj) {
+    return obj instanceof File && compareTo((File) obj) == 0;
+  }
+
+  public int hashCode() {
+    return (IsWindows ? path.toLowerCase().hashCode() : path.hashCode()) ^ 1234321;
+  }
 
   public File(String path) {
     if (path == null) throw new NullPointerException();

@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class AbstractQueuedLongSynchronizer extends AbstractOwnableSynchronizer implements Serializable {
-  private static final long serialVersionUID = 7373984972572414691L;
+  private static final long serialVersionUID = 7373984972572414692L;
 
   private static final class Node {
     final Thread thread;

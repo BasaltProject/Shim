@@ -7,6 +7,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
 public class HashSet<E> extends AbstractSet<E> implements Set<E>, Cloneable, java.io.Serializable {
+  private static final long serialVersionUID = -5024744406713321676L;
+
   transient HashMap<E, Object> map;
 
   static final Object PRESENT = new Object();

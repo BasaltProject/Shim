@@ -29,7 +29,7 @@ import java.util.Objects;
 
 public final class ZoneOffset extends ZoneId implements TemporalAccessor, TemporalAdjuster, Comparable<ZoneOffset>,
     Serializable {
-  private static final long serialVersionUID = 8841589723587858789L;
+  private static final long serialVersionUID = 2357656521762053153L;
 
   private static final Map<Integer, ZoneOffset> SECONDS_CACHE = new HashMap<Integer, ZoneOffset>();
   private static final Map<String, ZoneOffset> ID_CACHE = new HashMap<String, ZoneOffset>();

@@ -27,6 +27,8 @@ import java.io.Serializable;
 import java.util.random.RandomGenerator;
 
 public class Random implements RandomGenerator, Serializable {
+  private static final long serialVersionUID = 3905348978240129619L;
+
   private static final long Mask = 0x5DEECE66DL;
 
   private static final long InitialSeed = 123456789987654321L;

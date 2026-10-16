@@ -28,7 +28,7 @@ import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
 public class BitSet implements Serializable, Cloneable {
-  private static final long serialVersionUID = 7997698588984042384L;
+  private static final long serialVersionUID = 7997698588986878753L;
 
   private static final int BITS_PER_LONG = 64;
   private static final int BITS_PER_LONG_SHIFT = 6;

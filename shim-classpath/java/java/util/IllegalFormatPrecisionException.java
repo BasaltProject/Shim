@@ -8,6 +8,8 @@
 package java.util;
 
 public class IllegalFormatPrecisionException extends IllegalFormatException {
+  private static final long serialVersionUID = 18711008L;
+
   private final int precision;
 
   public IllegalFormatPrecisionException(int precision) {

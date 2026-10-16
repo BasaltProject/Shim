@@ -23,77 +23,136 @@
 
 package java.util.zip;
 
-import java.io.InputStream;
-import java.io.IOException;
 import java.io.EOFException;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
-public class InflaterInputStream extends InputStream {
-  protected InputStream in;
-  protected Inflater inflater;
+public class InflaterInputStream extends FilterInputStream {
   protected Inflater inf;
-  protected byte[] buffer;
   protected byte[] buf;
   protected int len;
 
-  public InflaterInputStream(InputStream in, Inflater inflater, int bufferSize)
-  {
-    this.in = in;
-    this.inflater = inflater;
-    this.inf = inflater;
-    this.buffer = new byte[bufferSize];
-    this.buf = this.buffer;
+  private boolean closed;
+  private boolean reachEOF;
+  boolean usesDefaultInflater;
+  private final byte[] singleByteBuf = new byte[1];
+  private final byte[] skipBuf = new byte[512];
+
+  private void ensureOpen() throws IOException {
+    if (closed) {
+      throw new IOException("Stream closed");
+    }
   }
 
-  public InflaterInputStream(InputStream in, Inflater inflater) {
-    this(in, inflater, 4 * 1024);
+  public InflaterInputStream(InputStream in, Inflater inf, int size) {
+    super(in);
+    if (in == null || inf == null) {
+      throw new NullPointerException();
+    } else if (size <= 0) {
+      throw new IllegalArgumentException("buffer size <= 0");
+    }
+    this.inf = inf;
+    buf = new byte[size];
+  }
+
+  public InflaterInputStream(InputStream in, Inflater inf) {
+    this(in, inf, 512);
   }
 
   public InflaterInputStream(InputStream in) {
     this(in, new Inflater());
+    usesDefaultInflater = true;
   }
 
   public int read() throws IOException {
-    byte[] buffer = new byte[1];
-    int c = read(buffer);
-    return (c < 0 ? c : (buffer[0] & 0xFF));
+    ensureOpen();
+    return read(singleByteBuf, 0, 1) == -1 ? -1 : singleByteBuf[0] & 0xff;
   }
 
-  public int read(byte[] b, int offset, int length) throws IOException {
-    if (inflater.finished()) {
-      return -1;
+  public int read(byte[] b, int off, int len) throws IOException {
+    ensureOpen();
+    if (b == null) {
+      throw new NullPointerException();
     }
-
-    while (true) {
-      if (inflater.needsInput()) {
-        int count = in.read(buffer);
-        if (count > 0) {
-          inflater.setInput(buffer, 0, count);
-        } else {
-          throw new EOFException();
-        }
-      }
-
-      try {
-        int count = inflater.inflate(b, offset, length);
-        if (count > 0) {
-          return count;
-        } else if (inflater.needsDictionary()) {
-          throw new IOException("missing dictionary");
-        } else if (inflater.finished()) {
+    java.util.Objects.checkFromIndexSize(off, len, b.length);
+    if (len == 0) {
+      return 0;
+    }
+    try {
+      int n;
+      while ((n = inf.inflate(b, off, len)) == 0) {
+        if (inf.finished() || inf.needsDictionary()) {
+          reachEOF = true;
           return -1;
         }
-      } catch (DataFormatException e) {
-        throw new IOException(e);
+        if (inf.needsInput()) {
+          fill();
+        }
       }
+      return n;
+    } catch (DataFormatException e) {
+      String s = e.getMessage();
+      throw new ZipException(s != null ? s : "Invalid ZLIB data format");
     }
   }
 
   public int available() throws IOException {
-    return inflater.finished() ? 0 : 1;
+    ensureOpen();
+    if (reachEOF) {
+      return 0;
+    } else if (inf.finished()) {
+      reachEOF = true;
+      return 0;
+    }
+    return 1;
+  }
+
+  public long skip(long n) throws IOException {
+    if (n < 0) {
+      throw new IllegalArgumentException("negative skip length");
+    }
+    ensureOpen();
+    int max = (int) Math.min(n, Integer.MAX_VALUE);
+    int total = 0;
+    while (total < max) {
+      int len = Math.min(max - total, skipBuf.length);
+      len = read(skipBuf, 0, len);
+      if (len == -1) {
+        reachEOF = true;
+        break;
+      }
+      total += len;
+    }
+    return total;
   }
 
   public void close() throws IOException {
-    in.close();
-    inflater.dispose();
+    if (!closed) {
+      if (usesDefaultInflater) {
+        inf.end();
+      }
+      in.close();
+      closed = true;
+    }
+  }
+
+  protected void fill() throws IOException {
+    ensureOpen();
+    len = in.read(buf, 0, buf.length);
+    if (len == -1) {
+      throw new EOFException("Unexpected end of ZLIB input stream");
+    }
+    inf.setInput(buf, 0, len);
+  }
+
+  public boolean markSupported() {
+    return false;
+  }
+
+  public synchronized void mark(int readlimit) { }
+
+  public synchronized void reset() throws IOException {
+    throw new IOException("mark/reset not supported");
   }
 }

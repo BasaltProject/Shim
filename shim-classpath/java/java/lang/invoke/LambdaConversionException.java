@@ -24,6 +24,8 @@
 package java.lang.invoke;
 
 public class LambdaConversionException extends java.lang.Exception {
+  private static final long serialVersionUID = 300L;
+
   public LambdaConversionException() { throw new RuntimeException(); }
   public LambdaConversionException(String s) { throw new RuntimeException(); }
   public LambdaConversionException(String s, Throwable th) { throw new RuntimeException(); }

@@ -28,7 +28,7 @@ import java.util.Objects;
 import java.util.Random;
 
 public class BigInteger extends Number implements Serializable, Comparable<BigInteger> {
-  private static final long serialVersionUID = -2998493210541164536L;
+  private static final long serialVersionUID = -8287574255936472291L;
 
   private final int sign;
   private final int[] value;

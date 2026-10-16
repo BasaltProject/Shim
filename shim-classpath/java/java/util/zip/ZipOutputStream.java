@@ -109,8 +109,8 @@ public class ZipOutputStream extends DeflaterOutputStream {
     crc.update(b, offset, length);
     currentEntry.crc = (int) crc.getValue();
     
-    deflater.setInput(b, offset, length);
-    while (deflater.getRemaining() > 0)
+    def.setInput(b, offset, length);
+    while (def.getRemaining() > 0)
       deflate();
   }
 
@@ -126,11 +126,11 @@ public class ZipOutputStream extends DeflaterOutputStream {
 
   @Override
   protected void deflate() throws IOException {
-    int len = deflater.deflate(buffer, 0, buffer.length);
+    int len = def.deflate(buf, 0, buf.length);
     currentEntry.compSize += len;
     bytesWritten += len;
     if (len > 0)
-      out.write(buffer, 0, len);
+      out.write(buf, 0, len);
   }
 
   private void writeLocalHeader(ZipEntry e) throws IOException {
@@ -223,11 +223,11 @@ public class ZipOutputStream extends DeflaterOutputStream {
   private boolean finished;
 
   private void finishDeflateEntry() throws IOException {
-    deflater.finish();
-    while (!deflater.finished()) {
+    def.finish();
+    while (!def.finished()) {
       deflate();
     }
-    deflater.reset();
+    def.reset();
   }
 
   @Override
@@ -251,7 +251,7 @@ public class ZipOutputStream extends DeflaterOutputStream {
     if (!finished) {
       finish();
     }
-    deflater.dispose();
+    def.dispose();
     out.close();
   }
   

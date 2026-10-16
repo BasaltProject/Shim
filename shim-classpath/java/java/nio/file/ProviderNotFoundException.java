@@ -9,7 +9,7 @@
 package java.nio.file;
 
 public class ProviderNotFoundException extends RuntimeException {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = -1880012509822920354L;
 
   public ProviderNotFoundException() { }
 

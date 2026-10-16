@@ -759,7 +759,7 @@ public class Collections {
     return new UnmodifiableList<T>(list);
   }
 
-  static class UnmodifiableList<T> implements List<T> {
+  static class UnmodifiableList<T> implements List<T>, java.io.Serializable {
 
     private List<T> inner;
 
@@ -986,7 +986,7 @@ public class Collections {
     }
   }
 
-  static class UnmodifiableMap<K, V> implements Map<K, V> {
+  static class UnmodifiableMap<K, V> implements Map<K, V>, java.io.Serializable {
 	  private Map<K, V> inner;
 
 	  UnmodifiableMap(Map<K, V> m) {
@@ -1219,7 +1219,7 @@ public class Collections {
     }
   }
   
-  static class UnmodifiableCollection<T> implements Collection<T> {
+  static class UnmodifiableCollection<T> implements Collection<T>, java.io.Serializable {
     private final Collection<T> inner;
     
     UnmodifiableCollection(Collection<T> inner) {

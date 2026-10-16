@@ -8,6 +8,8 @@
 package java.io;
 
 public class InvalidClassException extends ObjectStreamException {
+  private static final long serialVersionUID = -4333316296251054416L;
+
   public String classname;
 
   public InvalidClassException(String reason) {

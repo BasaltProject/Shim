@@ -60,10 +60,14 @@ public final class Currency implements Serializable {
   private static final Map<String, Currency> kInstances = new HashMap<String, Currency>();
 
   private final String currencyCode;
-  private final int defaultFractionDigits;
-  private final int numericCode;
-  private final String symbol;
-  private final String displayName;
+  private final transient int defaultFractionDigits;
+  private final transient int numericCode;
+  private final transient String symbol;
+  private final transient String displayName;
+
+  private Object readResolve() {
+    return getInstance(currencyCode);
+  }
 
   private Currency(String[] row) {
     this.currencyCode = row[0];

@@ -2,6 +2,8 @@
 package java.util;
 
 public class LinkedHashSet<E> extends HashSet<E> implements SequencedSet<E>, Cloneable, java.io.Serializable {
+  private static final long serialVersionUID = -2851667679971038690L;
+
   public LinkedHashSet(int initialCapacity, float loadFactor) {
     super(initialCapacity, loadFactor, true);
   }

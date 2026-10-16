@@ -2,6 +2,8 @@
 package java.util;
 
 public class Stack<E> extends Vector<E> {
+  private static final long serialVersionUID = 1224463164541339165L;
+
   public Stack() { }
 
   public E push(E item) {

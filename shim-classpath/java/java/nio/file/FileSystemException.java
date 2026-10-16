@@ -11,6 +11,8 @@ package java.nio.file;
 import java.io.IOException;
 
 public class FileSystemException extends IOException {
+  private static final long serialVersionUID = -3055425747967319812L;
+
   private final String file;
   private final String other;
 

@@ -7,6 +7,8 @@
 package java.lang;
 
 public class IllegalCallerException extends RuntimeException {
+  private static final long serialVersionUID = -2349421918363102232L;
+
   public IllegalCallerException() {
     super();
   }

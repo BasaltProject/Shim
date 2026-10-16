@@ -23,11 +23,39 @@
 
 package java.util;
 
-public class EnumSet<T extends Enum<T>> extends AbstractSet<T> {
+public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Cloneable, java.io.Serializable {
   
   private BitSet bitset;
   private Class<T> elementType;
   
+  private static class SerializationProxy<E extends Enum<E>> implements java.io.Serializable {
+    private static final long serialVersionUID = 1009687484059888093L;
+    private final Class<E> elementType;
+    private final Enum<?>[] elements;
+
+    SerializationProxy(EnumSet<E> set) {
+      elementType = set.elementType;
+      elements = set.toArray(new Enum<?>[0]);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object readResolve() {
+      EnumSet<E> result = EnumSet.noneOf(elementType);
+      for (Enum<?> e : elements) {
+        result.add((E) e);
+      }
+      return result;
+    }
+  }
+
+  Object writeReplace() {
+    return new SerializationProxy<T>(this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Proxy required");
+  }
+
   private EnumSet(int size, Class<T> type) {
     bitset = new BitSet(size);
     elementType = type;

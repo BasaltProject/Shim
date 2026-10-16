@@ -30,7 +30,7 @@ import java.util.Objects;
 import java.util.TimeZone;
 
 public class SimpleDateFormat extends DateFormat {
-  private static final long serialVersionUID = 4774881970558870743L;
+  private static final long serialVersionUID = 4774881970558875024L;
 
   private static final String kPatternChars = "GyMdkHmsSEDFwWahKzZYuXL";
   private static final int[] kCalendarFields = {Calendar.ERA, Calendar.YEAR, Calendar.MONTH, Calendar.DATE,

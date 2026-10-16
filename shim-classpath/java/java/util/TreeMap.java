@@ -34,7 +34,7 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
   private static final boolean RED = false;
   private static final boolean BLACK = true;
 
-  public static final long serialVersionUID = 0x0cc1f63e2d256ae6L;
+  public static final long serialVersionUID = 919286545866124006L;
 
   private final Comparator<? super K> comparator;
   private transient Entry<K, V> root;

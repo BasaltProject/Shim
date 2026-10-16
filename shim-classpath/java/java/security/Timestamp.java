@@ -15,7 +15,7 @@ import java.util.Date;
 import java.util.Objects;
 
 public final class Timestamp implements Serializable {
-  private static final long serialVersionUID = -5502683707835181012L;
+  private static final long serialVersionUID = -5502683707821851294L;
 
   private final Date timestamp;
   private final CertPath signerCertPath;

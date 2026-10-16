@@ -13,7 +13,7 @@ import java.util.ConcurrentModificationException;
 import java.util.Objects;
 
 public final class DirectoryIteratorException extends ConcurrentModificationException {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = -6012699886086212874L;
 
   public DirectoryIteratorException(IOException cause) {
     super(Objects.requireNonNull(cause));

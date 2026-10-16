@@ -25,6 +25,8 @@ package java.lang;
 
 public final class Double extends Number implements Comparable<Double>,
     java.lang.constant.Constable, java.lang.constant.ConstantDesc {
+  private static final long serialVersionUID = -9172774392245257468L;
+
   public static final Class TYPE = shim.Classes.forCanonicalName("D");
 
   public static final double NEGATIVE_INFINITY = -1.0 / 0.0;

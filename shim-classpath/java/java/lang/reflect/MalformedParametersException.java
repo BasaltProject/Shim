@@ -10,7 +10,7 @@
 package java.lang.reflect;
 
 public class MalformedParametersException extends RuntimeException {
-  private static final long serialVersionUID = 2079070076719158762L;
+  private static final long serialVersionUID = 20130919L;
 
   public MalformedParametersException() {
     super();

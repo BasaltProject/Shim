@@ -24,6 +24,8 @@
 package java.lang;
 
 public class AssertionError extends Error {
+  private static final long serialVersionUID = -5013299493970297370L;
+
   public AssertionError() {
     super("", null);
   }

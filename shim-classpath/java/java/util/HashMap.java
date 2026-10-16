@@ -34,6 +34,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>, Cloneable, Serializable {
+  private static final long serialVersionUID = 362498820763181265L;
+
   static final int DEFAULT_INITIAL_CAPACITY = 1 << 4;
   static final int MAXIMUM_CAPACITY = 1 << 30;
   static final float DEFAULT_LOAD_FACTOR = 0.75f;

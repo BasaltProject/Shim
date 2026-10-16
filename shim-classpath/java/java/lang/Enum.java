@@ -25,7 +25,10 @@ package java.lang;
 
 import java.lang.reflect.Method;
 
-public abstract class Enum<E extends Enum<E>> implements Comparable<E>, java.lang.constant.Constable {
+public abstract class Enum<E extends Enum<E>> implements Comparable<E>, java.lang.constant.Constable,
+    java.io.Serializable {
+  private static final long serialVersionUID = 0L;
+
   private final String name;
   protected final int ordinal;
 

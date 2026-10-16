@@ -25,6 +25,8 @@ package java.lang;
 
 public final class Integer extends Number implements Comparable<Integer>,
     java.lang.constant.Constable, java.lang.constant.ConstantDesc {
+  private static final long serialVersionUID = 1360826667806852920L;
+
   public static final Class TYPE = shim.Classes.forCanonicalName("I");
 
   public static final int MIN_VALUE = 0x80000000;

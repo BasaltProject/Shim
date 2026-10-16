@@ -114,7 +114,69 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
   transient volatile Node<K, V>[] table;
   private transient volatile int sizeCtl;
   private transient volatile long baseCount;
-  private final transient Object lock = new Object();
+  private transient Object lock = new Object();
+
+  private static final long serialVersionUID = 7249069246763182397L;
+  private static final int kSegmentCount = 16;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("segments", Segment[].class),
+    new java.io.ObjectStreamField("segmentMask", Integer.TYPE),
+    new java.io.ObjectStreamField("segmentShift", Integer.TYPE)
+  };
+
+  static class Segment<K, V> extends java.util.concurrent.locks.ReentrantLock implements Serializable {
+    private static final long serialVersionUID = 2249069246763182397L;
+    final float loadFactor;
+
+    Segment(float lf) {
+      this.loadFactor = lf;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    int sshift = 0;
+    int ssize = 1;
+    while (ssize < kSegmentCount) {
+      ++sshift;
+      ssize <<= 1;
+    }
+    Segment<K, V>[] segments = (Segment<K, V>[]) new Segment<?, ?>[kSegmentCount];
+    for (int i = 0; i < segments.length; ++i) {
+      segments[i] = new Segment<K, V>(LOAD_FACTOR);
+    }
+    java.io.ObjectOutputStream.PutField streamFields = s.putFields();
+    streamFields.put("segments", segments);
+    streamFields.put("segmentShift", 32 - sshift);
+    streamFields.put("segmentMask", ssize - 1);
+    s.writeFields();
+    for (Map.Entry<K, V> e : entrySet()) {
+      s.writeObject(e.getKey());
+      s.writeObject(e.getValue());
+    }
+    s.writeObject(null);
+    s.writeObject(null);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.readFields();
+    lock = new Object();
+    for (;;) {
+      K k = (K) s.readObject();
+      V v = (V) s.readObject();
+      if (k == null) {
+        if (v != null) {
+          throw new java.io.InvalidObjectException("Null key with non-null value");
+        }
+        break;
+      }
+      if (v == null) {
+        throw new java.io.InvalidObjectException("Null value");
+      }
+      put(k, v);
+    }
+  }
 
   public ConcurrentHashMap() { }
 

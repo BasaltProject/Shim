@@ -7,6 +7,8 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 public class LinkedHashMap<K, V> extends HashMap<K, V> implements SequencedMap<K, V> {
+  private static final long serialVersionUID = 3801124242820219131L;
+
   static class Entry<K, V> extends HashMap.Node<K, V> {
     Entry<K, V> before, after;
 

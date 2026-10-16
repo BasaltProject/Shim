@@ -15,18 +15,45 @@ public class EnumMap<K extends Enum<K>, V>
     extends AbstractMap<K, V>
     implements Serializable, Cloneable {
 
-  private static final long serialVersionUID = 4586612460070145105L;
+  private static final long serialVersionUID = 458661240069192865L;
 
   private static final Object NULL = new Object();
 
   private final Class<K> keyType;
-  private final K[] keyUniverse;
+  private transient K[] keyUniverse;
   private transient Object[] vals;
   private transient int size = 0;
 
   private transient Set<K> keySet;
   private transient Collection<V> values;
   private transient Set<Map.Entry<K, V>> entrySet;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    s.defaultWriteObject();
+    s.writeInt(size);
+    for (int i = 0; i < vals.length; i++) {
+      if (vals[i] != null) {
+        s.writeObject(keyUniverse[i]);
+        s.writeObject(unmaskNull(vals[i]));
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    keyUniverse = getKeyUniverse(keyType);
+    vals = new Object[keyUniverse.length];
+    int count = s.readInt();
+    if (count < 0) {
+      throw new java.io.InvalidObjectException("Negative size: " + count);
+    }
+    for (int i = 0; i < count; i++) {
+      K key = (K) s.readObject();
+      V value = (V) s.readObject();
+      put(key, value);
+    }
+  }
 
   public EnumMap(Class<K> keyType) {
     this.keyType = Objects.requireNonNull(keyType, "keyType");

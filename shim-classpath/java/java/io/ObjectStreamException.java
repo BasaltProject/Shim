@@ -24,6 +24,8 @@
 package java.io;
 
 public class ObjectStreamException extends IOException {
+  private static final long serialVersionUID = 7260898174833392607L;
+
   public ObjectStreamException(String message) {
     super(message);
   }

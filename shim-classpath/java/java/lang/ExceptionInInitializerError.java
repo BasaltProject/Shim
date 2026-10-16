@@ -24,6 +24,8 @@
 package java.lang;
 
 public class ExceptionInInitializerError extends Error {
+  private static final long serialVersionUID = 1521711792217232256L;
+
   private final Throwable exception;
 
   public ExceptionInInitializerError(String message) {

@@ -23,79 +23,112 @@
 
 package java.util.zip;
 
-import java.io.OutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 public class DeflaterOutputStream extends FilterOutputStream {
-  protected final Deflater deflater;
-  protected final byte[] buffer;
+  protected Deflater def;
+  protected byte[] buf;
 
-  public DeflaterOutputStream(OutputStream out, Deflater deflater, int bufferSize)
-  {
+  private boolean closed;
+  private final boolean syncFlush;
+  boolean usesDefaultDeflater;
+
+  public DeflaterOutputStream(OutputStream out, Deflater def, int size, boolean syncFlush) {
     super(out);
-    this.deflater = deflater;
-    this.buffer = new byte[bufferSize];
+    if (out == null || def == null) {
+      throw new NullPointerException();
+    } else if (size <= 0) {
+      throw new IllegalArgumentException("buffer size <= 0");
+    }
+    this.def = def;
+    this.buf = new byte[size];
+    this.syncFlush = syncFlush;
   }
 
-  public DeflaterOutputStream(OutputStream out, Deflater deflater) {
-    this(out, deflater, 4 * 1024);
+  public DeflaterOutputStream(OutputStream out, Deflater def, int size) {
+    this(out, def, size, false);
+  }
+
+  public DeflaterOutputStream(OutputStream out, Deflater def, boolean syncFlush) {
+    this(out, def, 512, syncFlush);
+  }
+
+  public DeflaterOutputStream(OutputStream out, Deflater def) {
+    this(out, def, 512, false);
+  }
+
+  public DeflaterOutputStream(OutputStream out, boolean syncFlush) {
+    this(out, new Deflater(), 512, syncFlush);
+    usesDefaultDeflater = true;
   }
 
   public DeflaterOutputStream(OutputStream out) {
-    this(out, new Deflater());
+    this(out, false);
+    usesDefaultDeflater = true;
   }
 
   public void write(int b) throws IOException {
-    byte[] buffer = new byte[1];
-    buffer[0] = (byte)(b & 0xff);
-    write(buffer, 0, 1);
+    byte[] one = new byte[1];
+    one[0] = (byte) (b & 0xff);
+    write(one, 0, 1);
   }
 
-  public void write(byte[] b) throws IOException {
-    write(b, 0, b.length);
-  }
-
-  public void write(byte[] b, int offset, int length) throws IOException {
-    // error condition checking
-    if (deflater.finished()) {
-      throw new IOException("Already at end of stream");
-    } else if (offset < 0) {
-      throw new IndexOutOfBoundsException("Offset can't be less than zero");
-    } else if (length < 0) {
-      throw new IndexOutOfBoundsException("Length can't be less than zero");
-    } else if (b.length - (offset + length) < 0) {
-      throw new IndexOutOfBoundsException("Offset + Length is larger than the input byte array");
-    } else if (length == 0) {
+  public void write(byte[] b, int off, int len) throws IOException {
+    if (def.finished()) {
+      throw new IOException("write beyond end of stream");
+    }
+    java.util.Objects.checkFromIndexSize(off, len, b.length);
+    if (len == 0) {
       return;
     }
-
-    deflater.setInput(b, offset, length);
-    while (deflater.getRemaining() > 0) {
+    def.setInput(b, off, len);
+    while (!def.needsInput()) {
       deflate();
     }
   }
 
-  protected void deflate() throws IOException {
-    int len = deflater.deflate(buffer, 0, buffer.length);
-    if (len > 0) {
-      out.write(buffer, 0, len);
-    }
-  }
-
   public void finish() throws IOException {
-    if (!deflater.finished()) {
-      deflater.finish();
-      while (!deflater.finished()) {
+    if (!def.finished()) {
+      def.finish();
+      while (!def.finished()) {
         deflate();
       }
     }
   }
 
-  @Override
   public void close() throws IOException {
-    finish();
-    out.close();
-    deflater.dispose();
+    if (!closed) {
+      closed = true;
+      try {
+        finish();
+      } finally {
+        if (usesDefaultDeflater) {
+          def.end();
+        }
+      }
+      out.close();
+    }
+  }
+
+  protected void deflate() throws IOException {
+    int len = def.deflate(buf, 0, buf.length);
+    if (len > 0) {
+      out.write(buf, 0, len);
+    }
+  }
+
+  public void flush() throws IOException {
+    if (syncFlush && !def.finished()) {
+      int len;
+      while ((len = def.deflate(buf, 0, buf.length, Deflater.SYNC_FLUSH)) > 0) {
+        out.write(buf, 0, len);
+        if (len < buf.length) {
+          break;
+        }
+      }
+    }
+    out.flush();
   }
 }

@@ -22,6 +22,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class LinkedBlockingDeque<E> extends AbstractQueue<E>
     implements BlockingDeque<E>, Serializable {
+  private static final long serialVersionUID = -387911632671998426L;
+
 
   static final class Node<E> {
     E item;

@@ -23,6 +23,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class SynchronousQueue<E> extends AbstractQueue<E>
     implements BlockingQueue<E>, Serializable {
+  private static final long serialVersionUID = -3223113410248163686L;
+
 
   static final class Waiter<E> {
     final boolean isData;

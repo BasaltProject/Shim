@@ -16,9 +16,14 @@ public class Semaphore implements Serializable {
   private static final long serialVersionUID = -3222578661600680210L;
 
   private final boolean fair;
-  private final Object monitor = new Object();
+  private transient Object monitor = new Object();
   private int permits;
   private int waiters;
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    monitor = new Object();
+  }
 
   public Semaphore(int permits) {
     this(permits, false);

@@ -23,8 +23,39 @@
 
 package java.util;
 
-public class IdentityHashMap<K, V> implements Map<K, V> {
-  private final HelperHashMap<K, V> map;
+public class IdentityHashMap<K, V> implements Map<K, V>, java.io.Serializable, Cloneable {
+  private static final long serialVersionUID = 8188218128353913216L;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("size", Integer.TYPE)
+  };
+
+  private transient HelperHashMap<K, V> map;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField fields = s.putFields();
+    fields.put("size", map.size());
+    s.writeFields();
+    s.writeInt(map.size() * 2);
+    for (Entry<K, V> e : map.entrySet()) {
+      s.writeObject(e.getKey());
+      s.writeObject(e.getValue());
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    int size = s.readFields().get("size", 0);
+    if (size < 0) {
+      throw new java.io.StreamCorruptedException("Illegal mappings count: " + size);
+    }
+    int length = s.readInt();
+    map = new HelperHashMap(size, new MyHelper());
+    for (int i = 0; i < size; i++) {
+      K key = (K) s.readObject();
+      V value = (V) s.readObject();
+      map.put(key, value);
+    }
+  }
 
   public IdentityHashMap(int capacity) {
     map = new HelperHashMap(capacity, new MyHelper());

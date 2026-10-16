@@ -104,11 +104,45 @@ extern "C" JNIEXPORT void JNICALL
   e->SetIntArrayRegion(results, 0, 3, resultArray);
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+    Java_java_util_zip_Inflater_setDictionary(JNIEnv* e,
+                                              jclass,
+                                              jlong peer,
+                                              jbyteArray dictionary,
+                                              jint offset,
+                                              jint length)
+{
+  z_stream* s = reinterpret_cast<z_stream*>(peer);
+  jbyte* dict = static_cast<jbyte*>(malloc(length > 0 ? length : 1));
+  if (dict == 0) {
+    throwNew(e, "java/lang/OutOfMemoryError", 0);
+    return JNI_FALSE;
+  }
+  e->GetByteArrayRegion(dictionary, offset, length, dict);
+  int r = inflateSetDictionary(s, reinterpret_cast<Bytef*>(dict), length);
+  free(dict);
+  return r == Z_OK;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+    Java_java_util_zip_Inflater_getAdler(JNIEnv*, jclass, jlong peer)
+{
+  return static_cast<jint>(reinterpret_cast<z_stream*>(peer)->adler);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+    Java_java_util_zip_Inflater_message(JNIEnv* e, jclass, jlong peer)
+{
+  const char* m = reinterpret_cast<z_stream*>(peer)->msg;
+  return m ? e->NewStringUTF(m) : 0;
+}
+
 extern "C" JNIEXPORT jlong JNICALL
     Java_java_util_zip_Deflater_make(JNIEnv* e,
                                      jclass,
                                      jboolean nowrap,
-                                     jint level)
+                                     jint level,
+                                     jint strategy)
 {
   z_stream* s = static_cast<z_stream*>(malloc(sizeof(z_stream)));
   if (s == 0) {
@@ -118,7 +152,14 @@ extern "C" JNIEXPORT jlong JNICALL
 
   memset(s, 0, sizeof(z_stream));
 
-  int r = deflateInit2(s, level, (nowrap ? -15 : 15));
+  int r = deflateInit2_(s,
+                        level,
+                        Z_DEFLATED,
+                        (nowrap ? -15 : 15),
+                        8,
+                        strategy,
+                        ZLIB_VERSION,
+                        static_cast<int>(sizeof(z_stream)));
   if (r != Z_OK) {
     free(s);
     throwNew(e, "java/lang/RuntimeException", zError(r));
@@ -146,7 +187,10 @@ extern "C" JNIEXPORT void JNICALL
                                         jbyteArray output,
                                         jint outputOffset,
                                         jint outputLength,
-                                        jboolean finish,
+                                        jint flush,
+                                        jboolean setParams,
+                                        jint level,
+                                        jint strategy,
                                         jintArray results)
 {
   z_stream* s = reinterpret_cast<z_stream*>(peer);
@@ -171,15 +215,57 @@ extern "C" JNIEXPORT void JNICALL
   s->next_out = reinterpret_cast<Bytef*>(out);
   s->avail_out = outputLength;
 
-  int r = deflate(s, finish ? Z_FINISH : Z_NO_FLUSH);
-  jint resultArray[3] = {r,
+  jint paramsApplied = 0;
+  int r = Z_OK;
+  if (setParams) {
+    r = deflateParams(s, level, strategy);
+    if (r == Z_OK) {
+      paramsApplied = 1;
+    } else if (r == Z_BUF_ERROR) {
+      r = Z_OK;
+    }
+  }
+  if (r == Z_OK && (paramsApplied || !setParams)) {
+    r = deflate(s, flush);
+    if (r == Z_BUF_ERROR) {
+      r = Z_OK;
+    }
+  }
+  jint resultArray[4] = {r,
                          static_cast<jint>(inputLength - s->avail_in),
-                         static_cast<jint>(outputLength - s->avail_out)};
+                         static_cast<jint>(outputLength - s->avail_out),
+                         paramsApplied};
 
   free(in);
 
   e->SetByteArrayRegion(output, outputOffset, resultArray[2], out);
   free(out);
 
-  e->SetIntArrayRegion(results, 0, 3, resultArray);
+  e->SetIntArrayRegion(results, 0, 4, resultArray);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+    Java_java_util_zip_Deflater_setDictionary(JNIEnv* e,
+                                              jclass,
+                                              jlong peer,
+                                              jbyteArray dictionary,
+                                              jint offset,
+                                              jint length)
+{
+  z_stream* s = reinterpret_cast<z_stream*>(peer);
+  jbyte* dict = static_cast<jbyte*>(malloc(length > 0 ? length : 1));
+  if (dict == 0) {
+    throwNew(e, "java/lang/OutOfMemoryError", 0);
+    return JNI_FALSE;
+  }
+  e->GetByteArrayRegion(dictionary, offset, length, dict);
+  int r = deflateSetDictionary(s, reinterpret_cast<Bytef*>(dict), length);
+  free(dict);
+  return r == Z_OK;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+    Java_java_util_zip_Deflater_getAdler(JNIEnv*, jclass, jlong peer)
+{
+  return static_cast<jint>(reinterpret_cast<z_stream*>(peer)->adler);
 }

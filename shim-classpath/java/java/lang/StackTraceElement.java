@@ -23,7 +23,19 @@
 
 package java.lang;
 
-public class StackTraceElement {
+public class StackTraceElement implements java.io.Serializable {
+  private static final long serialVersionUID = 6992337162326171013L;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("classLoaderName", String.class),
+    new java.io.ObjectStreamField("moduleName", String.class),
+    new java.io.ObjectStreamField("moduleVersion", String.class),
+    new java.io.ObjectStreamField("declaringClass", String.class),
+    new java.io.ObjectStreamField("methodName", String.class),
+    new java.io.ObjectStreamField("fileName", String.class),
+    new java.io.ObjectStreamField("lineNumber", int.class),
+    new java.io.ObjectStreamField("format", byte.class)
+  };
+
   private static int NativeLine = -1;
 
   private String class_;
@@ -45,6 +57,27 @@ public class StackTraceElement {
     this.method = method;
     this.file = file;
     this.line = line;
+  }
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField fields = s.putFields();
+    fields.put("classLoaderName", (Object) null);
+    fields.put("moduleName", (Object) null);
+    fields.put("moduleVersion", (Object) null);
+    fields.put("declaringClass", class_);
+    fields.put("methodName", method);
+    fields.put("fileName", file);
+    fields.put("lineNumber", line);
+    fields.put("format", (byte) 0);
+    s.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField fields = s.readFields();
+    class_ = (String) fields.get("declaringClass", null);
+    method = (String) fields.get("methodName", null);
+    file = (String) fields.get("fileName", null);
+    line = fields.get("lineNumber", -1);
   }
 
   public int hashCode() {

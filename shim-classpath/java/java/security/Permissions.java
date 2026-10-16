@@ -29,6 +29,8 @@ import java.util.Set;
 import java.util.HashSet;
 
 public class Permissions extends PermissionCollection {
+  private static final long serialVersionUID = 4858622370623524688L;
+
   private final Map<Class,PermissionCollection> collections = new HashMap();
 
   public void add(Permission p) {

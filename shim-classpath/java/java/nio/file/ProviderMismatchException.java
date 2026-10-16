@@ -9,7 +9,7 @@
 package java.nio.file;
 
 public class ProviderMismatchException extends IllegalArgumentException {
-  private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = 4990847485741612530L;
 
   public ProviderMismatchException() { }
 

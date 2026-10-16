@@ -8,6 +8,8 @@
 package java.util;
 
 public class IllegalFormatWidthException extends IllegalFormatException {
+  private static final long serialVersionUID = 16660902L;
+
   private final int width;
 
   public IllegalFormatWidthException(int width) {
