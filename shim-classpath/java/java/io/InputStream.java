@@ -60,6 +60,22 @@ public abstract class InputStream implements Closeable {
     return count - remaining;    
   }
 
+  public void skipNBytes(long n) throws IOException {
+    while (n > 0) {
+      long ns = skip(n);
+      if (ns > 0 && ns <= n) {
+        n -= ns;
+      } else if (ns == 0) {
+        if (read() == -1) {
+          throw new EOFException();
+        }
+        n--;
+      } else {
+        throw new IOException("Unable to skip exactly");
+      }
+    }
+  }
+
   public int available() throws IOException {
     return 0;
   }
@@ -192,6 +208,14 @@ public abstract class InputStream implements Closeable {
       public long skip(long n) throws IOException {
         ensureOpen();
         return 0;
+      }
+
+      @Override
+      public void skipNBytes(long n) throws IOException {
+        ensureOpen();
+        if (n > 0) {
+          throw new EOFException();
+        }
       }
 
       @Override

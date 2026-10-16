@@ -146,6 +146,14 @@ public class ByteArrayOutputStream extends OutputStream {
     return new String(toByteArray(), encoding);
   }
 
+  public String toString(java.nio.charset.Charset charset) {
+    return new String(toByteArray(), charset);
+  }
+
+  public void writeBytes(byte[] b) {
+    write(b, 0, b.length);
+  }
+
   private static class Cell {
     public byte[] array;
     public int offset;

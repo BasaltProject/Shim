@@ -24,6 +24,8 @@
 package java.io;
 
 import java.nio.CharBuffer;
+import java.util.List;
+import java.util.Objects;
 
 public abstract class Reader implements Closeable, Readable {
   public int read(CharBuffer buffer) throws IOException {
@@ -67,10 +69,43 @@ public abstract class Reader implements Closeable, Readable {
     throw new IOException("reset not supported");
   }
 
+  public long skip(long n) throws IOException {
+    if (n < 0L) {
+      throw new IllegalArgumentException("skip value is negative");
+    }
+    int nn = (int) Math.min(n, 8192L);
+    char[] skipBuffer = new char[nn];
+    long r = n;
+    while (r > 0) {
+      int nc = read(skipBuffer, 0, (int) Math.min(r, nn));
+      if (nc == -1) break;
+      r -= nc;
+    }
+    return n - r;
+  }
+
+  public boolean ready() throws IOException {
+    return false;
+  }
+
+  public String readAllAsString() throws IOException {
+    StringBuilder sb = new StringBuilder();
+    char[] buf = new char[8192];
+    int n;
+    while ((n = read(buf, 0, buf.length)) != -1) {
+      sb.append(buf, 0, n);
+    }
+    return sb.toString();
+  }
+
+  public List<String> readAllLines() throws IOException {
+    return readAllAsString().lines().toList();
+  }
+
   public abstract void close() throws IOException;
 
   public long transferTo(Writer out) throws IOException {
-    java.util.Objects.requireNonNull(out, "out");
+    Objects.requireNonNull(out, "out");
     long transferred = 0;
     char[] buffer = new char[8192];
     int count;
@@ -99,12 +134,110 @@ public abstract class Reader implements Closeable, Readable {
 
       @Override
       public int read(char[] cbuf, int off, int len) throws IOException {
-        java.util.Objects.checkFromIndexSize(off, len, cbuf.length);
+        Objects.checkFromIndexSize(off, len, cbuf.length);
         ensureOpen();
         if (len == 0) {
           return 0;
         }
         return -1;
+      }
+
+      @Override
+      public void close() {
+        closed = true;
+      }
+    };
+  }
+
+  public static Reader of(CharSequence cs) {
+    Objects.requireNonNull(cs, "cs");
+    return new Reader() {
+      private int next = 0;
+      private int mark = 0;
+      private boolean closed = false;
+
+      private void ensureOpen() throws IOException {
+        if (closed) {
+          throw new IOException("Stream closed");
+        }
+      }
+
+      @Override
+      public int read() throws IOException {
+        ensureOpen();
+        if (next >= cs.length()) {
+          return -1;
+        }
+        return (int) cs.charAt(next++);
+      }
+
+      @Override
+      public int read(char[] cbuf, int off, int len) throws IOException {
+        Objects.checkFromIndexSize(off, len, cbuf.length);
+        ensureOpen();
+        if (len == 0) {
+          return 0;
+        }
+        int lenTotal = cs.length();
+        if (next >= lenTotal) {
+          return -1;
+        }
+        int count = Math.min(lenTotal - next, len);
+        for (int i = 0; i < count; i++) {
+          cbuf[off + i] = cs.charAt(next++);
+        }
+        return count;
+      }
+
+      @Override
+      public String readAllAsString() throws IOException {
+        ensureOpen();
+        String res = cs.subSequence(next, cs.length()).toString();
+        next += res.length();
+        return res;
+      }
+
+      @Override
+      public List<String> readAllLines() throws IOException {
+        return readAllAsString().lines().toList();
+      }
+
+      @Override
+      public long skip(long n) throws IOException {
+        ensureOpen();
+        if (next >= cs.length()) {
+          return 0L;
+        }
+        long r = Math.min((long) (cs.length() - next), n);
+        r = Math.max((long) -next, r);
+        next += (int) r;
+        return r;
+      }
+
+      @Override
+      public boolean ready() throws IOException {
+        ensureOpen();
+        return true;
+      }
+
+      @Override
+      public boolean markSupported() {
+        return true;
+      }
+
+      @Override
+      public void mark(int readAheadLimit) throws IOException {
+        if (readAheadLimit < 0) {
+          throw new IllegalArgumentException("Read-ahead limit < 0");
+        }
+        ensureOpen();
+        mark = next;
+      }
+
+      @Override
+      public void reset() throws IOException {
+        ensureOpen();
+        next = mark;
       }
 
       @Override
