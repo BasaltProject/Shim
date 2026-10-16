@@ -3301,6 +3301,78 @@ GcClass* makeArrayClass(Thread* t,
   return c;
 }
 
+static GcLoadingConstraint* constraintRoot(GcLoadingConstraint* group)
+{
+  while (group && group->parent()) group = group->parent();
+  return group;
+}
+
+static GcLoadingConstraint* constraintForName(Thread* t, GcClassLoader* loader, GcByteArray* name)
+{
+  PROTECT(t, loader);
+  PROTECT(t, name);
+  if (!loader->constraints()) {
+    GcHashMap* map = makeHashMap(t, 0, 0);
+    loader->setConstraints(t, map);
+  }
+  GcLoadingConstraint* group = cast<GcLoadingConstraint>(t,
+      hashMapFind(t, cast<GcHashMap>(t, loader->constraints()), name, byteArrayHash, byteArrayEqual));
+  if (!group) {
+    GcClass* bound = findLoadedClass(t, loader, name);
+    PROTECT(t, bound);
+    group = makeLoadingConstraint(t, bound, 0, 0);
+    PROTECT(t, group);
+    hashMapInsert(t, cast<GcHashMap>(t, loader->constraints()), name, group, byteArrayHash);
+  }
+  return constraintRoot(group);
+}
+
+static void checkLoadingConstraint(Thread* t, GcClassLoader* loader, GcClass* class_, bool bind)
+{
+  if (!loader->constraints()) return;
+  GcLoadingConstraint* group = constraintRoot(cast<GcLoadingConstraint>(t,
+      hashMapFind(t, cast<GcHashMap>(t, loader->constraints()), class_->name(), byteArrayHash, byteArrayEqual)));
+  if (group) {
+    if (group->bound() && group->bound() != class_) {
+      throwNew(t, GcLinkageError::Type, "Loading constraint violated: %s", class_->name()->body().begin());
+    }
+    if (bind) group->setBound(t, class_);
+  }
+}
+
+static void imposeLoadingConstraints(Thread* t, GcClassLoader* left, GcClassLoader* right, GcByteArray* spec)
+{
+  if (left == right) return;
+  PROTECT(t, left);
+  PROTECT(t, right);
+  PROTECT(t, spec);
+  ACQUIRE(t, t->m->classLock);
+  for (unsigned i = 0; i + 1 < spec->length(); ++i) {
+    if (spec->body()[i] != 'L') continue;
+    unsigned start = ++i;
+    while (i + 1 < spec->length() && spec->body()[i] != ';') ++i;
+    GcByteArray* name = makeByteArray(t, i - start + 1);
+    PROTECT(t, name);
+    memcpy(name->body().begin(), &spec->body()[start], i - start);
+    GcLoadingConstraint* a = constraintForName(t, left, name);
+    PROTECT(t, a);
+    GcLoadingConstraint* b = constraintForName(t, right, name);
+    PROTECT(t, b);
+    if (a == b) continue;
+    if (a->bound() && b->bound() && a->bound() != b->bound()) {
+      throwNew(t, GcLinkageError::Type, "Loading constraint violated: %s", name->body().begin());
+    }
+    if (a->rank() < b->rank()) {
+      GcLoadingConstraint* swap = a;
+      a = b;
+      b = swap;
+    }
+    if (!a->bound()) a->setBound(t, b->bound());
+    b->setParent(t, a);
+    if (a->rank() == b->rank()) ++a->rank();
+  }
+}
+
 void saveLoadedClass(Thread* t, GcClassLoader* loader, GcClass* c)
 {
   PROTECT(t, loader);
@@ -3313,8 +3385,15 @@ void saveLoadedClass(Thread* t, GcClassLoader* loader, GcClass* c)
     loader->setMap(t, map);
   }
 
+  GcClass* previous = cast<GcClass>(t, hashMapFind(t, cast<GcHashMap>(t, loader->map()),
+      c->name(), byteArrayHash, byteArrayEqual));
+  if (previous && previous != c) {
+    throwNew(t, GcLinkageError::Type, "Duplicate class definition: %s", c->name()->body().begin());
+  }
+  checkLoadingConstraint(t, loader, c, false);
   hashMapInsert(
       t, cast<GcHashMap>(t, loader->map()), c->name(), c, byteArrayHash);
+  checkLoadingConstraint(t, loader, c, true);
 }
 
 GcClass* makeArrayClass(Thread* t,
@@ -5089,10 +5168,12 @@ GcClass* parseClass(Thread* t,
                     const uint8_t* data,
                     unsigned size,
                     Gc::Type throwType,
-                    GcClass* hiddenHost)
+                    GcClass* hiddenHost,
+                    GcByteArray* expectedName)
 {
   PROTECT(t, loader);
   PROTECT(t, hiddenHost);
+  PROTECT(t, expectedName);
 
   class Client : public Stream::Client {
    public:
@@ -5143,6 +5224,27 @@ GcClass* parseClass(Thread* t,
 
   unsigned flags = s.read2();
   unsigned name = s.read2();
+  requireConstantTag(t, poolTags, name - 1, CONSTANT_Class);
+  GcByteArray* definitionName = cast<GcReference>(t, singletonObject(t, pool, name - 1))->name();
+  PROTECT(t, definitionName);
+  unsigned nameLength = definitionName->length() - 1;
+  bool component = false;
+  for (unsigned i = 0; i < nameLength; ++i) {
+    unsigned c = definitionName->body()[i];
+    if (c == '.' || c == ';' || c == '[' || (c == '/' && !component)) {
+      throwNew(t, GcClassFormatError::Type, "Invalid class definition name");
+    }
+    component = c != '/';
+  }
+  if (!component) throwNew(t, GcClassFormatError::Type, "Invalid class definition name");
+  if (expectedName && !byteArrayEqual(t, expectedName, definitionName)) {
+    throwNew(t, GcNoClassDefFoundError::Type, "Wrong class name: %s", definitionName->body().begin());
+  }
+  if (loader != roots(t)->bootLoader() && nameLength > 5
+      && memcmp(definitionName->body().begin(), "java/", 5) == 0) {
+    throwNew(t, GcSecurityException::Type, "Prohibited package: java");
+  }
+
 
   GcClass* class_ = (GcClass*)makeClass(
       t,
@@ -5307,7 +5409,8 @@ uint64_t runParseClass(Thread* t, uintptr_t* arguments)
   Gc::Type throwType = static_cast<Gc::Type>(arguments[2]);
 
   return reinterpret_cast<uintptr_t>(
-      parseClass(t, loader, region->start(), region->length(), throwType));
+      parseClass(t, loader, region->start(), region->length(), throwType, 0,
+          cast<GcByteArray>(t, reinterpret_cast<object>(arguments[3]))));
 }
 
 GcClass* resolveSystemClass(Thread* t,
@@ -5339,12 +5442,31 @@ GcClass* resolveSystemClass(Thread* t,
       PROTECT(t, sysLoader);
 
       THREAD_RUNTIME_ARRAY(t, char, file, spec->length() + 6);
-      memcpy(
-          RUNTIME_ARRAY_BODY(file), spec->body().begin(), spec->length() - 1);
-      memcpy(RUNTIME_ARRAY_BODY(file) + spec->length() - 1, ".class", 7);
+      unsigned fileLength = 0;
+      bool validPath = true;
+      // Class symbols use modified UTF-8; filesystem and ZIP paths use UTF-8.
+      for (unsigned i = 0; i + 1 < spec->length();) {
+        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(spec->body().begin());
+        if (i + 6 < spec->length() && bytes[i] == 0xed && (bytes[i + 1] & 0xf0) == 0xa0
+            && (bytes[i + 2] & 0xc0) == 0x80 && bytes[i + 3] == 0xed
+            && (bytes[i + 4] & 0xf0) == 0xb0 && (bytes[i + 5] & 0xc0) == 0x80) {
+          unsigned high = ((bytes[i + 1] & 0x0f) << 6) | (bytes[i + 2] & 0x3f);
+          unsigned low = ((bytes[i + 4] & 0x0f) << 6) | (bytes[i + 5] & 0x3f);
+          unsigned cp = 0x10000 + (high << 10) + low;
+          RUNTIME_ARRAY_BODY(file)[fileLength++] = 0xf0 | (cp >> 18);
+          RUNTIME_ARRAY_BODY(file)[fileLength++] = 0x80 | ((cp >> 12) & 0x3f);
+          RUNTIME_ARRAY_BODY(file)[fileLength++] = 0x80 | ((cp >> 6) & 0x3f);
+          RUNTIME_ARRAY_BODY(file)[fileLength++] = 0x80 | (cp & 0x3f);
+          i += 6;
+        } else {
+          if (bytes[i] == 0 || (bytes[i] == 0xc0 && bytes[i + 1] == 0x80)) validPath = false;
+          RUNTIME_ARRAY_BODY(file)[fileLength++] = bytes[i++];
+        }
+      }
+      memcpy(RUNTIME_ARRAY_BODY(file) + fileLength, ".class", 7);
 
-      System::Region* region = static_cast<Finder*>(sysLoader->finder())
-                                   ->find(RUNTIME_ARRAY_BODY(file));
+      System::Region* region = validPath ? static_cast<Finder*>(sysLoader->finder())
+                                   ->find(RUNTIME_ARRAY_BODY(file)) : 0;
 
       if (region) {
         if (Verbose) {
@@ -5356,7 +5478,8 @@ GcClass* resolveSystemClass(Thread* t,
 
           uintptr_t arguments[] = {reinterpret_cast<uintptr_t>(loader),
                                    reinterpret_cast<uintptr_t>(region),
-                                   static_cast<uintptr_t>(throwType)};
+                                   static_cast<uintptr_t>(throwType),
+                                   reinterpret_cast<uintptr_t>(spec)};
 
           // parse class file
           class_ = cast<GcClass>(
@@ -5411,8 +5534,10 @@ GcClass* resolveSystemClass(Thread* t,
     }
 
     if (class_) {
+      checkLoadingConstraint(t, loader, class_, false);
       hashMapInsert(
           t, cast<GcHashMap>(t, loader->map()), spec, class_, byteArrayHash);
+      checkLoadingConstraint(t, loader, class_, true);
 
       updatePackageMap(t, class_);
     } else if (throw_) {
@@ -5490,7 +5615,12 @@ GcClass* resolveClass(Thread* t,
               RUNTIME_ARRAY_BODY(s),
               reinterpret_cast<char*>(spec->body().begin()));
 
-      GcString* specString = makeString(t, "%s", RUNTIME_ARRAY_BODY(s));
+      GcByteArray* binaryName = makeByteArray(t, "%s", RUNTIME_ARRAY_BODY(s));
+      object nameData = parseUtf8(t, binaryName);
+      PROTECT(t, nameData);
+      unsigned nameLength = objectClass(t, nameData) == type(t, GcByteArray::Type)
+          ? cast<GcByteArray>(t, nameData)->length() : cast<GcCharArray>(t, nameData)->length();
+      GcString* specString = t->m->classpath->makeString(t, nameData, 0, nameLength - 1);
       PROTECT(t, specString);
 
       uintptr_t arguments[] = {reinterpret_cast<uintptr_t>(method),
@@ -5502,13 +5632,20 @@ GcClass* resolveClass(Thread* t,
 
       if (LIKELY(jc)) {
         c = jc->vmClass();
+        if ((c->vmFlags() & PrimitiveFlag) || c->arrayDimensions()
+            || !byteArrayEqual(t, spec, c->name())) {
+          if (throw_) throwNew(t, throwType, "Wrong class returned for %s", spec->body().begin());
+          return 0;
+        }
       } else if (t->exception) {
         if (throw_) {
-          GcThrowable* e
-              = type(t, throwType) == objectClass(t, t->exception)
-                    ? t->exception
-                    : makeThrowable(t, throwType, specString, 0, t->exception);
+          GcThrowable* e = t->exception;
+          PROTECT(t, e);
           t->exception = 0;
+          if (throwType == GcNoClassDefFoundError::Type
+              && instanceOf(t, type(t, GcClassNotFoundException::Type), e)) {
+            e = makeThrowable(t, throwType, specString, 0, e);
+          }
           vm::throw_(t, e);
         } else {
           t->exception = 0;
@@ -5526,6 +5663,30 @@ GcClass* resolveClass(Thread* t,
 
     return c;
   }
+}
+
+object resolveMember(Thread* t,
+                     GcClassLoader* loader,
+                     GcClass* class_,
+                     GcByteArray* name,
+                     GcByteArray* spec,
+                     object (*find)(Thread*, GcClass*, GcByteArray*, GcByteArray*),
+                     Gc::Type errorType,
+                     bool throw_)
+{
+  PROTECT(t, loader);
+  PROTECT(t, class_);
+  PROTECT(t, name);
+  PROTECT(t, spec);
+  object member = findInHierarchy(t, class_, name, spec, find, errorType, throw_);
+  if (member) {
+    PROTECT(t, member);
+    GcClass* declaring = objectClass(t, member) == type(t, GcMethod::Type)
+        ? cast<GcMethod>(t, member)->class_() : cast<GcField>(t, member)->class_();
+    if (!throw_ && loader != declaring->loader()) return 0;
+    imposeLoadingConstraints(t, loader, declaring->loader(), spec);
+  }
+  return member;
 }
 
 GcMethod* resolveMethod(Thread* t,
@@ -6378,12 +6539,14 @@ GcClass* defineClass(Thread* t,
                      GcClassLoader* loader,
                      const uint8_t* buffer,
                      unsigned length,
-                     GcClass* hiddenTarget)
+                     GcClass* hiddenTarget,
+                     GcByteArray* expectedName)
 {
   PROTECT(t, loader);
   PROTECT(t, hiddenTarget);
+  PROTECT(t, expectedName);
 
-  GcClass* c = parseClass(t, loader, buffer, length);
+  GcClass* c = parseClass(t, loader, buffer, length, GcNoClassDefFoundError::Type, 0, expectedName);
 
   PROTECT(t, c);
 

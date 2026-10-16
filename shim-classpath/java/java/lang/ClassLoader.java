@@ -166,21 +166,28 @@ public abstract class ClassLoader {
     return unnamedModule;
   }
 
-  protected Class defineClass(String name, byte[] b, int offset, int length) {
-    if (b == null) {
-      throw new NullPointerException();
-    }
-
-    if (offset < 0 || offset > length || offset + length > b.length) {
-      throw new IndexOutOfBoundsException();
-    }
-
-    return shim.SystemClassLoader.getClass
-      (shim.Classes.defineVMClass(this, b, offset, length));
+  @Deprecated
+  protected final Class defineClass(byte[] b, int offset, int length) {
+    return defineClass(null, b, offset, length);
   }
 
-  protected Class defineClass(String name, byte[] b, int offset, int length,
-                              ProtectionDomain domain)
+  protected final Class defineClass(String name, byte[] b, int offset, int length) {
+    if (name != null) {
+      if (name.indexOf('/') >= 0 || name.startsWith("[")) {
+        throw new NoClassDefFoundError("Illegal name: " + name);
+      }
+      if (name.startsWith("java.")) throw new SecurityException("Prohibited package: " + name);
+    }
+    if (b == null) throw new NullPointerException();
+    if (offset < 0 || length < 0 || offset > b.length || length > b.length - offset) {
+      throw new ArrayIndexOutOfBoundsException();
+    }
+    return shim.SystemClassLoader.getClass
+      (shim.Classes.defineNamedVMClass(this, name, b, offset, length));
+  }
+
+  protected final Class defineClass(String name, byte[] b, int offset, int length,
+                                    ProtectionDomain domain)
   {
     return defineClass(name, b, offset, length);
   }

@@ -48,6 +48,9 @@ public class Classes {
   public static native VMClass defineVMClass
     (ClassLoader loader, byte[] b, int offset, int length);
 
+  public static native VMClass defineNamedVMClass
+    (ClassLoader loader, String name, byte[] b, int offset, int length);
+
   public static native VMClass defineLambdaVMClass(ClassLoader loader, byte[] bytes, VMClass target);
 
   public static native VMClass defineHiddenVMClass(VMClass host, byte[] bytes);
@@ -63,6 +66,9 @@ public class Classes {
   public static native VMMethod toVMMethod(Method m);
 
   private static native VMClass resolveVMClass(ClassLoader loader, byte[] spec)
+    throws ClassNotFoundException;
+
+  private static native VMClass resolveNamedVMClass(ClassLoader loader, String name)
     throws ClassNotFoundException;
 
   public static VMClass loadVMClass(ClassLoader loader,
@@ -276,10 +282,6 @@ public class Classes {
           for (int i = 0, count = declaredMethodCount(c); i < count; ++i) {
             VMMethod m = methodTable[i];
 
-            for (int j = 1; j < m.spec.length;) {
-              j = resolveSpec(loader, m.spec, j);
-            }
-
             parseAnnotationTable(loader, m.addendum);
           }
         }
@@ -287,8 +289,6 @@ public class Classes {
         if (c.fieldTable != null) {
           for (int i = 0; i < c.fieldTable.length; ++i) {
             VMField f = c.fieldTable[i];
-
-            resolveSpec(loader, f.spec, 0);
 
             parseAnnotationTable(loader, f.addendum);
           }
@@ -305,6 +305,40 @@ public class Classes {
     link(c, c.loader);
   }
 
+  private static void linkDeclaredMethods(VMClass c, boolean constructors, boolean publicOnly) {
+    link(c);
+    acquireClassLock();
+    try {
+      if (c.methodTable == null) return;
+      for (int i = 0, count = declaredMethodCount(c); i < count; ++i) {
+        VMMethod method = c.methodTable[i];
+        String name = toString(method.name);
+        boolean constructor = name.equals("<init>");
+        if ((constructors ? !constructor : name.startsWith("<"))
+            || (publicOnly && (method.flags & Modifier.PUBLIC) == 0)) continue;
+        for (int j = 1; j < method.spec.length;) j = resolveSpec(c.loader, method.spec, j);
+      }
+    } finally {
+      releaseClassLock();
+    }
+  }
+
+  public static void linkConstructors(VMClass c, boolean publicOnly) {
+    linkDeclaredMethods(c, true, publicOnly);
+  }
+
+  public static void linkFields(VMClass c) {
+    link(c);
+    acquireClassLock();
+    try {
+      if (c.fieldTable != null) {
+        for (VMField field : c.fieldTable) resolveSpec(c.loader, field.spec, 0);
+      }
+    } finally {
+      releaseClassLock();
+    }
+  }
+
   public static Class forName(String name, boolean initialize,
                               ClassLoader loader)
     throws ClassNotFoundException
@@ -313,8 +347,6 @@ public class Classes {
       loader = SystemClassLoader.bootLoader();
     }
     if (name.indexOf('/') != -1) throw new ClassNotFoundException(name);
-    Class c;
-    VMClass vmc;
     if (name.startsWith("[")) {
       int rank = 0;
       while (rank < name.length() && name.charAt(rank) == '[') ++rank;
@@ -326,16 +358,9 @@ public class Classes {
         valid = rank + 1 == name.length() && "ZBCSIJFD".indexOf(name.charAt(rank)) != -1;
       }
       if (!valid) throw new ClassNotFoundException(name);
-      byte[] bytes = name.replace('.', '/').getBytes(java.nio.charset.StandardCharsets.UTF_8);
-      byte[] spec = new byte[bytes.length + 1];
-      System.arraycopy(bytes, 0, spec, 0, bytes.length);
-      vmc = resolveVMClass(loader, spec);
-      c = SystemClassLoader.getClass(vmc);
-    } else {
-      c = loader.loadClass(name);
-      vmc = SystemClassLoader.vmClass(c);
     }
-    link(vmc, vmc.loader);
+    VMClass vmc = resolveNamedVMClass(loader, name);
+    Class c = SystemClassLoader.getClass(vmc);
     if (initialize) {
       initialize(vmc);
     }
@@ -418,7 +443,7 @@ public class Classes {
 
   public static int findField(VMClass vmClass, String name) {
     if (vmClass.fieldTable != null) {
-      link(vmClass);
+      linkFields(vmClass);
 
       for (int i = 0; i < vmClass.fieldTable.length; ++i) {
         if (toString(vmClass.fieldTable[i].name).equals(name)) {
@@ -487,7 +512,7 @@ public class Classes {
   {
     VMMethod[] methodTable = vmClass.methodTable;
     if (methodTable != null) {
-      link(vmClass);
+      linkDeclaredMethods(vmClass, name.equals("<init>"), false);
 
       if (parameterTypes == null) {
         parameterTypes = new Class[0];
@@ -525,7 +550,7 @@ public class Classes {
     Method[] array = new Method[countMethods(vmClass, publicOnly)];
     VMMethod[] methodTable = vmClass.methodTable;
     if (methodTable != null) {
-      link(vmClass);
+      linkDeclaredMethods(vmClass, false, publicOnly);
 
       int ai = 0;
       for (int i = 0, j = declaredMethodCount(vmClass); i < j; ++i) {
@@ -559,7 +584,7 @@ public class Classes {
   public static Field[] getFields(VMClass vmClass, boolean publicOnly) {
     Field[] array = new Field[countFields(vmClass, publicOnly)];
     if (vmClass.fieldTable != null) {
-      link(vmClass);
+      linkFields(vmClass);
 
       int ai = 0;
       for (int i = 0; i < vmClass.fieldTable.length; ++i) {

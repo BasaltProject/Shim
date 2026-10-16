@@ -32,6 +32,41 @@ using namespace vm;
 
 namespace {
 
+GcByteArray* classNameSpec(Thread* t, GcString* name, bool replaceDots)
+{
+  PROTECT(t, name);
+  auto charAt = [&](unsigned index) -> unsigned {
+    object data = name->data();
+    unsigned offset = name->offset(t) + index;
+    return objectClass(t, data) == type(t, GcByteArray::Type)
+        ? static_cast<uint8_t>(cast<GcByteArray>(t, data)->body()[offset])
+        : cast<GcCharArray>(t, data)->body()[offset];
+  };
+  uint64_t length = 0;
+  for (unsigned i = 0; i < name->length(t); ++i) {
+    unsigned c = charAt(i);
+    length += c && c < 0x80 ? 1 : c < 0x800 ? 2 : 3;
+  }
+  if (length > 0x7ffffffe) throwNew(t, GcOutOfMemoryError::Type);
+  GcByteArray* spec = makeByteArray(t, length + 1);
+  unsigned position = 0;
+  for (unsigned i = 0; i < name->length(t); ++i) {
+    unsigned c = charAt(i);
+    if (replaceDots && c == '.') c = '/';
+    if (c && c < 0x80) {
+      spec->body()[position++] = c;
+    } else if (c < 0x800) {
+      spec->body()[position++] = 0xc0 | (c >> 6);
+      spec->body()[position++] = 0x80 | (c & 0x3f);
+    } else {
+      spec->body()[position++] = 0xe0 | (c >> 12);
+      spec->body()[position++] = 0x80 | ((c >> 6) & 0x3f);
+      spec->body()[position++] = 0x80 | (c & 0x3f);
+    }
+  }
+  return spec;
+}
+
 int64_t search(Thread* t,
                GcClassLoader* loader,
                GcString* name,
@@ -42,14 +77,7 @@ int64_t search(Thread* t,
     PROTECT(t, loader);
     PROTECT(t, name);
 
-    unsigned length = stringUTFLength(t, name);
-    GcByteArray* n = makeByteArray(t, length + 1);
-    char* s = reinterpret_cast<char*>(n->body().begin());
-    stringUTFChars(t, name, s, length);
-
-    if (replaceDots) {
-      replace('.', '/', s);
-    }
+    GcByteArray* n = classNameSpec(t, name, replaceDots);
 
     return reinterpret_cast<int64_t>(op(t, loader, n));
   } else {
@@ -63,6 +91,11 @@ GcClass* resolveSystemClassThrow(Thread* t,
 {
   return resolveSystemClass(
       t, loader, spec, true, GcClassNotFoundException::Type);
+}
+
+GcClass* resolveClassThrow(Thread* t, GcClassLoader* loader, GcByteArray* spec)
+{
+  return resolveClass(t, loader, spec, true, GcClassNotFoundException::Type);
 }
 
 GcField* fieldForOffsetInClass(Thread* t, GcClass* c, unsigned offset)
@@ -118,6 +151,26 @@ GcField* fieldForOffset(Thread* t, object o, unsigned offset)
   }
 }
 
+GcClass* defineClassBytes(Thread* t, GcClassLoader* loader, GcByteArray* bytes,
+                         int32_t offset, int32_t length, GcByteArray* expectedName)
+{
+  if (loader == 0) loader = roots(t)->bootLoader();
+  PROTECT(t, loader);
+  PROTECT(t, bytes);
+  PROTECT(t, expectedName);
+  if (bytes == 0) throwNew(t, GcNullPointerException::Type);
+  if (offset < 0 || length < 0 || static_cast<unsigned>(offset) > bytes->length()
+      || static_cast<unsigned>(length) > bytes->length() - static_cast<unsigned>(offset)) {
+    throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+  }
+  unsigned size = length ? static_cast<unsigned>(length) : 1;
+  uint8_t* buffer = static_cast<uint8_t*>(t->m->heap->tryAllocate(size));
+  if (!buffer) throwNew(t, GcOutOfMemoryError::Type, "Class definition storage exhausted");
+  THREAD_RESOURCE2(t, uint8_t*, buffer, unsigned, size, t->m->heap->free(buffer, size));
+  if (length) memcpy(buffer, &bytes->body()[offset], length);
+  return defineClass(t, loader, buffer, length, 0, expectedName);
+}
+
 }  // namespace
 
 extern "C" SHIM_EXPORT int64_t JNICALL
@@ -168,6 +221,15 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_resolveNamedVMClass(Thread* t, object, uintptr_t* arguments)
+{
+  GcClassLoader* loader = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
+  if (loader == 0) loader = roots(t)->bootLoader();
+  GcString* name = cast<GcString>(t, reinterpret_cast<object>(arguments[1]));
+  return search(t, loader, name, resolveClassThrow, true);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_Thread_nextThreadId(Thread* t, object, uintptr_t*)
 {
   return static_cast<int64_t>(allocateThreadId(t));
@@ -176,21 +238,25 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_shim_Classes_defineVMClass(Thread* t, object, uintptr_t* arguments)
 {
-  GcClassLoader* loader
-      = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
-  if (loader == 0) loader = roots(t)->bootLoader();
-  GcByteArray* b = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[1]));
-  int offset = arguments[2];
-  int length = arguments[3];
+  return reinterpret_cast<int64_t>(defineClassBytes(t,
+      cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0])),
+      cast<GcByteArray>(t, reinterpret_cast<object>(arguments[1])),
+      arguments[2], arguments[3], 0));
+}
 
-  uint8_t* buffer = static_cast<uint8_t*>(t->m->heap->allocate(length));
-
-  THREAD_RESOURCE2(
-      t, uint8_t*, buffer, int, length, t->m->heap->free(buffer, length));
-
-  memcpy(buffer, &b->body()[offset], length);
-
-  return reinterpret_cast<int64_t>(defineClass(t, loader, buffer, length));
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Classes_defineNamedVMClass(Thread* t, object, uintptr_t* arguments)
+{
+  GcClassLoader* loader = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
+  GcString* name = cast<GcString>(t, reinterpret_cast<object>(arguments[1]));
+  GcByteArray* bytes = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[2]));
+  PROTECT(t, loader);
+  PROTECT(t, name);
+  PROTECT(t, bytes);
+  GcByteArray* expected = 0;
+  PROTECT(t, expected);
+  if (name) expected = classNameSpec(t, name, true);
+  return reinterpret_cast<int64_t>(defineClassBytes(t, loader, bytes, arguments[3], arguments[4], expected));
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
