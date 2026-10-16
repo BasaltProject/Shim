@@ -35,9 +35,23 @@ public abstract class Permission {
     return name;
   }
   
+  public boolean implies(Permission permission) {
+    return equals(permission);
+  }
+
+  public String getActions() {
+    return "";
+  }
+
+  public void checkGuard(Object object) throws SecurityException { }
+
   @Override
   public String toString() {
-    return this.getClass().getSimpleName() + '['+name+']';
+    String actions = getActions();
+    if (actions == null || actions.isEmpty()) {
+      return "(\"" + getClass().getName() + "\" \"" + name + "\")";
+    }
+    return "(\"" + getClass().getName() + "\" \"" + name + "\" \"" + actions + "\")";
   }
   
   public PermissionCollection newPermissionCollection() {
