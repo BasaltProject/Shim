@@ -24,110 +24,15 @@
 package java.io;
 
 import java.nio.CharBuffer;
-import java.util.List;
+import java.nio.ReadOnlyBufferException;
 import java.util.Objects;
 
-public abstract class Reader implements Closeable, Readable {
+public abstract class Reader implements Readable, Closeable {
+  private static final int kMaxSkipBufferSize = 8192;
+  private static final int kTransferBufferSize = 8192;
+
   protected Object lock;
-
-  protected Reader() {
-    this.lock = this;
-  }
-
-  protected Reader(Object lock) {
-    if (lock == null) {
-      throw new NullPointerException();
-    }
-    this.lock = lock;
-  }
-
-  public int read(CharBuffer buffer) throws IOException {
-    int c = read(buffer.array(),
-                 buffer.arrayOffset() + buffer.position(),
-                 buffer.remaining());
-
-    if (c > 0) {
-      buffer.position(buffer.position() + c);
-    }
-
-    return c;
-  }
-
-  public int read() throws IOException {
-    char[] buffer = new char[1];
-    int c = read(buffer);
-    if (c <= 0) {
-      return -1;
-    } else {
-      return (int) buffer[0];
-    }
-  }
-
-  public int read(char[] buffer) throws IOException {
-    return read(buffer, 0, buffer.length);
-  }
-
-  public abstract int read(char[] buffer, int offset, int length)
-    throws IOException;
-
-  public boolean markSupported() {
-    return false;
-  }
-  
-  public void mark(int readAheadLimit) throws IOException {
-    throw new IOException("mark not supported");
-  }
-  
-  public void reset() throws IOException {
-    throw new IOException("reset not supported");
-  }
-
-  public long skip(long n) throws IOException {
-    if (n < 0L) {
-      throw new IllegalArgumentException("skip value is negative");
-    }
-    int nn = (int) Math.min(n, 8192L);
-    char[] skipBuffer = new char[nn];
-    long r = n;
-    while (r > 0) {
-      int nc = read(skipBuffer, 0, (int) Math.min(r, nn));
-      if (nc == -1) break;
-      r -= nc;
-    }
-    return n - r;
-  }
-
-  public boolean ready() throws IOException {
-    return false;
-  }
-
-  public String readAllAsString() throws IOException {
-    StringBuilder sb = new StringBuilder();
-    char[] buf = new char[8192];
-    int n;
-    while ((n = read(buf, 0, buf.length)) != -1) {
-      sb.append(buf, 0, n);
-    }
-    return sb.toString();
-  }
-
-  public List<String> readAllLines() throws IOException {
-    return readAllAsString().lines().toList();
-  }
-
-  public abstract void close() throws IOException;
-
-  public long transferTo(Writer out) throws IOException {
-    Objects.requireNonNull(out, "out");
-    long transferred = 0;
-    char[] buffer = new char[8192];
-    int count;
-    while ((count = this.read(buffer, 0, buffer.length)) >= 0) {
-      out.write(buffer, 0, count);
-      transferred += count;
-    }
-    return transferred;
-  }
+  private char[] skipBuffer = null;
 
   public static Reader nullReader() {
     return new Reader() {
@@ -156,107 +61,143 @@ public abstract class Reader implements Closeable, Readable {
       }
 
       @Override
+      public int read(CharBuffer target) throws IOException {
+        Objects.requireNonNull(target);
+        ensureOpen();
+        if (target.hasRemaining()) {
+          return -1;
+        }
+        return 0;
+      }
+
+      @Override
+      public boolean ready() throws IOException {
+        ensureOpen();
+        return false;
+      }
+
+      @Override
+      public long skip(long n) throws IOException {
+        if (n < 0L) {
+          throw new IllegalArgumentException("skip value is negative");
+        }
+        ensureOpen();
+        return 0L;
+      }
+
+      @Override
+      public long transferTo(Writer out) throws IOException {
+        Objects.requireNonNull(out);
+        ensureOpen();
+        return 0L;
+      }
+
+      @Override
       public void close() {
         closed = true;
       }
     };
   }
 
-  public static Reader of(CharSequence cs) {
-    Objects.requireNonNull(cs, "cs");
-    return new Reader() {
-      private int next = 0;
-      private int mark = 0;
-      private boolean closed = false;
+  protected Reader() {
+    this.lock = this;
+  }
 
-      private void ensureOpen() throws IOException {
-        if (closed) {
-          throw new IOException("Stream closed");
+  protected Reader(Object lock) {
+    if (lock == null) {
+      throw new NullPointerException();
+    }
+    this.lock = lock;
+  }
+
+  public int read(CharBuffer target) throws IOException {
+    if (target.isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    int nread;
+    if (target.hasArray()) {
+      char[] cbuf = target.array();
+      int pos = target.position();
+      int rem = Math.max(target.limit() - pos, 0);
+      int off = target.arrayOffset() + pos;
+      nread = this.read(cbuf, off, rem);
+      if (nread > 0) {
+        target.position(pos + nread);
+      }
+    } else {
+      int len = target.remaining();
+      char[] cbuf = new char[len];
+      nread = read(cbuf, 0, len);
+      if (nread > 0) {
+        target.put(cbuf, 0, nread);
+      }
+    }
+    return nread;
+  }
+
+  public int read() throws IOException {
+    char[] cb = new char[1];
+    if (read(cb, 0, 1) == -1) {
+      return -1;
+    } else {
+      return cb[0];
+    }
+  }
+
+  public int read(char[] cbuf) throws IOException {
+    return read(cbuf, 0, cbuf.length);
+  }
+
+  public abstract int read(char[] cbuf, int off, int len) throws IOException;
+
+  public long skip(long n) throws IOException {
+    if (n < 0L) {
+      throw new IllegalArgumentException("skip value is negative");
+    }
+    int nn = (int) Math.min(n, kMaxSkipBufferSize);
+    synchronized (lock) {
+      if (skipBuffer == null || skipBuffer.length < nn) {
+        skipBuffer = new char[nn];
+      }
+      long r = n;
+      while (r > 0) {
+        int nc = read(skipBuffer, 0, (int) Math.min(r, nn));
+        if (nc == -1) {
+          break;
         }
+        r -= nc;
       }
+      return n - r;
+    }
+  }
 
-      @Override
-      public int read() throws IOException {
-        ensureOpen();
-        if (next >= cs.length()) {
-          return -1;
-        }
-        return (int) cs.charAt(next++);
-      }
+  public boolean ready() throws IOException {
+    return false;
+  }
 
-      @Override
-      public int read(char[] cbuf, int off, int len) throws IOException {
-        Objects.checkFromIndexSize(off, len, cbuf.length);
-        ensureOpen();
-        if (len == 0) {
-          return 0;
-        }
-        int lenTotal = cs.length();
-        if (next >= lenTotal) {
-          return -1;
-        }
-        int count = Math.min(lenTotal - next, len);
-        for (int i = 0; i < count; i++) {
-          cbuf[off + i] = cs.charAt(next++);
-        }
-        return count;
-      }
+  public boolean markSupported() {
+    return false;
+  }
 
-      @Override
-      public String readAllAsString() throws IOException {
-        ensureOpen();
-        String res = cs.subSequence(next, cs.length()).toString();
-        next += res.length();
-        return res;
-      }
+  public void mark(int readAheadLimit) throws IOException {
+    throw new IOException("mark() not supported");
+  }
 
-      @Override
-      public List<String> readAllLines() throws IOException {
-        return readAllAsString().lines().toList();
-      }
+  public void reset() throws IOException {
+    throw new IOException("reset() not supported");
+  }
 
-      @Override
-      public long skip(long n) throws IOException {
-        ensureOpen();
-        if (next >= cs.length()) {
-          return 0L;
-        }
-        long r = Math.min((long) (cs.length() - next), n);
-        r = Math.max((long) -next, r);
-        next += (int) r;
-        return r;
-      }
+  public abstract void close() throws IOException;
 
-      @Override
-      public boolean ready() throws IOException {
-        ensureOpen();
-        return true;
-      }
-
-      @Override
-      public boolean markSupported() {
-        return true;
-      }
-
-      @Override
-      public void mark(int readAheadLimit) throws IOException {
-        if (readAheadLimit < 0) {
-          throw new IllegalArgumentException("Read-ahead limit < 0");
-        }
-        ensureOpen();
-        mark = next;
-      }
-
-      @Override
-      public void reset() throws IOException {
-        ensureOpen();
-        next = mark;
-      }
-
-      @Override
-      public void close() {
-        closed = true;
-      }
-    };
+  public long transferTo(Writer out) throws IOException {
+    Objects.requireNonNull(out, "out");
+    long transferred = 0;
+    char[] buffer = new char[kTransferBufferSize];
+    int nRead;
+    while ((nRead = read(buffer, 0, kTransferBufferSize)) >= 0) {
+      out.write(buffer, 0, nRead);
+      transferred += nRead;
+    }
+    return transferred;
   }
 }

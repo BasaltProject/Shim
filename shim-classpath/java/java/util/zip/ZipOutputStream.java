@@ -116,12 +116,9 @@ public class ZipOutputStream extends DeflaterOutputStream {
 
   @Override
   public void write(int b) throws IOException {
-    inputBuffer[bufferIndex] = (byte)(b & 0xff);
-    bufferIndex += 1;
-    if (bufferIndex == 1024) {
-      write(inputBuffer, 0, bufferIndex);
-      bufferIndex = 0;
-    }
+    byte[] one = new byte[1];
+    one[0] = (byte) b;
+    write(one, 0, 1);
   }
 
   @Override

@@ -24,210 +24,389 @@
 package java.io;
 
 import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.UnsupportedCharsetException;
+import java.util.Formatter;
+import java.util.Locale;
 import java.util.Objects;
 
-public class PrintStream extends OutputStream implements Appendable {
-  private final OutputStream out;
+public class PrintStream extends FilterOutputStream implements Appendable, Closeable {
   private final boolean autoFlush;
+  private boolean trouble = false;
+  private Formatter formatter;
+  private BufferedWriter textOut;
+  private OutputStreamWriter charOut;
+  private boolean closing = false;
+  private final Charset charset;
 
-  private static class Static {
-    private static final byte[] newline
-      = System.getProperty("line.separator").getBytes();
-  }
-
-  public PrintStream(OutputStream out, boolean autoFlush) {
-    this.out = out;
-    this.autoFlush = autoFlush;
-  }
-
-  public PrintStream(OutputStream out, boolean autoFlush, String encoding)
-    throws UnsupportedEncodingException
-  {
-    this.out = out;
-    this.autoFlush = autoFlush;
-
-    if (! (encoding.equals("UTF-8") || encoding.equals("ISO-8859-1"))) {
-      throw new UnsupportedEncodingException(encoding);
-    }
-  }
-
-  private static OutputStream openFile(String fileName) throws FileNotFoundException {
+  private static Charset toCharset(String csn) throws UnsupportedEncodingException {
+    Objects.requireNonNull(csn, "charsetName");
     try {
-      return new FileOutputStream(fileName);
-    } catch (FileNotFoundException e) {
-      throw e;
-    } catch (IOException e) {
-      throw new FileNotFoundException(e.getMessage());
+      return Charset.forName(csn);
+    } catch (IllegalCharsetNameException | UnsupportedCharsetException unused) {
+      throw new UnsupportedEncodingException(csn);
     }
   }
 
-  private static OutputStream openFile(File file) throws FileNotFoundException {
-    return openFile(file.getPath());
+  private PrintStream(boolean autoFlush, OutputStream out) {
+    super(out);
+    this.autoFlush = autoFlush;
+    this.charset = Charset.defaultCharset();
+    this.charOut = new OutputStreamWriter(this, charset);
+    this.textOut = new BufferedWriter(charOut);
   }
 
-  public PrintStream(OutputStream out, boolean autoFlush, Charset charset) {
-    this.out = out;
+  private PrintStream(boolean autoFlush, Charset charset, OutputStream out) {
+    super(out);
     this.autoFlush = autoFlush;
-    Objects.requireNonNull(charset);
+    this.charset = charset;
+    this.charOut = new OutputStreamWriter(this, charset);
+    this.textOut = new BufferedWriter(charOut);
   }
 
   public PrintStream(OutputStream out) {
     this(out, false);
   }
 
-  public PrintStream(String fileName) throws FileNotFoundException {
-    this(openFile(fileName), false);
+  public PrintStream(OutputStream out, boolean autoFlush) {
+    this(autoFlush, Objects.requireNonNull(out, "Null output stream"));
   }
 
-  public PrintStream(String fileName, String csn)
-      throws FileNotFoundException, UnsupportedEncodingException {
-    this(openFile(fileName), false, csn);
+  public PrintStream(OutputStream out, boolean autoFlush, String encoding) throws UnsupportedEncodingException {
+    this(autoFlush, toCharset(encoding), Objects.requireNonNull(out, "Null output stream"));
+  }
+
+  public PrintStream(OutputStream out, boolean autoFlush, Charset charset) {
+    super(out);
+    this.autoFlush = autoFlush;
+    this.charset = Objects.requireNonNull(charset, "charset");
+    this.charOut = new OutputStreamWriter(this, charset);
+    this.textOut = new BufferedWriter(charOut);
+  }
+
+  public PrintStream(String fileName) throws FileNotFoundException {
+    this(false, new FileOutputStream(fileName));
+  }
+
+  public PrintStream(String fileName, String csn) throws FileNotFoundException, UnsupportedEncodingException {
+    this(false, toCharset(csn), new FileOutputStream(fileName));
   }
 
   public PrintStream(String fileName, Charset charset) throws IOException {
-    this(openFile(fileName), false, charset);
+    this(false, Objects.requireNonNull(charset, "charset"), new FileOutputStream(fileName));
   }
 
   public PrintStream(File file) throws FileNotFoundException {
-    this(openFile(file), false);
+    this(false, new FileOutputStream(file));
   }
 
-  public PrintStream(File file, String csn)
-      throws FileNotFoundException, UnsupportedEncodingException {
-    this(openFile(file), false, csn);
+  public PrintStream(File file, String csn) throws FileNotFoundException, UnsupportedEncodingException {
+    this(false, toCharset(csn), new FileOutputStream(file));
   }
 
   public PrintStream(File file, Charset charset) throws IOException {
-    this(openFile(file), false, charset);
+    this(false, Objects.requireNonNull(charset, "charset"), new FileOutputStream(file));
   }
 
-  public synchronized void print(String s) {
-    try {
-      out.write((s == null ? "null" : s).getBytes());
-      if (autoFlush) flush();
-    } catch (IOException e) { }
+  public Charset charset() {
+    return charset;
   }
 
-  public void print(Object o) {
-    print(String.valueOf(o));
-  }
-
-  public void print(boolean v) {
-    print(String.valueOf(v));
-  }
-
-  public void print(char c) {
-    print(String.valueOf(c));
-  }
-
-  public void print(int v) {
-    print(String.valueOf(v));
-  }
-
-  public void print(long v) {
-    print(String.valueOf(v));
-  }
-
-  public void print(float v) {
-    print(String.valueOf(v));
-  }
-
-  public void print(double v) {
-    print(String.valueOf(v));
-  }
-
-  public void print(char[] s) {
-    print(String.valueOf(s));
-  }
-
-  public synchronized PrintStream printf(java.util.Locale locale, String format, Object... args) {
-    // should this be cached in an instance variable??
-    final java.util.Formatter formatter = new java.util.Formatter(this);
-    formatter.format(locale, format, args);
-    return this;
-  }
-
-  public synchronized PrintStream printf(String format, Object... args) {
-    final java.util.Formatter formatter = new java.util.Formatter(this);
-    formatter.format(format, args);
-    return this;
-  }
-
-  public PrintStream format(String format, Object... args) {
-    return printf(format, args);
-  }
-
-  public PrintStream format(java.util.Locale locale, String format, Object... args) {
-    return printf(locale, format, args);
-  }
-
-  public synchronized void println(String s) {
-    try {
-      out.write((s == null ? "null" : s).getBytes());
-      out.write(Static.newline);
-      if (autoFlush) flush();
-    } catch (IOException e) { }
-  }
-
-  public synchronized void println() {
-    try {
-      out.write(Static.newline);
-      if (autoFlush) flush();
-    } catch (IOException e) { }
-  }
-
-  public void println(Object o) {
-    println(String.valueOf(o));
-  }
-
-  public void println(boolean v) {
-    println(String.valueOf(v));
-  }
-
-  public void println(char c) {
-    println(String.valueOf(c));
-  }
-
-  public void println(int v) {
-    println(String.valueOf(v));
-  }
-
-  public void println(long v) {
-    println(String.valueOf(v));
-  }
-
-  public void println(float v) {
-    println(String.valueOf(v));
-  }
-
-  public void println(double v) {
-    println(String.valueOf(v));
-  }
-
-  public void println(char[] s) {
-    println(String.valueOf(s));
-  }
-  
-  public void write(int c) throws IOException {
-    out.write(c);
-    if (autoFlush && c == '\n') flush();
-  }
-
-  public void write(byte[] buffer, int offset, int length) throws IOException {
-    out.write(buffer, offset, length);
-    if (autoFlush) flush();
+  private void ensureOpen() throws IOException {
+    if (out == null) {
+      throw new IOException("Stream closed");
+    }
   }
 
   public void flush() {
-    try {
-      out.flush();
-    } catch (IOException e) { }
+    synchronized (this) {
+      try {
+        ensureOpen();
+        out.flush();
+      } catch (IOException x) {
+        trouble = true;
+      }
+    }
   }
 
   public void close() {
+    synchronized (this) {
+      if (!closing) {
+        closing = true;
+        try {
+          textOut.close();
+          out.close();
+        } catch (IOException x) {
+          trouble = true;
+        }
+        textOut = null;
+        charOut = null;
+        out = null;
+      }
+    }
+  }
+
+  public boolean checkError() {
+    if (out != null) {
+      flush();
+    }
+    if (out instanceof PrintStream) {
+      PrintStream ps = (PrintStream) out;
+      return ps.checkError();
+    }
+    return trouble;
+  }
+
+  protected void setError() {
+    trouble = true;
+  }
+
+  protected void clearError() {
+    trouble = false;
+  }
+
+  public void write(int b) {
     try {
-      out.close();
-    } catch (IOException e) { }
+      synchronized (this) {
+        ensureOpen();
+        out.write(b);
+        if (b == '\n' && autoFlush) {
+          out.flush();
+        }
+      }
+    } catch (InterruptedIOException x) {
+      Thread.currentThread().interrupt();
+    } catch (IOException x) {
+      trouble = true;
+    }
+  }
+
+  public void write(byte[] buf, int off, int len) {
+    try {
+      synchronized (this) {
+        ensureOpen();
+        out.write(buf, off, len);
+        if (autoFlush) {
+          out.flush();
+        }
+      }
+    } catch (InterruptedIOException x) {
+      Thread.currentThread().interrupt();
+    } catch (IOException x) {
+      trouble = true;
+    }
+  }
+
+  public void write(byte[] buf) throws IOException {
+    this.write(buf, 0, buf.length);
+  }
+
+  public void writeBytes(byte[] buf) {
+    this.write(buf, 0, buf.length);
+  }
+
+  private void write(char[] buf) {
+    try {
+      synchronized (this) {
+        ensureOpen();
+        textOut.write(buf);
+        textOut.flushBuffer();
+        charOut.flushBuffer();
+        if (autoFlush) {
+          for (int i = 0; i < buf.length; i++) {
+            if (buf[i] == '\n') {
+              out.flush();
+            }
+          }
+        }
+      }
+    } catch (InterruptedIOException x) {
+      Thread.currentThread().interrupt();
+    } catch (IOException x) {
+      trouble = true;
+    }
+  }
+
+  private void write(String s) {
+    try {
+      synchronized (this) {
+        ensureOpen();
+        textOut.write(s);
+        textOut.flushBuffer();
+        charOut.flushBuffer();
+        if (autoFlush && s.indexOf('\n') >= 0) {
+          out.flush();
+        }
+      }
+    } catch (InterruptedIOException x) {
+      Thread.currentThread().interrupt();
+    } catch (IOException x) {
+      trouble = true;
+    }
+  }
+
+  private void newLine() {
+    try {
+      synchronized (this) {
+        ensureOpen();
+        textOut.newLine();
+        textOut.flushBuffer();
+        charOut.flushBuffer();
+        if (autoFlush) {
+          out.flush();
+        }
+      }
+    } catch (InterruptedIOException x) {
+      Thread.currentThread().interrupt();
+    } catch (IOException x) {
+      trouble = true;
+    }
+  }
+
+  public void print(boolean b) {
+    write(String.valueOf(b));
+  }
+
+  public void print(char c) {
+    write(String.valueOf(c));
+  }
+
+  public void print(int i) {
+    write(String.valueOf(i));
+  }
+
+  public void print(long l) {
+    write(String.valueOf(l));
+  }
+
+  public void print(float f) {
+    write(String.valueOf(f));
+  }
+
+  public void print(double d) {
+    write(String.valueOf(d));
+  }
+
+  public void print(char[] s) {
+    write(s);
+  }
+
+  public void print(String s) {
+    write(String.valueOf(s));
+  }
+
+  public void print(Object obj) {
+    write(String.valueOf(obj));
+  }
+
+  public void println() {
+    newLine();
+  }
+
+  public void println(boolean x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(char x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(int x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(long x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(float x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(double x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(char[] x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(String x) {
+    synchronized (this) {
+      print(x);
+      newLine();
+    }
+  }
+
+  public void println(Object x) {
+    String s = String.valueOf(x);
+    synchronized (this) {
+      print(s);
+      newLine();
+    }
+  }
+
+  public PrintStream printf(String format, Object... args) {
+    return format(format, args);
+  }
+
+  public PrintStream printf(Locale l, String format, Object... args) {
+    return format(l, format, args);
+  }
+
+  public PrintStream format(String format, Object... args) {
+    try {
+      synchronized (this) {
+        ensureOpen();
+        if (formatter == null || formatter.locale() != Locale.getDefault(Locale.Category.FORMAT)) {
+          formatter = new Formatter((Appendable) this);
+        }
+        formatter.format(Locale.getDefault(Locale.Category.FORMAT), format, args);
+      }
+    } catch (InterruptedIOException x) {
+      Thread.currentThread().interrupt();
+    } catch (IOException x) {
+      trouble = true;
+    }
+    return this;
+  }
+
+  public PrintStream format(Locale l, String format, Object... args) {
+    try {
+      synchronized (this) {
+        ensureOpen();
+        if (formatter == null || formatter.locale() != l) {
+          formatter = new Formatter(this, l);
+        }
+        formatter.format(l, format, args);
+      }
+    } catch (InterruptedIOException x) {
+      Thread.currentThread().interrupt();
+    } catch (IOException x) {
+      trouble = true;
+    }
+    return this;
   }
 
   public PrintStream append(CharSequence csq) {

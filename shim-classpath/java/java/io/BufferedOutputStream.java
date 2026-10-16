@@ -23,52 +23,53 @@
 
 package java.io;
 
-public class BufferedOutputStream extends OutputStream {
-  private final OutputStream out;
-  private final byte[] buffer;
-  private int position;
+import java.util.Objects;
+
+public class BufferedOutputStream extends FilterOutputStream {
+  protected byte[] buf;
+  protected int count;
+
+  public BufferedOutputStream(OutputStream out) {
+    this(out, 8192);
+  }
 
   public BufferedOutputStream(OutputStream out, int size) {
-    this.out = out;
-    this.buffer = new byte[size];
+    super(out);
+    if (size <= 0) {
+      throw new IllegalArgumentException("Buffer size <= 0");
+    }
+    buf = new byte[size];
   }
-  
-  public BufferedOutputStream(OutputStream out) {
-    this(out, 4096);
-  }
-  
-  private void drain() throws IOException {
-    if (position > 0) {
-      out.write(buffer, 0, position);
-      position = 0;
+
+  private void flushBuffer() throws IOException {
+    if (count > 0) {
+      out.write(buf, 0, count);
+      count = 0;
     }
   }
 
-  public void write(int c) throws IOException {
-    if (position >= buffer.length) {
-      drain();
+  public synchronized void write(int b) throws IOException {
+    if (count >= buf.length) {
+      flushBuffer();
     }
-
-    buffer[position++] = (byte) (c & 0xFF);
+    buf[count++] = (byte) b;
   }
 
-  public void write(byte[] b, int offset, int length) throws IOException {
-    if (length > buffer.length - position) {
-      drain();
-      out.write(b, offset, length);      
-    } else {
-      System.arraycopy(b, offset, buffer, position, length);
-      position += length;
+  public synchronized void write(byte[] b, int off, int len) throws IOException {
+    if (len >= buf.length) {
+      flushBuffer();
+      out.write(b, off, len);
+      return;
     }
+    if (len > buf.length - count) {
+      flushBuffer();
+    }
+    System.arraycopy(b, off, buf, count, len);
+    count += len;
   }
 
-  public void flush() throws IOException {
-    drain();
+  public synchronized void flush() throws IOException {
+    flushBuffer();
     out.flush();
-  }
-
-  public void close() throws IOException {
-    flush();
-    out.close();
   }
 }

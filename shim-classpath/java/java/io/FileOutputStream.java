@@ -23,90 +23,109 @@
 
 package java.io;
 
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannelImpl;
+import java.util.Objects;
+import shim.FileNative;
+
 public class FileOutputStream extends OutputStream {
-  //   static {
-  //     System.loadLibrary("natives");
-  //   }
+  private final FileDescriptor fd;
+  private final boolean append;
+  private final String path;
+  private volatile boolean closed;
+  private FileChannel channel;
 
-  private int fd;
-  private String path;
-  private boolean append;
-
-  public FileOutputStream(FileDescriptor fd) {
-    this.fd = fd.value;
+  public FileOutputStream(String name) throws FileNotFoundException {
+    this(name != null ? new File(name) : null, false);
   }
 
-  public FileOutputStream(String path) throws FileNotFoundException {
-    this(path, false);
-  }
-
-  public FileOutputStream(String path, boolean append) throws FileNotFoundException {
-    this.path = path;
-    this.append = append;
-    try {
-      fd = open(path, append);
-    } catch (FileNotFoundException e) {
-      throw e;
-    } catch (IOException e) {
-      FileNotFoundException notFound = new FileNotFoundException(e.getMessage());
-      notFound.initCause(e);
-      throw notFound;
-    }
+  public FileOutputStream(String name, boolean append) throws FileNotFoundException {
+    this(name != null ? new File(name) : null, append);
   }
 
   public FileOutputStream(File file) throws FileNotFoundException {
-    this(file.getPath());
+    this(file, false);
   }
 
   public FileOutputStream(File file, boolean append) throws FileNotFoundException {
-    this(file.getPath(), append);
-  }
-
-  public FileDescriptor getFD() throws IOException {
-    if (fd == -1) throw new IOException("closed");
-    return new FileDescriptor(fd);
-  }
-
-  public java.nio.channels.FileChannel getChannel() {
-    try {
-      RandomAccessFile raf = path != null
-          ? new RandomAccessFile(new File(path), "rw")
-          : new RandomAccessFile(File.createTempFile("shim-fos", ".tmp"), "rw");
-      return new java.nio.channels.FileChannelImpl(raf, false, true, append);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static native int open(String path, boolean append) throws IOException;
-
-  private static native void write(int fd, int c) throws IOException;
-
-  private static native void write(int fd, byte[] b, int offset, int length)
-    throws IOException;
-
-  private static native void close(int fd) throws IOException;
-
-  public void write(int c) throws IOException {
-    write(fd, c);
-  }
-
-  public void write(byte[] b, int offset, int length) throws IOException {
-    if (b == null) {
+    String name = (file != null ? file.getPath() : null);
+    if (name == null) {
       throw new NullPointerException();
     }
-
-    if (offset < 0 || length < 0 || length > b.length || offset > b.length - length) {
-      throw new ArrayIndexOutOfBoundsException();
+    if (file.isInvalid()) {
+      throw new FileNotFoundException("Invalid file path");
     }
+    this.fd = new FileDescriptor();
+    this.append = append;
+    this.path = name;
+    int flags = FileNative.WRITE | FileNative.CREATE | (append ? FileNative.APPEND : FileNative.TRUNCATE);
+    int r = FileNative.open(name, flags, 0666);
+    if (r < 0) {
+      throw new FileNotFoundException(name + " (" + FileNative.message(r) + ")");
+    }
+    fd.fd = r;
+  }
 
-    write(fd, b, offset, length);
+  public FileOutputStream(FileDescriptor fdObj) {
+    if (fdObj == null) {
+      throw new NullPointerException();
+    }
+    this.fd = fdObj;
+    this.append = false;
+    this.path = null;
+  }
+
+  private void ensureOpen() throws IOException {
+    if (closed || fd.fd == -1) {
+      throw new IOException("Stream Closed");
+    }
+  }
+
+  public void write(int b) throws IOException {
+    ensureOpen();
+    int r = FileNative.writeByte(fd.fd, b);
+    if (r < 0) {
+      throw new IOException(FileNative.message(r));
+    }
+  }
+
+  public void write(byte[] b) throws IOException {
+    write(b, 0, b.length);
+  }
+
+  public void write(byte[] b, int off, int len) throws IOException {
+    Objects.checkFromIndexSize(off, len, b.length);
+    ensureOpen();
+    int r = FileNative.write(fd.fd, b, off, len);
+    if (r < 0) {
+      throw new IOException(FileNative.message(r));
+    }
   }
 
   public void close() throws IOException {
-    if (fd != -1) {
-      close(fd);
-      fd = -1;
+    if (closed) {
+      return;
+    }
+    closed = true;
+    if (channel != null) {
+      channel.close();
+    }
+    fd.closeAll();
+  }
+
+  public final FileDescriptor getFD() throws IOException {
+    if (fd != null) {
+      return fd;
+    }
+    throw new IOException();
+  }
+
+  public FileChannel getChannel() {
+    synchronized (this) {
+      if (channel == null) {
+        channel = new FileChannelImpl(new RandomAccessFile(fd, path, false, true), false, true, append);
+      }
+      return channel;
     }
   }
 }

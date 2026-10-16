@@ -23,147 +23,89 @@
 
 package java.io;
 
+import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.Objects;
+
 public class ByteArrayOutputStream extends OutputStream {
-  private static final int BufferSize = 32;
-
-  private Cell firstCell;
-  private Cell curCell;
-  private int length;
-  private byte[] buffer;
-  private int position;
-
-  public ByteArrayOutputStream(int capacity) { }
+  protected byte[] buf;
+  protected int count;
 
   public ByteArrayOutputStream() {
-    this(0);
+    this(32);
   }
 
-  public void reset() {
-    firstCell = null;
-    curCell = null;
-    length = 0;
-    buffer = null;
-    position = 0;
-  }
-
-  public int size() {
-    return length;
-  }
-
-  public void write(int c) {
-    if (buffer == null) {
-      buffer = new byte[BufferSize];
-    } else if (position >= buffer.length) {
-      flushBuffer();
-      buffer = new byte[BufferSize];
+  public ByteArrayOutputStream(int size) {
+    if (size < 0) {
+      throw new IllegalArgumentException("Negative initial size: " + size);
     }
-
-    buffer[position++] = (byte) (c & 0xFF);
-    ++ length;
+    buf = new byte[size];
   }
 
-  private byte[] copy(byte[] b, int offset, int length) {
-    byte[] array = new byte[length];
-    System.arraycopy(b, offset, array, 0, length);
-    return array;
-  }
-
-  public void write(byte[] b, int offset, int length) {
-    if (b == null) {
-      throw new NullPointerException();
-    }
-
-    if (offset < 0 || offset + length > b.length) {
-      throw new ArrayIndexOutOfBoundsException();
-    }
-
-    if (length == 0) return;
-
-    if (buffer != null && length <= buffer.length - position) {
-      System.arraycopy(b, offset, buffer, position, length);
-      position += length;
-    } else {
-      flushBuffer();
-      chainCell( new Cell(copy(b, offset, length), 0, length) );
-    }
-
-    this.length += length;
-  }
-  
-  private void chainCell(Cell cell){
-    if (curCell == null){
-      firstCell = cell;
-      curCell = cell;
-    }else{
-      curCell.next = cell;
-      curCell = cell;
+  private void ensureCapacity(int minCapacity) {
+    int oldCapacity = buf.length;
+    int minGrowth = minCapacity - oldCapacity;
+    if (minGrowth > 0) {
+      int newLength = Math.max(minCapacity, oldCapacity * 2);
+      if (newLength < 0) {
+        if (minCapacity < 0) {
+          throw new OutOfMemoryError("Required length exceeds implementation limit");
+        }
+        newLength = Integer.MAX_VALUE - 8;
+      }
+      buf = Arrays.copyOf(buf, newLength);
     }
   }
 
-  private void flushBuffer() {
-    if (position > 0) {
-      byte[] b = buffer;
-      int p = position;
-      buffer = null;
-      position = 0;
-
-      chainCell( new Cell(b, 0, p) );
-    }    
+  public synchronized void write(int b) {
+    ensureCapacity(count + 1);
+    buf[count] = (byte) b;
+    count += 1;
   }
 
-  public byte[] toByteArray() {
-    flushBuffer();
-    
-    byte[] array = new byte[length];
-    int pos = 0;
-    for (Cell c = firstCell; c != null; c = c.next) {
-      System.arraycopy(c.array, c.offset, array, pos, c.length);
-      pos += c.length;
-    }
-    return array;
-  }
-  
-  public synchronized void writeTo(OutputStream out) throws IOException {
-    if (length==0) return;
-
-    if (out == null){
-      throw new NullPointerException();
-    }
-
-    flushBuffer();
-
-    for (Cell c = firstCell; c != null; c = c.next) {
-      out.write(c.array, c.offset, c.length);
-    }
-  }
-  
-  @Override
-  public String toString() {
-    return new String(toByteArray());
-  }
-
-  public String toString(String encoding) throws UnsupportedEncodingException {
-    return new String(toByteArray(), encoding);
-  }
-
-  public String toString(java.nio.charset.Charset charset) {
-    return new String(toByteArray(), charset);
+  public synchronized void write(byte[] b, int off, int len) {
+    Objects.checkFromIndexSize(off, len, b.length);
+    ensureCapacity(count + len);
+    System.arraycopy(b, off, buf, count, len);
+    count += len;
   }
 
   public void writeBytes(byte[] b) {
     write(b, 0, b.length);
   }
 
-  private static class Cell {
-    public byte[] array;
-    public int offset;
-    public int length;
-    public Cell next = null;
-
-    public Cell(byte[] array, int offset, int length) {
-      this.array = array;
-      this.offset = offset;
-      this.length = length;
-    }
+  public synchronized void writeTo(OutputStream out) throws IOException {
+    out.write(buf, 0, count);
   }
+
+  public synchronized void reset() {
+    count = 0;
+  }
+
+  public synchronized byte[] toByteArray() {
+    return Arrays.copyOf(buf, count);
+  }
+
+  public synchronized int size() {
+    return count;
+  }
+
+  public synchronized String toString() {
+    return new String(buf, 0, count);
+  }
+
+  public synchronized String toString(String charsetName) throws UnsupportedEncodingException {
+    return new String(buf, 0, count, charsetName);
+  }
+
+  public synchronized String toString(Charset charset) {
+    return new String(buf, 0, count, charset);
+  }
+
+  @Deprecated
+  public synchronized String toString(int hibyte) {
+    return new String(buf, hibyte, 0, count);
+  }
+
+  public void close() throws IOException { }
 }

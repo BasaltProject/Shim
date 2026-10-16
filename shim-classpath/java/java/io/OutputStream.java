@@ -23,22 +23,10 @@
 
 package java.io;
 
+import java.util.Objects;
+
 public abstract class OutputStream implements Closeable, Flushable {
-  public abstract void write(int c) throws IOException;
-
-  public void write(byte[] buffer) throws IOException {
-    write(buffer, 0, buffer.length);
-  }
-
-  public void write(byte[] buffer, int offset, int length) throws IOException {
-    for (int i = 0; i < length; ++i) {
-      write(buffer[offset + i]);
-    }
-  }
-
-  public void flush() throws IOException { }
-
-  public void close() throws IOException { }
+  public OutputStream() { }
 
   public static OutputStream nullOutputStream() {
     return new OutputStream() {
@@ -57,12 +45,7 @@ public abstract class OutputStream implements Closeable, Flushable {
 
       @Override
       public void write(byte[] b, int off, int len) throws IOException {
-        java.util.Objects.checkFromIndexSize(off, len, b.length);
-        ensureOpen();
-      }
-
-      @Override
-      public void flush() throws IOException {
+        Objects.checkFromIndexSize(off, len, b.length);
         ensureOpen();
       }
 
@@ -72,4 +55,21 @@ public abstract class OutputStream implements Closeable, Flushable {
       }
     };
   }
+
+  public abstract void write(int b) throws IOException;
+
+  public void write(byte[] b) throws IOException {
+    write(b, 0, b.length);
+  }
+
+  public void write(byte[] b, int off, int len) throws IOException {
+    Objects.checkFromIndexSize(off, len, b.length);
+    for (int i = 0; i < len; i++) {
+      write(b[off + i]);
+    }
+  }
+
+  public void flush() throws IOException { }
+
+  public void close() throws IOException { }
 }

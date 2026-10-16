@@ -23,34 +23,46 @@
 
 package java.io;
 
-public class FileWriter extends Writer {
-  private final Writer out;
+import java.nio.charset.Charset;
 
-  private FileWriter(FileOutputStream out) {
-    this.out = new OutputStreamWriter(out);
+public class FileWriter extends OutputStreamWriter {
+  public FileWriter(String fileName) throws IOException {
+    super(open(new File(fileName), false));
   }
 
-  public FileWriter(FileDescriptor fd) {
-    this(new FileOutputStream(fd));
-  }
-
-  public FileWriter(String path) throws IOException {
-    this(new FileOutputStream(path));
+  public FileWriter(String fileName, boolean append) throws IOException {
+    super(open(new File(fileName), append));
   }
 
   public FileWriter(File file) throws IOException {
-    this(new FileOutputStream(file));
-  }
-  
-  public void write(char[] b, int offset, int length) throws IOException {
-    out.write(b, offset, length);
+    super(open(file, false));
   }
 
-  public void flush() throws IOException {
-    out.flush();
+  public FileWriter(File file, boolean append) throws IOException {
+    super(open(file, append));
   }
 
-  public void close() throws IOException {
-    out.close();
+  public FileWriter(FileDescriptor fd) {
+    super(new FileOutputStream(fd));
+  }
+
+  public FileWriter(String fileName, Charset charset) throws IOException {
+    super(open(new File(fileName), false), charset);
+  }
+
+  public FileWriter(String fileName, Charset charset, boolean append) throws IOException {
+    super(open(new File(fileName), append), charset);
+  }
+
+  public FileWriter(File file, Charset charset) throws IOException {
+    super(open(file, false), charset);
+  }
+
+  public FileWriter(File file, Charset charset, boolean append) throws IOException {
+    super(open(file, append), charset);
+  }
+
+  private static FileOutputStream open(File file, boolean append) throws IOException {
+    return new FileOutputStream(file, append);
   }
 }

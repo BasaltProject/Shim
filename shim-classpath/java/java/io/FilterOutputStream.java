@@ -26,16 +26,15 @@ package java.io;
 public class FilterOutputStream extends OutputStream {
   protected OutputStream out;
 
+  private volatile boolean closed;
+  private final Object closeLock = new Object();
+
   public FilterOutputStream(OutputStream out) {
     this.out = out;
   }
 
-  public void close() throws IOException {
-    out.close();
-  }
-
-  public void flush() throws IOException {
-    out.flush();
+  public void write(int b) throws IOException {
+    out.write(b);
   }
 
   public void write(byte[] b) throws IOException {
@@ -43,11 +42,47 @@ public class FilterOutputStream extends OutputStream {
   }
 
   public void write(byte[] b, int off, int len) throws IOException {
-    out.write(b, off, len);
+    if ((off | len | (b.length - (len + off)) | (off + len)) < 0) {
+      throw new IndexOutOfBoundsException();
+    }
+    for (int i = 0; i < len; i++) {
+      write(b[off + i]);
+    }
   }
 
-  public void write(int b) throws IOException {
-    out.write(b);
+  public void flush() throws IOException {
+    out.flush();
   }
 
+  public void close() throws IOException {
+    if (closed) {
+      return;
+    }
+    synchronized (closeLock) {
+      if (closed) {
+        return;
+      }
+      closed = true;
+    }
+    Throwable flushException = null;
+    try {
+      flush();
+    } catch (Throwable e) {
+      flushException = e;
+      throw e;
+    } finally {
+      if (flushException == null) {
+        out.close();
+      } else {
+        try {
+          out.close();
+        } catch (Throwable closeException) {
+          if (flushException != closeException) {
+            closeException.addSuppressed(flushException);
+          }
+          throw closeException;
+        }
+      }
+    }
+  }
 }

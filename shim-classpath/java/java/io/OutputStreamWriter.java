@@ -23,32 +23,77 @@
 
 package java.io;
 
-import shim.Utf8;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import sun.nio.cs.StreamEncoder;
 
 public class OutputStreamWriter extends Writer {
-  private final OutputStream out;
-
-  public OutputStreamWriter(OutputStream out) {
-    this.out = out;
-  }
+  private final StreamEncoder se;
 
   public OutputStreamWriter(OutputStream out, String charsetName) throws UnsupportedEncodingException {
-    this(out);
+    super(out);
+    if (charsetName == null) {
+      throw new NullPointerException("charsetName");
+    }
+    se = StreamEncoder.forOutputStreamWriter(out, this, charsetName);
   }
 
-  public OutputStreamWriter(OutputStream out, java.nio.charset.Charset cs) {
-    this(out);
+  public OutputStreamWriter(OutputStream out) {
+    super(out);
+    se = StreamEncoder.forOutputStreamWriter(out, this, Charset.defaultCharset());
   }
-  
-  public void write(char[] b, int offset, int length) throws IOException {
-    out.write(Utf8.encode(b, offset, length));
+
+  public OutputStreamWriter(OutputStream out, Charset cs) {
+    super(out);
+    if (cs == null) {
+      throw new NullPointerException("charset");
+    }
+    se = StreamEncoder.forOutputStreamWriter(out, this, cs);
+  }
+
+  public OutputStreamWriter(OutputStream out, CharsetEncoder enc) {
+    super(out);
+    if (enc == null) {
+      throw new NullPointerException("charset encoder");
+    }
+    se = StreamEncoder.forOutputStreamWriter(out, this, enc);
+  }
+
+  public String getEncoding() {
+    return se.getEncoding();
+  }
+
+  void flushBuffer() throws IOException {
+    se.flushBuffer();
+  }
+
+  public void write(int c) throws IOException {
+    se.write(c);
+  }
+
+  public void write(char[] cbuf, int off, int len) throws IOException {
+    se.write(cbuf, off, len);
+  }
+
+  public void write(String str, int off, int len) throws IOException {
+    se.write(str, off, len);
+  }
+
+  public Writer append(CharSequence csq, int start, int end) throws IOException {
+    se.append(csq, start, end);
+    return this;
+  }
+
+  public Writer append(CharSequence csq) throws IOException {
+    se.append(csq);
+    return this;
   }
 
   public void flush() throws IOException {
-    out.flush();
+    se.flush();
   }
 
   public void close() throws IOException {
-    out.close();
+    se.close();
   }
 }
