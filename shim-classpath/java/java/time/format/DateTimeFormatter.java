@@ -2,70 +2,203 @@
  * Copyright (c) 2026 BasaltMC.
  * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
  * SPDX-License-Identifier: MIT
  */
 
 package java.time.format;
 
+import static java.time.temporal.ChronoField.DAY_OF_MONTH;
+import static java.time.temporal.ChronoField.DAY_OF_WEEK;
+import static java.time.temporal.ChronoField.DAY_OF_YEAR;
+import static java.time.temporal.ChronoField.HOUR_OF_DAY;
+import static java.time.temporal.ChronoField.MINUTE_OF_HOUR;
+import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
+import static java.time.temporal.ChronoField.NANO_OF_SECOND;
+import static java.time.temporal.ChronoField.SECOND_OF_MINUTE;
+import static java.time.temporal.ChronoField.YEAR;
+
+import java.io.IOException;
+import java.text.FieldPosition;
+import java.text.Format;
+import java.text.ParseException;
+import java.text.ParsePosition;
 import java.time.DateTimeException;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.time.temporal.ChronoField;
+import java.time.chrono.Chronology;
+import java.time.chrono.IsoChronology;
+import java.time.format.DateTimeFormatterBuilder.CompositePrinterParser;
+import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalField;
-import java.time.temporal.TemporalQueries;
 import java.time.temporal.TemporalQuery;
-import java.time.temporal.UnsupportedTemporalTypeException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public final class DateTimeFormatter {
-  private enum FormatKind {
-    ISO_LOCAL_DATE,
-    ISO_LOCAL_TIME,
-    ISO_LOCAL_DATE_TIME,
-    ISO_INSTANT,
-    BASIC_ISO_DATE,
-    PATTERN
+  public static final DateTimeFormatter ISO_LOCAL_DATE;
+  public static final DateTimeFormatter ISO_OFFSET_DATE;
+  public static final DateTimeFormatter ISO_DATE;
+  public static final DateTimeFormatter ISO_LOCAL_TIME;
+  public static final DateTimeFormatter ISO_OFFSET_TIME;
+  public static final DateTimeFormatter ISO_TIME;
+  public static final DateTimeFormatter ISO_LOCAL_DATE_TIME;
+  public static final DateTimeFormatter ISO_OFFSET_DATE_TIME;
+  public static final DateTimeFormatter ISO_ZONED_DATE_TIME;
+  public static final DateTimeFormatter ISO_DATE_TIME;
+  public static final DateTimeFormatter ISO_ORDINAL_DATE;
+  public static final DateTimeFormatter ISO_WEEK_DATE;
+  public static final DateTimeFormatter ISO_INSTANT;
+  public static final DateTimeFormatter BASIC_ISO_DATE;
+  public static final DateTimeFormatter RFC_1123_DATE_TIME;
+
+  static {
+    ISO_LOCAL_DATE = new DateTimeFormatterBuilder().appendValue(YEAR, 4, 10, SignStyle.EXCEEDS_PAD)
+        .appendLiteral('-').appendValue(MONTH_OF_YEAR, 2).appendLiteral('-').appendValue(DAY_OF_MONTH, 2)
+        .toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_OFFSET_DATE = new DateTimeFormatterBuilder().parseCaseInsensitive().append(ISO_LOCAL_DATE).appendOffsetId()
+        .toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_DATE = new DateTimeFormatterBuilder().parseCaseInsensitive().append(ISO_LOCAL_DATE).optionalStart()
+        .appendOffsetId().toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_LOCAL_TIME = new DateTimeFormatterBuilder().appendValue(HOUR_OF_DAY, 2).appendLiteral(':')
+        .appendValue(MINUTE_OF_HOUR, 2).optionalStart().appendLiteral(':').appendValue(SECOND_OF_MINUTE, 2)
+        .optionalStart().appendFraction(NANO_OF_SECOND, 0, 9, true).toFormatter(ResolverStyle.STRICT, null);
+    ISO_OFFSET_TIME = new DateTimeFormatterBuilder().parseCaseInsensitive().append(ISO_LOCAL_TIME).appendOffsetId()
+        .toFormatter(ResolverStyle.STRICT, null);
+    ISO_TIME = new DateTimeFormatterBuilder().parseCaseInsensitive().append(ISO_LOCAL_TIME).optionalStart()
+        .appendOffsetId().toFormatter(ResolverStyle.STRICT, null);
+    ISO_LOCAL_DATE_TIME = new DateTimeFormatterBuilder().parseCaseInsensitive().append(ISO_LOCAL_DATE)
+        .appendLiteral('T').append(ISO_LOCAL_TIME).toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_OFFSET_DATE_TIME = new DateTimeFormatterBuilder().parseCaseInsensitive().append(ISO_LOCAL_DATE_TIME)
+        .parseLenient().appendOffsetId().parseStrict().toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_ZONED_DATE_TIME = new DateTimeFormatterBuilder().append(ISO_OFFSET_DATE_TIME).optionalStart()
+        .appendLiteral('[').parseCaseSensitive().appendZoneRegionId().appendLiteral(']')
+        .toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_DATE_TIME = new DateTimeFormatterBuilder().append(ISO_LOCAL_DATE_TIME).optionalStart().appendOffsetId()
+        .optionalStart().appendLiteral('[').parseCaseSensitive().appendZoneRegionId().appendLiteral(']')
+        .toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_ORDINAL_DATE = new DateTimeFormatterBuilder().parseCaseInsensitive()
+        .appendValue(YEAR, 4, 10, SignStyle.EXCEEDS_PAD).appendLiteral('-').appendValue(DAY_OF_YEAR, 3)
+        .optionalStart().appendOffsetId().toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_WEEK_DATE = new DateTimeFormatterBuilder().parseCaseInsensitive()
+        .appendValue(IsoFields.WEEK_BASED_YEAR, 4, 10, SignStyle.EXCEEDS_PAD).appendLiteral("-W")
+        .appendValue(IsoFields.WEEK_OF_WEEK_BASED_YEAR, 2).appendLiteral('-').appendValue(DAY_OF_WEEK, 1)
+        .optionalStart().appendOffsetId().toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    ISO_INSTANT = new DateTimeFormatterBuilder().parseCaseInsensitive().appendInstant()
+        .toFormatter(ResolverStyle.STRICT, null);
+    BASIC_ISO_DATE = new DateTimeFormatterBuilder().parseCaseInsensitive().appendValue(YEAR, 4)
+        .appendValue(MONTH_OF_YEAR, 2).appendValue(DAY_OF_MONTH, 2).optionalStart().parseLenient()
+        .appendOffset("+HHMMss", "Z").parseStrict().toFormatter(ResolverStyle.STRICT, IsoChronology.INSTANCE);
+    Map<Long, String> dow = new HashMap<Long, String>();
+    dow.put(1L, "Mon");
+    dow.put(2L, "Tue");
+    dow.put(3L, "Wed");
+    dow.put(4L, "Thu");
+    dow.put(5L, "Fri");
+    dow.put(6L, "Sat");
+    dow.put(7L, "Sun");
+    Map<Long, String> moy = new HashMap<Long, String>();
+    moy.put(1L, "Jan");
+    moy.put(2L, "Feb");
+    moy.put(3L, "Mar");
+    moy.put(4L, "Apr");
+    moy.put(5L, "May");
+    moy.put(6L, "Jun");
+    moy.put(7L, "Jul");
+    moy.put(8L, "Aug");
+    moy.put(9L, "Sep");
+    moy.put(10L, "Oct");
+    moy.put(11L, "Nov");
+    moy.put(12L, "Dec");
+    RFC_1123_DATE_TIME = new DateTimeFormatterBuilder().parseCaseInsensitive().parseLenient().optionalStart()
+        .appendText(DAY_OF_WEEK, dow).appendLiteral(", ").optionalEnd()
+        .appendValue(DAY_OF_MONTH, 1, 2, SignStyle.NOT_NEGATIVE).appendLiteral(' ').appendText(MONTH_OF_YEAR, moy)
+        .appendLiteral(' ').appendValue(YEAR, 4).appendLiteral(' ').appendValue(HOUR_OF_DAY, 2).appendLiteral(':')
+        .appendValue(MINUTE_OF_HOUR, 2).optionalStart().appendLiteral(':').appendValue(SECOND_OF_MINUTE, 2)
+        .optionalEnd().appendLiteral(' ').appendOffset("+HHMM", "GMT")
+        .toFormatter(ResolverStyle.SMART, IsoChronology.INSTANCE);
   }
 
-  public static final DateTimeFormatter ISO_LOCAL_DATE = new DateTimeFormatter(FormatKind.ISO_LOCAL_DATE, null, Locale.getDefault(), null);
-  public static final DateTimeFormatter ISO_LOCAL_TIME = new DateTimeFormatter(FormatKind.ISO_LOCAL_TIME, null, Locale.getDefault(), null);
-  public static final DateTimeFormatter ISO_LOCAL_DATE_TIME = new DateTimeFormatter(FormatKind.ISO_LOCAL_DATE_TIME, null, Locale.getDefault(), null);
-  public static final DateTimeFormatter ISO_INSTANT = new DateTimeFormatter(FormatKind.ISO_INSTANT, null, Locale.getDefault(), ZoneOffset.UTC);
-  public static final DateTimeFormatter ISO_DATE = ISO_LOCAL_DATE;
-  public static final DateTimeFormatter ISO_TIME = ISO_LOCAL_TIME;
-  public static final DateTimeFormatter ISO_DATE_TIME = ISO_LOCAL_DATE_TIME;
-  public static final DateTimeFormatter BASIC_ISO_DATE = new DateTimeFormatter(FormatKind.BASIC_ISO_DATE, null, Locale.getDefault(), null);
-
-  private final FormatKind kind;
-  private final String pattern;
+  private final CompositePrinterParser printerParser;
   private final Locale locale;
+  private final DecimalStyle decimalStyle;
+  private final ResolverStyle resolverStyle;
+  private final Set<TemporalField> resolverFields;
+  private final Chronology chrono;
   private final ZoneId zone;
 
-  private DateTimeFormatter(FormatKind kind, String pattern, Locale locale, ZoneId zone) {
-    this.kind = kind;
-    this.pattern = pattern;
-    this.locale = locale;
-    this.zone = zone;
-  }
-
   public static DateTimeFormatter ofPattern(String pattern) {
-    Objects.requireNonNull(pattern, "pattern");
-    return new DateTimeFormatter(FormatKind.PATTERN, pattern, Locale.getDefault(), null);
+    return new DateTimeFormatterBuilder().appendPattern(pattern).toFormatter();
   }
 
   public static DateTimeFormatter ofPattern(String pattern, Locale locale) {
-    Objects.requireNonNull(pattern, "pattern");
-    Objects.requireNonNull(locale, "locale");
-    return new DateTimeFormatter(FormatKind.PATTERN, pattern, locale, null);
+    return new DateTimeFormatterBuilder().appendPattern(pattern).toFormatter(locale);
+  }
+
+  public static DateTimeFormatter ofLocalizedDate(FormatStyle dateStyle) {
+    Objects.requireNonNull(dateStyle, "dateStyle");
+    return new DateTimeFormatterBuilder().appendLocalized(dateStyle, null)
+        .toFormatter(ResolverStyle.SMART, IsoChronology.INSTANCE);
+  }
+
+  public static DateTimeFormatter ofLocalizedTime(FormatStyle timeStyle) {
+    Objects.requireNonNull(timeStyle, "timeStyle");
+    return new DateTimeFormatterBuilder().appendLocalized(null, timeStyle)
+        .toFormatter(ResolverStyle.SMART, IsoChronology.INSTANCE);
+  }
+
+  public static DateTimeFormatter ofLocalizedDateTime(FormatStyle dateTimeStyle) {
+    Objects.requireNonNull(dateTimeStyle, "dateTimeStyle");
+    return new DateTimeFormatterBuilder().appendLocalized(dateTimeStyle, dateTimeStyle)
+        .toFormatter(ResolverStyle.SMART, IsoChronology.INSTANCE);
+  }
+
+  public static DateTimeFormatter ofLocalizedDateTime(FormatStyle dateStyle, FormatStyle timeStyle) {
+    Objects.requireNonNull(dateStyle, "dateStyle");
+    Objects.requireNonNull(timeStyle, "timeStyle");
+    return new DateTimeFormatterBuilder().appendLocalized(dateStyle, timeStyle)
+        .toFormatter(ResolverStyle.SMART, IsoChronology.INSTANCE);
+  }
+
+  public static final TemporalQuery<Period> parsedExcessDays() {
+    return new TemporalQuery<Period>() {
+      @Override
+      public Period queryFrom(TemporalAccessor t) {
+        if (t instanceof Parsed) {
+          return ((Parsed) t).excessDays;
+        }
+        return Period.ZERO;
+      }
+    };
+  }
+
+  public static final TemporalQuery<Boolean> parsedLeapSecond() {
+    return new TemporalQuery<Boolean>() {
+      @Override
+      public Boolean queryFrom(TemporalAccessor t) {
+        if (t instanceof Parsed) {
+          return ((Parsed) t).leapSecond;
+        }
+        return Boolean.FALSE;
+      }
+    };
+  }
+
+  DateTimeFormatter(CompositePrinterParser printerParser, Locale locale, DecimalStyle decimalStyle,
+      ResolverStyle resolverStyle, Set<TemporalField> resolverFields, Chronology chrono, ZoneId zone) {
+    this.printerParser = Objects.requireNonNull(printerParser, "printerParser");
+    this.resolverFields = resolverFields;
+    this.locale = Objects.requireNonNull(locale, "locale");
+    this.decimalStyle = Objects.requireNonNull(decimalStyle, "decimalStyle");
+    this.resolverStyle = Objects.requireNonNull(resolverStyle, "resolverStyle");
+    this.chrono = chrono;
+    this.zone = zone;
   }
 
   public Locale getLocale() {
@@ -76,7 +209,33 @@ public final class DateTimeFormatter {
     if (this.locale.equals(locale)) {
       return this;
     }
-    return new DateTimeFormatter(kind, pattern, locale, zone);
+    return new DateTimeFormatter(printerParser, locale, decimalStyle, resolverStyle, resolverFields, chrono, zone);
+  }
+
+  public DateTimeFormatter localizedBy(Locale locale) {
+    return withLocale(locale);
+  }
+
+  public DecimalStyle getDecimalStyle() {
+    return decimalStyle;
+  }
+
+  public DateTimeFormatter withDecimalStyle(DecimalStyle decimalStyle) {
+    if (this.decimalStyle.equals(decimalStyle)) {
+      return this;
+    }
+    return new DateTimeFormatter(printerParser, locale, decimalStyle, resolverStyle, resolverFields, chrono, zone);
+  }
+
+  public Chronology getChronology() {
+    return chrono;
+  }
+
+  public DateTimeFormatter withChronology(Chronology chrono) {
+    if (Objects.equals(this.chrono, chrono)) {
+      return this;
+    }
+    return new DateTimeFormatter(printerParser, locale, decimalStyle, resolverStyle, resolverFields, chrono, zone);
   }
 
   public ZoneId getZone() {
@@ -87,379 +246,259 @@ public final class DateTimeFormatter {
     if (Objects.equals(this.zone, zone)) {
       return this;
     }
-    return new DateTimeFormatter(kind, pattern, locale, zone);
+    return new DateTimeFormatter(printerParser, locale, decimalStyle, resolverStyle, resolverFields, chrono, zone);
+  }
+
+  public ResolverStyle getResolverStyle() {
+    return resolverStyle;
+  }
+
+  public DateTimeFormatter withResolverStyle(ResolverStyle resolverStyle) {
+    Objects.requireNonNull(resolverStyle, "resolverStyle");
+    if (Objects.equals(this.resolverStyle, resolverStyle)) {
+      return this;
+    }
+    return new DateTimeFormatter(printerParser, locale, decimalStyle, resolverStyle, resolverFields, chrono, zone);
+  }
+
+  public Set<TemporalField> getResolverFields() {
+    return resolverFields;
+  }
+
+  public DateTimeFormatter withResolverFields(TemporalField... resolverFields) {
+    Set<TemporalField> fields = null;
+    if (resolverFields != null) {
+      fields = Collections.unmodifiableSet(new HashSet<TemporalField>(java.util.Arrays.asList(resolverFields)));
+    }
+    if (Objects.equals(this.resolverFields, fields)) {
+      return this;
+    }
+    return new DateTimeFormatter(printerParser, locale, decimalStyle, resolverStyle, fields, chrono, zone);
+  }
+
+  public DateTimeFormatter withResolverFields(Set<TemporalField> resolverFields) {
+    if (Objects.equals(this.resolverFields, resolverFields)) {
+      return this;
+    } else if (resolverFields != null) {
+      resolverFields = Collections.unmodifiableSet(new HashSet<TemporalField>(resolverFields));
+    }
+    return new DateTimeFormatter(printerParser, locale, decimalStyle, resolverStyle, resolverFields, chrono, zone);
   }
 
   public String format(TemporalAccessor temporal) {
-    Objects.requireNonNull(temporal, "temporal");
-    StringBuilder sb = new StringBuilder(32);
-    formatTo(temporal, sb);
-    return sb.toString();
+    StringBuilder buf = new StringBuilder(32);
+    formatTo(temporal, buf);
+    return buf.toString();
   }
 
   public void formatTo(TemporalAccessor temporal, Appendable appendable) {
     Objects.requireNonNull(temporal, "temporal");
     Objects.requireNonNull(appendable, "appendable");
     try {
-      switch (kind) {
-        case ISO_LOCAL_DATE:
-          appendable.append(LocalDate.from(temporal).toString());
-          break;
-        case ISO_LOCAL_TIME: {
-          LocalTime lt = LocalTime.from(temporal);
-          StringBuilder tsb = new StringBuilder(18);
-          appendZeroPadded(tsb, lt.getHour(), 2);
-          tsb.append(':');
-          appendZeroPadded(tsb, lt.getMinute(), 2);
-          tsb.append(':');
-          appendZeroPadded(tsb, lt.getSecond(), 2);
-          if (lt.getNano() > 0) {
-            tsb.append('.');
-            appendNanos(tsb, lt.getNano());
-          }
-          appendable.append(tsb.toString());
-          break;
-        }
-        case ISO_LOCAL_DATE_TIME: {
-          LocalDate ld = LocalDate.from(temporal);
-          LocalTime lt = LocalTime.from(temporal);
-          appendable.append(ld.toString());
-          appendable.append('T');
-          StringBuilder tsb = new StringBuilder(18);
-          appendZeroPadded(tsb, lt.getHour(), 2);
-          tsb.append(':');
-          appendZeroPadded(tsb, lt.getMinute(), 2);
-          tsb.append(':');
-          appendZeroPadded(tsb, lt.getSecond(), 2);
-          if (lt.getNano() > 0) {
-            tsb.append('.');
-            appendNanos(tsb, lt.getNano());
-          }
-          appendable.append(tsb.toString());
-          break;
-        }
-        case ISO_INSTANT:
-          appendable.append(Instant.from(temporal).toString());
-          break;
-        case BASIC_ISO_DATE: {
-          LocalDate ld = LocalDate.from(temporal);
-          int y = ld.getYear();
-          int m = ld.getMonthValue();
-          int d = ld.getDayOfMonth();
-          StringBuilder sb = new StringBuilder(8);
-          appendZeroPadded(sb, y, 4);
-          appendZeroPadded(sb, m, 2);
-          appendZeroPadded(sb, d, 2);
-          appendable.append(sb.toString());
-          break;
-        }
-        case PATTERN:
-          formatPattern(temporal, pattern, appendable);
-          break;
+      DateTimePrintContext context = new DateTimePrintContext(temporal, this);
+      if (appendable instanceof StringBuilder) {
+        printerParser.format(context, (StringBuilder) appendable);
+      } else {
+        StringBuilder buf = new StringBuilder(32);
+        printerParser.format(context, buf);
+        appendable.append(buf);
       }
-    } catch (java.io.IOException ex) {
+    } catch (IOException ex) {
       throw new DateTimeException(ex.getMessage(), ex);
     }
   }
 
-  private void formatPattern(TemporalAccessor temporal, String pat, Appendable appendable) throws java.io.IOException {
-    int len = pat.length();
-    int i = 0;
-    while (i < len) {
-      char c = pat.charAt(i);
-      if (c == '\'') {
-        int end = pat.indexOf('\'', i + 1);
-        if (end < 0) {
-          throw new IllegalArgumentException("Unclosed quote in pattern: " + pat);
-        }
-        appendable.append(pat.substring(i + 1, end));
-        i = end + 1;
-      } else if (isPatternLetter(c)) {
-        int start = i;
-        while (i < len && pat.charAt(i) == c) {
-          i++;
-        }
-        int count = i - start;
-        formatField(temporal, c, count, appendable);
-      } else {
-        appendable.append(c);
-        i++;
-      }
+  public TemporalAccessor parse(CharSequence text) {
+    Objects.requireNonNull(text, "text");
+    try {
+      return parseResolved0(text, null);
+    } catch (DateTimeParseException ex) {
+      throw ex;
+    } catch (RuntimeException ex) {
+      throw createError(text, ex);
     }
   }
 
-  private static boolean isPatternLetter(char c) {
-    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-  }
-
-  private void formatField(TemporalAccessor temporal, char c, int count, Appendable appendable) throws java.io.IOException {
-    StringBuilder sb = new StringBuilder();
-    switch (c) {
-      case 'y':
-      case 'u': {
-        int year = temporal.get(ChronoField.YEAR);
-        if (count == 2) {
-          int y2 = Math.abs(year) % 100;
-          appendZeroPadded(sb, y2, 2);
-        } else {
-          appendZeroPadded(sb, year, count);
-        }
-        break;
-      }
-      case 'M':
-      case 'L': {
-        int month = temporal.get(ChronoField.MONTH_OF_YEAR);
-        appendZeroPadded(sb, month, count);
-        break;
-      }
-      case 'd': {
-        int day = temporal.get(ChronoField.DAY_OF_MONTH);
-        appendZeroPadded(sb, day, count);
-        break;
-      }
-      case 'H': {
-        int hour = temporal.get(ChronoField.HOUR_OF_DAY);
-        appendZeroPadded(sb, hour, count);
-        break;
-      }
-      case 'm': {
-        int minute = temporal.get(ChronoField.MINUTE_OF_HOUR);
-        appendZeroPadded(sb, minute, count);
-        break;
-      }
-      case 's': {
-        int second = temporal.get(ChronoField.SECOND_OF_MINUTE);
-        appendZeroPadded(sb, second, count);
-        break;
-      }
-      case 'S': {
-        int nano = temporal.get(ChronoField.NANO_OF_SECOND);
-        long fraction = (long) (nano / Math.pow(10, 9 - count));
-        appendZeroPadded(sb, (int) fraction, count);
-        break;
-      }
-      default:
-        throw new UnsupportedTemporalTypeException("Unsupported pattern letter: " + c);
+  public TemporalAccessor parse(CharSequence text, ParsePosition position) {
+    Objects.requireNonNull(text, "text");
+    Objects.requireNonNull(position, "position");
+    try {
+      return parseResolved0(text, position);
+    } catch (DateTimeParseException ex) {
+      throw ex;
+    } catch (IndexOutOfBoundsException ex) {
+      throw ex;
+    } catch (RuntimeException ex) {
+      throw createError(text, ex);
     }
-    appendable.append(sb.toString());
   }
 
   public <T> T parse(CharSequence text, TemporalQuery<T> query) {
     Objects.requireNonNull(text, "text");
     Objects.requireNonNull(query, "query");
-    TemporalAccessor parsed = parse(text);
-    return query.queryFrom(parsed);
+    try {
+      return parseResolved0(text, null).query(query);
+    } catch (DateTimeParseException ex) {
+      throw ex;
+    } catch (RuntimeException ex) {
+      throw createError(text, ex);
+    }
   }
 
-  public TemporalAccessor parse(CharSequence text) {
+  public TemporalAccessor parseBest(CharSequence text, TemporalQuery<?>... queries) {
     Objects.requireNonNull(text, "text");
-    String str = text.toString().trim();
-    Parsed parsed = new Parsed();
-    if (kind == FormatKind.ISO_LOCAL_DATE || kind == FormatKind.BASIC_ISO_DATE) {
-      parseIsoDate(str, parsed);
-    } else if (kind == FormatKind.ISO_LOCAL_TIME) {
-      parseIsoTime(str, parsed);
-    } else if (kind == FormatKind.ISO_LOCAL_DATE_TIME) {
-      int t = str.indexOf('T');
-      if (t < 0) t = str.indexOf('t');
-      if (t < 0) throw new DateTimeParseException("Expected 'T' separator", str, 0);
-      parseIsoDate(str.substring(0, t), parsed);
-      parseIsoTime(str.substring(t + 1), parsed);
-    } else if (kind == FormatKind.ISO_INSTANT) {
-      if (!str.endsWith("Z") && !str.endsWith("z")) {
-        throw new DateTimeParseException("Expected 'Z' at end of Instant", str, str.length() - 1);
-      }
-      String body = str.substring(0, str.length() - 1);
-      int t = body.indexOf('T');
-      if (t < 0) t = body.indexOf('t');
-      if (t < 0) throw new DateTimeParseException("Expected 'T' separator", str, 0);
-      parseIsoDate(body.substring(0, t), parsed);
-      parseIsoTime(body.substring(t + 1), parsed);
-      parsed.put(ChronoField.OFFSET_SECONDS, 0L);
-    } else if (kind == FormatKind.PATTERN) {
-      parsePattern(str, pattern, parsed);
+    Objects.requireNonNull(queries, "queries");
+    if (queries.length < 2) {
+      throw new IllegalArgumentException("At least two queries must be specified");
     }
-    return parsed;
-  }
-
-  private void parseIsoDate(String str, Parsed parsed) {
-    if (kind == FormatKind.BASIC_ISO_DATE) {
-      if (str.length() != 8) {
-        throw new DateTimeParseException("Expected 8 characters for BASIC_ISO_DATE", str, 0);
-      }
-      parsed.put(ChronoField.YEAR, Long.parseLong(str.substring(0, 4)));
-      parsed.put(ChronoField.MONTH_OF_YEAR, Long.parseLong(str.substring(4, 6)));
-      parsed.put(ChronoField.DAY_OF_MONTH, Long.parseLong(str.substring(6, 8)));
-      return;
-    }
-    String[] parts = str.split("-");
-    if (parts.length != 3) {
-      throw new DateTimeParseException("Invalid ISO date: " + str, str, 0);
-    }
-    parsed.put(ChronoField.YEAR, Long.parseLong(parts[0]));
-    parsed.put(ChronoField.MONTH_OF_YEAR, Long.parseLong(parts[1]));
-    parsed.put(ChronoField.DAY_OF_MONTH, Long.parseLong(parts[2]));
-  }
-
-  private void parseIsoTime(String str, Parsed parsed) {
-    String[] parts = str.split(":");
-    if (parts.length < 2 || parts.length > 3) {
-      throw new DateTimeParseException("Invalid ISO time: " + str, str, 0);
-    }
-    parsed.put(ChronoField.HOUR_OF_DAY, Long.parseLong(parts[0]));
-    parsed.put(ChronoField.MINUTE_OF_HOUR, Long.parseLong(parts[1]));
-    if (parts.length == 3) {
-      String secStr = parts[2];
-      int dot = secStr.indexOf('.');
-      if (dot >= 0) {
-        parsed.put(ChronoField.SECOND_OF_MINUTE, Long.parseLong(secStr.substring(0, dot)));
-        String nanoStr = secStr.substring(dot + 1);
-        long nano = Long.parseLong(nanoStr);
-        for (int i = nanoStr.length(); i < 9; ++i) {
-          nano *= 10;
+    try {
+      TemporalAccessor resolved = parseResolved0(text, null);
+      for (TemporalQuery<?> query : queries) {
+        try {
+          return (TemporalAccessor) resolved.query(query);
+        } catch (RuntimeException ex) {
+          // try next
         }
-        parsed.put(ChronoField.NANO_OF_SECOND, nano);
-      } else {
-        parsed.put(ChronoField.SECOND_OF_MINUTE, Long.parseLong(secStr));
       }
+      throw new DateTimeException("Unable to convert parsed text using any of the specified queries");
+    } catch (DateTimeParseException ex) {
+      throw ex;
+    } catch (RuntimeException ex) {
+      throw createError(text, ex);
+    }
+  }
+
+  private DateTimeParseException createError(CharSequence text, RuntimeException ex) {
+    String abbr;
+    if (text.length() > 64) {
+      abbr = text.subSequence(0, 64).toString() + "...";
     } else {
-      parsed.put(ChronoField.SECOND_OF_MINUTE, 0L);
+      abbr = text.toString();
     }
+    return new DateTimeParseException("Text '" + abbr + "' could not be parsed: " + ex.getMessage(), text, 0, ex);
   }
 
-  private void parsePattern(String text, String pat, Parsed parsed) {
-    // Basic pattern parser for standard numeric elements
-    int pIdx = 0;
-    int tIdx = 0;
-    int pLen = pat.length();
-    int tLen = text.length();
-
-    while (pIdx < pLen && tIdx < tLen) {
-      char c = pat.charAt(pIdx);
-      if (isPatternLetter(c)) {
-        int pStart = pIdx;
-        while (pIdx < pLen && pat.charAt(pIdx) == c) {
-          pIdx++;
-        }
-        int count = pIdx - pStart;
-        int numDigits = count;
-        if (tIdx + numDigits > tLen) {
-          numDigits = tLen - tIdx;
-        }
-        long val = Long.parseLong(text.substring(tIdx, tIdx + numDigits));
-        tIdx += numDigits;
-        switch (c) {
-          case 'y':
-          case 'u':
-            parsed.put(ChronoField.YEAR, val);
-            break;
-          case 'M':
-          case 'L':
-            parsed.put(ChronoField.MONTH_OF_YEAR, val);
-            break;
-          case 'd':
-            parsed.put(ChronoField.DAY_OF_MONTH, val);
-            break;
-          case 'H':
-            parsed.put(ChronoField.HOUR_OF_DAY, val);
-            break;
-          case 'm':
-            parsed.put(ChronoField.MINUTE_OF_HOUR, val);
-            break;
-          case 's':
-            parsed.put(ChronoField.SECOND_OF_MINUTE, val);
-            break;
-          case 'S':
-            for (int k = count; k < 9; ++k) val *= 10;
-            parsed.put(ChronoField.NANO_OF_SECOND, val);
-            break;
-        }
+  private TemporalAccessor parseResolved0(final CharSequence text, final ParsePosition position) {
+    ParsePosition pos = (position != null ? position : new ParsePosition(0));
+    Parsed unresolved = parseUnresolved0(text, pos);
+    if (unresolved == null || pos.getErrorIndex() >= 0 || (position == null && pos.getIndex() < text.length())) {
+      String abbr;
+      if (text.length() > 64) {
+        abbr = text.subSequence(0, 64).toString() + "...";
       } else {
-        if (text.charAt(tIdx) != c) {
-          throw new DateTimeParseException("Mismatch in literal character '" + c + "'", text, tIdx);
-        }
-        pIdx++;
-        tIdx++;
+        abbr = text.toString();
+      }
+      if (pos.getErrorIndex() >= 0) {
+        throw new DateTimeParseException("Text '" + abbr + "' could not be parsed at index " + pos.getErrorIndex(),
+            text, pos.getErrorIndex());
+      } else {
+        throw new DateTimeParseException("Text '" + abbr + "' could not be parsed, unparsed text found at index "
+            + pos.getIndex(), text, pos.getIndex());
       }
     }
+    return unresolved.resolve(resolverStyle, resolverFields);
   }
 
-  private static void appendZeroPadded(StringBuilder sb, int value, int digits) {
-    String s = Integer.toString(value);
-    for (int i = s.length(); i < digits; ++i) {
-      sb.append('0');
+  public TemporalAccessor parseUnresolved(CharSequence text, ParsePosition position) {
+    return parseUnresolved0(text, position);
+  }
+
+  private Parsed parseUnresolved0(CharSequence text, ParsePosition position) {
+    Objects.requireNonNull(text, "text");
+    Objects.requireNonNull(position, "position");
+    DateTimeParseContext context = new DateTimeParseContext(this);
+    int pos = position.getIndex();
+    pos = printerParser.parse(context, text, pos);
+    if (pos < 0) {
+      position.setErrorIndex(~pos);
+      return null;
     }
-    sb.append(s);
+    position.setIndex(pos);
+    return context.toResolved0();
   }
 
-  private static void appendNanos(StringBuilder sb, int nano) {
-    if (nano % 1000000 == 0) {
-      appendZeroPadded(sb, nano / 1000000, 3);
-    } else if (nano % 1000 == 0) {
-      appendZeroPadded(sb, nano / 1000, 6);
-    } else {
-      appendZeroPadded(sb, nano, 9);
-    }
+  CompositePrinterParser toPrinterParser(boolean optional) {
+    return printerParser.withOptional(optional);
   }
 
-  private static final class Parsed implements TemporalAccessor {
-    private final Map<TemporalField, Long> fields = new HashMap<TemporalField, Long>();
+  public Format toFormat() {
+    return new ClassicFormat(this, null);
+  }
 
-    void put(TemporalField field, long value) {
-      fields.put(field, value);
+  public Format toFormat(TemporalQuery<?> parseQuery) {
+    Objects.requireNonNull(parseQuery, "parseQuery");
+    return new ClassicFormat(this, parseQuery);
+  }
+
+  @Override
+  public String toString() {
+    String pattern = printerParser.toString();
+    pattern = pattern.startsWith("[") ? pattern : pattern.substring(1, pattern.length() - 1);
+    return pattern;
+  }
+
+  private static class ClassicFormat extends Format {
+    private final DateTimeFormatter formatter;
+    private final TemporalQuery<?> parseType;
+
+    public ClassicFormat(DateTimeFormatter formatter, TemporalQuery<?> parseType) {
+      this.formatter = formatter;
+      this.parseType = parseType;
     }
 
     @Override
-    public boolean isSupported(TemporalField field) {
-      return fields.containsKey(field);
+    public StringBuffer format(Object obj, StringBuffer toAppendTo, FieldPosition pos) {
+      Objects.requireNonNull(obj, "obj");
+      Objects.requireNonNull(toAppendTo, "toAppendTo");
+      Objects.requireNonNull(pos, "pos");
+      if (obj instanceof TemporalAccessor == false) {
+        throw new IllegalArgumentException("Format target must implement TemporalAccessor");
+      }
+      pos.setBeginIndex(0);
+      pos.setEndIndex(0);
+      try {
+        formatter.formatTo((TemporalAccessor) obj, toAppendTo);
+      } catch (RuntimeException ex) {
+        throw new IllegalArgumentException(ex.getMessage(), ex);
+      }
+      return toAppendTo;
     }
 
     @Override
-    public long getLong(TemporalField field) {
-      Long val = fields.get(field);
-      if (val != null) {
-        return val.longValue();
+    public Object parseObject(String text) throws ParseException {
+      Objects.requireNonNull(text, "text");
+      try {
+        if (parseType == null) {
+          return formatter.parseResolved0(text, null);
+        }
+        return formatter.parse(text, parseType);
+      } catch (DateTimeParseException ex) {
+        throw new ParseException(ex.getMessage(), ex.getErrorIndex());
+      } catch (RuntimeException ex) {
+        throw (ParseException) new ParseException(ex.getMessage(), 0).initCause(ex);
       }
-      if (field == ChronoField.EPOCH_DAY && isSupported(ChronoField.YEAR) && isSupported(ChronoField.MONTH_OF_YEAR) && isSupported(ChronoField.DAY_OF_MONTH)) {
-        LocalDate ld = LocalDate.of((int) getLong(ChronoField.YEAR), (int) getLong(ChronoField.MONTH_OF_YEAR), (int) getLong(ChronoField.DAY_OF_MONTH));
-        return ld.toEpochDay();
-      }
-      if (field == ChronoField.NANO_OF_DAY && isSupported(ChronoField.HOUR_OF_DAY) && isSupported(ChronoField.MINUTE_OF_HOUR)) {
-        int h = (int) getLong(ChronoField.HOUR_OF_DAY);
-        int m = (int) getLong(ChronoField.MINUTE_OF_HOUR);
-        int s = isSupported(ChronoField.SECOND_OF_MINUTE) ? (int) getLong(ChronoField.SECOND_OF_MINUTE) : 0;
-        int n = isSupported(ChronoField.NANO_OF_SECOND) ? (int) getLong(ChronoField.NANO_OF_SECOND) : 0;
-        LocalTime lt = LocalTime.of(h, m, s, n);
-        return lt.toNanoOfDay();
-      }
-      if (field == ChronoField.INSTANT_SECONDS && isSupported(ChronoField.EPOCH_DAY) && isSupported(ChronoField.NANO_OF_DAY)) {
-        long epochDay = getLong(ChronoField.EPOCH_DAY);
-        long nanoOfDay = getLong(ChronoField.NANO_OF_DAY);
-        return epochDay * 86400L + (nanoOfDay / 1000000000L);
-      }
-      throw new UnsupportedTemporalTypeException("Field not found: " + field);
     }
 
     @Override
-    public <R> R query(TemporalQuery<R> query) {
-      if (query == TemporalQueries.localDate()) {
-        if (isSupported(ChronoField.YEAR) && isSupported(ChronoField.MONTH_OF_YEAR) && isSupported(ChronoField.DAY_OF_MONTH)) {
-          return (R) LocalDate.of((int) getLong(ChronoField.YEAR), (int) getLong(ChronoField.MONTH_OF_YEAR), (int) getLong(ChronoField.DAY_OF_MONTH));
+    public Object parseObject(String text, ParsePosition pos) {
+      Objects.requireNonNull(text, "text");
+      try {
+        TemporalAccessor temporal = formatter.parseUnresolved0(text, pos);
+        if (temporal == null) {
+          if (pos.getErrorIndex() < 0) {
+            pos.setErrorIndex(0);
+          }
+          return null;
         }
-      } else if (query == TemporalQueries.localTime()) {
-        if (isSupported(ChronoField.HOUR_OF_DAY) && isSupported(ChronoField.MINUTE_OF_HOUR)) {
-          int h = (int) getLong(ChronoField.HOUR_OF_DAY);
-          int m = (int) getLong(ChronoField.MINUTE_OF_HOUR);
-          int s = isSupported(ChronoField.SECOND_OF_MINUTE) ? (int) getLong(ChronoField.SECOND_OF_MINUTE) : 0;
-          int n = isSupported(ChronoField.NANO_OF_SECOND) ? (int) getLong(ChronoField.NANO_OF_SECOND) : 0;
-          return (R) LocalTime.of(h, m, s, n);
+        TemporalAccessor resolved = ((Parsed) temporal).resolve(formatter.resolverStyle, formatter.resolverFields);
+        if (parseType == null) {
+          return resolved;
         }
-      } else if (query == TemporalQueries.offset()) {
-        if (isSupported(ChronoField.OFFSET_SECONDS)) {
-          return (R) ZoneOffset.ofTotalSeconds((int) getLong(ChronoField.OFFSET_SECONDS));
-        }
+        return resolved.query(parseType);
+      } catch (RuntimeException ex) {
+        pos.setErrorIndex(0);
+        return null;
       }
-      return TemporalAccessor.super.query(query);
     }
   }
 }

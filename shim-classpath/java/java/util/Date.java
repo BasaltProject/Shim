@@ -38,6 +38,18 @@ public class Date {
     return when;
   }
 
+  public java.time.Instant toInstant() {
+    return java.time.Instant.ofEpochMilli(when);
+  }
+
+  public static Date from(java.time.Instant instant) {
+    try {
+      return new Date(instant.toEpochMilli());
+    } catch (ArithmeticException ex) {
+      throw new IllegalArgumentException(ex);
+    }
+  }
+
   public String toString() {
     return toString(when);
   }

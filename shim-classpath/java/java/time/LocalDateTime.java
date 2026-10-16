@@ -2,11 +2,23 @@
  * Copyright (c) 2026 BasaltMC.
  * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
  * SPDX-License-Identifier: MIT
  */
 
 package java.time;
+
+import static java.time.LocalTime.HOURS_PER_DAY;
+import static java.time.LocalTime.MICROS_PER_DAY;
+import static java.time.LocalTime.MILLIS_PER_DAY;
+import static java.time.LocalTime.MINUTES_PER_DAY;
+import static java.time.LocalTime.NANOS_PER_DAY;
+import static java.time.LocalTime.NANOS_PER_HOUR;
+import static java.time.LocalTime.NANOS_PER_MINUTE;
+import static java.time.LocalTime.NANOS_PER_SECOND;
+import static java.time.LocalTime.SECONDS_PER_DAY;
+import static java.time.temporal.ChronoField.EPOCH_DAY;
+import static java.time.temporal.ChronoField.NANO_OF_DAY;
+import static java.time.temporal.ChronoField.NANO_OF_SECOND;
 
 import java.io.Serializable;
 import java.time.chrono.ChronoLocalDateTime;
@@ -18,21 +30,20 @@ import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAdjuster;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalField;
+import java.time.temporal.TemporalQueries;
+import java.time.temporal.TemporalQuery;
 import java.time.temporal.TemporalUnit;
-import java.time.temporal.UnsupportedTemporalTypeException;
+import java.time.temporal.ValueRange;
 import java.util.Objects;
 
 public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLocalDateTime<LocalDate>, Serializable {
+  private static final long serialVersionUID = 6207766400415563566L;
+
   public static final LocalDateTime MIN = LocalDateTime.of(LocalDate.MIN, LocalTime.MIN);
   public static final LocalDateTime MAX = LocalDateTime.of(LocalDate.MAX, LocalTime.MAX);
 
   private final LocalDate date;
   private final LocalTime time;
-
-  private LocalDateTime(LocalDate date, LocalTime time) {
-    this.date = date;
-    this.time = time;
-  }
 
   public static LocalDateTime now() {
     return now(Clock.systemDefaultZone());
@@ -44,45 +55,35 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
 
   public static LocalDateTime now(Clock clock) {
     Objects.requireNonNull(clock, "clock");
-    Instant now = clock.instant();
+    final Instant now = clock.instant();
     ZoneOffset offset = clock.getZone().getRules().getOffset(now);
     return ofEpochSecond(now.getEpochSecond(), now.getNano(), offset);
   }
 
   public static LocalDateTime of(int year, Month month, int dayOfMonth, int hour, int minute) {
-    LocalDate d = LocalDate.of(year, month, dayOfMonth);
-    LocalTime t = LocalTime.of(hour, minute);
-    return new LocalDateTime(d, t);
+    return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute));
   }
 
   public static LocalDateTime of(int year, Month month, int dayOfMonth, int hour, int minute, int second) {
-    LocalDate d = LocalDate.of(year, month, dayOfMonth);
-    LocalTime t = LocalTime.of(hour, minute, second);
-    return new LocalDateTime(d, t);
+    return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute, second));
   }
 
-  public static LocalDateTime of(int year, Month month, int dayOfMonth, int hour, int minute, int second, int nanoOfSecond) {
-    LocalDate d = LocalDate.of(year, month, dayOfMonth);
-    LocalTime t = LocalTime.of(hour, minute, second, nanoOfSecond);
-    return new LocalDateTime(d, t);
+  public static LocalDateTime of(int year, Month month, int dayOfMonth, int hour, int minute, int second,
+      int nanoOfSecond) {
+    return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute, second, nanoOfSecond));
   }
 
   public static LocalDateTime of(int year, int month, int dayOfMonth, int hour, int minute) {
-    LocalDate d = LocalDate.of(year, month, dayOfMonth);
-    LocalTime t = LocalTime.of(hour, minute);
-    return new LocalDateTime(d, t);
+    return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute));
   }
 
   public static LocalDateTime of(int year, int month, int dayOfMonth, int hour, int minute, int second) {
-    LocalDate d = LocalDate.of(year, month, dayOfMonth);
-    LocalTime t = LocalTime.of(hour, minute, second);
-    return new LocalDateTime(d, t);
+    return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute, second));
   }
 
-  public static LocalDateTime of(int year, int month, int dayOfMonth, int hour, int minute, int second, int nanoOfSecond) {
-    LocalDate d = LocalDate.of(year, month, dayOfMonth);
-    LocalTime t = LocalTime.of(hour, minute, second, nanoOfSecond);
-    return new LocalDateTime(d, t);
+  public static LocalDateTime of(int year, int month, int dayOfMonth, int hour, int minute, int second,
+      int nanoOfSecond) {
+    return new LocalDateTime(LocalDate.of(year, month, dayOfMonth), LocalTime.of(hour, minute, second, nanoOfSecond));
   }
 
   public static LocalDateTime of(LocalDate date, LocalTime time) {
@@ -100,31 +101,103 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
 
   public static LocalDateTime ofEpochSecond(long epochSecond, int nanoOfSecond, ZoneOffset offset) {
     Objects.requireNonNull(offset, "offset");
-    ChronoField.NANO_OF_SECOND.checkValidValue(nanoOfSecond);
+    NANO_OF_SECOND.checkValidValue(nanoOfSecond);
     long localSecond = epochSecond + offset.getTotalSeconds();
-    long localEpochDay = Math.floorDiv(localSecond, 86400L);
-    int secsOfDay = (int) Math.floorMod(localSecond, 86400L);
+    long localEpochDay = Math.floorDiv(localSecond, SECONDS_PER_DAY);
+    int secsOfDay = Math.floorMod(localSecond, SECONDS_PER_DAY);
     LocalDate date = LocalDate.ofEpochDay(localEpochDay);
-    LocalTime time = LocalTime.ofNanoOfDay(((long) secsOfDay) * 1000000000L + nanoOfSecond);
+    LocalTime time = LocalTime.ofNanoOfDay(secsOfDay * NANOS_PER_SECOND + nanoOfSecond);
     return new LocalDateTime(date, time);
   }
 
   public static LocalDateTime from(TemporalAccessor temporal) {
-    Objects.requireNonNull(temporal, "temporal");
     if (temporal instanceof LocalDateTime) {
       return (LocalDateTime) temporal;
+    } else if (temporal instanceof ZonedDateTime) {
+      return ((ZonedDateTime) temporal).toLocalDateTime();
+    } else if (temporal instanceof OffsetDateTime) {
+      return ((OffsetDateTime) temporal).toLocalDateTime();
     }
-    LocalDate d = LocalDate.from(temporal);
-    LocalTime t = LocalTime.from(temporal);
-    return new LocalDateTime(d, t);
+    try {
+      LocalDate date = LocalDate.from(temporal);
+      LocalTime time = LocalTime.from(temporal);
+      return new LocalDateTime(date, time);
+    } catch (DateTimeException ex) {
+      throw new DateTimeException("Unable to obtain LocalDateTime from TemporalAccessor: " + temporal + " of type "
+          + temporal.getClass().getName(), ex);
+    }
   }
 
+  public static LocalDateTime parse(CharSequence text) {
+    return parse(text, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+  }
+
+  public static LocalDateTime parse(CharSequence text, DateTimeFormatter formatter) {
+    Objects.requireNonNull(formatter, "formatter");
+    return formatter.parse(text, new TemporalQuery<LocalDateTime>() {
+      @Override
+      public LocalDateTime queryFrom(TemporalAccessor temporal) {
+        return LocalDateTime.from(temporal);
+      }
+    });
+  }
+
+  private LocalDateTime(LocalDate date, LocalTime time) {
+    this.date = date;
+    this.time = time;
+  }
+
+  private LocalDateTime with(LocalDate newDate, LocalTime newTime) {
+    if (date == newDate && time == newTime) {
+      return this;
+    }
+    return new LocalDateTime(newDate, newTime);
+  }
+
+  @Override
+  public boolean isSupported(TemporalField field) {
+    if (field instanceof ChronoField) {
+      ChronoField f = (ChronoField) field;
+      return f.isDateBased() || f.isTimeBased();
+    }
+    return field != null && field.isSupportedBy(this);
+  }
+
+  @Override
+  public boolean isSupported(TemporalUnit unit) {
+    return ChronoLocalDateTime.super.isSupported(unit);
+  }
+
+  @Override
+  public ValueRange range(TemporalField field) {
+    if (field instanceof ChronoField) {
+      ChronoField f = (ChronoField) field;
+      return (f.isTimeBased() ? time.range(field) : date.range(field));
+    }
+    return field.rangeRefinedBy(this);
+  }
+
+  @Override
+  public int get(TemporalField field) {
+    if (field instanceof ChronoField) {
+      ChronoField f = (ChronoField) field;
+      return (f.isTimeBased() ? time.get(field) : date.get(field));
+    }
+    return ChronoLocalDateTime.super.get(field);
+  }
+
+  @Override
+  public long getLong(TemporalField field) {
+    if (field instanceof ChronoField) {
+      ChronoField f = (ChronoField) field;
+      return (f.isTimeBased() ? time.getLong(field) : date.getLong(field));
+    }
+    return field.getFrom(this);
+  }
+
+  @Override
   public LocalDate toLocalDate() {
     return date;
-  }
-
-  public LocalTime toLocalTime() {
-    return time;
   }
 
   public int getYear() {
@@ -151,6 +224,11 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
     return date.getDayOfWeek();
   }
 
+  @Override
+  public LocalTime toLocalTime() {
+    return time;
+  }
+
   public int getHour() {
     return time.getHour();
   }
@@ -168,48 +246,28 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
   }
 
   @Override
-  public boolean isSupported(TemporalField field) {
-    if (field instanceof ChronoField) {
-      return field.isDateBased() || field.isTimeBased();
+  public LocalDateTime with(TemporalAdjuster adjuster) {
+    if (adjuster instanceof LocalDate) {
+      return with((LocalDate) adjuster, time);
+    } else if (adjuster instanceof LocalTime) {
+      return with(date, (LocalTime) adjuster);
+    } else if (adjuster instanceof LocalDateTime) {
+      return (LocalDateTime) adjuster;
     }
-    return field != null && field.isSupportedBy(this);
-  }
-
-  @Override
-  public boolean isSupported(TemporalUnit unit) {
-    if (unit instanceof ChronoUnit) {
-      return true;
-    }
-    return unit != null && unit.isSupportedBy(this);
-  }
-
-  @Override
-  public long getLong(TemporalField field) {
-    if (field instanceof ChronoField) {
-      ChronoField cf = (ChronoField) field;
-      return cf.isTimeBased() ? time.getLong(field) : date.getLong(field);
-    }
-    return field.getFrom(this);
+    return (LocalDateTime) adjuster.adjustInto(this);
   }
 
   @Override
   public LocalDateTime with(TemporalField field, long newValue) {
     if (field instanceof ChronoField) {
-      ChronoField cf = (ChronoField) field;
-      if (cf.isTimeBased()) {
+      ChronoField f = (ChronoField) field;
+      if (f.isTimeBased()) {
         return with(date, time.with(field, newValue));
       } else {
         return with(date.with(field, newValue), time);
       }
     }
-    return (LocalDateTime) field.adjustInto(this, newValue);
-  }
-
-  private LocalDateTime with(LocalDate newDate, LocalTime newTime) {
-    if (date == newDate && time == newTime) {
-      return this;
-    }
-    return new LocalDateTime(newDate, newTime);
+    return field.adjustInto(this, newValue);
   }
 
   public LocalDateTime withYear(int year) {
@@ -244,9 +302,18 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
     return with(date, time.withNano(nanoOfSecond));
   }
 
+  public LocalDateTime truncatedTo(TemporalUnit unit) {
+    return with(date, time.truncatedTo(unit));
+  }
+
   @Override
-  public LocalDateTime plus(TemporalAmount amount) {
-    return (LocalDateTime) amount.addTo(this);
+  public LocalDateTime plus(TemporalAmount amountToAdd) {
+    if (amountToAdd instanceof Period) {
+      Period periodToAdd = (Period) amountToAdd;
+      return with(date.plus(periodToAdd), time);
+    }
+    Objects.requireNonNull(amountToAdd, "amountToAdd");
+    return (LocalDateTime) amountToAdd.addTo(this);
   }
 
   @Override
@@ -257,9 +324,9 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
         case NANOS:
           return plusNanos(amountToAdd);
         case MICROS:
-          return plusDays(amountToAdd / (86400L * 1000000L)).plusNanos((amountToAdd % (86400L * 1000000L)) * 1000L);
+          return plusDays(amountToAdd / MICROS_PER_DAY).plusNanos((amountToAdd % MICROS_PER_DAY) * 1000);
         case MILLIS:
-          return plusDays(amountToAdd / (86400L * 1000L)).plusNanos((amountToAdd % (86400L * 1000L)) * 1000000L);
+          return plusDays(amountToAdd / MILLIS_PER_DAY).plusNanos((amountToAdd % MILLIS_PER_DAY) * 1000_000);
         case SECONDS:
           return plusSeconds(amountToAdd);
         case MINUTES:
@@ -267,44 +334,29 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
         case HOURS:
           return plusHours(amountToAdd);
         case HALF_DAYS:
-          return plusDays(amountToAdd / 2).plusHours((amountToAdd % 2) * 12);
-        case DAYS:
-          return plusDays(amountToAdd);
-        case WEEKS:
-          return plusWeeks(amountToAdd);
-        case MONTHS:
-          return plusMonths(amountToAdd);
-        case YEARS:
-          return plusYears(amountToAdd);
-        case DECADES:
-          return plusYears(Math.multiplyExact(amountToAdd, 10L));
-        case CENTURIES:
-          return plusYears(Math.multiplyExact(amountToAdd, 100L));
-        case MILLENNIA:
-          return plusYears(Math.multiplyExact(amountToAdd, 1000L));
-        case ERAS:
-          return with(ChronoField.ERA, Math.addExact(getLong(ChronoField.ERA), amountToAdd));
+          return plusDays(amountToAdd / 256).plusHours((amountToAdd % 256) * 12);
         default:
-          throw new UnsupportedTemporalTypeException("Unsupported unit: " + unit);
+          break;
       }
+      return with(date.plus(amountToAdd, unit), time);
     }
-    return (LocalDateTime) unit.addTo(this, amountToAdd);
+    return unit.addTo(this, amountToAdd);
   }
 
-  public LocalDateTime plusYears(long years) {
-    return with(date.plusYears(years), time);
+  public LocalDateTime plusYears(long yearsToAdd) {
+    return with(date.plusYears(yearsToAdd), time);
   }
 
-  public LocalDateTime plusMonths(long months) {
-    return with(date.plusMonths(months), time);
+  public LocalDateTime plusMonths(long monthsToAdd) {
+    return with(date.plusMonths(monthsToAdd), time);
   }
 
-  public LocalDateTime plusWeeks(long weeks) {
-    return with(date.plusWeeks(weeks), time);
+  public LocalDateTime plusWeeks(long weeksToAdd) {
+    return with(date.plusWeeks(weeksToAdd), time);
   }
 
-  public LocalDateTime plusDays(long days) {
-    return with(date.plusDays(days), time);
+  public LocalDateTime plusDays(long daysToAdd) {
+    return with(date.plusDays(daysToAdd), time);
   }
 
   public LocalDateTime plusHours(long hours) {
@@ -323,53 +375,36 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
     return plusWithOverflow(date, 0, 0, 0, nanos, 1);
   }
 
-  private LocalDateTime plusWithOverflow(LocalDate newDate, long hours, long minutes, long seconds, long nanos, int sign) {
-    if ((hours | minutes | seconds | nanos) == 0) {
-      return with(newDate, time);
-    }
-    long totDays = nanos / 86400000000000L +
-                   seconds / 86400L +
-                   minutes / 1440L +
-                   hours / 24L;
-    totDays *= sign;
-    long totNanos = nanos % 86400000000000L +
-                    (seconds % 86400L) * 1000000000L +
-                    (minutes % 1440L) * 60000000000L +
-                    (hours % 24L) * 3600000000000L;
-    long curNoD = time.toNanoOfDay();
-    totNanos = totNanos * sign + curNoD;
-    totDays += Math.floorDiv(totNanos, 86400000000000L);
-    long newNoD = Math.floorMod(totNanos, 86400000000000L);
-    LocalTime newTime = (newNoD == curNoD ? time : LocalTime.ofNanoOfDay(newNoD));
-    return with(newDate.plusDays(totDays), newTime);
-  }
-
   @Override
-  public LocalDateTime minus(TemporalAmount amount) {
-    return (LocalDateTime) amount.subtractFrom(this);
+  public LocalDateTime minus(TemporalAmount amountToSubtract) {
+    if (amountToSubtract instanceof Period) {
+      Period periodToSubtract = (Period) amountToSubtract;
+      return with(date.minus(periodToSubtract), time);
+    }
+    Objects.requireNonNull(amountToSubtract, "amountToSubtract");
+    return (LocalDateTime) amountToSubtract.subtractFrom(this);
   }
 
   @Override
   public LocalDateTime minus(long amountToSubtract, TemporalUnit unit) {
-    return (amountToSubtract == Long.MIN_VALUE)
-        ? plus(Long.MAX_VALUE, unit).plus(1, unit)
-        : plus(-amountToSubtract, unit);
+    return (amountToSubtract == Long.MIN_VALUE ? plus(Long.MAX_VALUE, unit).plus(1, unit)
+        : plus(-amountToSubtract, unit));
   }
 
-  public LocalDateTime minusYears(long years) {
-    return (years == Long.MIN_VALUE) ? plusYears(Long.MAX_VALUE).plusYears(1) : plusYears(-years);
+  public LocalDateTime minusYears(long yearsToSubtract) {
+    return (yearsToSubtract == Long.MIN_VALUE ? plusYears(Long.MAX_VALUE).plusYears(1) : plusYears(-yearsToSubtract));
   }
 
-  public LocalDateTime minusMonths(long months) {
-    return (months == Long.MIN_VALUE) ? plusMonths(Long.MAX_VALUE).plusMonths(1) : plusMonths(-months);
+  public LocalDateTime minusMonths(long monthsToSubtract) {
+    return (monthsToSubtract == Long.MIN_VALUE ? plusMonths(Long.MAX_VALUE).plusMonths(1) : plusMonths(-monthsToSubtract));
   }
 
-  public LocalDateTime minusWeeks(long weeks) {
-    return (weeks == Long.MIN_VALUE) ? plusWeeks(Long.MAX_VALUE).plusWeeks(1) : plusWeeks(-weeks);
+  public LocalDateTime minusWeeks(long weeksToSubtract) {
+    return (weeksToSubtract == Long.MIN_VALUE ? plusWeeks(Long.MAX_VALUE).plusWeeks(1) : plusWeeks(-weeksToSubtract));
   }
 
-  public LocalDateTime minusDays(long days) {
-    return (days == Long.MIN_VALUE) ? plusDays(Long.MAX_VALUE).plusDays(1) : plusDays(-days);
+  public LocalDateTime minusDays(long daysToSubtract) {
+    return (daysToSubtract == Long.MIN_VALUE ? plusDays(Long.MAX_VALUE).plusDays(1) : plusDays(-daysToSubtract));
   }
 
   public LocalDateTime minusHours(long hours) {
@@ -388,10 +423,36 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
     return plusWithOverflow(date, 0, 0, 0, nanos, -1);
   }
 
+  private LocalDateTime plusWithOverflow(LocalDate newDate, long hours, long minutes, long seconds, long nanos,
+      int sign) {
+    if ((hours | minutes | seconds | nanos) == 0) {
+      return with(newDate, time);
+    }
+    long totDays = nanos / NANOS_PER_DAY + seconds / SECONDS_PER_DAY + minutes / MINUTES_PER_DAY
+        + hours / HOURS_PER_DAY;
+    totDays *= sign;
+    long totNanos = nanos % NANOS_PER_DAY + (seconds % SECONDS_PER_DAY) * NANOS_PER_SECOND
+        + (minutes % MINUTES_PER_DAY) * NANOS_PER_MINUTE + (hours % HOURS_PER_DAY) * NANOS_PER_HOUR;
+    long curNoD = time.toNanoOfDay();
+    totNanos = totNanos * sign + curNoD;
+    totDays += Math.floorDiv(totNanos, NANOS_PER_DAY);
+    long newNoD = Math.floorMod(totNanos, NANOS_PER_DAY);
+    LocalTime newTime = (newNoD == curNoD ? time : LocalTime.ofNanoOfDay(newNoD));
+    return with(newDate.plusDays(totDays), newTime);
+  }
+
+  @SuppressWarnings("unchecked")
+  @Override
+  public <R> R query(TemporalQuery<R> query) {
+    if (query == TemporalQueries.localDate()) {
+      return (R) date;
+    }
+    return ChronoLocalDateTime.super.query(query);
+  }
+
   @Override
   public Temporal adjustInto(Temporal temporal) {
-    return temporal.with(ChronoField.EPOCH_DAY, date.toEpochDay())
-                   .with(ChronoField.NANO_OF_DAY, time.toNanoOfDay());
+    return temporal.with(EPOCH_DAY, date.toEpochDay()).with(NANO_OF_DAY, time.toNanoOfDay());
   }
 
   @Override
@@ -399,34 +460,50 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
     LocalDateTime end = LocalDateTime.from(endExclusive);
     if (unit instanceof ChronoUnit) {
       if (unit.isTimeBased()) {
-        long daysUntil = date.until(end.date, ChronoUnit.DAYS);
-        long nanosUntil = end.time.toNanoOfDay() - time.toNanoOfDay();
-        if (daysUntil > 0 && nanosUntil < 0) {
-          daysUntil--;
-          nanosUntil += 86400000000000L;
-        } else if (daysUntil < 0 && nanosUntil > 0) {
-          daysUntil++;
-          nanosUntil -= 86400000000000L;
+        long amount = date.daysUntil(end.date);
+        if (amount == 0) {
+          return time.until(end.time, unit);
         }
-        long totalNanos = Math.addExact(Math.multiplyExact(daysUntil, 86400000000000L), nanosUntil);
+        long timePart = end.time.toNanoOfDay() - time.toNanoOfDay();
+        if (amount > 0) {
+          amount--;
+          timePart += NANOS_PER_DAY;
+        } else {
+          amount++;
+          timePart -= NANOS_PER_DAY;
+        }
         switch ((ChronoUnit) unit) {
           case NANOS:
-            return totalNanos;
+            amount = Math.multiplyExact(amount, NANOS_PER_DAY);
+            break;
           case MICROS:
-            return totalNanos / 1000L;
+            amount = Math.multiplyExact(amount, MICROS_PER_DAY);
+            timePart = timePart / 1000;
+            break;
           case MILLIS:
-            return totalNanos / 1000000L;
+            amount = Math.multiplyExact(amount, MILLIS_PER_DAY);
+            timePart = timePart / 1_000_000;
+            break;
           case SECONDS:
-            return totalNanos / 1000000000L;
+            amount = Math.multiplyExact(amount, SECONDS_PER_DAY);
+            timePart = timePart / NANOS_PER_SECOND;
+            break;
           case MINUTES:
-            return totalNanos / 60000000000L;
+            amount = Math.multiplyExact(amount, MINUTES_PER_DAY);
+            timePart = timePart / NANOS_PER_MINUTE;
+            break;
           case HOURS:
-            return totalNanos / 3600000000000L;
+            amount = Math.multiplyExact(amount, HOURS_PER_DAY);
+            timePart = timePart / NANOS_PER_HOUR;
+            break;
           case HALF_DAYS:
-            return totalNanos / (12 * 3600000000000L);
+            amount = Math.multiplyExact(amount, 2);
+            timePart = timePart / (NANOS_PER_HOUR * 12);
+            break;
           default:
-            throw new UnsupportedTemporalTypeException("Unsupported unit: " + unit);
+            break;
         }
+        return Math.addExact(amount, timePart);
       }
       LocalDate endDate = end.date;
       if (endDate.isAfter(date) && end.time.isBefore(time)) {
@@ -439,29 +516,33 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
     return unit.between(this, end);
   }
 
-  public Instant toInstant(ZoneOffset offset) {
-    return Instant.ofEpochSecond(toEpochSecond(offset), time.getNano());
+  @Override
+  public String format(DateTimeFormatter formatter) {
+    Objects.requireNonNull(formatter, "formatter");
+    return formatter.format(this);
   }
 
-  public long toEpochSecond(ZoneOffset offset) {
-    Objects.requireNonNull(offset, "offset");
-    long epochDay = date.toEpochDay();
-    long secs = epochDay * 86400L + time.toSecondOfDay();
-    return secs - offset.getTotalSeconds();
+  public OffsetDateTime atOffset(ZoneOffset offset) {
+    return OffsetDateTime.of(this, offset);
+  }
+
+  @Override
+  public ZonedDateTime atZone(ZoneId zone) {
+    return ZonedDateTime.of(this, zone);
   }
 
   @Override
   public int compareTo(ChronoLocalDateTime<?> other) {
     if (other instanceof LocalDateTime) {
-      return compareTo((LocalDateTime) other);
+      return compareTo0((LocalDateTime) other);
     }
     return ChronoLocalDateTime.super.compareTo(other);
   }
 
-  public int compareTo(LocalDateTime other) {
-    int cmp = date.compareTo(other.date);
+  private int compareTo0(LocalDateTime other) {
+    int cmp = date.compareTo0(other.toLocalDate());
     if (cmp == 0) {
-      cmp = time.compareTo(other.time);
+      cmp = time.compareTo(other.toLocalTime());
     }
     return cmp;
   }
@@ -469,7 +550,7 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
   @Override
   public boolean isAfter(ChronoLocalDateTime<?> other) {
     if (other instanceof LocalDateTime) {
-      return compareTo((LocalDateTime) other) > 0;
+      return compareTo0((LocalDateTime) other) > 0;
     }
     return ChronoLocalDateTime.super.isAfter(other);
   }
@@ -477,7 +558,7 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
   @Override
   public boolean isBefore(ChronoLocalDateTime<?> other) {
     if (other instanceof LocalDateTime) {
-      return compareTo((LocalDateTime) other) < 0;
+      return compareTo0((LocalDateTime) other) < 0;
     }
     return ChronoLocalDateTime.super.isBefore(other);
   }
@@ -485,7 +566,7 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
   @Override
   public boolean isEqual(ChronoLocalDateTime<?> other) {
     if (other instanceof LocalDateTime) {
-      return compareTo((LocalDateTime) other) == 0;
+      return compareTo0((LocalDateTime) other) == 0;
     }
     return ChronoLocalDateTime.super.isEqual(other);
   }
@@ -510,19 +591,5 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
   @Override
   public String toString() {
     return date.toString() + 'T' + time.toString();
-  }
-
-  public String format(DateTimeFormatter formatter) {
-    Objects.requireNonNull(formatter, "formatter");
-    return formatter.format(this);
-  }
-
-  public static LocalDateTime parse(CharSequence text) {
-    return parse(text, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-  }
-
-  public static LocalDateTime parse(CharSequence text, DateTimeFormatter formatter) {
-    Objects.requireNonNull(formatter, "formatter");
-    return formatter.parse(text, LocalDateTime::from);
   }
 }

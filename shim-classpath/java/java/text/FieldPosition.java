@@ -24,5 +24,54 @@
 package java.text;
 
 public class FieldPosition {
-  public FieldPosition(int field) { }
+  int field = 0;
+  int endIndex = 0;
+  int beginIndex = 0;
+
+  public FieldPosition(int field) {
+    this.field = field;
+  }
+
+  public int getField() {
+    return field;
+  }
+
+  public int getBeginIndex() {
+    return beginIndex;
+  }
+
+  public int getEndIndex() {
+    return endIndex;
+  }
+
+  public void setBeginIndex(int bi) {
+    beginIndex = bi;
+  }
+
+  public void setEndIndex(int ei) {
+    endIndex = ei;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == null) {
+      return false;
+    }
+    if (!(obj instanceof FieldPosition)) {
+      return false;
+    }
+    FieldPosition other = (FieldPosition) obj;
+    return beginIndex == other.beginIndex && endIndex == other.endIndex && field == other.field;
+  }
+
+  @Override
+  public int hashCode() {
+    return (field << 24) | (beginIndex << 16) | endIndex;
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getName() + "[field=" + field + ",attribute=null,beginIndex=" + beginIndex + ",endIndex="
+        + endIndex + ']';
+  }
 }

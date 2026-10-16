@@ -2,18 +2,27 @@
  * Copyright (c) 2026 BasaltMC.
  * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
  * SPDX-License-Identifier: MIT
  */
 
 package java.time;
 
-import java.time.temporal.ChronoField;
+import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
+
+import java.time.chrono.Chronology;
+import java.time.chrono.IsoChronology;
+import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAdjuster;
 import java.time.temporal.TemporalField;
+import java.time.temporal.TemporalQueries;
+import java.time.temporal.TemporalQuery;
 import java.time.temporal.UnsupportedTemporalTypeException;
+import java.time.temporal.ValueRange;
+import java.util.Locale;
+import java.util.Objects;
 
 public enum Month implements TemporalAccessor, TemporalAdjuster {
   JANUARY,
@@ -33,13 +42,79 @@ public enum Month implements TemporalAccessor, TemporalAdjuster {
 
   public static Month of(int month) {
     if (month < 1 || month > 12) {
-      throw new DateTimeException("Invalid value for Month: " + month);
+      throw new DateTimeException("Invalid value for MonthOfYear: " + month);
     }
     return ENUMS[month - 1];
   }
 
+  public static Month from(TemporalAccessor temporal) {
+    if (temporal instanceof Month) {
+      return (Month) temporal;
+    }
+    try {
+      if (!IsoChronology.INSTANCE.equals(Chronology.from(temporal))) {
+        temporal = LocalDate.from(temporal);
+      }
+      return of(temporal.get(MONTH_OF_YEAR));
+    } catch (DateTimeException ex) {
+      throw new DateTimeException("Unable to obtain Month from TemporalAccessor: " + temporal + " of type "
+          + temporal.getClass().getName(), ex);
+    }
+  }
+
   public int getValue() {
     return ordinal() + 1;
+  }
+
+  public String getDisplayName(TextStyle style, Locale locale) {
+    Objects.requireNonNull(style, "style");
+    Objects.requireNonNull(locale, "locale");
+    String name = name();
+    String full = name.charAt(0) + name.substring(1).toLowerCase();
+    switch (style) {
+      case FULL:
+      case FULL_STANDALONE:
+        return full;
+      case SHORT:
+      case SHORT_STANDALONE:
+        return full.substring(0, 3);
+      default:
+        return full.substring(0, 1);
+    }
+  }
+
+  @Override
+  public boolean isSupported(TemporalField field) {
+    if (field instanceof java.time.temporal.ChronoField) {
+      return field == MONTH_OF_YEAR;
+    }
+    return field != null && field.isSupportedBy(this);
+  }
+
+  @Override
+  public ValueRange range(TemporalField field) {
+    if (field == MONTH_OF_YEAR) {
+      return field.range();
+    }
+    return TemporalAccessor.super.range(field);
+  }
+
+  @Override
+  public int get(TemporalField field) {
+    if (field == MONTH_OF_YEAR) {
+      return getValue();
+    }
+    return TemporalAccessor.super.get(field);
+  }
+
+  @Override
+  public long getLong(TemporalField field) {
+    if (field == MONTH_OF_YEAR) {
+      return getValue();
+    } else if (field instanceof java.time.temporal.ChronoField) {
+      throw new UnsupportedTemporalTypeException("Unsupported field: " + field);
+    }
+    return field.getFrom(this);
   }
 
   public Month plus(long months) {
@@ -53,60 +128,97 @@ public enum Month implements TemporalAccessor, TemporalAdjuster {
 
   public int length(boolean leapYear) {
     switch (this) {
-    case FEBRUARY:
-      return leapYear ? 29 : 28;
-    case APRIL:
-    case JUNE:
-    case SEPTEMBER:
-    case NOVEMBER:
-      return 30;
-    default:
-      return 31;
+      case FEBRUARY:
+        return (leapYear ? 29 : 28);
+      case APRIL:
+      case JUNE:
+      case SEPTEMBER:
+      case NOVEMBER:
+        return 30;
+      default:
+        return 31;
     }
   }
 
   public int minLength() {
-    return length(false);
+    switch (this) {
+      case FEBRUARY:
+        return 28;
+      case APRIL:
+      case JUNE:
+      case SEPTEMBER:
+      case NOVEMBER:
+        return 30;
+      default:
+        return 31;
+    }
   }
 
   public int maxLength() {
-    return length(true);
+    switch (this) {
+      case FEBRUARY:
+        return 29;
+      case APRIL:
+      case JUNE:
+      case SEPTEMBER:
+      case NOVEMBER:
+        return 30;
+      default:
+        return 31;
+    }
   }
 
   public int firstDayOfYear(boolean leapYear) {
     int leap = leapYear ? 1 : 0;
     switch (this) {
-    case JANUARY: return 1;
-    case FEBRUARY: return 32;
-    case MARCH: return 60 + leap;
-    case APRIL: return 91 + leap;
-    case MAY: return 121 + leap;
-    case JUNE: return 152 + leap;
-    case JULY: return 182 + leap;
-    case AUGUST: return 213 + leap;
-    case SEPTEMBER: return 244 + leap;
-    case OCTOBER: return 274 + leap;
-    case NOVEMBER: return 305 + leap;
-    case DECEMBER: return 335 + leap;
-    default: throw new AssertionError();
+      case JANUARY:
+        return 1;
+      case FEBRUARY:
+        return 32;
+      case MARCH:
+        return 60 + leap;
+      case APRIL:
+        return 91 + leap;
+      case MAY:
+        return 121 + leap;
+      case JUNE:
+        return 152 + leap;
+      case JULY:
+        return 182 + leap;
+      case AUGUST:
+        return 213 + leap;
+      case SEPTEMBER:
+        return 244 + leap;
+      case OCTOBER:
+        return 274 + leap;
+      case NOVEMBER:
+        return 305 + leap;
+      case DECEMBER:
+      default:
+        return 335 + leap;
     }
   }
 
-  @Override
-  public boolean isSupported(TemporalField field) {
-    return field == ChronoField.MONTH_OF_YEAR;
+  public Month firstMonthOfQuarter() {
+    return ENUMS[(ordinal() / 3) * 3];
   }
 
+  @SuppressWarnings("unchecked")
   @Override
-  public long getLong(TemporalField field) {
-    if (field == ChronoField.MONTH_OF_YEAR) {
-      return getValue();
+  public <R> R query(TemporalQuery<R> query) {
+    if (query == TemporalQueries.chronology()) {
+      return (R) IsoChronology.INSTANCE;
+    } else if (query == TemporalQueries.precision()) {
+      return (R) ChronoUnit.MONTHS;
     }
-    throw new UnsupportedTemporalTypeException("Unsupported field: " + field);
+    return TemporalAccessor.super.query(query);
   }
 
   @Override
   public Temporal adjustInto(Temporal temporal) {
-    return temporal.with(ChronoField.MONTH_OF_YEAR, getValue());
+    if (!Chronology.from(temporal).equals(IsoChronology.INSTANCE)) {
+      throw new DateTimeException("Adjustment only supported on ISO date-time");
+    }
+    return temporal.with(MONTH_OF_YEAR, getValue());
   }
 }
