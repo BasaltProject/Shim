@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.security.ProtectionDomain;
@@ -271,19 +272,19 @@ public abstract class ClassLoader {
     return getSystemClassLoader().getResources(name);
   }
 
-  public Enumeration<URL> getResources(String name)
-    throws IOException {
-    Collection<URL> resources = collectResources(name);
-    return Collections.enumeration(resources);
-  }
-
-  private Collection<URL> collectResources(String name) {
-    Collection<URL> urls = parent != null ? parent.collectResources(name) : new ArrayList<URL>(5);
-    URL url = findResource(name);
-    if (url != null) {
-      urls.add(url);
+  public Enumeration<URL> getResources(String name) throws IOException {
+    List<URL> list = new ArrayList<URL>();
+    if (parent != null) {
+      Enumeration<URL> parentUrls = parent.getResources(name);
+      while (parentUrls != null && parentUrls.hasMoreElements()) {
+        list.add(parentUrls.nextElement());
+      }
     }
-    return urls;
+    Enumeration<URL> localUrls = findResources(name);
+    while (localUrls != null && localUrls.hasMoreElements()) {
+      list.add(localUrls.nextElement());
+    }
+    return Collections.enumeration(list);
   }
 
   protected String findLibrary(String name) {

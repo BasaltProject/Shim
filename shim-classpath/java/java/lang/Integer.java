@@ -143,8 +143,56 @@ public final class Integer extends Number implements Comparable<Integer>,
     return parseInt(s, 10);
   }
 
+  public static int parseInt(CharSequence s, int beginIndex, int endIndex, int radix) {
+    java.util.Objects.requireNonNull(s);
+    java.util.Objects.checkFromToIndex(beginIndex, endIndex, s.length());
+    if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+      throw new NumberFormatException("radix " + radix + " not in [" + Character.MIN_RADIX + ", " + Character.MAX_RADIX + "]");
+    }
+    int len = endIndex - beginIndex;
+    if (len == 0) {
+      throw new NumberFormatException("For input string: \"\"");
+    }
+    int i = beginIndex;
+    char firstChar = s.charAt(i);
+    boolean negative = false;
+    int limit = -Integer.MAX_VALUE;
+    if (firstChar < '0') {
+      if (firstChar == '-') {
+        negative = true;
+        limit = Integer.MIN_VALUE;
+      } else if (firstChar != '+') {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      if (len == 1) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      i++;
+    }
+    int multmin = limit / radix;
+    int result = 0;
+    while (i < endIndex) {
+      int digit = Character.digit(s.charAt(i++), radix);
+      if (digit < 0) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      if (result < multmin) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      result *= radix;
+      if (result < limit + digit) {
+        throw new NumberFormatException("For input string: \"" + s.subSequence(beginIndex, endIndex) + "\"");
+      }
+      result -= digit;
+    }
+    return negative ? result : -result;
+  }
+
   public static int parseInt(String s, int radix) {
-    return (int) Long.parseLong(s, radix);
+    if (s == null) {
+      throw new NumberFormatException("null");
+    }
+    return parseInt(s, 0, s.length(), radix);
   }
 
   public static Integer decode(String string) {
@@ -198,30 +246,41 @@ public final class Integer extends Number implements Comparable<Integer>,
     return toUnsignedString(i, 10);
   }
 
+  public static int parseUnsignedInt(CharSequence s, int beginIndex, int endIndex, int radix) {
+    java.util.Objects.requireNonNull(s);
+    java.util.Objects.checkFromToIndex(beginIndex, endIndex, s.length());
+    int len = endIndex - beginIndex;
+    if (len == 0) {
+      throw new NumberFormatException("For input string: \"\"");
+    }
+    char firstChar = s.charAt(beginIndex);
+    if (firstChar == '-') {
+      throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s.subSequence(beginIndex, endIndex)));
+    }
+    if (firstChar == '+') {
+      beginIndex++;
+      len--;
+      if (len == 0) {
+        throw new NumberFormatException("For input string: \"+\"");
+      }
+    }
+    if (len <= 5 || (radix == 10 && len <= 9)) {
+      return parseInt(s, beginIndex, endIndex, radix);
+    } else {
+      long ell = Long.parseLong(s, beginIndex, endIndex, radix);
+      if ((ell & 0xFFFFFFFF00000000L) == 0) {
+        return (int) ell;
+      } else {
+        throw new NumberFormatException(String.format("String value %s exceeds range of unsigned integer.", s.subSequence(beginIndex, endIndex)));
+      }
+    }
+  }
+
   public static int parseUnsignedInt(String s, int radix) {
     if (s == null) {
       throw new NumberFormatException("null");
     }
-    int len = s.length();
-    if (len > 0) {
-      char firstChar = s.charAt(0);
-      if (firstChar == '-') {
-        throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s));
-      } else {
-        if (len <= 5 || (radix == 10 && len <= 9)) {
-          return parseInt(s, radix);
-        } else {
-          long ell = Long.parseLong(s, radix);
-          if ((ell & 0xFFFFFFFF00000000L) == 0) {
-            return (int) ell;
-          } else {
-            throw new NumberFormatException(String.format("String value %s exceeds range of unsigned integer.", s));
-          }
-        }
-      }
-    } else {
-      throw new NumberFormatException("For input string: \"\"");
-    }
+    return parseUnsignedInt(s, 0, s.length(), radix);
   }
 
   public static int parseUnsignedInt(String s) {
@@ -270,6 +329,35 @@ public final class Integer extends Number implements Comparable<Integer>,
     i = (i & 0x33333333) << 2 | (i >>> 2) & 0x33333333;
     i = (i & 0x0f0f0f0f) << 4 | (i >>> 4) & 0x0f0f0f0f;
     return reverseBytes(i);
+  }
+
+  public static int compress(int i, int mask) {
+    i &= mask;
+    int res = 0;
+    int outBit = 0;
+    while (mask != 0) {
+      int bit = mask & -mask;
+      if ((i & bit) != 0) {
+        res |= (1 << outBit);
+      }
+      outBit++;
+      mask &= mask - 1;
+    }
+    return res;
+  }
+
+  public static int expand(int i, int mask) {
+    int res = 0;
+    int inBit = 0;
+    while (mask != 0) {
+      int bit = mask & -mask;
+      if (((i >>> inBit) & 1) != 0) {
+        res |= bit;
+      }
+      inBit++;
+      mask &= mask - 1;
+    }
+    return res;
   }
 
   @Override

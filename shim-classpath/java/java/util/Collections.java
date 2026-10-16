@@ -236,6 +236,16 @@ public class Collections {
   public static <T> ListIterator<T> emptyListIterator() {
     return (ListIterator<T>) EMPTY_LIST_ITERATOR;
   }
+
+  private static final Enumeration<Object> EMPTY_ENUMERATION = new Enumeration<Object>() {
+    public boolean hasMoreElements() { return false; }
+    public Object nextElement() { throw new NoSuchElementException(); }
+  };
+
+  @SuppressWarnings("unchecked")
+  public static <T> Enumeration<T> emptyEnumeration() {
+    return (Enumeration<T>) EMPTY_ENUMERATION;
+  }
   
   public static <T> Enumeration<T> enumeration(Collection<T> c) {
     return new IteratorEnumeration<T> (c.iterator());

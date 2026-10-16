@@ -28,6 +28,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
+import java.util.Collections;
+import java.util.Enumeration;
 
 public class URLClassLoader extends ClassLoader {
 
@@ -84,13 +86,25 @@ public class URLClassLoader extends ClassLoader {
     }
   }
 
-  public URL getResource(String path) {
-    try {
-      return new URL("jar:file:" + jarFile.getAbsolutePath() + "!/" + path);
-    } catch(MalformedURLException e) {
-      throw new RuntimeException(e);
+  @Override
+  protected URL findResource(String path) {
+    if (jarFile.exists()) {
+      try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(jarFile)) {
+        if (zf.getEntry(path) != null) {
+          return new URL("jar:file:" + jarFile.getAbsolutePath() + "!/" + path);
+        }
+      } catch (IOException ignored) {
+      }
     }
+    return null;
   }
 
-
+  @Override
+  protected Enumeration<URL> findResources(String path) throws IOException {
+    URL u = findResource(path);
+    if (u != null) {
+      return Collections.enumeration(Collections.singletonList(u));
+    }
+    return Collections.emptyEnumeration();
+  }
 }
