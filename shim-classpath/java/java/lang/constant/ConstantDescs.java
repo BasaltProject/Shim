@@ -55,8 +55,11 @@ public final class ConstantDescs {
   public static final ClassDesc CD_MethodHandleDesc = ClassDesc.of("java.lang.constant.MethodHandleDesc");
   public static final ClassDesc CD_MethodTypeDesc = ClassDesc.of("java.lang.constant.MethodTypeDesc");
   public static final ClassDesc CD_DirectMethodHandleDesc = ClassDesc.of("java.lang.constant.DirectMethodHandleDesc");
-
-  private static final ClassDesc CD_ConstantBootstraps = ClassDesc.of("java.lang.invoke.ConstantBootstraps");
+  public static final ClassDesc CD_DynamicCallSiteDesc = ClassDesc.of("java.lang.constant.DynamicCallSiteDesc");
+  public static final ClassDesc CD_EnumDesc = ClassDesc.of("java.lang.Enum$EnumDesc");
+  public static final ClassDesc CD_VarHandleDesc = ClassDesc.of("java.lang.invoke.VarHandle$VarHandleDesc");
+  public static final ClassDesc CD_MethodHandleDesc_Kind = ClassDesc.of("java.lang.constant.DirectMethodHandleDesc$Kind");
+  public static final ClassDesc CD_ConstantBootstraps = ClassDesc.of("java.lang.invoke.ConstantBootstraps");
 
   public static final DirectMethodHandleDesc BSM_PRIMITIVE_CLASS = MethodHandleDesc.ofMethod(
       DirectMethodHandleDesc.Kind.STATIC, CD_ConstantBootstraps, "primitiveClass",

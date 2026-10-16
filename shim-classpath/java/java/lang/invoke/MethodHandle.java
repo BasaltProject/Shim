@@ -30,6 +30,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
@@ -646,6 +647,335 @@ public class MethodHandle implements java.lang.constant.Constable {
     public Object invokeWithArguments(Object... arguments) throws Throwable {
       target.invokeWithArguments(arguments);
       return null;
+    }
+  }
+
+  static Object defaultValue(Class<?> type) {
+    if (!type.isPrimitive()) return null;
+    if (type == boolean.class) return Boolean.FALSE;
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == char.class) return (char) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0.0f;
+    if (type == double.class) return 0.0d;
+    return null;
+  }
+
+  static Object[] slice(Object[] arguments, int count) {
+    if (count <= 0) return new Object[0];
+    Object[] res = new Object[count];
+    System.arraycopy(arguments, 0, res, 0, Math.min(count, arguments.length));
+    return res;
+  }
+
+  static class TryFinallyMethodHandle extends MethodHandle {
+    private final MethodHandle target;
+    private final MethodHandle cleanup;
+
+    TryFinallyMethodHandle(MethodHandle target, MethodHandle cleanup) {
+      super(target.type());
+      this.target = target;
+      this.cleanup = cleanup;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      Class<?> rtype = target.type().returnType();
+      boolean isVoid = (rtype == void.class);
+      Object targetResult = null;
+      Throwable targetEx = null;
+      try {
+        targetResult = target.invokeWithArguments(arguments);
+      } catch (Throwable t) {
+        targetEx = t;
+      }
+
+      int cleanupParamCount = cleanup.type().parameterCount();
+      Object[] cleanupArgs = new Object[cleanupParamCount];
+      int idx = 0;
+      cleanupArgs[idx++] = targetEx;
+      if (!isVoid) {
+        cleanupArgs[idx++] = (targetEx == null ? targetResult : defaultValue(rtype));
+      }
+      for (int i = 0; idx < cleanupParamCount && i < arguments.length; i++) {
+        cleanupArgs[idx++] = arguments[i];
+      }
+
+      Object cleanupResult = cleanup.invokeWithArguments(cleanupArgs);
+      if (targetEx != null) {
+        throw targetEx;
+      }
+      return isVoid ? null : cleanupResult;
+    }
+  }
+
+  static class WhileLoopMethodHandle extends MethodHandle {
+    private final MethodHandle init;
+    private final MethodHandle pred;
+    private final MethodHandle body;
+    private final Class<?> varType;
+
+    WhileLoopMethodHandle(MethodType type, MethodHandle init, MethodHandle pred, MethodHandle body, Class<?> varType) {
+      super(type);
+      this.init = init;
+      this.pred = pred;
+      this.body = body;
+      this.varType = varType;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      while (true) {
+        Object[] predArgs = packArgs(state, arguments, pred.type().parameterCount(), varType);
+        boolean cond = (Boolean) pred.invokeWithArguments(predArgs);
+        if (!cond) break;
+        Object[] bodyArgs = packArgs(state, arguments, body.type().parameterCount(), varType);
+        Object res = body.invokeWithArguments(bodyArgs);
+        if (varType != void.class) {
+          state = res;
+        }
+      }
+      return (varType == void.class) ? null : state;
+    }
+
+    static Object[] packArgs(Object state, Object[] args, int targetCount, Class<?> vtype) {
+      if (targetCount <= 0) return new Object[0];
+      Object[] res = new Object[targetCount];
+      int idx = 0;
+      if (vtype != void.class) {
+        res[idx++] = state;
+      }
+      for (int i = 0; idx < targetCount && i < args.length; i++) {
+        res[idx++] = args[i];
+      }
+      return res;
+    }
+  }
+
+  static class DoWhileLoopMethodHandle extends MethodHandle {
+    private final MethodHandle init;
+    private final MethodHandle body;
+    private final MethodHandle pred;
+    private final Class<?> varType;
+
+    DoWhileLoopMethodHandle(MethodType type, MethodHandle init, MethodHandle body, MethodHandle pred, Class<?> varType) {
+      super(type);
+      this.init = init;
+      this.body = body;
+      this.pred = pred;
+      this.varType = varType;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      do {
+        Object[] bodyArgs = WhileLoopMethodHandle.packArgs(state, arguments, body.type().parameterCount(), varType);
+        Object res = body.invokeWithArguments(bodyArgs);
+        if (varType != void.class) {
+          state = res;
+        }
+        Object[] predArgs = WhileLoopMethodHandle.packArgs(state, arguments, pred.type().parameterCount(), varType);
+        boolean cond = (Boolean) pred.invokeWithArguments(predArgs);
+        if (!cond) break;
+      } while (true);
+      return (varType == void.class) ? null : state;
+    }
+  }
+
+  static class CountedLoopMethodHandle extends MethodHandle {
+    private final MethodHandle start;
+    private final MethodHandle end;
+    private final MethodHandle init;
+    private final MethodHandle body;
+    private final Class<?> varType;
+
+    CountedLoopMethodHandle(MethodType type, MethodHandle start, MethodHandle end, MethodHandle init, MethodHandle body, Class<?> varType) {
+      super(type);
+      this.start = start;
+      this.end = end;
+      this.init = init;
+      this.body = body;
+      this.varType = varType;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      int s = (start != null) ? ((Number) start.invokeWithArguments(slice(arguments, start.type().parameterCount()))).intValue() : 0;
+      int e = ((Number) end.invokeWithArguments(slice(arguments, end.type().parameterCount()))).intValue();
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      for (int i = s; i < e; i++) {
+        Object[] bodyArgs = packCountedArgs(state, i, arguments, body.type().parameterCount(), varType);
+        Object res = body.invokeWithArguments(bodyArgs);
+        if (varType != void.class) {
+          state = res;
+        }
+      }
+      return (varType == void.class) ? null : state;
+    }
+
+    private static Object[] packCountedArgs(Object state, int counter, Object[] args, int targetCount, Class<?> vtype) {
+      if (targetCount <= 0) return new Object[0];
+      Object[] res = new Object[targetCount];
+      int idx = 0;
+      if (vtype != void.class) {
+        res[idx++] = state;
+      }
+      if (idx < targetCount) {
+        res[idx++] = Integer.valueOf(counter);
+      }
+      for (int i = 0; idx < targetCount && i < args.length; i++) {
+        res[idx++] = args[i];
+      }
+      return res;
+    }
+  }
+
+  static class IteratedLoopMethodHandle extends MethodHandle {
+    private final MethodHandle iterator;
+    private final MethodHandle init;
+    private final MethodHandle body;
+    private final Class<?> varType;
+
+    IteratedLoopMethodHandle(MethodType type, MethodHandle iterator, MethodHandle init, MethodHandle body, Class<?> varType) {
+      super(type);
+      this.iterator = iterator;
+      this.init = init;
+      this.body = body;
+      this.varType = varType;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      Iterator<?> iter;
+      if (iterator != null) {
+        Object itObj = iterator.invokeWithArguments(slice(arguments, iterator.type().parameterCount()));
+        iter = toIterator(itObj);
+      } else {
+        iter = toIterator(arguments[0]);
+      }
+      Object state = (init != null) ? init.invokeWithArguments(slice(arguments, init.type().parameterCount())) : defaultValue(varType);
+      while (iter.hasNext()) {
+        Object elem = iter.next();
+        Object[] bodyArgs = packIteratedArgs(state, elem, arguments, body.type().parameterCount(), varType);
+        Object res = body.invokeWithArguments(bodyArgs);
+        if (varType != void.class) {
+          state = res;
+        }
+      }
+      return (varType == void.class) ? null : state;
+    }
+
+    private static Iterator<?> toIterator(Object obj) {
+      if (obj instanceof Iterator) {
+        return (Iterator<?>) obj;
+      }
+      if (obj instanceof Iterable) {
+        return ((Iterable<?>) obj).iterator();
+      }
+      throw new IllegalArgumentException("Cannot iterate over: " + obj);
+    }
+
+    private static Object[] packIteratedArgs(Object state, Object elem, Object[] args, int targetCount, Class<?> vtype) {
+      if (targetCount <= 0) return new Object[0];
+      Object[] res = new Object[targetCount];
+      int idx = 0;
+      if (vtype != void.class) {
+        res[idx++] = state;
+      }
+      if (idx < targetCount) {
+        res[idx++] = elem;
+      }
+      for (int i = 0; idx < targetCount && i < args.length; i++) {
+        res[idx++] = args[i];
+      }
+      return res;
+    }
+  }
+
+  static class LoopMethodHandle extends MethodHandle {
+    private final MethodHandle[] inits;
+    private final MethodHandle[] steps;
+    private final MethodHandle[] preds;
+    private final MethodHandle[] finis;
+    private final Class<?>[] varTypes;
+    private final int[] varIndices;
+    private final Class<?> returnType;
+
+    LoopMethodHandle(MethodType type,
+                     MethodHandle[] inits,
+                     MethodHandle[] steps,
+                     MethodHandle[] preds,
+                     MethodHandle[] finis,
+                     Class<?>[] varTypes,
+                     int[] varIndices,
+                     Class<?> returnType) {
+      super(type);
+      this.inits = inits;
+      this.steps = steps;
+      this.preds = preds;
+      this.finis = finis;
+      this.varTypes = varTypes;
+      this.varIndices = varIndices;
+      this.returnType = returnType;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      int clauseCount = inits.length;
+      Object[] vars = new Object[clauseCount];
+      for (int j = 0; j < clauseCount; j++) {
+        if (varTypes[j] != void.class) {
+          MethodHandle init = inits[j];
+          vars[j] = (init != null)
+              ? init.invokeWithArguments(slice(arguments, init.type().parameterCount()))
+              : defaultValue(varTypes[j]);
+        }
+      }
+
+      while (true) {
+        for (int j = 0; j < clauseCount; j++) {
+          MethodHandle step = steps[j];
+          if (step != null) {
+            Object[] stepArgs = packLoopArgs(vars, varIndices, arguments, step.type().parameterCount());
+            Object updated = step.invokeWithArguments(stepArgs);
+            if (varTypes[j] != void.class) {
+              vars[j] = updated;
+            }
+          }
+
+          MethodHandle pred = preds[j];
+          if (pred != null) {
+            Object[] predArgs = packLoopArgs(vars, varIndices, arguments, pred.type().parameterCount());
+            boolean cont = (Boolean) pred.invokeWithArguments(predArgs);
+            if (!cont) {
+              MethodHandle fini = finis[j];
+              if (fini != null) {
+                Object[] finiArgs = packLoopArgs(vars, varIndices, arguments, fini.type().parameterCount());
+                return fini.invokeWithArguments(finiArgs);
+              } else {
+                return (varTypes[j] != void.class) ? vars[j] : defaultValue(returnType);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    private static Object[] packLoopArgs(Object[] vars, int[] varIndices, Object[] args, int targetCount) {
+      if (targetCount <= 0) return new Object[0];
+      Object[] res = new Object[targetCount];
+      int idx = 0;
+      for (int vi = 0; vi < varIndices.length && idx < targetCount; vi++) {
+        res[idx++] = vars[varIndices[vi]];
+      }
+      for (int i = 0; idx < targetCount && i < args.length; i++) {
+        res[idx++] = args[i];
+      }
+      return res;
     }
   }
 

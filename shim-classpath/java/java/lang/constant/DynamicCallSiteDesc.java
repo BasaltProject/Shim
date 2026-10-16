@@ -72,6 +72,17 @@ public class DynamicCallSiteDesc {
     return Collections.unmodifiableList(Arrays.asList(bootstrapArgs));
   }
 
+  public DynamicCallSiteDesc withArgs(ConstantDesc... bootstrapArgs) {
+    Objects.requireNonNull(bootstrapArgs, "bootstrapArgs");
+    return new DynamicCallSiteDesc(bootstrapMethod, invocationName, invocationType, bootstrapArgs);
+  }
+
+  public DynamicCallSiteDesc withNameAndType(String invocationName, MethodTypeDesc invocationType) {
+    Objects.requireNonNull(invocationName, "invocationName");
+    Objects.requireNonNull(invocationType, "invocationType");
+    return new DynamicCallSiteDesc(bootstrapMethod, invocationName, invocationType, bootstrapArgs);
+  }
+
   public CallSite resolveCallSiteDesc(MethodHandles.Lookup lookup) throws Throwable {
     Objects.requireNonNull(lookup, "lookup");
     MethodHandle bsm = bootstrapMethod.resolveConstantDesc(lookup);

@@ -41,11 +41,38 @@ public class DynamicConstantDesc<T> implements ConstantDesc {
   }
 
   public static <T> DynamicConstantDesc<T> ofNamed(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc... bootstrapArgs) {
-    return ofCanonical(bootstrapMethod, constantName, constantType, bootstrapArgs);
+    return new DynamicConstantDesc<T>(bootstrapMethod, constantName, constantType, bootstrapArgs);
   }
 
-  public static <T> DynamicConstantDesc<T> ofCanonical(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc[] bootstrapArgs) {
-    return new DynamicConstantDesc<T>(bootstrapMethod, constantName, constantType, bootstrapArgs);
+  @SuppressWarnings("unchecked")
+  public static <T> ConstantDesc ofCanonical(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc[] bootstrapArgs) {
+    Objects.requireNonNull(bootstrapMethod, "bootstrapMethod");
+    Objects.requireNonNull(constantName, "constantName");
+    Objects.requireNonNull(constantType, "constantType");
+    Objects.requireNonNull(bootstrapArgs, "bootstrapArgs");
+    if (bootstrapMethod.equals(ConstantDescs.BSM_NULL_CONSTANT) && bootstrapArgs.length == 0) {
+      return ConstantDescs.NULL;
+    }
+    if (bootstrapMethod.equals(ConstantDescs.BSM_PRIMITIVE_CLASS) && bootstrapArgs.length == 0
+        && constantType.equals(ConstantDescs.CD_Class)) {
+      return ClassDesc.ofDescriptor(constantName);
+    }
+    if (bootstrapMethod.equals(ConstantDescs.BSM_ENUM_CONSTANT) && bootstrapArgs.length == 0) {
+      return java.lang.Enum.EnumDesc.of(constantType, constantName);
+    }
+    if (bootstrapMethod.equals(ConstantDescs.BSM_VARHANDLE_STATIC_FIELD) && bootstrapArgs.length == 2
+        && constantType.equals(ConstantDescs.CD_VarHandle)) {
+      return java.lang.invoke.VarHandle.VarHandleDesc.ofStaticField((ClassDesc) bootstrapArgs[0], constantName, (ClassDesc) bootstrapArgs[1]);
+    }
+    if (bootstrapMethod.equals(ConstantDescs.BSM_VARHANDLE_FIELD) && bootstrapArgs.length == 2
+        && constantType.equals(ConstantDescs.CD_VarHandle)) {
+      return java.lang.invoke.VarHandle.VarHandleDesc.ofField((ClassDesc) bootstrapArgs[0], constantName, (ClassDesc) bootstrapArgs[1]);
+    }
+    if (bootstrapMethod.equals(ConstantDescs.BSM_VARHANDLE_ARRAY) && bootstrapArgs.length == 1
+        && constantType.equals(ConstantDescs.CD_VarHandle)) {
+      return java.lang.invoke.VarHandle.VarHandleDesc.ofArray((ClassDesc) bootstrapArgs[0]);
+    }
+    return ofNamed(bootstrapMethod, constantName, constantType, bootstrapArgs);
   }
 
   public DirectMethodHandleDesc bootstrapMethod() {

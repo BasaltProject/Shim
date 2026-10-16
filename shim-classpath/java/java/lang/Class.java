@@ -148,6 +148,19 @@ public final class Class <T>
     return getComponentType();
   }
 
+  private static final java.util.concurrent.ConcurrentHashMap<Class<?>, Boolean> HIDDEN_CLASSES =
+      new java.util.concurrent.ConcurrentHashMap<Class<?>, Boolean>();
+
+  public static void markHidden(Class<?> c) {
+    if (c != null) {
+      HIDDEN_CLASSES.put(c, Boolean.TRUE);
+    }
+  }
+
+  public boolean isHidden() {
+    return HIDDEN_CLASSES.containsKey(this);
+  }
+
   public java.util.Optional<java.lang.constant.ClassDesc> describeConstable() {
     return java.util.Optional.of(java.lang.constant.ClassDesc.ofDescriptor(descriptorString()));
   }

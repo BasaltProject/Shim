@@ -32,7 +32,9 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MethodHandles {
   public static Lookup lookup() {
@@ -249,6 +251,176 @@ public class MethodHandles {
     return new MethodHandle.DropReturnMethodHandle(target);
   }
 
+  public static MethodHandle tryFinally(MethodHandle target, MethodHandle cleanup) {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(cleanup, "cleanup");
+    Class<?> rtype = target.type().returnType();
+    if (cleanup.type().returnType() != rtype) {
+      throw new IllegalArgumentException("cleanup return type must match target return type: " + cleanup.type().returnType() + " != " + rtype);
+    }
+    int minCleanupParams = (rtype == void.class) ? 1 : 2;
+    if (cleanup.type().parameterCount() < minCleanupParams) {
+      throw new IllegalArgumentException("cleanup must accept at least (" + (rtype == void.class ? "Throwable" : "Throwable, " + rtype) + ")");
+    }
+    if (!Throwable.class.isAssignableFrom(cleanup.type().parameterType(0))) {
+      throw new IllegalArgumentException("cleanup first parameter must be Throwable: " + cleanup.type().parameterType(0));
+    }
+    if (rtype != void.class && cleanup.type().parameterType(1) != rtype) {
+      throw new IllegalArgumentException("cleanup second parameter must be " + rtype + ": " + cleanup.type().parameterType(1));
+    }
+    return new MethodHandle.TryFinallyMethodHandle(target, cleanup);
+  }
+
+  public static MethodHandle whileLoop(MethodHandle init, MethodHandle pred, MethodHandle body) {
+    Objects.requireNonNull(pred, "pred");
+    Objects.requireNonNull(body, "body");
+    if (pred.type().returnType() != boolean.class) {
+      throw new IllegalArgumentException("pred must return boolean: " + pred.type());
+    }
+    Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
+    if (body.type().returnType() != varType) {
+      throw new IllegalArgumentException("body return type must match varType: " + body.type().returnType() + " != " + varType);
+    }
+    MethodType type;
+    if (init != null) {
+      type = init.type();
+    } else if (pred.type().parameterCount() > 0 && varType == void.class) {
+      type = MethodType.methodType(void.class, pred.type().parameterArray());
+    } else {
+      type = body.type().changeReturnType(varType);
+    }
+    return new MethodHandle.WhileLoopMethodHandle(type, init, pred, body, varType);
+  }
+
+  public static MethodHandle doWhileLoop(MethodHandle init, MethodHandle body, MethodHandle pred) {
+    Objects.requireNonNull(pred, "pred");
+    Objects.requireNonNull(body, "body");
+    if (pred.type().returnType() != boolean.class) {
+      throw new IllegalArgumentException("pred must return boolean: " + pred.type());
+    }
+    Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
+    if (body.type().returnType() != varType) {
+      throw new IllegalArgumentException("body return type must match varType: " + body.type().returnType() + " != " + varType);
+    }
+    MethodType type;
+    if (init != null) {
+      type = init.type();
+    } else if (pred.type().parameterCount() > 0 && varType == void.class) {
+      type = MethodType.methodType(void.class, pred.type().parameterArray());
+    } else {
+      type = body.type().changeReturnType(varType);
+    }
+    return new MethodHandle.DoWhileLoopMethodHandle(type, init, body, pred, varType);
+  }
+
+  public static MethodHandle countedLoop(MethodHandle iterations, MethodHandle init, MethodHandle body) {
+    Objects.requireNonNull(iterations, "iterations");
+    Objects.requireNonNull(body, "body");
+    if (iterations.type().returnType() != int.class) {
+      throw new IllegalArgumentException("iterations must return int: " + iterations.type());
+    }
+    Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
+    MethodType type = (init != null) ? init.type() : iterations.type().changeReturnType(varType);
+    return new MethodHandle.CountedLoopMethodHandle(type, null, iterations, init, body, varType);
+  }
+
+  public static MethodHandle countedLoop(MethodHandle start, MethodHandle end, MethodHandle init, MethodHandle body) {
+    Objects.requireNonNull(start, "start");
+    Objects.requireNonNull(end, "end");
+    Objects.requireNonNull(body, "body");
+    if (start.type().returnType() != int.class || end.type().returnType() != int.class) {
+      throw new IllegalArgumentException("start and end must return int");
+    }
+    Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
+    MethodType type = (init != null) ? init.type() : start.type().changeReturnType(varType);
+    return new MethodHandle.CountedLoopMethodHandle(type, start, end, init, body, varType);
+  }
+
+  public static MethodHandle iteratedLoop(MethodHandle iterator, MethodHandle init, MethodHandle body) {
+    Objects.requireNonNull(body, "body");
+    Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
+    MethodType type;
+    if (iterator != null) {
+      type = (init != null)
+          ? MethodType.methodType(init.type().returnType(), iterator.type().parameterArray())
+          : MethodType.methodType(varType, iterator.type().parameterArray());
+    } else {
+      if (init != null) {
+        type = init.type().insertParameterTypes(0, Iterable.class);
+      } else {
+        type = MethodType.methodType(varType, Iterable.class);
+      }
+    }
+    return new MethodHandle.IteratedLoopMethodHandle(type, iterator, init, body, varType);
+  }
+
+  public static MethodHandle loop(MethodHandle[]... clauses) {
+    if (clauses == null || clauses.length == 0) {
+      throw new IllegalArgumentException("null or no clauses passed");
+    }
+    int clauseCount = clauses.length;
+    MethodHandle[] inits = new MethodHandle[clauseCount];
+    MethodHandle[] steps = new MethodHandle[clauseCount];
+    MethodHandle[] preds = new MethodHandle[clauseCount];
+    MethodHandle[] finis = new MethodHandle[clauseCount];
+    Class<?>[] varTypes = new Class<?>[clauseCount];
+
+    boolean hasPred = false;
+    Class<?> returnType = void.class;
+
+    List<Integer> nonVoidVarIndices = new ArrayList<Integer>();
+
+    for (int j = 0; j < clauseCount; j++) {
+      MethodHandle[] clause = clauses[j];
+      if (clause == null) {
+        throw new IllegalArgumentException("null clauses are not allowed");
+      }
+      if (clause.length > 4) {
+        throw new IllegalArgumentException("All loop clauses must be represented as MethodHandle arrays with at most 4 elements.");
+      }
+      inits[j] = clause.length > 0 ? clause[0] : null;
+      steps[j] = clause.length > 1 ? clause[1] : null;
+      preds[j] = clause.length > 2 ? clause[2] : null;
+      finis[j] = clause.length > 3 ? clause[3] : null;
+
+      if (preds[j] != null) {
+        hasPred = true;
+      }
+      Class<?> vtype = void.class;
+      if (inits[j] != null) {
+        vtype = inits[j].type().returnType();
+      } else if (steps[j] != null) {
+        vtype = steps[j].type().returnType();
+      }
+      varTypes[j] = vtype;
+      if (vtype != void.class) {
+        nonVoidVarIndices.add(j);
+      }
+      if (finis[j] != null && finis[j].type().returnType() != void.class) {
+        returnType = finis[j].type().returnType();
+      }
+    }
+
+    if (!hasPred) {
+      throw new IllegalArgumentException("no predicate found: " + Arrays.toString(clauses));
+    }
+
+    int[] varIndices = new int[nonVoidVarIndices.size()];
+    for (int i = 0; i < varIndices.length; i++) {
+      varIndices[i] = nonVoidVarIndices.get(i);
+    }
+
+    MethodType type = MethodType.methodType(returnType);
+    for (int j = 0; j < clauseCount; j++) {
+      if (inits[j] != null && inits[j].type().parameterCount() > 0) {
+        type = MethodType.methodType(returnType, inits[j].type().parameterArray());
+        break;
+      }
+    }
+
+    return new MethodHandle.LoopMethodHandle(type, inits, steps, preds, finis, varTypes, varIndices, returnType);
+  }
+
   public static MethodHandle zero(Class<?> type) {
     Objects.requireNonNull(type);
     if (type == void.class) {
@@ -356,6 +528,41 @@ public class MethodHandles {
       throw new IllegalArgumentException("Target class is primitive or array: " + targetClass);
     }
     return new Lookup(shim.Classes.toVMClass(targetClass), 0x5f);
+  }
+
+  private static final Map<Class<?>, Object> CLASS_DATA_MAP = new ConcurrentHashMap<Class<?>, Object>();
+
+  public static Object classData(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
+    Objects.requireNonNull(lookup, "lookup");
+    Objects.requireNonNull(name, "name");
+    Objects.requireNonNull(type, "type");
+    if (!lookup.hasFullPrivilegeAccess()) {
+      throw new IllegalAccessException(lookup + " does not have ORIGINAL access");
+    }
+    Object data = CLASS_DATA_MAP.get(lookup.lookupClass());
+    if (data == null) {
+      return null;
+    }
+    return type.cast(data);
+  }
+
+  public static Object classDataAt(Lookup lookup, String name, Class<?> type, int index) throws IllegalAccessException {
+    Objects.requireNonNull(lookup, "lookup");
+    Objects.requireNonNull(name, "name");
+    Objects.requireNonNull(type, "type");
+    if (!lookup.hasFullPrivilegeAccess()) {
+      throw new IllegalAccessException(lookup + " does not have ORIGINAL access");
+    }
+    Object data = CLASS_DATA_MAP.get(lookup.lookupClass());
+    if (data == null) {
+      return null;
+    }
+    if (!(data instanceof List)) {
+      throw new IllegalArgumentException("class data is not a List: " + data.getClass().getName());
+    }
+    List<?> list = (List<?>) data;
+    Object elem = list.get(index);
+    return type.cast(elem);
   }
 
   public static class Lookup {
@@ -638,6 +845,33 @@ public class MethodHandles {
         loader = ClassLoader.getSystemClassLoader();
       }
       return shim.SystemClassLoader.getClass(shim.Classes.defineVMClass(loader, bytes, 0, bytes.length));
+    }
+
+    public enum ClassOption {
+      NESTMATE,
+      STRONG
+    }
+
+    public Lookup defineHiddenClass(byte[] bytes, boolean initialize, ClassOption... options) throws IllegalAccessException {
+      return defineHiddenClassWithClassData(bytes, null, initialize, options);
+    }
+
+    public Lookup defineHiddenClassWithClassData(byte[] bytes, Object classData, boolean initialize, ClassOption... options)
+        throws IllegalAccessException {
+      Objects.requireNonNull(bytes, "bytes");
+      Objects.requireNonNull(options, "options");
+      if (!hasFullPrivilegeAccess()) {
+        throw new IllegalAccessException("Lookup does not have full privilege access");
+      }
+      Class<?> definedClass = defineClass(bytes);
+      Class.markHidden(definedClass);
+      if (initialize) {
+        ensureInitialized(definedClass);
+      }
+      if (classData != null) {
+        CLASS_DATA_MAP.put(definedClass, classData);
+      }
+      return new Lookup(shim.Classes.toVMClass(definedClass), 0x5f);
     }
 
     public String toString() {
