@@ -202,6 +202,7 @@ const unsigned LinkFlag = 1 << 8;
 const unsigned HasFinalMemberFlag = 1 << 9;
 const unsigned SingletonFlag = 1 << 10;
 const unsigned ContinuationFlag = 1 << 11;
+const unsigned HiddenClassFlag = 1 << 12;
 
 // method vmFlags:
 const unsigned ClassInitFlag = 1 << 0;
@@ -1076,6 +1077,7 @@ class Machine {
   System::Monitor* stateLock;
   System::Monitor* heapLock;
   System::Monitor* classLock;
+  unsigned long long hiddenClassSequence;
   System::Monitor* referenceLock;
   System::Monitor* shutdownLock;
   System::Library* libraries;
@@ -2416,7 +2418,8 @@ GcClass* parseClass(Thread* t,
                     GcClassLoader* loader,
                     const uint8_t* data,
                     unsigned length,
-                    Gc::Type throwType = GcNoClassDefFoundError::Type);
+                    Gc::Type throwType = GcNoClassDefFoundError::Type,
+                    GcClass* hiddenHost = 0);
 
 GcClass* resolveClass(Thread* t,
                       GcClassLoader* loader,
@@ -3802,7 +3805,8 @@ GcMethod* getCaller(Thread* t, unsigned target, bool skipMethodInvoke = false);
 GcClass* defineClass(Thread* t,
                      GcClassLoader* loader,
                      const uint8_t* buffer,
-                     unsigned length);
+                     unsigned length,
+                     GcClass* hiddenTarget = 0);
 
 inline GcMethod* methodClone(Thread* t, GcMethod* method)
 {

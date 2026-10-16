@@ -46,4 +46,8 @@ public class ClassAddendum extends Addendum {
   public Object[] permittedSubclasses;
 
   public Object[] recordComponents;
+
+  public VMClass hiddenNestHost;
+
+  public Object classData;
 }

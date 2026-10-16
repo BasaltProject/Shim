@@ -1343,7 +1343,7 @@ GcClassAddendum* getClassAddendum(Thread* t, GcClass* class_, GcSingleton* pool)
   if (addendum == 0) {
     PROTECT(t, class_);
 
-    addendum = makeClassAddendum(t, pool, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0);
+    addendum = makeClassAddendum(t, pool, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0);
     setField(t, class_, ClassAddendum, addendum);
   }
   return addendum;
@@ -4003,6 +4003,7 @@ Machine::Machine(System* system,
       stateLock(0),
       heapLock(0),
       classLock(0),
+      hiddenClassSequence(0),
       referenceLock(0),
       shutdownLock(0),
       libraries(0),
@@ -5040,13 +5041,31 @@ unsigned primitiveSize(Thread* t, unsigned code)
   }
 }
 
+static void bindClassReferences(Thread* t, GcSingleton* pool, GcByteArray* name, GcClass* target)
+{
+  for (unsigned i = 0; i < singletonCount(t, pool); ++i) {
+    if (!singletonIsObject(t, pool, i)) continue;
+    object entry = singletonObject(t, pool, i);
+    if (entry == 0 or objectClass(t, entry) != type(t, GcReference::Type)) continue;
+    GcReference* ref = cast<GcReference>(t, entry);
+    if (ref->class_() and objectClass(t, ref->class_()) == type(t, GcByteArray::Type)
+        and byteArrayEqual(t, ref->class_(), name)) {
+      setField(t, ref, ReferenceClass, target);
+    } else if (ref->class_() == 0 and byteArrayEqual(t, ref->name(), name)) {
+      pool->setBodyElement(t, i, reinterpret_cast<uintptr_t>(target));
+    }
+  }
+}
+
 GcClass* parseClass(Thread* t,
                     GcClassLoader* loader,
                     const uint8_t* data,
                     unsigned size,
-                    Gc::Type throwType)
+                    Gc::Type throwType,
+                    GcClass* hiddenHost)
 {
   PROTECT(t, loader);
+  PROTECT(t, hiddenHost);
 
   class Client : public Stream::Client {
    public:
@@ -5122,6 +5141,26 @@ GcClass* parseClass(Thread* t,
       0);  // vtable length
   PROTECT(t, class_);
 
+  if (hiddenHost) {
+    if (flags & 0x8000) {
+      throwNew(t, GcIllegalArgumentException::Type, "Hidden class cannot be a module descriptor");
+    }
+    GcByteArray* hostName = hiddenHost->name();
+    unsigned hostLength = hostName->length() - 1;
+    if (hiddenHost->vmFlags() & HiddenClassFlag) {
+      while (hostLength and hostName->body()[hostLength - 1] != '/') --hostLength;
+      if (hostLength) --hostLength;
+    }
+    while (hostLength and hostName->body()[hostLength - 1] != '/') --hostLength;
+    unsigned packageLength = class_->name()->length() - 1;
+    while (packageLength and class_->name()->body()[packageLength - 1] != '/') --packageLength;
+    if (packageLength != hostLength
+        or memcmp(class_->name()->body().begin(), hostName->body().begin(), packageLength)) {
+      throwNew(t, GcIllegalArgumentException::Type, "Hidden class must be in the lookup package");
+    }
+    class_->vmFlags() |= HiddenClassFlag;
+  }
+
   unsigned super = s.read2();
   if (super) {
     GcClass* sc = resolveClass(
@@ -5177,6 +5216,24 @@ GcClass* parseClass(Thread* t,
   t->m->processor->initVtable(t, real);
 
   updateClassTables(t, real, class_);
+
+  if (hiddenHost) {
+    getClassAddendum(t, real, pool);
+    GcByteArray* originalName = real->name();
+    PROTECT(t, originalName);
+    bindClassReferences(t, pool, originalName, real);
+    unsigned long long id;
+    {
+      ACQUIRE(t, t->m->classLock);
+      id = ++t->m->hiddenClassSequence;
+    }
+    char suffix[32];
+    unsigned suffixLength = snprintf(suffix, sizeof(suffix), "/0x%llx", id);
+    GcByteArray* hiddenName = makeByteArray(t, originalName->length() + suffixLength);
+    memcpy(hiddenName->body().begin(), originalName->body().begin(), originalName->length() - 1);
+    memcpy(hiddenName->body().begin() + originalName->length() - 1, suffix, suffixLength + 1);
+    real->setName(t, hiddenName);
+  }
 
   if (roots(t)->poolMap()) {
     object bootstrapClass = hashMapFind(t,
@@ -5625,9 +5682,22 @@ GcClass* resolveObjectArrayClass(Thread* t,
     spec->body()[elementSpec->length() + 2] = 0;
   }
 
-  GcClass* arrayClass = resolveClass(t, loader, spec);
-
-  getClassRuntimeData(t, elementClass)->setArrayClass(t, arrayClass);
+  PROTECT(t, spec);
+  GcClass* leaf = elementClass;
+  while (leaf->arrayDimensions()) leaf = leaf->arrayElementClass();
+  GcClass* arrayClass = 0;
+  PROTECT(t, arrayClass);
+  if (leaf->vmFlags() & HiddenClassFlag) {
+    ACQUIRE(t, t->m->classLock);
+    arrayClass = cast<GcClass>(t, getClassRuntimeData(t, elementClass)->arrayClass());
+    if (arrayClass == 0) {
+      arrayClass = makeArrayClass(t, loader, elementClass->arrayDimensions() + 1, spec, elementClass);
+      getClassRuntimeData(t, elementClass)->setArrayClass(t, arrayClass);
+    }
+  } else {
+    arrayClass = resolveClass(t, loader, spec);
+    getClassRuntimeData(t, elementClass)->setArrayClass(t, arrayClass);
+  }
 
   return arrayClass;
 }
@@ -6254,28 +6324,25 @@ GcMethod* getCaller(Thread* t, unsigned target, bool skipMethodInvoke)
 GcClass* defineClass(Thread* t,
                      GcClassLoader* loader,
                      const uint8_t* buffer,
-                     unsigned length)
+                     unsigned length,
+                     GcClass* hiddenTarget)
 {
   PROTECT(t, loader);
+  PROTECT(t, hiddenTarget);
 
   GcClass* c = parseClass(t, loader, buffer, length);
 
-  // char name[byteArrayLength(t, className(t, c))];
-  // memcpy(name, &byteArrayBody(t, className(t, c), 0),
-  //        byteArrayLength(t, className(t, c)));
-  // replace('/', '-', name);
-
-  // const unsigned BufferSize = 1024;
-  // char path[BufferSize];
-  // snprintf(path, BufferSize, "/tmp/shim-define-class/%s.class", name);
-
-  // FILE* file = fopen(path, "wb");
-  // if (file) {
-  //   fwrite(buffer, length, 1, file);
-  //   fclose(file);
-  // }
-
   PROTECT(t, c);
+
+  if (hiddenTarget and (hiddenTarget->vmFlags() & HiddenClassFlag)) {
+    GcArray* methods = cast<GcArray>(t, c->methodTable());
+    for (unsigned i = 0; methods and i < methods->length(); ++i) {
+      GcMethod* method = cast<GcMethod>(t, methods->body()[i]);
+      if ((method->flags() & (ACC_NATIVE | ACC_ABSTRACT)) == 0) {
+        bindClassReferences(t, method->code()->pool(), hiddenTarget->name(), hiddenTarget);
+      }
+    }
+  }
 
   saveLoadedClass(t, loader, c);
 

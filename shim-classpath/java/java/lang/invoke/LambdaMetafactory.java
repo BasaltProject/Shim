@@ -505,14 +505,15 @@ public class LambdaMetafactory {
     return out.toByteArray();
   }
 
-  private static CallSite makeCallSite(MethodType invokedType, byte[] classData) throws AssertionError {
+  private static CallSite makeCallSite(MethodType invokedType, byte[] classData, MethodHandle implementation)
+      throws AssertionError {
     try {
       return new ConstantCallSite
               (new MethodHandle
                       (MethodHandle.REF_invokeStatic, invokedType.loader, Classes.toVMMethod
                               (shim.SystemClassLoader.getClass
-                                      (shim.Classes.defineVMClass
-                                              (invokedType.loader, classData, 0, classData.length))
+                                      (shim.Classes.defineLambdaVMClass
+                                              (invokedType.loader, classData, implementation.method.class_))
                                       .getMethod("make", invokedType.parameterArray()))));
     } catch (NoSuchMethodException e) {
       AssertionError error = new AssertionError();
@@ -532,7 +533,7 @@ public class LambdaMetafactory {
     throws LambdaConversionException
   {
     byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, emptyInterfaceList);
-    return makeCallSite(invokedType, classData);
+    return makeCallSite(invokedType, classData, methodImplementation);
   }
 
   public static CallSite altMetafactory(MethodHandles.Lookup caller,
@@ -604,6 +605,6 @@ public class LambdaMetafactory {
       interfaces[0] = java.io.Serializable.class;
 
     byte[] classData = makeLambda(invokedName, invokedType, methodType, methodImplementation, interfaces);
-    return makeCallSite(invokedType, classData);
+    return makeCallSite(invokedType, classData, methodImplementation);
   }
 }

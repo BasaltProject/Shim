@@ -32,9 +32,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class MethodHandles {
   public static Lookup lookup() {
@@ -527,19 +525,22 @@ public class MethodHandles {
     if (targetClass.isPrimitive() || targetClass.isArray()) {
       throw new IllegalArgumentException("Target class is primitive or array: " + targetClass);
     }
-    return new Lookup(shim.Classes.toVMClass(targetClass), 0x5f);
+    if (!lookup.hasFullPrivilegeAccess()) {
+      throw new IllegalAccessException("Lookup does not have full privilege access");
+    }
+    return new Lookup(shim.Classes.toVMClass(targetClass), 0x1f);
   }
-
-  private static final Map<Class<?>, Object> CLASS_DATA_MAP = new ConcurrentHashMap<Class<?>, Object>();
 
   public static Object classData(Lookup lookup, String name, Class<?> type) throws IllegalAccessException {
     Objects.requireNonNull(lookup, "lookup");
     Objects.requireNonNull(name, "name");
     Objects.requireNonNull(type, "type");
-    if (!lookup.hasFullPrivilegeAccess()) {
+    if ((lookup.lookupModes() & Lookup.ORIGINAL) == 0) {
       throw new IllegalAccessException(lookup + " does not have ORIGINAL access");
     }
-    Object data = CLASS_DATA_MAP.get(lookup.lookupClass());
+    if (!"_".equals(name)) throw new IllegalArgumentException("class data name must be _");
+    shim.ClassAddendum addendum = shim.Classes.toVMClass(lookup.lookupClass()).addendum;
+    Object data = addendum == null ? null : addendum.classData;
     if (data == null) {
       return null;
     }
@@ -550,10 +551,12 @@ public class MethodHandles {
     Objects.requireNonNull(lookup, "lookup");
     Objects.requireNonNull(name, "name");
     Objects.requireNonNull(type, "type");
-    if (!lookup.hasFullPrivilegeAccess()) {
+    if ((lookup.lookupModes() & Lookup.ORIGINAL) == 0) {
       throw new IllegalAccessException(lookup + " does not have ORIGINAL access");
     }
-    Object data = CLASS_DATA_MAP.get(lookup.lookupClass());
+    if (!"_".equals(name)) throw new IllegalArgumentException("class data name must be _");
+    shim.ClassAddendum addendum = shim.Classes.toVMClass(lookup.lookupClass()).addendum;
+    Object data = addendum == null ? null : addendum.classData;
     if (data == null) {
       return null;
     }
@@ -572,7 +575,7 @@ public class MethodHandles {
     public static final int PACKAGE = 0x0008;
     public static final int MODULE = 0x0010;
     public static final int UNCONDITIONAL = 0x0020;
-    public static final int ORIGINAL_FULL_RESOURCE_ACCESS = 0x0040;
+    public static final int ORIGINAL = 0x0040;
 
     final shim.VMClass class_;
     private final int modes;
@@ -599,7 +602,7 @@ public class MethodHandles {
       if (requestedLookupClass == lookupClass()) {
         return this;
       }
-      int newModes = modes & ~(PROTECTED | PRIVATE);
+      int newModes = modes & ~(PROTECTED | PRIVATE | ORIGINAL);
       if (!requestedLookupClass.getPackageName().equals(lookupClass().getPackageName())) {
         newModes &= ~PACKAGE;
       }
@@ -607,7 +610,19 @@ public class MethodHandles {
     }
 
     public Lookup dropLookupMode(int modeToDrop) {
-      return new Lookup(class_, modes & ~modeToDrop);
+      if (modeToDrop != PUBLIC && modeToDrop != PRIVATE && modeToDrop != PROTECTED
+          && modeToDrop != PACKAGE && modeToDrop != MODULE && modeToDrop != UNCONDITIONAL
+          && modeToDrop != ORIGINAL) {
+        throw new IllegalArgumentException("Invalid lookup mode");
+      }
+      int remaining = modes & ~modeToDrop;
+      if ((modes & UNCONDITIONAL) == 0) {
+        remaining &= ~(PROTECTED | ORIGINAL);
+        if (modeToDrop == PUBLIC) remaining = 0;
+        if (modeToDrop == MODULE) remaining &= ~(PACKAGE | PRIVATE);
+        if (modeToDrop == PACKAGE) remaining &= ~PRIVATE;
+      }
+      return new Lookup(class_, remaining);
     }
 
     public MethodHandle findVirtual(Class<?> refc, String name, MethodType type)
@@ -807,11 +822,7 @@ public class MethodHandles {
       if (targetClass.isPrimitive() || targetClass.isArray()) {
         throw new IllegalArgumentException("targetClass is primitive or array: " + targetClass);
       }
-      try {
-        Class.forName(targetClass.getName(), true, targetClass.getClassLoader());
-      } catch (ClassNotFoundException e) {
-        throw new NoClassDefFoundError(e.getMessage());
-      }
+      shim.Classes.initialize(shim.Classes.toVMClass(targetClass));
       return targetClass;
     }
 
@@ -853,23 +864,34 @@ public class MethodHandles {
     }
 
     public Lookup defineHiddenClass(byte[] bytes, boolean initialize, ClassOption... options) throws IllegalAccessException {
-      return defineHiddenClassWithClassData(bytes, null, initialize, options);
+      return defineHiddenClass0(bytes, null, initialize, options);
     }
 
     public Lookup defineHiddenClassWithClassData(byte[] bytes, Object classData, boolean initialize, ClassOption... options)
+        throws IllegalAccessException {
+      Objects.requireNonNull(classData, "classData");
+      return defineHiddenClass0(bytes, classData, initialize, options);
+    }
+
+    private Lookup defineHiddenClass0(byte[] bytes, Object classData, boolean initialize, ClassOption... options)
         throws IllegalAccessException {
       Objects.requireNonNull(bytes, "bytes");
       Objects.requireNonNull(options, "options");
       if (!hasFullPrivilegeAccess()) {
         throw new IllegalAccessException("Lookup does not have full privilege access");
       }
-      Class<?> definedClass = defineClass(bytes);
-      Class.markHidden(definedClass);
+      boolean nestmate = false;
+      for (ClassOption option : options) {
+        Objects.requireNonNull(option, "option");
+        nestmate |= option == ClassOption.NESTMATE;
+      }
+      shim.VMClass defined = shim.Classes.defineHiddenVMClass(class_, bytes);
+      Class<?> definedClass = shim.SystemClassLoader.getClass(defined);
+      defined.addendum.hiddenNestHost = nestmate
+          ? shim.Classes.toVMClass(lookupClass().getNestHost()) : null;
+      defined.addendum.classData = classData;
       if (initialize) {
         ensureInitialized(definedClass);
-      }
-      if (classData != null) {
-        CLASS_DATA_MAP.put(definedClass, classData);
       }
       return new Lookup(shim.Classes.toVMClass(definedClass), 0x5f);
     }

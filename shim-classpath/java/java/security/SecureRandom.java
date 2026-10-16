@@ -106,20 +106,7 @@ public class SecureRandom extends Random {
     }
 
     if (!entropyGathered) {
-      long t1 = System.currentTimeMillis();
-      long t2 = System.nanoTime();
-      int hash = System.identityHashCode(this);
-      long mem = Runtime.getRuntime().freeMemory();
-
-      for (int i = 0; i < 8; i++) {
-        seedBytes[i] = (byte) (t1 >>> (i * 8));
-        seedBytes[i + 8] = (byte) (t2 >>> (i * 8));
-        seedBytes[i + 16] = (byte) (mem >>> (i * 8));
-      }
-      seedBytes[24] = (byte) (hash);
-      seedBytes[25] = (byte) (hash >>> 8);
-      seedBytes[26] = (byte) (hash >>> 16);
-      seedBytes[27] = (byte) (hash >>> 24);
+      throw new ProviderException("Operating-system entropy is unavailable");
     }
 
     setSeed(seedBytes);
@@ -151,42 +138,25 @@ public class SecureRandom extends Random {
 
   @Override
   public synchronized void nextBytes(byte[] bytes) {
-    if (bytes == null || bytes.length == 0) {
-      return;
-    }
+    Objects.requireNonNull(bytes, "bytes");
+    // Never derive future output from a block disclosed to the caller.
+    readEntropy(bytes);
+  }
 
-    if ("NATIVEPRNG".equalsIgnoreCase(algorithm) && urandomStream != null) {
-      try {
-        synchronized (urandomStream) {
-          int offset = 0;
-          while (offset < bytes.length) {
-            int read = urandomStream.read(bytes, offset, bytes.length - offset);
-            if (read < 0) {
-              break;
-            }
-            offset += read;
-          }
-          if (offset == bytes.length) {
-            return;
-          }
+  private static void readEntropy(byte[] bytes) {
+    if (bytes.length == 0) return;
+    if (urandomStream == null) throw new ProviderException("Operating-system entropy is unavailable");
+    try {
+      synchronized (urandomStream) {
+        int offset = 0;
+        while (offset < bytes.length) {
+          int count = urandomStream.read(bytes, offset, bytes.length - offset);
+          if (count <= 0) throw new IOException("Entropy source ended before filling request");
+          offset += count;
         }
-      } catch (IOException ignored) {
       }
-    }
-
-    int offset = 0;
-    while (offset < bytes.length) {
-      digest.update(state);
-      long c = ++counter;
-      for (int i = 0; i < 8; i++) {
-        digest.update((byte) (c >>> (i * 8)));
-      }
-      byte[] block = digest.digest();
-      System.arraycopy(block, 0, state, 0, Math.min(state.length, block.length));
-
-      int toCopy = Math.min(bytes.length - offset, block.length);
-      System.arraycopy(block, 0, bytes, offset, toCopy);
-      offset += toCopy;
+    } catch (IOException failure) {
+      throw new ProviderException("Operating-system entropy read failed", failure);
     }
   }
 
@@ -216,26 +186,7 @@ public class SecureRandom extends Random {
       throw new NegativeArraySizeException("Negative seed size");
     }
     byte[] seed = new byte[numBytes];
-    if (urandomStream != null) {
-      try {
-        synchronized (urandomStream) {
-          int offset = 0;
-          while (offset < numBytes) {
-            int read = urandomStream.read(seed, offset, numBytes - offset);
-            if (read < 0) {
-              break;
-            }
-            offset += read;
-          }
-          if (offset == numBytes) {
-            return seed;
-          }
-        }
-      } catch (IOException ignored) {
-      }
-    }
-
-    nextBytes(seed);
+    readEntropy(seed);
     return seed;
   }
 }
