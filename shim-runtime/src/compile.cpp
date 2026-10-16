@@ -2504,6 +2504,7 @@ int64_t findInterfaceMethodFromInstanceAndReference(MyThread* t,
 
 void checkMethod(Thread* t, GcMethod* method, bool shouldBeStatic)
 {
+  if (isPolymorphicStub(method)) return;
   if (((method->flags() & ACC_STATIC) == 0) == shouldBeStatic) {
     throwNew(t,
              GcIncompatibleClassChangeError::Type,

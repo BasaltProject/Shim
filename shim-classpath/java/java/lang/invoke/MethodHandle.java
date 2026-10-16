@@ -291,16 +291,111 @@ public class MethodHandle implements java.lang.constant.Constable {
   }
 
   private static class AsTypeMethodHandle extends MethodHandle {
+    private static final String kinds = "ZBSCIJFD";
+
     private final MethodHandle target;
 
     AsTypeMethodHandle(MethodHandle target, MethodType newType) {
       super(newType);
       this.target = target;
+      MethodType old = target.type();
+      if (old.parameterCount() != newType.parameterCount()) throw mismatch(old, newType);
+      for (int i = 0; i < old.parameterCount(); ++i) {
+        if (!canConvert(newType.parameterType(i), old.parameterType(i))) throw mismatch(old, newType);
+      }
+      if (!canConvert(old.returnType(), newType.returnType())) throw mismatch(old, newType);
+    }
+
+    private static WrongMethodTypeException mismatch(MethodType from, MethodType to) {
+      return new WrongMethodTypeException("cannot convert MethodHandle" + from + " to " + to);
+    }
+
+    private static int kind(Class<?> c) {
+      return c.isPrimitive() && c != void.class ? kinds.indexOf(c.getName().equals("boolean") ? 'Z'
+          : c.getName().equals("byte") ? 'B' : c.getName().equals("short") ? 'S' : c.getName().equals("char") ? 'C'
+          : c.getName().equals("int") ? 'I' : c.getName().equals("long") ? 'J'
+          : c.getName().equals("float") ? 'F' : 'D') : -1;
+    }
+
+    private static Class<?> wrapper(Class<?> c) {
+      switch (kind(c)) {
+      case 0: return Boolean.class;
+      case 1: return Byte.class;
+      case 2: return Short.class;
+      case 3: return Character.class;
+      case 4: return Integer.class;
+      case 5: return Long.class;
+      case 6: return Float.class;
+      case 7: return Double.class;
+      default: return c;
+      }
+    }
+
+    private static int unwrapped(Class<?> c) {
+      if (c == Boolean.class) return 0;
+      if (c == Byte.class) return 1;
+      if (c == Short.class) return 2;
+      if (c == Character.class) return 3;
+      if (c == Integer.class) return 4;
+      if (c == Long.class) return 5;
+      if (c == Float.class) return 6;
+      if (c == Double.class) return 7;
+      return -1;
+    }
+
+    private static boolean widens(int from, int to) {
+      if (from == to) return true;
+      if (from == 0 || to == 0) return false;
+      switch (from) {
+      case 1: return to == 2 || to >= 4;
+      case 2: return to >= 4;
+      case 3: return to >= 4;
+      case 4: return to >= 5;
+      case 5: return to >= 6;
+      case 6: return to == 7;
+      default: return false;
+      }
+    }
+
+    private static boolean canConvert(Class<?> from, Class<?> to) {
+      if (from == to || to == void.class) return true;
+      if (from == void.class) return true;
+      int fromKind = kind(from);
+      int toKind = kind(to);
+      if (fromKind >= 0 && toKind >= 0) return widens(fromKind, toKind);
+      if (fromKind >= 0) return to.isAssignableFrom(wrapper(from));
+      if (toKind >= 0) {
+        int sourceKind = unwrapped(from);
+        return sourceKind >= 0 ? widens(sourceKind, toKind) : from.isAssignableFrom(wrapper(to));
+      }
+      return true;
+    }
+
+    private static Object convert(Object value, Class<?> to) {
+      if (to == void.class) return null;
+      int toKind = kind(to);
+      if (toKind < 0) return to.isInstance(value) || value == null ? value : to.cast(value);
+      if (value == null) throw new NullPointerException();
+      int fromKind = unwrapped(value.getClass());
+      if (fromKind < 0 || !widens(fromKind, toKind)) throw new ClassCastException(value.getClass().getName());
+      if (fromKind == toKind) return value;
+      long integral = value instanceof Character ? (Character) value : ((Number) value).longValue();
+      switch (toKind) {
+      case 2: return (short) integral;
+      case 4: return (int) integral;
+      case 5: return integral;
+      case 6: return value instanceof Number && fromKind >= 6 ? ((Number) value).floatValue() : (float) integral;
+      default: return value instanceof Number && fromKind >= 6 ? ((Number) value).doubleValue() : (double) integral;
+      }
     }
 
     @Override
     public Object invokeWithArguments(Object... arguments) throws Throwable {
-      return target.invokeWithArguments(arguments);
+      MethodType old = target.type();
+      if (arguments.length != old.parameterCount()) throw new WrongMethodTypeException("wrong argument count");
+      Object[] converted = new Object[arguments.length];
+      for (int i = 0; i < arguments.length; ++i) converted[i] = convert(arguments[i], old.parameterType(i));
+      return convert(target.invokeWithArguments(converted), type().returnType());
     }
   }
 

@@ -3416,6 +3416,8 @@ GcClass* nestHostOf(Thread* t, GcClass* c);
 
 bool classAccessible(Thread* t, GcClass* accessor, GcClass* c);
 
+bool isPolymorphicStub(GcMethod* method);
+
 void checkClassAccess(Thread* t, GcClass* accessor, GcClass* c);
 
 void setHiddenNestHost(Thread* t, GcClass* defined, GcClass* host);

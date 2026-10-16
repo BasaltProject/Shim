@@ -5730,6 +5730,60 @@ void checkClassAccess(Thread* t, GcClass* accessor, GcClass* c)
   }
 }
 
+static bool bytesEqual(GcByteArray* array, const char* text)
+{
+  return array->length() - 1 == strlen(text) && memcmp(array->body().begin(), text, strlen(text)) == 0;
+}
+
+static bool isPolymorphicCall(Thread* t, GcClass* class_, GcByteArray* name, GcClass* accessor)
+{
+  if (bytesEqual(class_->name(), "java/lang/invoke/MethodHandle")) {
+    return bytesEqual(name, "invoke") || bytesEqual(name, "invokeExact");
+  }
+  if (accessor == 0 || accessor->loader() == roots(t)->bootLoader()
+      || not bytesEqual(class_->name(), "java/lang/invoke/VarHandle")) {
+    return false;
+  }
+  static const char* const modes[] = {"get", "set", "getVolatile", "setVolatile", "getOpaque", "setOpaque",
+      "getAcquire", "setRelease", "compareAndSet", "compareAndExchange", "compareAndExchangeAcquire",
+      "compareAndExchangeRelease", "weakCompareAndSetPlain", "weakCompareAndSet", "weakCompareAndSetAcquire",
+      "weakCompareAndSetRelease", "getAndSet", "getAndSetAcquire", "getAndSetRelease", "getAndAdd",
+      "getAndAddAcquire", "getAndAddRelease"};
+  for (const char* mode : modes) {
+    if (bytesEqual(name, mode)) return true;
+  }
+  return false;
+}
+
+bool isPolymorphicStub(GcMethod* method)
+{
+  static const char prefix[] = "shim/PolymorphicStub$";
+  return (method->flags() & ACC_STATIC) && method->class_()->name()->length() > sizeof(prefix)
+         && memcmp(method->class_()->name()->body().begin(), prefix, sizeof(prefix) - 1) == 0;
+}
+
+static object makePolymorphicStub(Thread* t, GcClassLoader* loader, GcByteArray* name, GcByteArray* spec)
+{
+  PROTECT(t, loader);
+  PROTECT(t, name);
+  PROTECT(t, spec);
+  GcClass* stubs = resolveSystemClass(t, roots(t)->bootLoader(), makeByteArray(t, "%s", "shim/PolymorphicStubs"));
+  PROTECT(t, stubs);
+  GcMethod* factory = findMethodOrNull(
+      t, stubs, "stub", "(Ljava/lang/ClassLoader;Ljava/lang/String;Ljava/lang/String;)Lshim/VMMethod;");
+  PROTECT(t, factory);
+  GcString* nameString = makeString(t, "%s", name->body().begin());
+  PROTECT(t, nameString);
+  GcString* specString = makeString(t, "%s", spec->body().begin());
+  object result = t->m->processor->invoke(t, factory, 0, loader, nameString, specString);
+  if (t->exception) {
+    GcThrowable* e = t->exception;
+    t->exception = 0;
+    vm::throw_(t, e);
+  }
+  return result;
+}
+
 object resolveMember(Thread* t,
                      GcClassLoader* loader,
                      GcClass* class_,
@@ -5749,7 +5803,17 @@ object resolveMember(Thread* t,
     if (!throw_) return 0;
     checkClassAccess(t, accessor, class_);
   }
-  object member = findInHierarchy(t, class_, name, spec, find, errorType, throw_);
+  object member = 0;
+  if (find == findMethodInClass and isPolymorphicCall(t, class_, name, accessor)) {
+    if (not bytesEqual(class_->name(), "java/lang/invoke/MethodHandle")) {
+      member = makePolymorphicStub(t, loader, name, spec);
+    } else {
+      member = findInHierarchyOrNull(t, class_, name, spec, find);
+      if (member == 0) member = makePolymorphicStub(t, loader, name, spec);
+    }
+  } else {
+    member = findInHierarchy(t, class_, name, spec, find, errorType, throw_);
+  }
   if (member) {
     PROTECT(t, member);
     GcClass* declaring = objectClass(t, member) == type(t, GcMethod::Type)
