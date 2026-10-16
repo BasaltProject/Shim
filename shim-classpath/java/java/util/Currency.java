@@ -164,11 +164,12 @@ public final class Currency implements Serializable {
   }
 
   public String getDisplayName() {
-    return displayName;
+    return getDisplayName(Locale.getDefault(Locale.Category.DISPLAY));
   }
 
   public String getDisplayName(Locale locale) {
-    return displayName;
+    String name = LocaleNames.currency(currencyCode, Objects.requireNonNull(locale));
+    return name != null ? name : displayName;
   }
 
   @Override
