@@ -29,4 +29,22 @@ public class BasicPermission extends Permission {
     super(name);
   }
 
+  public BasicPermission(String name, String actions) {
+    super(name);
+  }
+
+  public String getActions() {
+    return "";
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    return obj != null && obj.getClass() == getClass() && ((BasicPermission) obj).getName().equals(getName());
+  }
+
+  @Override
+  public int hashCode() {
+    return getName().hashCode();
+  }
+
 }

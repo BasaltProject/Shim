@@ -24,6 +24,19 @@
 package java.io;
 
 public abstract class Writer implements Closeable, Flushable, Appendable {
+  protected Object lock;
+
+  protected Writer() {
+    this.lock = this;
+  }
+
+  protected Writer(Object lock) {
+    if (lock == null) {
+      throw new NullPointerException();
+    }
+    this.lock = lock;
+  }
+
   public void write(int c) throws IOException {
     char[] buffer = new char[] { (char) c };
     write(buffer);

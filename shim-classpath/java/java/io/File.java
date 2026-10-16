@@ -303,7 +303,21 @@ public class File implements Serializable {
   }
 
   public File[] listFiles() {
-    return listFiles(null);
+    return listFiles((FilenameFilter) null);
+  }
+
+  public File[] listFiles(FileFilter filter) {
+    File[] all = listFiles();
+    if (all == null) {
+      return null;
+    }
+    java.util.ArrayList<File> kept = new java.util.ArrayList<File>();
+    for (File file : all) {
+      if (filter == null || filter.accept(file)) {
+        kept.add(file);
+      }
+    }
+    return kept.toArray(new File[0]);
   }
 
   public File[] listFiles(FilenameFilter filter) {
@@ -356,6 +370,15 @@ public class File implements Serializable {
 
   public long lastModified() {
     return lastModified(path);
+  }
+
+  private static native boolean setLastModified(String path, long millis);
+
+  public boolean setLastModified(long time) {
+    if (time < 0) {
+      throw new IllegalArgumentException("Negative time");
+    }
+    return setLastModified(path, time);
   }
   private static native long openDir(String path);
 

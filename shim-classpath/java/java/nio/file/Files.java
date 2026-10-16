@@ -159,10 +159,7 @@ public final class Files {
   }
 
   public static Path createTempDirectory(String prefix, FileAttribute<?>... attrs) throws IOException {
-    File f = File.createTempFile(prefix, ".tmp");
-    f.delete();
-    f.mkdir();
-    return f.toPath();
+    return createTempDirectory(new File(System.getProperty("java.io.tmpdir")).toPath(), prefix, attrs);
   }
 
   public static void delete(Path path) throws IOException {
@@ -542,35 +539,206 @@ public final class Files {
   }
 
   public static Path walkFileTree(Path start, FileVisitor<? super Path> visitor) throws IOException {
+    return walkFileTree(start, Collections.<FileVisitOption>emptySet(), Integer.MAX_VALUE, visitor);
+  }
+
+  public static Path walkFileTree(Path start, Set<FileVisitOption> options, int maxDepth,
+      FileVisitor<? super Path> visitor) throws IOException {
     Objects.requireNonNull(start, "start");
+    Objects.requireNonNull(options, "options");
     Objects.requireNonNull(visitor, "visitor");
-    walkFileTreeInternal(start, visitor);
+    if (maxDepth < 0) {
+      throw new IllegalArgumentException("'maxDepth' is negative");
+    }
+    walkVisit(start, 0, maxDepth, visitor);
     return start;
   }
 
-  private static void walkFileTreeInternal(Path current, FileVisitor<? super Path> visitor) throws IOException {
+  private static FileVisitResult walkVisit(Path current, int depth, int maxDepth, FileVisitor<? super Path> visitor)
+      throws IOException {
     File f = current.toFile();
-    BasicFileAttributes attrs = new DefaultBasicFileAttributes(f);
-    if (attrs.isDirectory()) {
-      FileVisitResult pre = visitor.preVisitDirectory(current, attrs);
-      if (pre == FileVisitResult.TERMINATE) return;
-      if (pre == FileVisitResult.CONTINUE) {
-        IOException exc = null;
-        try {
-          String[] names = f.list();
-          if (names != null) {
-            for (String name : names) {
-              walkFileTreeInternal(current.resolve(name), visitor);
-            }
-          }
-        } catch (IOException e) {
-          exc = e;
-        }
-        visitor.postVisitDirectory(current, exc);
-      }
-    } else {
-      visitor.visitFile(current, attrs);
+    if (!f.exists()) {
+      return visitor.visitFileFailed(current, new NoSuchFileException(current.toString()));
     }
+    BasicFileAttributes attrs = new DefaultBasicFileAttributes(f);
+    if (depth >= maxDepth || !attrs.isDirectory()) {
+      return visitor.visitFile(current, attrs);
+    }
+    String[] names = f.list();
+    if (names == null) {
+      return visitor.visitFileFailed(current, new AccessDeniedException(current.toString()));
+    }
+    FileVisitResult result = visitor.preVisitDirectory(current, attrs);
+    if (result != FileVisitResult.CONTINUE) {
+      return result == FileVisitResult.SKIP_SUBTREE ? FileVisitResult.CONTINUE : result;
+    }
+    for (String name : names) {
+      FileVisitResult child = walkVisit(current.resolve(name), depth + 1, maxDepth, visitor);
+      if (child == FileVisitResult.TERMINATE) {
+        return child;
+      }
+      if (child == FileVisitResult.SKIP_SIBLINGS) {
+        break;
+      }
+    }
+    result = visitor.postVisitDirectory(current, null);
+    return Objects.requireNonNull(result);
+  }
+
+  public static DirectoryStream<Path> newDirectoryStream(Path dir, String glob) throws IOException {
+    if (glob.equals("*")) {
+      return newDirectoryStream(dir);
+    }
+    PathMatcher matcher = dir.getFileSystem().getPathMatcher("glob:" + glob);
+    return newDirectoryStream(dir, entry -> matcher.matches(entry.getFileName()));
+  }
+
+  public static Path createTempDirectory(Path dir, String prefix, FileAttribute<?>... attrs) throws IOException {
+    File parent = dir.toFile();
+    String base = prefix == null ? "" : prefix;
+    for (int i = 0; i < 100; i++) {
+      File candidate = new File(parent, base + Long.toUnsignedString(System.nanoTime() ^ (i * 0x9E3779B97F4A7C15L)));
+      if (candidate.mkdir()) {
+        return candidate.toPath();
+      }
+      if (!parent.isDirectory()) {
+        throw new NoSuchFileException(candidate.getPath());
+      }
+    }
+    throw new IOException("Unable to create temporary directory");
+  }
+
+  public static boolean isHidden(Path path) throws IOException {
+    Path name = path.getFileName();
+    return name != null && name.toString().startsWith(".");
+  }
+
+  public static Path setLastModifiedTime(Path path, FileTime time) throws IOException {
+    Objects.requireNonNull(time, "time");
+    File f = path.toFile();
+    if (!f.exists()) {
+      throw new NoSuchFileException(path.toString());
+    }
+    if (!f.setLastModified(time.toMillis())) {
+      throw new AccessDeniedException(path.toString());
+    }
+    return path;
+  }
+
+  public static long mismatch(Path path, Path path2) throws IOException {
+    if (isSameFile(path, path2)) {
+      return -1;
+    }
+    try (InputStream a = new java.io.BufferedInputStream(newInputStream(path));
+        InputStream b = new java.io.BufferedInputStream(newInputStream(path2))) {
+      long position = 0;
+      while (true) {
+        int x = a.read();
+        int y = b.read();
+        if (x != y) {
+          return position;
+        }
+        if (x == -1) {
+          return -1;
+        }
+        position++;
+      }
+    }
+  }
+
+  public static Stream<Path> find(Path start, int maxDepth,
+      java.util.function.BiPredicate<Path, BasicFileAttributes> matcher, FileVisitOption... options)
+      throws IOException {
+    if (maxDepth < 0) {
+      throw new IllegalArgumentException("'maxDepth' is negative");
+    }
+    Objects.requireNonNull(matcher, "matcher");
+    final List<Path> found = new ArrayList<Path>();
+    walkFileTree(start, Collections.<FileVisitOption>emptySet(), maxDepth, new SimpleFileVisitor<Path>() {
+      @Override
+      public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+        if (matcher.test(dir, attrs)) {
+          found.add(dir);
+        }
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override
+      public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+        if (matcher.test(file, attrs)) {
+          found.add(file);
+        }
+        return FileVisitResult.CONTINUE;
+      }
+    });
+    return found.stream();
+  }
+
+  public static java.util.Map<String, Object> readAttributes(Path path, String attributes, LinkOption... options)
+      throws IOException {
+    String view = "basic";
+    String names = attributes;
+    int colon = attributes.indexOf(':');
+    if (colon >= 0) {
+      view = attributes.substring(0, colon);
+      names = attributes.substring(colon + 1);
+    }
+    if (!view.equals("basic")) {
+      throw new UnsupportedOperationException("View '" + view + "' not available");
+    }
+    BasicFileAttributes attrs = readAttributes(path, BasicFileAttributes.class, options);
+    java.util.Map<String, Object> result = new java.util.HashMap<String, Object>();
+    String[] all = {"lastModifiedTime", "lastAccessTime", "creationTime", "size", "isRegularFile", "isDirectory",
+        "isSymbolicLink", "isOther", "fileKey"};
+    for (String name : names.split(",")) {
+      if (name.equals("*")) {
+        for (String each : all) {
+          result.put(each, basicAttribute(attrs, each));
+        }
+        continue;
+      }
+      boolean known = false;
+      for (String each : all) {
+        known |= each.equals(name);
+      }
+      if (!known) {
+        throw new IllegalArgumentException("'" + name + "' not recognized");
+      }
+      result.put(name, basicAttribute(attrs, name));
+    }
+    return result;
+  }
+
+  private static Object basicAttribute(BasicFileAttributes a, String name) {
+    switch (name) {
+      case "lastModifiedTime":
+        return a.lastModifiedTime();
+      case "lastAccessTime":
+        return a.lastAccessTime();
+      case "creationTime":
+        return a.creationTime();
+      case "size":
+        return Long.valueOf(a.size());
+      case "isRegularFile":
+        return Boolean.valueOf(a.isRegularFile());
+      case "isDirectory":
+        return Boolean.valueOf(a.isDirectory());
+      case "isSymbolicLink":
+        return Boolean.valueOf(a.isSymbolicLink());
+      case "isOther":
+        return Boolean.valueOf(a.isOther());
+      default:
+        return a.fileKey();
+    }
+  }
+
+  public static Object getAttribute(Path path, String attribute, LinkOption... options) throws IOException {
+    if (attribute.indexOf('*') >= 0 || attribute.indexOf(',') >= 0) {
+      throw new IllegalArgumentException(attribute);
+    }
+    java.util.Map<String, Object> map = readAttributes(path, attribute, options);
+    String name = attribute.substring(attribute.indexOf(':') + 1);
+    return map.get(name);
   }
 
   private static final class SimpleDirectoryStream implements DirectoryStream<Path> {

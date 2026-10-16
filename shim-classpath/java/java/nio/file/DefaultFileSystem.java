@@ -91,9 +91,55 @@ final class DefaultFileSystem extends FileSystem {
     StringBuilder sb = new StringBuilder("^");
     int len = glob.length();
     int i = 0;
+    boolean inGroup = false;
     while (i < len) {
       char c = glob.charAt(i++);
       switch (c) {
+        case '{':
+          if (inGroup) {
+            throw new java.util.regex.PatternSyntaxException("Cannot nest groups", glob, i - 1);
+          }
+          inGroup = true;
+          sb.append("(?:(?:");
+          break;
+        case '}':
+          if (inGroup) {
+            sb.append("))");
+            inGroup = false;
+          } else {
+            sb.append("\\}");
+          }
+          break;
+        case ',':
+          sb.append(inGroup ? ")|(?:" : ",");
+          break;
+        case '[': {
+          sb.append("[[^/]&&[");
+          if (i < len && glob.charAt(i) == '!') {
+            sb.append('^');
+            i++;
+          }
+          boolean closed = false;
+          while (i < len) {
+            char b = glob.charAt(i++);
+            if (b == ']') {
+              closed = true;
+              break;
+            }
+            if (b == '\\' || b == '[' || b == '&') {
+              sb.append('\\');
+            }
+            sb.append(b);
+          }
+          if (!closed) {
+            throw new java.util.regex.PatternSyntaxException("Missing ']", glob, i - 1);
+          }
+          sb.append("]]");
+          break;
+        }
+        case ']':
+          sb.append("\\]");
+          break;
         case '*':
           if (i < len && glob.charAt(i) == '*') {
             i++;
@@ -125,6 +171,9 @@ final class DefaultFileSystem extends FileSystem {
           sb.append(c);
           break;
       }
+    }
+    if (inGroup) {
+      throw new java.util.regex.PatternSyntaxException("Missing '}", glob, len - 1);
     }
     return sb.append('$').toString();
   }

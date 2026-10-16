@@ -309,6 +309,9 @@ public class Thread implements Runnable {
   }
 
   public State getState() {
+    if (state == (byte) State.NEW.ordinal() && peer != 0) {
+      return State.RUNNABLE;
+    }
     return State.values()[state];
   }
 

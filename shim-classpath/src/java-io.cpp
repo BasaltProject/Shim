@@ -633,6 +633,55 @@ extern "C" JNIEXPORT jlong JNICALL
   return 0;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+    Java_java_io_File_setLastModified(JNIEnv* e, jclass, jstring path, jlong millis)
+{
+  string_t chars = getChars(e, path);
+  if (!chars) {
+    return false;
+  }
+#ifdef PLATFORM_WINDOWS
+#if !defined(WINAPI_FAMILY) || WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+  HANDLE hFile = CreateFileW(
+      chars, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING,
+      FILE_FLAG_BACKUP_SEMANTICS, 0);
+  releaseChars(e, path, chars);
+  if (hFile == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+  ULARGE_INTEGER ticks;
+  ticks.QuadPart = (static_cast<unsigned long long>(millis) + 11644473600000ULL) * 10000ULL;
+  FILETIME ft;
+  ft.dwLowDateTime = ticks.LowPart;
+  ft.dwHighDateTime = ticks.HighPart;
+  BOOL ok = SetFileTime(hFile, 0, 0, &ft);
+  CloseHandle(hFile);
+  return ok != 0;
+#else
+  releaseChars(e, path, chars);
+  return false;
+#endif
+#else
+  struct stat fileStat;
+  if (stat(chars, &fileStat) == -1) {
+    releaseChars(e, path, chars);
+    return false;
+  }
+  struct timespec times[2];
+  times[0].tv_sec = 0;
+  times[0].tv_nsec = UTIME_OMIT;
+  times[1].tv_sec = static_cast<time_t>(millis / 1000);
+  times[1].tv_nsec = static_cast<long>((millis % 1000) * 1000000);
+  if (times[1].tv_nsec < 0) {
+    times[1].tv_nsec += 1000000000;
+    times[1].tv_sec -= 1;
+  }
+  int res = utimensat(AT_FDCWD, chars, times, 0);
+  releaseChars(e, path, chars);
+  return res == 0;
+#endif
+}
+
 #ifdef PLATFORM_WINDOWS
 
 extern "C" JNIEXPORT jlong JNICALL
