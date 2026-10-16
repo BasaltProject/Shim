@@ -22,33 +22,55 @@
    details. */
 
 package java.util.concurrent;
+
 import java.util.List;
 import java.util.Collection;
 
-public interface ExecutorService extends Executor {
-    public void shutdown();
-    
-    public List<Runnable> shutdownNow();
+public interface ExecutorService extends Executor, AutoCloseable {
+  public void shutdown();
 
-    public boolean isShutdown();
+  public List<Runnable> shutdownNow();
 
-    public boolean isTerminated();
+  public boolean isShutdown();
 
-    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
+  public boolean isTerminated();
 
-    public <T> Future<T> submit(Callable<T> task);
+  public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
 
-    public <T> Future<T> submit(Runnable task, T result);
+  public <T> Future<T> submit(Callable<T> task);
 
-    public Future<?> submit(Runnable task);
+  public <T> Future<T> submit(Runnable task, T result);
 
-    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException;
+  public Future<?> submit(Runnable task);
 
-    public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
-                                         long timeout, TimeUnit unit) throws InterruptedException;
+  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) throws InterruptedException;
 
-    public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException;
+  public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+      throws InterruptedException;
 
-    public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
-                           long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException;
+  public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException;
+
+  public <T> T invokeAny(Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException;
+
+  default void close() {
+    boolean terminated = isTerminated();
+    if (!terminated) {
+      shutdown();
+      boolean interrupted = false;
+      while (!terminated) {
+        try {
+          terminated = awaitTermination(1L, TimeUnit.DAYS);
+        } catch (InterruptedException e) {
+          if (!interrupted) {
+            shutdownNow();
+            interrupted = true;
+          }
+        }
+      }
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
 }

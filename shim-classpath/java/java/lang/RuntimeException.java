@@ -33,7 +33,7 @@ public class RuntimeException extends Exception {
   }
 
   public RuntimeException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public RuntimeException() {

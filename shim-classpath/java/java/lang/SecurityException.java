@@ -33,7 +33,7 @@ public class SecurityException extends RuntimeException {
   }
 
   public SecurityException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public SecurityException() {

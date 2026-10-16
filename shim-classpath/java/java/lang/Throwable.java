@@ -47,7 +47,7 @@ public class Throwable implements Serializable {
   }
 
   public Throwable(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public Throwable() {

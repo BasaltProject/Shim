@@ -33,7 +33,7 @@ public class IllegalStateException extends RuntimeException {
   }
 
   public IllegalStateException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public IllegalStateException() {

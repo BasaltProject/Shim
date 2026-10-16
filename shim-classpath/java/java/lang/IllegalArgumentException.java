@@ -33,7 +33,7 @@ public class IllegalArgumentException extends RuntimeException {
   }
 
   public IllegalArgumentException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public IllegalArgumentException() {

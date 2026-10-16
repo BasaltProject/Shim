@@ -23,200 +23,273 @@
 
 package java.util.concurrent;
 
-import java.util.concurrent.atomic.AtomicReference;
+public class FutureTask<V> implements RunnableFuture<V> {
+  private static final int NEW = 0;
+  private static final int COMPLETING = 1;
+  private static final int NORMAL = 2;
+  private static final int EXCEPTIONAL = 3;
+  private static final int CANCELLED = 4;
+  private static final int INTERRUPTING = 5;
+  private static final int INTERRUPTED = 6;
 
-public class FutureTask<T> implements RunnableFuture<T> {
-  private enum TaskState { New, Canceling, Canceled, Running, Done };
-  
-  private final AtomicReference<TaskState> currentState;
-  private final Callable<T> callable;
-  private final Object notifyLock;
-  private volatile Thread runningThread;
-  private volatile T result;
-  private volatile Throwable failure;
-  
-  public FutureTask(final Runnable r, final T result) {
-    this(new Callable<T>() {
-      @Override
-      public T call() {
-        r.run();
-        
-        return result;
-      }
-    });
-  }
-  
-  public FutureTask(Callable<T> callable) {
-    currentState = new AtomicReference<TaskState>(TaskState.New);
-    this.callable = callable;
-    notifyLock = new Object();
-    runningThread = null;
-    result = null;
-    failure = null;
-  }
+  private volatile int state;
+  private Callable<V> callable;
+  private Object outcome;
+  private volatile Thread runner;
 
-  @Override
-  public void run() {
-    if (currentState.compareAndSet(TaskState.New, TaskState.Running)) {
-      runningThread = Thread.currentThread();
-      try {
-        result = callable.call();
-      } catch (Throwable t) {
-        failure = t;
-      } finally {
-        if (currentState.compareAndSet(TaskState.Running, TaskState.Done) || 
-            currentState.get() == TaskState.Canceled) {
-          /* in either of these conditions we either were not canceled 
-           * or we already were interrupted.  The thread may or MAY NOT
-           * be in an interrupted status depending on when it was 
-           * interrupted and what the callable did with the state. 
-           */
-        } else {
-          /* Should be in canceling state, so block forever till we are 
-           * interrupted.  If state already transitioned into canceled 
-           * and thus thread is in interrupted status, the exception should 
-           * throw immediately on the sleep call.
-           */
-          try {
-            Thread.sleep(Long.MAX_VALUE);
-          } catch (InterruptedException e) {
-            // expected
-          }
-        }
-
-        Thread.interrupted(); // reset interrupted status if set
-        handleDone();
-        runningThread = null; // must be last operation
-      }
+  @SuppressWarnings("unchecked")
+  private V report(int s) throws ExecutionException {
+    Object x = outcome;
+    if (s == NORMAL) {
+      return (V) x;
     }
-  }
-  
-  private void handleDone() {
-    done();
-    
-    synchronized (notifyLock) {
-      notifyLock.notifyAll();
-    }
-  }
-  
-  protected void done() {
-    // default implementation does nothing, designed to be overridden
-  }
-
-  @Override
-  public boolean cancel(boolean mayInterruptIfRunning) {
-    if (currentState.compareAndSet(TaskState.New, TaskState.Canceled)) {
-      handleDone();
-      
-      return true;
-    } else if (mayInterruptIfRunning && 
-               currentState.compareAndSet(TaskState.Running, TaskState.Canceling)) {
-      // handleDone will be called from running thread
-      try {
-        Thread runningThread = this.runningThread;
-        if (runningThread != null) {
-          runningThread.interrupt();
-          
-          return true;
-        }
-      } finally {
-        // we can not set to canceled until interrupt status has been set
-        currentState.set(TaskState.Canceled);
-      }
-    }
-    
-    return false;
-  }
-
-  @Override
-  public boolean isCancelled() {
-    return currentState.get() == TaskState.Canceled;
-  }
-
-  @Override
-  public boolean isDone() {
-    return currentState.get() == TaskState.Done || isCancelled();
-  }
-
-  @Override
-  public Future.State state() {
-    TaskState s = currentState.get();
-    if (s == TaskState.Canceled || s == TaskState.Canceling) {
-      return Future.State.CANCELLED;
-    }
-    if (s == TaskState.Done) {
-      return failure != null ? Future.State.FAILED : Future.State.SUCCESS;
-    }
-    return Future.State.RUNNING;
-  }
-
-  @Override
-  public T resultNow() {
-    if (!isDone()) {
-      throw new IllegalStateException("Task has not completed");
-    }
-    if (isCancelled()) {
-      throw new IllegalStateException("Task was cancelled");
-    }
-    if (failure != null) {
-      throw new IllegalStateException("Task completed with exception: " + failure);
-    }
-    return result;
-  }
-
-  @Override
-  public Throwable exceptionNow() {
-    if (!isDone()) {
-      throw new IllegalStateException("Task has not completed");
-    }
-    if (isCancelled()) {
-      throw new IllegalStateException("Task was cancelled");
-    }
-    if (failure == null) {
-      throw new IllegalStateException("Task completed normally with a result");
-    }
-    return failure;
-  }
-
-  @Override
-  public T get() throws InterruptedException, ExecutionException {
-    try {
-      return get(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-    } catch (TimeoutException e) {
-      // not possible
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public T get(long timeout, TimeUnit unit) throws InterruptedException, 
-                                                   ExecutionException,
-                                                   TimeoutException {
-    long timeoutInMillis = unit.toMillis(timeout);
-    long startTime = 0;
-    if (timeoutInMillis < Long.MAX_VALUE) {
-      startTime = System.currentTimeMillis();
-    }
-    long remainingTime;
-    synchronized (notifyLock) {
-      remainingTime = timeoutInMillis;
-      while (! isDone() && remainingTime > 0) {
-        notifyLock.wait(remainingTime);
-        
-        if (timeoutInMillis < Long.MAX_VALUE) {
-          remainingTime = timeoutInMillis - (System.currentTimeMillis() - startTime);
-        }
-      }
-    }
-    
-    if (remainingTime <= 0) {
-      throw new TimeoutException();
-    } else if (currentState.get() == TaskState.Canceled) {
+    if (s >= CANCELLED) {
       throw new CancellationException();
-    } else if (failure != null) {
-      throw new ExecutionException(failure);
-    } else {
-      return result;
     }
+    throw new ExecutionException((Throwable) x);
+  }
+
+  public FutureTask(Callable<V> callable) {
+    if (callable == null) {
+      throw new NullPointerException();
+    }
+    this.callable = callable;
+    this.state = NEW;
+  }
+
+  public FutureTask(Runnable runnable, V result) {
+    this.callable = Executors.callable(runnable, result);
+    this.state = NEW;
+  }
+
+  public boolean isCancelled() {
+    return state >= CANCELLED;
+  }
+
+  public boolean isDone() {
+    return state != NEW;
+  }
+
+  public boolean cancel(boolean mayInterruptIfRunning) {
+    synchronized (this) {
+      if (state != NEW) {
+        return false;
+      }
+      state = mayInterruptIfRunning ? INTERRUPTING : CANCELLED;
+      if (mayInterruptIfRunning) {
+        try {
+          Thread t = runner;
+          if (t != null) {
+            t.interrupt();
+          }
+        } finally {
+          state = INTERRUPTED;
+        }
+      }
+      callable = null;
+      notifyAll();
+    }
+    done();
+    return true;
+  }
+
+  public V get() throws InterruptedException, ExecutionException {
+    int s;
+    synchronized (this) {
+      while ((s = state) <= COMPLETING) {
+        wait();
+      }
+    }
+    return report(s);
+  }
+
+  public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+    if (unit == null) {
+      throw new NullPointerException();
+    }
+    long nanos = unit.toNanos(timeout);
+    long deadline = System.nanoTime() + nanos;
+    int s;
+    synchronized (this) {
+      while ((s = state) <= COMPLETING) {
+        if (nanos <= 0L) {
+          throw new TimeoutException();
+        }
+        wait(nanos / 1000000L, (int) (nanos % 1000000L));
+        nanos = deadline - System.nanoTime();
+      }
+    }
+    return report(s);
+  }
+
+  public V resultNow() {
+    switch (state()) {
+    case SUCCESS:
+      @SuppressWarnings("unchecked")
+      V result = (V) outcome;
+      return result;
+    case FAILED:
+      throw new IllegalStateException("Task completed with exception");
+    case CANCELLED:
+      throw new IllegalStateException("Task was cancelled");
+    default:
+      throw new IllegalStateException("Task has not completed");
+    }
+  }
+
+  public Throwable exceptionNow() {
+    switch (state()) {
+    case SUCCESS:
+      throw new IllegalStateException("Task completed with a result");
+    case FAILED:
+      return (Throwable) outcome;
+    case CANCELLED:
+      throw new IllegalStateException("Task was cancelled");
+    default:
+      throw new IllegalStateException("Task has not completed");
+    }
+  }
+
+  public State state() {
+    int s = state;
+    while (s == COMPLETING) {
+      Thread.yield();
+      s = state;
+    }
+    switch (s) {
+    case NORMAL:
+      return State.SUCCESS;
+    case EXCEPTIONAL:
+      return State.FAILED;
+    case CANCELLED:
+    case INTERRUPTING:
+    case INTERRUPTED:
+      return State.CANCELLED;
+    default:
+      return State.RUNNING;
+    }
+  }
+
+  protected void done() { }
+
+  protected void set(V v) {
+    synchronized (this) {
+      if (state != NEW) {
+        return;
+      }
+      outcome = v;
+      state = NORMAL;
+      callable = null;
+      notifyAll();
+    }
+    done();
+  }
+
+  protected void setException(Throwable t) {
+    synchronized (this) {
+      if (state != NEW) {
+        return;
+      }
+      outcome = t;
+      state = EXCEPTIONAL;
+      callable = null;
+      notifyAll();
+    }
+    done();
+  }
+
+  private boolean claim() {
+    synchronized (this) {
+      if (state != NEW || runner != null) {
+        return false;
+      }
+      runner = Thread.currentThread();
+      return true;
+    }
+  }
+
+  public void run() {
+    if (!claim()) {
+      return;
+    }
+    try {
+      Callable<V> c = callable;
+      if (c != null && state == NEW) {
+        V result;
+        boolean ran;
+        try {
+          result = c.call();
+          ran = true;
+        } catch (Throwable ex) {
+          result = null;
+          ran = false;
+          setException(ex);
+        }
+        if (ran) {
+          set(result);
+        }
+      }
+    } finally {
+      runner = null;
+      int s = state;
+      if (s >= INTERRUPTING) {
+        handlePossibleCancellationInterrupt(s);
+      }
+    }
+  }
+
+  protected boolean runAndReset() {
+    if (!claim()) {
+      return false;
+    }
+    boolean ran = false;
+    int s = state;
+    try {
+      Callable<V> c = callable;
+      if (c != null && s == NEW) {
+        try {
+          c.call();
+          ran = true;
+        } catch (Throwable ex) {
+          setException(ex);
+        }
+      }
+    } finally {
+      runner = null;
+      s = state;
+      if (s >= INTERRUPTING) {
+        handlePossibleCancellationInterrupt(s);
+      }
+    }
+    return ran && s == NEW;
+  }
+
+  private void handlePossibleCancellationInterrupt(int s) {
+    if (s == INTERRUPTING) {
+      while (state == INTERRUPTING) {
+        Thread.yield();
+      }
+    }
+  }
+
+  public String toString() {
+    final String status;
+    switch (state) {
+    case NORMAL:
+      status = "[Completed normally]";
+      break;
+    case EXCEPTIONAL:
+      status = "[Completed exceptionally: " + outcome + "]";
+      break;
+    case CANCELLED:
+    case INTERRUPTING:
+    case INTERRUPTED:
+      status = "[Cancelled]";
+      break;
+    default:
+      final Callable<?> callable = this.callable;
+      status = (callable == null) ? "[Not completed]" : "[Not completed, task = " + callable + "]";
+    }
+    return super.toString() + status;
   }
 }

@@ -3194,7 +3194,7 @@ inline void wait(Thread* t, object o, int64_t milliseconds)
       }
     }
   } else {
-    throwNew(t, GcIllegalMonitorStateException::Type);
+    throwNew(t, GcIllegalMonitorStateException::Type, "current thread is not owner");
   }
 
   if (DebugMonitors) {
@@ -3220,7 +3220,7 @@ inline void notify(Thread* t, object o)
   if (m and m->owner() == t) {
     monitorNotify(t, m);
   } else {
-    throwNew(t, GcIllegalMonitorStateException::Type);
+    throwNew(t, GcIllegalMonitorStateException::Type, "current thread is not owner");
   }
 }
 
@@ -3239,7 +3239,7 @@ inline void notifyAll(Thread* t, object o)
   if (m and m->owner() == t) {
     monitorNotifyAll(t, m);
   } else {
-    throwNew(t, GcIllegalMonitorStateException::Type);
+    throwNew(t, GcIllegalMonitorStateException::Type, "current thread is not owner");
   }
 }
 

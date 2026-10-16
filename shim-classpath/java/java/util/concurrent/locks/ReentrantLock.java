@@ -140,7 +140,7 @@ public class ReentrantLock implements Lock, Serializable {
     synchronized (sync) {
       Thread current = Thread.currentThread();
       if (owner != current) {
-        throw new IllegalMonitorStateException("Calling thread does not hold this lock");
+        throw new IllegalMonitorStateException();
       }
       holdCount--;
       if (holdCount == 0) {
@@ -154,7 +154,7 @@ public class ReentrantLock implements Lock, Serializable {
     synchronized (sync) {
       Thread current = Thread.currentThread();
       if (owner != current) {
-        throw new IllegalMonitorStateException("Calling thread does not hold this lock");
+        throw new IllegalMonitorStateException();
       }
       int count = holdCount;
       holdCount = 0;
@@ -392,7 +392,7 @@ public class ReentrantLock implements Lock, Serializable {
 
     public void signal() {
       if (!isHeldByCurrentThread()) {
-        throw new IllegalMonitorStateException("Calling thread does not hold lock");
+        throw new IllegalMonitorStateException();
       }
       synchronized (condSync) {
         condSync.notify();
@@ -401,7 +401,7 @@ public class ReentrantLock implements Lock, Serializable {
 
     public void signalAll() {
       if (!isHeldByCurrentThread()) {
-        throw new IllegalMonitorStateException("Calling thread does not hold lock");
+        throw new IllegalMonitorStateException();
       }
       synchronized (condSync) {
         condSync.notifyAll();

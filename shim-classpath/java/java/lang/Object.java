@@ -52,7 +52,9 @@ public class Object {
 
   public native final void notifyAll();
 
-  public native String toString();
+  public String toString() {
+    return getClass().getName() + "@" + Integer.toHexString(hashCode());
+  }
 
   public final void wait() throws InterruptedException {
     wait(0);

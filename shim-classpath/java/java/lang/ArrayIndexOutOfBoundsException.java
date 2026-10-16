@@ -33,7 +33,7 @@ public class ArrayIndexOutOfBoundsException extends IndexOutOfBoundsException {
   }
 
   public ArrayIndexOutOfBoundsException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public ArrayIndexOutOfBoundsException(int idx) {

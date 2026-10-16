@@ -2494,6 +2494,29 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
   return code;
 }
 
+static bool moreSpecificDefault(Thread* t,
+                                GcArray* itable,
+                                unsigned stride,
+                                unsigned current,
+                                GcMethod* existing,
+                                GcMethod* candidate)
+{
+  GcClass* challenger = cast<GcClass>(t, itable->body()[current]);
+  for (unsigned k = 0; k < itable->length(); k += stride) {
+    GcClass* provider = cast<GcClass>(t, itable->body()[k]);
+    GcArray* table = cast<GcArray>(t, provider->virtualTable());
+    if (table == 0 or provider == challenger) continue;
+    for (unsigned j = 0; j < table->length(); ++j) {
+      GcMethod* m = cast<GcMethod>(t, table->body()[j]);
+      if (m->code() == existing->code() and byteArrayEqual(t, m->name(), candidate->name())
+          and byteArrayEqual(t, m->spec(), candidate->spec())) {
+        return isAssignableFrom(t, provider, challenger);
+      }
+    }
+  }
+  return false;
+}
+
 GcList* addInterfaceMethods(Thread* t,
                             GcClass* class_,
                             GcHashMap* virtualMap,
@@ -2551,6 +2574,10 @@ GcList* addInterfaceMethods(Thread* t,
           } else if (method->code() != 0) {
             GcMethod* existing = cast<GcMethod>(t, n->second());
             if (existing->code() == 0 and (existing->vmFlags() & InterfaceMethodFlag)) {
+              existing->setCode(t, method->code());
+              existing->flags() = method->flags();
+            } else if ((existing->vmFlags() & InterfaceMethodFlag) and existing->code() != method->code()
+                       and moreSpecificDefault(t, itable, stride, i, existing, method)) {
               existing->setCode(t, method->code());
               existing->flags() = method->flags();
             }
@@ -5706,7 +5733,12 @@ static bool memberAccessible(Thread* t, GcClass* accessor, GcClass* declaring, u
 {
   if (flags & ACC_PUBLIC) return true;
   if (accessor == declaring) return true;
-  if (flags & ACC_PRIVATE) return nestHostOf(t, accessor) == nestHostOf(t, declaring);
+  if (flags & ACC_PRIVATE) {
+    PROTECT(t, declaring);
+    GcClass* accessorHost = nestHostOf(t, accessor);
+    PROTECT(t, accessorHost);
+    return accessorHost == nestHostOf(t, declaring);
+  }
   if (samePackage(accessor, declaring)) return true;
   return (flags & ACC_PROTECTED) && isAssignableFrom(t, declaring, accessor);
 }

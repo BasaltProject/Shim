@@ -33,7 +33,7 @@ public class IOException extends Exception {
   }
 
   public IOException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public IOException() {

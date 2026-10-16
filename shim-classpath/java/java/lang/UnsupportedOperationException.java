@@ -33,7 +33,7 @@ public class UnsupportedOperationException extends RuntimeException {
   }
 
   public UnsupportedOperationException(Throwable cause) {
-    this(null, cause);
+    this(cause == null ? null : cause.toString(), cause);
   }
 
   public UnsupportedOperationException() {
