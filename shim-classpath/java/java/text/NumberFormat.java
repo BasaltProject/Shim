@@ -199,4 +199,26 @@ public abstract class NumberFormat extends Format {
   public Object clone() {
     return super.clone();
   }
+
+  @Override
+  public int hashCode() {
+    return maxIntegerDigits * 37 + maxFractionDigits;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == null) {
+      return false;
+    }
+    if (this == obj) {
+      return true;
+    }
+    if (getClass() != obj.getClass()) {
+      return false;
+    }
+    NumberFormat other = (NumberFormat) obj;
+    return maxIntegerDigits == other.maxIntegerDigits && minIntegerDigits == other.minIntegerDigits
+        && maxFractionDigits == other.maxFractionDigits && minFractionDigits == other.minFractionDigits
+        && groupingUsed == other.groupingUsed && parseIntegerOnly == other.parseIntegerOnly;
+  }
 }
