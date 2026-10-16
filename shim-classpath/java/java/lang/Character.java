@@ -169,35 +169,32 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static char toLowerCase(char c) {
-    if (c >= 'A' && c <= 'Z') {
-      return (char) ((c - 'A') + 'a');
-    } else {
-      return c;
-    }
+    return (char) toLowerCase((int) c);
   }
 
   public static int toLowerCase(int codePoint) {
-    if (isSupplementaryCodePoint(codePoint)) {
-      return codePoint;
-    } else {
-      return toLowerCase((char) codePoint);
-    }
+    if (codePoint >= 'A' && codePoint <= 'Z') return codePoint + ('a' - 'A');
+    if (codePoint < 128) return codePoint;
+    return CharacterMappings.lower(codePoint);
   }
 
   public static char toUpperCase(char c) {
-    if (c >= 'a' && c <= 'z') {
-      return (char) ((c - 'a') + 'A');
-    } else {
-      return c;
-    }
+    return (char) toUpperCase((int) c);
   }
 
   public static int toUpperCase(int codePoint) {
-    if (isSupplementaryCodePoint(codePoint)) {
-      return codePoint;
-    } else {
-      return toUpperCase((char) codePoint);
-    }
+    if (codePoint >= 'a' && codePoint <= 'z') return codePoint - ('a' - 'A');
+    if (codePoint < 128) return codePoint;
+    return CharacterMappings.upper(codePoint);
+  }
+
+  public static char toTitleCase(char c) {
+    return (char) toTitleCase((int) c);
+  }
+
+  public static int toTitleCase(int codePoint) {
+    if (codePoint < 128) return toUpperCase(codePoint);
+    return CharacterMappings.title(codePoint);
   }
 
   public static boolean isDigit(char c) {
@@ -209,22 +206,32 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static int digit(char c, int radix) {
-    int digit = 0;
-    if ((c >= '0') && (c <= '9')) {
-      digit = c - '0';
-    } else if ((c >= 'a') && (c <= 'z')) {
-      digit = c - 'a' + 10;
-    } else if ((c >= 'A') && (c <= 'Z')) {
-      digit = c - 'A' + 10;
-    } else {
-      return -1;
-    }
+    return digit((int) c, radix);
+  }
 
-    if (digit < radix) {
-      return digit;
-    } else {
-      return -1;
-    }
+  public static int digit(int codePoint, int radix) {
+    if (radix < MIN_RADIX || radix > MAX_RADIX) return -1;
+    int value = latinDigit(codePoint);
+    if (value < 0) value = CharacterMappings.decimal(codePoint);
+    return value >= 0 && value < radix ? value : -1;
+  }
+
+  public static int getNumericValue(char c) {
+    return getNumericValue((int) c);
+  }
+
+  public static int getNumericValue(int codePoint) {
+    int value = latinDigit(codePoint);
+    return value >= 0 ? value : CharacterMappings.numeric(codePoint);
+  }
+
+  private static int latinDigit(int codePoint) {
+    if (codePoint >= '0' && codePoint <= '9') return codePoint - '0';
+    if (codePoint >= 'a' && codePoint <= 'z') return codePoint - 'a' + 10;
+    if (codePoint >= 'A' && codePoint <= 'Z') return codePoint - 'A' + 10;
+    if (codePoint >= 0xff21 && codePoint <= 0xff3a) return codePoint - 0xff21 + 10;
+    if (codePoint >= 0xff41 && codePoint <= 0xff5a) return codePoint - 0xff41 + 10;
+    return -1;
   }
 
   public static char forDigit(int digit, int radix) {
@@ -234,6 +241,22 @@ public final class Character implements Comparable<Character>, java.lang.constan
       }
     }
     return 0;
+  }
+
+  public static byte getDirectionality(char c) {
+    return getDirectionality((int) c);
+  }
+
+  public static byte getDirectionality(int codePoint) {
+    return CharacterBidiData.directionality(codePoint);
+  }
+
+  public static boolean isMirrored(char c) {
+    return isMirrored((int) c);
+  }
+
+  public static boolean isMirrored(int codePoint) {
+    return CharacterBidiData.mirrored(codePoint);
   }
 
   public static boolean isLetter(int c) {
@@ -513,128 +536,26 @@ public final class Character implements Comparable<Character>, java.lang.constan
   }
 
   public static boolean isEmojiModifier(int codePoint) {
-    return codePoint >= 0x1F3FB && codePoint <= 0x1F3FF;
+    return CharacterEmojiData.hasProperty(codePoint, CharacterEmojiData.EMOJI_MODIFIER);
   }
 
   public static boolean isEmojiComponent(int codePoint) {
-    if (codePoint == 0x23 || codePoint == 0x2A) return true;
-    if (codePoint >= 0x30 && codePoint <= 0x39) return true;
-    if (codePoint == 0x200D || codePoint == 0x20E3 || codePoint == 0xFE0F) return true;
-    if (codePoint >= 0x1F1E6 && codePoint <= 0x1F1FF) return true;
-    if (codePoint >= 0x1F3FB && codePoint <= 0x1F3FF) return true;
-    if (codePoint >= 0xE0020 && codePoint <= 0xE007F) return true;
-    return false;
+    return CharacterEmojiData.hasProperty(codePoint, CharacterEmojiData.EMOJI_COMPONENT);
   }
 
-  public static boolean isEmojiModifierBase(int cp) {
-    if (cp == 0x261D || cp == 0x26F9) return true;
-    if (cp >= 0x270A && cp <= 0x270D) return true;
-    if (cp == 0x1F385 || cp == 0x1F3C7 || cp == 0x1F4AA || cp == 0x1F57A) return true;
-    if (cp >= 0x1F3C2 && cp <= 0x1F3C4) return true;
-    if (cp >= 0x1F3CA && cp <= 0x1F3CC) return true;
-    if (cp >= 0x1F442 && cp <= 0x1F443) return true;
-    if (cp >= 0x1F446 && cp <= 0x1F450) return true;
-    if (cp >= 0x1F466 && cp <= 0x1F478) return true;
-    if (cp == 0x1F47C || cp == 0x1F48F || cp == 0x1F491) return true;
-    if (cp >= 0x1F481 && cp <= 0x1F483) return true;
-    if (cp >= 0x1F485 && cp <= 0x1F487) return true;
-    if (cp >= 0x1F574 && cp <= 0x1F575) return true;
-    if (cp == 0x1F590 || cp == 0x1F595 || cp == 0x1F596) return true;
-    if (cp >= 0x1F645 && cp <= 0x1F647) return true;
-    if (cp >= 0x1F64B && cp <= 0x1F64F) return true;
-    if (cp == 0x1F6A3 || cp == 0x1F6C0 || cp == 0x1F6CC) return true;
-    if (cp >= 0x1F6B4 && cp <= 0x1F6B6) return true;
-    if (cp == 0x1F90C || cp == 0x1F90F || cp == 0x1F926 || cp == 0x1F977 || cp == 0x1F9BB) return true;
-    if (cp >= 0x1F918 && cp <= 0x1F91F) return true;
-    if (cp >= 0x1F930 && cp <= 0x1F93E) return true;
-    if (cp >= 0x1F9B5 && cp <= 0x1F9B6) return true;
-    if (cp >= 0x1F9B8 && cp <= 0x1F9B9) return true;
-    if (cp >= 0x1F9CD && cp <= 0x1F9CF) return true;
-    if (cp >= 0x1F9D1 && cp <= 0x1F9DD) return true;
-    if (cp >= 0x1FAF0 && cp <= 0x1FAF8) return true;
-    return false;
+  public static boolean isEmojiModifierBase(int codePoint) {
+    return CharacterEmojiData.hasProperty(codePoint, CharacterEmojiData.EMOJI_MODIFIER_BASE);
   }
 
-  public static boolean isExtendedPictographic(int cp) {
-    if (cp == 0x00A9 || cp == 0x00AE || cp == 0x203C || cp == 0x2049 || cp == 0x2122 || cp == 0x2139) return true;
-    if (cp >= 0x2194 && cp <= 0x2199) return true;
-    if (cp == 0x21A9 || cp == 0x21AA || cp == 0x2328 || cp == 0x23CF || cp == 0x24C2) return true;
-    if (cp >= 0x231A && cp <= 0x231B) return true;
-    if (cp >= 0x23E9 && cp <= 0x23F3) return true;
-    if (cp >= 0x23F8 && cp <= 0x23FA) return true;
-    if (cp >= 0x25AA && cp <= 0x25AB) return true;
-    if (cp == 0x25B6 || cp == 0x25C0) return true;
-    if (cp >= 0x25FB && cp <= 0x25FE) return true;
-    if (cp >= 0x2600 && cp <= 0x2604) return true;
-    if (cp >= 0x2614 && cp <= 0x2615) return true;
-    if (cp >= 0x2648 && cp <= 0x2653) return true;
-    if (cp >= 0x26AA && cp <= 0x26AB) return true;
-    if (cp >= 0x26BD && cp <= 0x26BE) return true;
-    if (cp >= 0x26C4 && cp <= 0x26C5) return true;
-    if (cp >= 0x2708 && cp <= 0x270D) return true;
-    if (cp >= 0x2753 && cp <= 0x2755) return true;
-    if (cp >= 0x2763 && cp <= 0x2764) return true;
-    if (cp >= 0x2795 && cp <= 0x2797) return true;
-    if (cp == 0x260E || cp == 0x2611 || cp == 0x2618 || cp == 0x261D || cp == 0x2620 || cp == 0x2622 || cp == 0x2623) return true;
-    if (cp == 0x2626 || cp == 0x262A || cp == 0x262E || cp == 0x262F || cp == 0x2638 || cp == 0x2639 || cp == 0x263A) return true;
-    if (cp == 0x2640 || cp == 0x2642 || cp == 0x265F || cp == 0x2660 || cp == 0x2663 || cp == 0x2665 || cp == 0x2666) return true;
-    if (cp == 0x2668 || cp == 0x267B || cp == 0x267E || cp == 0x267F || cp == 0x2692 || cp == 0x2693 || cp == 0x2694) return true;
-    if (cp == 0x2695 || cp == 0x2696 || cp == 0x2697 || cp == 0x2699 || cp == 0x269B || cp == 0x269C || cp == 0x26A0) return true;
-    if (cp == 0x26A1 || cp == 0x26A7 || cp == 0x26B0 || cp == 0x26B1 || cp == 0x26C8 || cp == 0x26CE || cp == 0x26CF) return true;
-    if (cp == 0x26D1 || cp == 0x26D3 || cp == 0x26D4 || cp == 0x26E9 || cp == 0x26EA || cp == 0x26F0 || cp == 0x26F1) return true;
-    if (cp == 0x26F2 || cp == 0x26F3 || cp == 0x26F4 || cp == 0x26F5 || cp == 0x26F7 || cp == 0x26F8 || cp == 0x26F9) return true;
-    if (cp == 0x26FA || cp == 0x26FD) return true;
-    if (cp == 0x2702 || cp == 0x2705 || cp == 0x270F || cp == 0x2712 || cp == 0x2714 || cp == 0x2716 || cp == 0x271D) return true;
-    if (cp == 0x2721 || cp == 0x2728 || cp == 0x2733 || cp == 0x2734 || cp == 0x2744 || cp == 0x2747 || cp == 0x274C) return true;
-    if (cp == 0x274E || cp == 0x2757 || cp == 0x27A1 || cp == 0x27B0 || cp == 0x27BF) return true;
-    if (cp >= 0x2B05 && cp <= 0x2B07) return true;
-    if (cp >= 0x2B1B && cp <= 0x2B1C) return true;
-    if (cp == 0x2B50 || cp == 0x2B55 || cp == 0x3030 || cp == 0x303D || cp == 0x3297 || cp == 0x3299) return true;
-    if (cp >= 0x1F000 && cp <= 0x1FAFF) {
-      if (cp >= 0x1F1E6 && cp <= 0x1F1FF) return false;
-      if (cp >= 0x1F3FB && cp <= 0x1F3FF) return false;
-      return true;
-    }
-    return false;
+  public static boolean isExtendedPictographic(int codePoint) {
+    return CharacterEmojiData.hasProperty(codePoint, CharacterEmojiData.EXTENDED_PICTOGRAPHIC);
   }
 
-  public static boolean isEmojiPresentation(int cp) {
-    if (cp >= 0x231A && cp <= 0x231B) return true;
-    if (cp >= 0x23E9 && cp <= 0x23EC) return true;
-    if (cp == 0x23F0 || cp == 0x23F3) return true;
-    if (cp >= 0x25FD && cp <= 0x25FE) return true;
-    if (cp >= 0x2614 && cp <= 0x2615) return true;
-    if (cp >= 0x2648 && cp <= 0x2653) return true;
-    if (cp == 0x267F || cp == 0x2693 || cp == 0x26A1 || cp == 0x26AA || cp == 0x26AB) return true;
-    if (cp >= 0x26BD && cp <= 0x26BE) return true;
-    if (cp >= 0x26C4 && cp <= 0x26C5) return true;
-    if (cp == 0x26CE || cp == 0x26D4 || cp == 0x26EA || cp == 0x26F2 || cp == 0x26F3 || cp == 0x26F5 || cp == 0x26FA || cp == 0x26FD) return true;
-    if (cp == 0x2705 || cp == 0x270A || cp == 0x270B || cp == 0x2728 || cp == 0x274C || cp == 0x274E) return true;
-    if (cp >= 0x2753 && cp <= 0x2755) return true;
-    if (cp == 0x2757 || cp == 0x27B0 || cp == 0x27BF) return true;
-    if (cp >= 0x2795 && cp <= 0x2797) return true;
-    if (cp >= 0x2B1B && cp <= 0x2B1C) return true;
-    if (cp == 0x2B50 || cp == 0x2B55) return true;
-    if (cp >= 0x1F1E6 && cp <= 0x1F1FF) return true;
-    if (cp >= 0x1F300 && cp <= 0x1F64F) {
-      if (cp >= 0x1F3FB && cp <= 0x1F3FF) return true;
-      return isExtendedPictographic(cp);
-    }
-    if (cp >= 0x1F680 && cp <= 0x1FAFF) {
-      return isExtendedPictographic(cp);
-    }
-    return false;
+  public static boolean isEmojiPresentation(int codePoint) {
+    return CharacterEmojiData.hasProperty(codePoint, CharacterEmojiData.EMOJI_PRESENTATION);
   }
 
-  public static boolean isEmoji(int cp) {
-    if (isEmojiComponent(cp)) {
-      if (cp == 0x200D || cp == 0x20E3 || cp == 0xFE0F || (cp >= 0xE0020 && cp <= 0xE007F)) {
-        return false;
-      }
-      return true;
-    }
-    if (isEmojiPresentation(cp)) return true;
-    if (isExtendedPictographic(cp)) return true;
-    return false;
+  public static boolean isEmoji(int codePoint) {
+    return CharacterEmojiData.hasProperty(codePoint, CharacterEmojiData.EMOJI);
   }
 }
