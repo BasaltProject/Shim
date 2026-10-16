@@ -30,7 +30,7 @@ import shim.Classes;
 
 import java.lang.annotation.Annotation;
 
-public class Method<T> extends Executable {
+public class Method extends Executable {
   public final VMMethod vmMethod;
   private boolean accessible;
 
@@ -52,7 +52,7 @@ public class Method<T> extends Executable {
 
   public static native VMMethod getCaller();
 
-  public Class<T> getDeclaringClass() {
+  public Class<?> getDeclaringClass() {
     return SystemClassLoader.getClass(vmMethod.class_);
   }
 
@@ -284,6 +284,13 @@ public class Method<T> extends Executable {
       }
     }
     return sb.toString();
+  }
+
+  public String getGenericSignature() {
+    if (vmMethod.addendum != null && vmMethod.addendum.signature != null) {
+      return Classes.toString((byte[]) vmMethod.addendum.signature);
+    }
+    return null;
   }
 
   public Type getGenericReturnType() {

@@ -14,9 +14,9 @@ public final class RecordComponent implements AnnotatedElement {
   private final Class<?> declaringRecord;
   private final String name;
   private final Class<?> type;
-  private final Method<?> accessor;
+  private final Method accessor;
 
-  public RecordComponent(Class<?> declaringRecord, String name, Class<?> type, Method<?> accessor) {
+  public RecordComponent(Class<?> declaringRecord, String name, Class<?> type, Method accessor) {
     this.declaringRecord = Objects.requireNonNull(declaringRecord);
     this.name = Objects.requireNonNull(name);
     this.type = Objects.requireNonNull(type);
@@ -35,15 +35,18 @@ public final class RecordComponent implements AnnotatedElement {
     return declaringRecord;
   }
 
-  public Method<?> getAccessor() {
+  public Method getAccessor() {
     return accessor;
   }
 
   public String getGenericSignature() {
-    return null;
+    return accessor != null ? accessor.getGenericSignature() : null;
   }
 
   public Type getGenericType() {
+    if (accessor != null) {
+      return accessor.getGenericReturnType();
+    }
     return type;
   }
 
@@ -79,6 +82,6 @@ public final class RecordComponent implements AnnotatedElement {
   }
 
   public AnnotatedType getAnnotatedType() {
-    return new AnnotatedTypeImpl(type);
+    return new AnnotatedTypeImpl(getGenericType());
   }
 }

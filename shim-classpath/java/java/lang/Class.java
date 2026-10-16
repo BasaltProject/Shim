@@ -1002,7 +1002,8 @@ public final class Class <T>
 
   public boolean isRecord() {
     return getSuperclass() == Record.class
-        && ((vmClass.flags & 0x1000) != 0 || (vmClass.addendum != null && vmClass.addendum.recordComponents != null));
+        && vmClass.addendum != null
+        && vmClass.addendum.recordComponents != null;
   }
 
   public RecordComponent[] getRecordComponents() {

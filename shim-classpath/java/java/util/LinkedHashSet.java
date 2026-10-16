@@ -23,7 +23,7 @@
 
 package java.util;
 
-public class LinkedHashSet<T> extends AbstractSet<T> implements Set<T> {
+public class LinkedHashSet<T> extends AbstractSet<T> implements SequencedSet<T>, Cloneable, java.io.Serializable {
   private static final Object Value = new Object();
 
   private final LinkedHashMap<T, Object> map;
@@ -75,6 +75,59 @@ public class LinkedHashSet<T> extends AbstractSet<T> implements Set<T> {
     return new MyIterator(map.iterator());
   }
 
+  @Override
+  public void addFirst(T element) {
+    map.putFirst(element, Value);
+  }
+
+  @Override
+  public void addLast(T element) {
+    map.putLast(element, Value);
+  }
+
+  @Override
+  public T getFirst() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    return iterator().next();
+  }
+
+  @Override
+  public T getLast() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    return reversed().iterator().next();
+  }
+
+  @Override
+  public T removeFirst() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    Iterator<T> it = iterator();
+    T elem = it.next();
+    it.remove();
+    return elem;
+  }
+
+  @Override
+  public T removeLast() {
+    if (isEmpty()) {
+      throw new NoSuchElementException();
+    }
+    Iterator<T> it = reversed().iterator();
+    T elem = it.next();
+    it.remove();
+    return elem;
+  }
+
+  @Override
+  public SequencedSet<T> reversed() {
+    return new ReversedView();
+  }
+
   public String toString() {
     return shim.Data.toString(this);
   }
@@ -96,6 +149,79 @@ public class LinkedHashSet<T> extends AbstractSet<T> implements Set<T> {
 
     public void remove() {
       it.remove();
+    }
+  }
+
+  private class ReversedView extends AbstractSet<T> implements SequencedSet<T> {
+    @Override
+    public int size() {
+      return LinkedHashSet.this.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return LinkedHashSet.this.isEmpty();
+    }
+
+    @Override
+    public boolean contains(Object o) {
+      return LinkedHashSet.this.contains(o);
+    }
+
+    @Override
+    public boolean add(T element) {
+      LinkedHashSet.this.addFirst(element);
+      return true;
+    }
+
+    @Override
+    public void addFirst(T element) {
+      LinkedHashSet.this.addLast(element);
+    }
+
+    @Override
+    public void addLast(T element) {
+      LinkedHashSet.this.addFirst(element);
+    }
+
+    @Override
+    public T getFirst() {
+      return LinkedHashSet.this.getLast();
+    }
+
+    @Override
+    public T getLast() {
+      return LinkedHashSet.this.getFirst();
+    }
+
+    @Override
+    public T removeFirst() {
+      return LinkedHashSet.this.removeLast();
+    }
+
+    @Override
+    public T removeLast() {
+      return LinkedHashSet.this.removeFirst();
+    }
+
+    @Override
+    public boolean remove(Object o) {
+      return LinkedHashSet.this.remove(o);
+    }
+
+    @Override
+    public void clear() {
+      LinkedHashSet.this.clear();
+    }
+
+    @Override
+    public SequencedSet<T> reversed() {
+      return LinkedHashSet.this;
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+      return new MyIterator<T>(map.reversed().entrySet().iterator());
     }
   }
 }
