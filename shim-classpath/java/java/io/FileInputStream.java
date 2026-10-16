@@ -36,13 +36,21 @@ public class FileInputStream extends InputStream {
     this.fd = fd.value;
   }
 
-  public FileInputStream(String path) throws IOException {
+  public FileInputStream(String path) throws FileNotFoundException {
     this.path = path;
-    fd = open(path);
+    try {
+      fd = open(path);
+    } catch (FileNotFoundException e) {
+      throw e;
+    } catch (IOException e) {
+      FileNotFoundException notFound = new FileNotFoundException(e.getMessage());
+      notFound.initCause(e);
+      throw notFound;
+    }
     remaining = (int) new File(path).length();
   }
 
-  public FileInputStream(File file) throws IOException {
+  public FileInputStream(File file) throws FileNotFoundException {
     this(file.getPath());
   }
 

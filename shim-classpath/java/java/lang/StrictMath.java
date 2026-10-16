@@ -98,4 +98,28 @@ public final class StrictMath {
   public static double nextAfter(double start, double direction) { return Math.nextAfter(start, direction); }
   public static int getExponent(float f) { return Math.getExponent(f); }
   public static int getExponent(double d) { return Math.getExponent(d); }
+  public static double log10(double a) { return Math.log10(a); }
+  public static double rint(double a) { return Math.rint(a); }
+  public static double cbrt(double a) { return Math.cbrt(a); }
+  public static double scalb(double d, int scaleFactor) { return Math.scalb(d, scaleFactor); }
+  public static float scalb(float f, int scaleFactor) { return Math.scalb(f, scaleFactor); }
+  public static double IEEEremainder(double f1, double f2) { return Math.IEEEremainder(f1, f2); }
+  public static double hypot(double x, double y) { return Math.hypot(x, y); }
+  public static double expm1(double x) { return Math.expm1(x); }
+  public static double log1p(double x) { return Math.log1p(x); }
+  public static int unsignedMultiplyExact(int x, int y) { return Math.unsignedMultiplyExact(x, y); }
+  public static long unsignedMultiplyExact(long x, int y) { return Math.unsignedMultiplyExact(x, y); }
+  public static long unsignedMultiplyExact(long x, long y) { return Math.unsignedMultiplyExact(x, y); }
+  public static double toRadians(double angdeg) { return Math.toRadians(angdeg); }
+  public static double toDegrees(double angrad) { return Math.toDegrees(angrad); }
+  public static long multiplyFull(int x, int y) { return Math.multiplyFull(x, y); }
+  public static int absExact(int a) { return Math.absExact(a); }
+  public static long absExact(long a) { return Math.absExact(a); }
+  public static float nextAfter(float start, double direction) { return Math.nextAfter(start, direction); }
+  public static float nextUp(float f) { return Math.nextUp(f); }
+  public static float nextDown(float f) { return Math.nextDown(f); }
+  public static int powExact(int x, int n) { return Math.powExact(x, n); }
+  public static long powExact(long x, int n) { return Math.powExact(x, n); }
+  public static int unsignedPowExact(int x, int n) { return Math.unsignedPowExact(x, n); }
+  public static long unsignedPowExact(long x, int n) { return Math.unsignedPowExact(x, n); }
 }

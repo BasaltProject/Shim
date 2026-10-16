@@ -195,21 +195,42 @@ public final class Integer extends Number implements Comparable<Integer>,
     return parseInt(s, 0, s.length(), radix);
   }
 
-  public static Integer decode(String string) {
-    if (string.startsWith("-")) {
-      if (string.startsWith("-0") || string.startsWith("-#")) {
-        return new Integer(-decode(string.substring(1)));
-      }
-    } else if (string.startsWith("0")) {
-      char c = string.length() < 2 ? (char)-1 : string.charAt(1);
-      if (c == 'x' || c == 'X') {
-        return new Integer(parseInt(string.substring(2), 0x10));
-      }
-      return new Integer(parseInt(string, 010));
-    } else if (string.startsWith("#")) {
-      return new Integer(parseInt(string.substring(1), 0x10));
+  public static Integer decode(String nm) {
+    int radix = 10;
+    int index = 0;
+    boolean negative = false;
+    int result;
+    if (nm.isEmpty()) {
+      throw new NumberFormatException("Zero length string");
     }
-    return new Integer(parseInt(string, 10));
+    char firstChar = nm.charAt(0);
+    if (firstChar == '-') {
+      negative = true;
+      index++;
+    } else if (firstChar == '+') {
+      index++;
+    }
+    if (nm.startsWith("0x", index) || nm.startsWith("0X", index)) {
+      index += 2;
+      radix = 16;
+    } else if (nm.startsWith("#", index)) {
+      index++;
+      radix = 16;
+    } else if (nm.startsWith("0", index) && nm.length() > 1 + index) {
+      index++;
+      radix = 8;
+    }
+    if (nm.startsWith("-", index) || nm.startsWith("+", index)) {
+      throw new NumberFormatException("Sign character in wrong position");
+    }
+    try {
+      result = parseInt(nm.substring(index), radix);
+      result = negative ? -result : result;
+    } catch (NumberFormatException e) {
+      String constant = negative ? ("-" + nm.substring(index)) : nm.substring(index);
+      result = parseInt(constant, radix);
+    }
+    return Integer.valueOf(result);
   }
 
   public static int numberOfLeadingZeros(int i) {
@@ -369,5 +390,32 @@ public final class Integer extends Number implements Comparable<Integer>,
   public Integer resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
     return this;
   }
-}
 
+  public static Integer valueOf(String s, int radix) throws NumberFormatException {
+    return Integer.valueOf(parseInt(s, radix));
+  }
+
+  public static Integer getInteger(String nm) {
+    return getInteger(nm, null);
+  }
+
+  public static Integer getInteger(String nm, int val) {
+    Integer result = getInteger(nm, null);
+    return result == null ? Integer.valueOf(val) : result;
+  }
+
+  public static Integer getInteger(String nm, Integer val) {
+    String v = null;
+    try {
+      v = System.getProperty(nm);
+    } catch (IllegalArgumentException | NullPointerException e) {
+    }
+    if (v != null) {
+      try {
+        return Integer.decode(v);
+      } catch (NumberFormatException e) {
+      }
+    }
+    return val;
+  }
+}

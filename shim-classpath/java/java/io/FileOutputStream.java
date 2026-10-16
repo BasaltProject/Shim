@@ -36,21 +36,29 @@ public class FileOutputStream extends OutputStream {
     this.fd = fd.value;
   }
 
-  public FileOutputStream(String path) throws IOException {
+  public FileOutputStream(String path) throws FileNotFoundException {
     this(path, false);
   }
 
-  public FileOutputStream(String path, boolean append) throws IOException {
+  public FileOutputStream(String path, boolean append) throws FileNotFoundException {
     this.path = path;
     this.append = append;
-    fd = open(path, append);
+    try {
+      fd = open(path, append);
+    } catch (FileNotFoundException e) {
+      throw e;
+    } catch (IOException e) {
+      FileNotFoundException notFound = new FileNotFoundException(e.getMessage());
+      notFound.initCause(e);
+      throw notFound;
+    }
   }
 
-  public FileOutputStream(File file) throws IOException {
+  public FileOutputStream(File file) throws FileNotFoundException {
     this(file.getPath());
   }
 
-  public FileOutputStream(File file, boolean append) throws IOException {
+  public FileOutputStream(File file, boolean append) throws FileNotFoundException {
     this(file.getPath(), append);
   }
 

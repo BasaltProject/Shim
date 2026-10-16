@@ -168,4 +168,36 @@ public final class Double extends Number implements Comparable<Double>,
   public Double resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
     return this;
   }
+
+  public static String toHexString(double d) {
+    if (isNaN(d) || isInfinite(d)) {
+      return toString(d);
+    }
+    StringBuilder answer = new StringBuilder(24);
+    if (Math.copySign(1.0, d) == -1.0) {
+      answer.append("-");
+    }
+    answer.append("0x");
+    d = Math.abs(d);
+    if (d == 0.0) {
+      answer.append("0.0p0");
+    } else {
+      boolean subnormal = d < MIN_NORMAL;
+      long significand = (doubleToLongBits(d) & 0x000FFFFFFFFFFFFFL) | 0x8000000000000000L;
+      answer.append(subnormal ? "0." : "1.");
+      String digits = Long.toHexString(significand).substring(3, 16);
+      if (digits.equals("0000000000000")) {
+        answer.append("0");
+      } else {
+        int end = digits.length();
+        while (end > 1 && digits.charAt(end - 1) == '0') {
+          --end;
+        }
+        answer.append(digits, 0, end);
+      }
+      answer.append('p');
+      answer.append(subnormal ? MIN_EXPONENT : Math.getExponent(d));
+    }
+    return answer.toString();
+  }
 }

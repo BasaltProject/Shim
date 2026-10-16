@@ -95,6 +95,42 @@ public final class String
     this(data, offset, length, true);
   }
 
+  public String(StringBuilder builder) {
+    this(builder.toString());
+  }
+
+  public String(StringBuffer buffer) {
+    this(buffer.toString());
+  }
+
+  public String(int[] codePoints, int offset, int count) {
+    this(codePointChars(codePoints, offset, count));
+  }
+
+  @Deprecated
+  public String(byte[] ascii, int hibyte) {
+    this(ascii, hibyte, 0, ascii.length);
+  }
+
+  private static char[] codePointChars(int[] codePoints, int offset, int count) {
+    if (offset < 0 || count < 0 || offset > codePoints.length - count) {
+      throw new StringIndexOutOfBoundsException("offset " + offset + ", count " + count + ", length "
+                                                + codePoints.length);
+    }
+    int length = 0;
+    for (int i = offset; i < offset + count; ++i) {
+      int c = codePoints[i];
+      if (!Character.isValidCodePoint(c)) throw new IllegalArgumentException(Integer.toString(c));
+      length += Character.charCount(c);
+    }
+    char[] result = new char[length];
+    int position = 0;
+    for (int i = offset; i < offset + count; ++i) {
+      position += Character.toChars(codePoints[i], result, position);
+    }
+    return result;
+  }
+
   public String(byte[] data) {
     this(data, 0, data.length);
   }
@@ -438,11 +474,15 @@ public final class String
   }
 
   public boolean startsWith(String s, int start) {
-    if (length >= s.length + start) {
-      return substring(start, s.length).compareTo(s) == 0;
-    } else {
+    if (start < 0 || start > length - s.length) {
       return false;
     }
+    for (int i = 0; i < s.length; ++i) {
+      if (charAt(start + i) != s.charAt(i)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public boolean endsWith(String s) {
@@ -1052,5 +1092,89 @@ public final class String
   @Override
   public String resolveConstantDesc(java.lang.invoke.MethodHandles.Lookup lookup) {
     return this;
+  }
+
+  private void checkBoundsBeginEnd(int begin, int end) {
+    if (begin < 0 || begin > end || end > length) {
+      throw new StringIndexOutOfBoundsException("begin " + begin + ", end " + end + ", length " + length);
+    }
+  }
+
+  public int indexOf(int ch, int beginIndex, int endIndex) {
+    checkBoundsBeginEnd(beginIndex, endIndex);
+    if (ch < Character.MIN_SUPPLEMENTARY_CODE_POINT) {
+      for (int i = beginIndex; i < endIndex; ++i) {
+        if (charAt(i) == ch) return i;
+      }
+      return -1;
+    }
+    if (!Character.isValidCodePoint(ch)) return -1;
+    char high = Character.highSurrogate(ch);
+    char low = Character.lowSurrogate(ch);
+    for (int i = beginIndex; i < endIndex - 1; ++i) {
+      if (charAt(i) == high && charAt(i + 1) == low) return i;
+    }
+    return -1;
+  }
+
+  public int indexOf(String str, int beginIndex, int endIndex) {
+    checkBoundsBeginEnd(beginIndex, endIndex);
+    if (str.length == 0) return beginIndex;
+    for (int i = beginIndex; i <= endIndex - str.length; ++i) {
+      if (startsWith(str, i)) return i;
+    }
+    return -1;
+  }
+
+  public int offsetByCodePoints(int index, int codePointOffset) {
+    return Character.offsetByCodePoints(this, index, codePointOffset);
+  }
+
+  public boolean contentEquals(CharSequence cs) {
+    if (cs.length() != length) return false;
+    for (int i = 0; i < length; ++i) {
+      if (charAt(i) != cs.charAt(i)) return false;
+    }
+    return true;
+  }
+
+  public boolean contentEquals(StringBuffer buffer) {
+    return contentEquals((CharSequence) buffer);
+  }
+
+  public static String copyValueOf(char[] data, int offset, int count) {
+    return valueOf(data, offset, count);
+  }
+
+  public static String copyValueOf(char[] data) {
+    return valueOf(data);
+  }
+
+  public String[] splitWithDelimiters(String regex, int limit) {
+    java.util.regex.Matcher matcher = Pattern.compile(regex).matcher(this);
+    boolean limited = limit > 0;
+    java.util.ArrayList<String> parts = new java.util.ArrayList<String>();
+    int index = 0;
+    int matches = 0;
+    while (matcher.find()) {
+      if (!limited || matches < limit - 1) {
+        if (index == 0 && matcher.start() == 0 && matcher.end() == 0) continue;
+        parts.add(substring(index, matcher.start()));
+        index = matcher.end();
+        parts.add(substring(matcher.start(), index));
+        ++matches;
+      } else if (matches == limit - 1) {
+        parts.add(substring(index, length));
+        index = matcher.end();
+        ++matches;
+      }
+    }
+    if (index == 0) return new String[] {this};
+    if (!limited || matches < limit) parts.add(substring(index, length));
+    int size = parts.size();
+    if (limit == 0) {
+      while (size > 0 && parts.get(size - 1).isEmpty()) --size;
+    }
+    return parts.subList(0, size).toArray(new String[size]);
   }
 }

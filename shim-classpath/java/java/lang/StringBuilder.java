@@ -37,6 +37,10 @@ public class StringBuilder implements CharSequence, Appendable, Comparable<Strin
 
   public StringBuilder(int capacity) { }
 
+  public StringBuilder(CharSequence seq) {
+    append(seq);
+  }
+
   public StringBuilder() {
     this(0);
   }
@@ -429,6 +433,76 @@ public class StringBuilder implements CharSequence, Appendable, Comparable<Strin
     position = 0;
     length = 0;
     append(new String(c));
+    return this;
+  }
+
+  public StringBuilder appendCodePoint(int codePoint) {
+    if (!Character.isValidCodePoint(codePoint)) {
+      throw new IllegalArgumentException(String.format("Not a valid Unicode code point: 0x%X", codePoint));
+    }
+    return append(new String(Character.toChars(codePoint)));
+  }
+
+  public StringBuilder insert(int i, char[] chars) {
+    return insert(i, String.valueOf(chars));
+  }
+
+  public StringBuilder insert(int i, char[] chars, int offset, int length) {
+    if (offset < 0 || length < 0 || offset > chars.length - length) {
+      throw new StringIndexOutOfBoundsException("offset " + offset + ", len " + length + ", str.length " + chars.length);
+    }
+    return insert(i, new String(chars, offset, length));
+  }
+
+  public StringBuilder insert(int i, CharSequence seq, int start, int end) {
+    if (seq == null) {
+      seq = "null";
+    }
+    if (start < 0 || end < 0 || start > end || end > seq.length()) {
+      throw new IndexOutOfBoundsException("start " + start + ", end " + end + ", length " + seq.length());
+    }
+    return insert(i, seq.subSequence(start, end).toString());
+  }
+
+  public StringBuilder insert(int i, Object o) {
+    return insert(i, String.valueOf(o));
+  }
+
+  public StringBuilder insert(int i, boolean v) {
+    return insert(i, String.valueOf(v));
+  }
+
+  public StringBuilder insert(int i, long v) {
+    return insert(i, String.valueOf(v));
+  }
+
+  public StringBuilder insert(int i, float v) {
+    return insert(i, String.valueOf(v));
+  }
+
+  public StringBuilder insert(int i, double v) {
+    return insert(i, String.valueOf(v));
+  }
+
+  public StringBuilder repeat(int codePoint, int count) {
+    if (count < 0) {
+      throw new IllegalArgumentException("count is negative: " + count);
+    }
+    String text = new String(Character.toChars(codePoint));
+    for (int k = 0; k < count; ++k) {
+      append(text);
+    }
+    return this;
+  }
+
+  public StringBuilder repeat(CharSequence seq, int count) {
+    if (count < 0) {
+      throw new IllegalArgumentException("count is negative: " + count);
+    }
+    String text = String.valueOf(seq);
+    for (int k = 0; k < count; ++k) {
+      append(text);
+    }
     return this;
   }
 }

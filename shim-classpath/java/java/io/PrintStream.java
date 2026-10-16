@@ -26,7 +26,7 @@ package java.io;
 import java.nio.charset.Charset;
 import java.util.Objects;
 
-public class PrintStream extends OutputStream {
+public class PrintStream extends OutputStream implements Appendable {
   private final OutputStream out;
   private final boolean autoFlush;
 
@@ -228,5 +228,22 @@ public class PrintStream extends OutputStream {
     try {
       out.close();
     } catch (IOException e) { }
+  }
+
+  public PrintStream append(CharSequence csq) {
+    print(String.valueOf(csq));
+    return this;
+  }
+
+  public PrintStream append(CharSequence csq, int start, int end) {
+    if (csq == null) {
+      csq = "null";
+    }
+    return append(csq.subSequence(start, end));
+  }
+
+  public PrintStream append(char c) {
+    print(c);
+    return this;
   }
 }

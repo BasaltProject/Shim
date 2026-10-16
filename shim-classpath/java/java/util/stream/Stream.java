@@ -327,4 +327,40 @@ public interface Stream<T> extends BaseStream<T, Stream<T>> {
         a.isParallel() || b.isParallel());
     return stream.onClose(a::close).onClose(b::close);
   }
+
+  default <R> Stream<R> mapMulti(java.util.function.BiConsumer<? super T, ? super java.util.function.Consumer<R>> mapper) {
+    java.util.Objects.requireNonNull(mapper);
+    return flatMap(e -> {
+      Stream.Builder<R> buffer = Stream.builder();
+      mapper.accept(e, (java.util.function.Consumer<R>) buffer);
+      return buffer.build();
+    });
+  }
+
+  default IntStream mapMultiToInt(java.util.function.BiConsumer<? super T, ? super java.util.function.IntConsumer> mapper) {
+    java.util.Objects.requireNonNull(mapper);
+    return flatMapToInt(e -> {
+      IntStream.Builder buffer = IntStream.builder();
+      mapper.accept(e, buffer);
+      return buffer.build();
+    });
+  }
+
+  default LongStream mapMultiToLong(java.util.function.BiConsumer<? super T, ? super java.util.function.LongConsumer> mapper) {
+    java.util.Objects.requireNonNull(mapper);
+    return flatMapToLong(e -> {
+      LongStream.Builder buffer = LongStream.builder();
+      mapper.accept(e, buffer);
+      return buffer.build();
+    });
+  }
+
+  default DoubleStream mapMultiToDouble(java.util.function.BiConsumer<? super T, ? super java.util.function.DoubleConsumer> mapper) {
+    java.util.Objects.requireNonNull(mapper);
+    return flatMapToDouble(e -> {
+      DoubleStream.Builder buffer = DoubleStream.builder();
+      mapper.accept(e, buffer);
+      return buffer.build();
+    });
+  }
 }
