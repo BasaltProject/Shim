@@ -73,6 +73,38 @@ public final class GetInstance {
     return Providers.list();
   }
 
+  public static java.util.Iterator<Service> getServices(String type, String algorithm) {
+    List<Service> found = new java.util.ArrayList<Service>();
+    if (algorithm == null) {
+      return found.iterator();
+    }
+    for (Provider p : Providers.list()) {
+      Service s = p.getService(type, algorithm);
+      if (s != null) {
+        found.add(s);
+      }
+    }
+    return found.iterator();
+  }
+
+  public static java.util.Iterator<Service> getServices(String type, String algorithm, Provider provider) {
+    List<Service> found = new java.util.ArrayList<Service>();
+    Service s = provider.getService(type, algorithm);
+    if (s != null) {
+      found.add(s);
+    }
+    return found.iterator();
+  }
+
+  public static java.util.Iterator<Service> getServices(String type, String algorithm, String provider)
+      throws NoSuchProviderException {
+    Provider p = Providers.named(provider);
+    if (p == null) {
+      throw new NoSuchProviderException("no such provider: " + provider);
+    }
+    return getServices(type, algorithm, p);
+  }
+
   public static Instance getInstance(String type, Class<?> clazz, String algorithm) throws NoSuchAlgorithmException {
     if (algorithm == null) {
       throw new NoSuchAlgorithmException("null algorithm name");

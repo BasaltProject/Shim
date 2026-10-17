@@ -8,9 +8,8 @@
 
 package java.security;
 
-import java.io.Serializable;
-
-public interface Key extends Serializable {
+public interface Key extends java.io.Serializable {
+  @Deprecated
   long serialVersionUID = 6603384152749567654L;
 
   String getAlgorithm();

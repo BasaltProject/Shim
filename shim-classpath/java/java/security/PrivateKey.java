@@ -8,6 +8,7 @@
 
 package java.security;
 
-public interface PrivateKey extends Key {
+public interface PrivateKey extends AsymmetricKey, javax.security.auth.Destroyable {
+  @Deprecated
   long serialVersionUID = 6034044314589513430L;
 }
