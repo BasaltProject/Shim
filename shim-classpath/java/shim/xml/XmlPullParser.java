@@ -70,6 +70,7 @@ public final class XmlPullParser {
     public String local;
     public String prefix = "";
     public String[] nsDecls;
+    public String literal;
   }
 
   private static final int kXmlDecl = 5;
@@ -505,6 +506,9 @@ public final class XmlPullParser {
         return startElement();
       }
       sc.read();
+      if (sc.peek() < 0) {
+        throw error(XmlMessages.kMarkupEntityMismatch);
+      }
       throw error(XmlMessages.kMarkupNotRecognizedInContent);
     }
     if (c == '&' && sc.peek(1) != '#') {

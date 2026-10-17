@@ -29,6 +29,7 @@ public final class XmlInput {
   public final String publicId;
   public final String baseUri;
   public String encodingProblem;
+  public String encodingName;
   public boolean encodingInvalidName;
 
   public XmlInput(Reader reader, String systemId, String publicId, String baseUri) {
@@ -55,6 +56,9 @@ public final class XmlInput {
     }
     Reader decoded = decode(bytes, encoding);
     XmlInput result = new XmlInput(decoded, expanded, source.getPublicId(), expanded);
+    if (decoded instanceof Pending) {
+      result.encodingName = ((Pending) decoded).name;
+    }
     if (decoded instanceof Pending && ((Pending) decoded).problem != null) {
       result.encodingProblem = ((Pending) decoded).problem;
       result.encodingInvalidName = ((Pending) decoded).invalid;
@@ -206,6 +210,7 @@ public final class XmlInput {
       reader = new InputStreamReader(in, cs);
     }
     Pending pending = new Pending(reader, problem, invalid);
+    pending.name = cs.name();
     return pending;
   }
 
@@ -213,6 +218,7 @@ public final class XmlInput {
     final Reader delegate;
     final String problem;
     final boolean invalid;
+    String name;
 
     Pending(Reader delegate, String problem, boolean invalid) {
       this.delegate = delegate;

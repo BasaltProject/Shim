@@ -747,6 +747,7 @@ final class XmlDtdScanner {
     String reported = parameter ? "%" + name : name;
     if (decl.notation != null) {
       XmlPullParser.Ev e = ev(XmlPullParser.kUnparsedEntityDecl);
+      e.literal = decl.systemId;
       e.a = reported;
       e.b = decl.publicId;
       e.c = decl.expandedSystemId;
@@ -754,6 +755,7 @@ final class XmlDtdScanner {
       emit(e);
     } else if (decl.external) {
       XmlPullParser.Ev e = ev(XmlPullParser.kExternalEntityDecl);
+      e.literal = decl.systemId;
       e.a = reported;
       e.b = decl.publicId;
       e.c = decl.expandedSystemId;
@@ -867,6 +869,7 @@ final class XmlDtdScanner {
     decl.expandedSystemId = ids[1] == null ? null : XmlInput.expandDecl(ids[1], sc.baseUri());
     dtd.notations.put(name, decl);
     XmlPullParser.Ev e = ev(XmlPullParser.kNotationDecl);
+    e.literal = ids[1];
     e.a = name;
     e.b = ids[0];
     e.c = decl.expandedSystemId;
