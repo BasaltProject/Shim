@@ -245,7 +245,6 @@ public class SecureRandom extends Random {
         }
         return SecureRandom.getInstance(algName, prov);
       } catch (NoSuchAlgorithmException | NoSuchProviderException e) {
-        // try next
       }
     }
     throw new NoSuchAlgorithmException("No strong SecureRandom impls available: " + property);

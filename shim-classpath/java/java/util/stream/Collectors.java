@@ -659,8 +659,10 @@ public final class Collectors {
     Objects.requireNonNull(merger, "merger");
     Supplier<A1> c1Supplier = Objects.requireNonNull(downstream1.supplier(), "downstream1 supplier");
     Supplier<A2> c2Supplier = Objects.requireNonNull(downstream2.supplier(), "downstream2 supplier");
-    BiConsumer<A1, ? super T> c1Accumulator = Objects.requireNonNull(downstream1.accumulator(), "downstream1 accumulator");
-    BiConsumer<A2, ? super T> c2Accumulator = Objects.requireNonNull(downstream2.accumulator(), "downstream2 accumulator");
+    BiConsumer<A1, ? super T> c1Accumulator = Objects.requireNonNull(downstream1.accumulator(),
+        "downstream1 accumulator");
+    BiConsumer<A2, ? super T> c2Accumulator = Objects.requireNonNull(downstream2.accumulator(),
+        "downstream2 accumulator");
     BinaryOperator<A1> c1Combiner = Objects.requireNonNull(downstream1.combiner(), "downstream1 combiner");
     BinaryOperator<A2> c2Combiner = Objects.requireNonNull(downstream2.combiner(), "downstream2 combiner");
     Function<A1, R1> c1Finisher = Objects.requireNonNull(downstream1.finisher(), "downstream1 finisher");

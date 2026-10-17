@@ -49,14 +49,12 @@ public class DomModern {
       p("tagname", () -> d.getElementsByTagName("*").getLength() + "|" + d.getElementsByTagName("a").getLength() + "|" + d.getElementsByTagNameNS("u", "b").getLength() + "|" + d.getElementsByTagNameNS("*", "*").getLength() + "|" + d.getElementsByTagNameNS(null, "c").getLength());
       p("textcontent", () -> d.getDocumentElement().getTextContent() + "|" + d.getTextContent() + "|" + d.getDoctype().getTextContent() + "|" + d.getFirstChild().getTextContent());
     }
-    // modes
     String doc2 = "<!DOCTYPE a [<!ELEMENT a (b)*><!ELEMENT b EMPTY><!ENTITY e \"t<b/>u\">]><a><!--c--> <b/> <![CDATA[x]]>y&e;</a>";
     for (int mode = 0; mode < 6; mode++) {
       final int m = mode;
       Document d = parse(doc2, m % 2 == 1, m >= 2 && m < 4, m >= 2 && m < 4, m >= 2 && m < 4, m < 4);
       System.out.println("== doc2 mode=" + m); System.out.print(dump(d.getDocumentElement()));
     }
-    // factory methods
     Document d = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
     p("new doc", () -> d + "|" + d.getXmlVersion() + "|" + d.getXmlStandalone() + "|" + d.getInputEncoding() + "|" + d.getXmlEncoding() + "|" + d.getDocumentURI() + "|" + d.getDoctype() + "|" + d.getDocumentElement() + "|" + d.getBaseURI() + "|" + d.getStrictErrorChecking());
     String[] names = {"a", "a:b", "1a", "a b", "", "a:b:c", ":a", "a:", "xml:a", "xmlns", "xmlns:a", "_a", "a.b-c", "\u00e9", "a\u0300"};
@@ -73,7 +71,6 @@ public class DomModern {
     p("createText", () -> d.createTextNode("t") + "|" + d.createTextNode(null) + "|" + d.createComment("c") + "|" + d.createCDATASection("cd") + "|" + d.createDocumentFragment());
     p("createText null", () -> { Text t = d.createTextNode(null); return t.getData() + "|" + t.getLength(); });
     p("owner", () -> d.createElement("a").getOwnerDocument() == d);
-    // implementation
     DOMImplementation impl = d.getImplementation();
     String[] feats = {"Core", "XML", "XMLVersion", "Events", "Traversal", "Range", "LS", "LS-Async", "Views", "ElementTraversal", "+Core", "core", "xml", "Foo", ""};
     String[] vers = {null, "", "1.0", "2.0", "3.0", "1.1", "4.0"};
@@ -87,7 +84,6 @@ public class DomModern {
     p("createDocument bad ns", () -> impl.createDocument(null, "p:r", null));
     p("createDocument dt owned", () -> { DocumentType t = impl.createDocumentType("r", null, null); impl.createDocument(null, "r", t); return impl.createDocument(null, "r", t); });
     p("createDocument bad name", () -> impl.createDocument("u", "1a", null));
-    // traversal / structure
     Document s = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
     Element root = s.createElement("root");
     p("append root", () -> s.appendChild(root));

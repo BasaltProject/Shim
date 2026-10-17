@@ -42,7 +42,6 @@ public abstract class X509CRLEntry implements X509Extension {
         retval += entryData[i] * i;
       }
     } catch (CRLException ce) {
-      // ignore
     }
     return retval;
   }

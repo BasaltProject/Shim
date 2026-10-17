@@ -411,7 +411,8 @@ public final class EdDSA {
     }
 
     @Override
-    public void initialize(AlgorithmParameterSpec params, SecureRandom random) throws InvalidAlgorithmParameterException {
+    public void initialize(AlgorithmParameterSpec params, SecureRandom random)
+        throws InvalidAlgorithmParameterException {
       Curve c = curveOf(params);
       if (fixed && c != curve) {
         throw new InvalidAlgorithmParameterException("Parameters must be " + curve.name);

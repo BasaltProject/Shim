@@ -254,17 +254,21 @@ public class MethodHandles {
     Objects.requireNonNull(cleanup, "cleanup");
     Class<?> rtype = target.type().returnType();
     if (cleanup.type().returnType() != rtype) {
-      throw new IllegalArgumentException("cleanup return type must match target return type: " + cleanup.type().returnType() + " != " + rtype);
+      throw new IllegalArgumentException("cleanup return type must match target return type: "
+          + cleanup.type().returnType() + " != " + rtype);
     }
     int minCleanupParams = (rtype == void.class) ? 1 : 2;
     if (cleanup.type().parameterCount() < minCleanupParams) {
-      throw new IllegalArgumentException("cleanup must accept at least (" + (rtype == void.class ? "Throwable" : "Throwable, " + rtype) + ")");
+      throw new IllegalArgumentException("cleanup must accept at least (" + (rtype == void.class ? "Throwable"
+          : "Throwable, " + rtype) + ")");
     }
     if (!Throwable.class.isAssignableFrom(cleanup.type().parameterType(0))) {
-      throw new IllegalArgumentException("cleanup first parameter must be Throwable: " + cleanup.type().parameterType(0));
+      throw new IllegalArgumentException("cleanup first parameter must be Throwable: "
+          + cleanup.type().parameterType(0));
     }
     if (rtype != void.class && cleanup.type().parameterType(1) != rtype) {
-      throw new IllegalArgumentException("cleanup second parameter must be " + rtype + ": " + cleanup.type().parameterType(1));
+      throw new IllegalArgumentException("cleanup second parameter must be " + rtype + ": "
+          + cleanup.type().parameterType(1));
     }
     return new MethodHandle.TryFinallyMethodHandle(target, cleanup);
   }
@@ -277,7 +281,8 @@ public class MethodHandles {
     }
     Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
     if (body.type().returnType() != varType) {
-      throw new IllegalArgumentException("body return type must match varType: " + body.type().returnType() + " != " + varType);
+      throw new IllegalArgumentException("body return type must match varType: " + body.type().returnType() + " != "
+          + varType);
     }
     MethodType type;
     if (init != null) {
@@ -298,7 +303,8 @@ public class MethodHandles {
     }
     Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
     if (body.type().returnType() != varType) {
-      throw new IllegalArgumentException("body return type must match varType: " + body.type().returnType() + " != " + varType);
+      throw new IllegalArgumentException("body return type must match varType: " + body.type().returnType() + " != "
+          + varType);
     }
     MethodType type;
     if (init != null) {
@@ -648,7 +654,8 @@ public class MethodHandles {
         }
       }
       if (!allowed) {
-        throw new IllegalAccessException("no access to " + what + " in " + declaring.getName() + " from " + from.getName());
+        throw new IllegalAccessException("no access to " + what + " in " + declaring.getName() + " from "
+            + from.getName());
       }
     }
 
@@ -908,11 +915,13 @@ public class MethodHandles {
       STRONG
     }
 
-    public Lookup defineHiddenClass(byte[] bytes, boolean initialize, ClassOption... options) throws IllegalAccessException {
+    public Lookup defineHiddenClass(byte[] bytes, boolean initialize, ClassOption... options)
+        throws IllegalAccessException {
       return defineHiddenClass0(bytes, null, initialize, options);
     }
 
-    public Lookup defineHiddenClassWithClassData(byte[] bytes, Object classData, boolean initialize, ClassOption... options)
+    public Lookup defineHiddenClassWithClassData(byte[] bytes, Object classData, boolean initialize,
+        ClassOption... options)
         throws IllegalAccessException {
       Objects.requireNonNull(classData, "classData");
       return defineHiddenClass0(bytes, classData, initialize, options);

@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 21
 import java.io.FileOutputStream;
 
 public class EmojiProperties {

@@ -11,7 +11,8 @@ package javax.management;
 public interface DynamicMBean {
   Object getAttribute(String p0) throws AttributeNotFoundException, MBeanException, ReflectionException;
 
-  void setAttribute(Attribute p0) throws AttributeNotFoundException, InvalidAttributeValueException, MBeanException, ReflectionException;
+  void setAttribute(Attribute p0) throws AttributeNotFoundException, InvalidAttributeValueException, MBeanException,
+      ReflectionException;
 
   AttributeList getAttributes(String[] p0);
 

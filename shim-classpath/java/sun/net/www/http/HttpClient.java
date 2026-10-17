@@ -198,7 +198,6 @@ public class HttpClient {
         serverSocket.close();
       }
     } catch (IOException e) {
-      // already closed
     }
     serverSocket = null;
   }

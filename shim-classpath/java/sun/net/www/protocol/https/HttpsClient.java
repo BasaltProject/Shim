@@ -77,7 +77,8 @@ final class HttpsClient extends HttpClient {
       doTunnel(host, port);
     }
     SSLSocket s = (SSLSocket) sslSocketFactory.createSocket(serverSocket, host, port, true);
-    boolean defaultVerifier = hv == null || hv.getClass().getName().endsWith("HttpsURLConnection$DefaultHostnameVerifier");
+    boolean defaultVerifier = hv == null
+        || hv.getClass().getName().endsWith("HttpsURLConnection$DefaultHostnameVerifier");
     boolean needToCheckSpoofing = true;
     if (defaultVerifier) {
       SSLParameters parameters = s.getSSLParameters();

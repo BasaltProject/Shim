@@ -63,7 +63,8 @@ public class BatchUpdateException extends SQLException {
   public BatchUpdateException(String reason, String SQLState, int vendorCode, long[] longUpdateCounts,
                               Throwable cause) {
     super(reason, SQLState, vendorCode, cause);
-    this.longUpdateCounts = (longUpdateCounts == null) ? null : Arrays.copyOf(longUpdateCounts, longUpdateCounts.length);
+    this.longUpdateCounts = (longUpdateCounts == null) ? null : Arrays.copyOf(longUpdateCounts,
+        longUpdateCounts.length);
     this.updateCounts = (longUpdateCounts == null) ? null : copyUpdateCount(longUpdateCounts);
   }
 

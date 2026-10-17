@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 17
 
 import java.util.*;
 import java.util.concurrent.*;

@@ -336,7 +336,8 @@ public class HttpsURLConnectionImpl extends HttpsURLConnection {
 
   @Override
   public boolean equals(Object obj) {
-    return this == obj || (obj instanceof HttpsURLConnectionImpl && delegate == ((HttpsURLConnectionImpl) obj).delegate);
+    return this == obj || (obj instanceof HttpsURLConnectionImpl
+        && delegate == ((HttpsURLConnectionImpl) obj).delegate);
   }
 
   @Override

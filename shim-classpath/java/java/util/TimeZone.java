@@ -105,9 +105,11 @@ public abstract class TimeZone implements Serializable, Cloneable {
     }
     switch (id) {
       case "EST":
-        return style == SHORT ? (daylight ? "EDT" : "EST") : (daylight ? "Eastern Daylight Time" : "Eastern Standard Time");
+        return style == SHORT ? (daylight ? "EDT" : "EST") : (daylight ? "Eastern Daylight Time"
+            : "Eastern Standard Time");
       case "MST":
-        return style == SHORT ? (daylight ? "MDT" : "MST") : (daylight ? "Mountain Daylight Time" : "Mountain Standard Time");
+        return style == SHORT ? (daylight ? "MDT" : "MST") : (daylight ? "Mountain Daylight Time"
+            : "Mountain Standard Time");
       case "HST":
         return style == SHORT ? (daylight ? "HDT" : "HST")
             : (daylight ? "Hawaii-Aleutian Daylight Time" : "Hawaii-Aleutian Standard Time");

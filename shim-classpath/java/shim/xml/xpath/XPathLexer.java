@@ -73,7 +73,8 @@ final class XPathLexer {
         }
         out.add(new Tok(kLiteral, s.substring(i, end + 1), null, s.substring(i + 1, end)));
         i = end + 1;
-      } else if ((ch >= '0' && ch <= '9') || (ch == '.' && i + 1 < n && s.charAt(i + 1) >= '0' && s.charAt(i + 1) <= '9')) {
+      } else if ((ch >= '0' && ch <= '9') || (ch == '.' && i + 1 < n && s.charAt(i + 1) >= '0' && s.charAt(i
+          + 1) <= '9')) {
         int j = i;
         int dots = 0;
         while (j < n && (s.charAt(j) >= '0' && s.charAt(j) <= '9' || s.charAt(j) == '.')) {

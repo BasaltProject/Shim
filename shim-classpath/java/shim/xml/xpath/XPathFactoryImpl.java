@@ -32,7 +32,8 @@ public final class XPathFactoryImpl extends XPathFactory {
 
   public void setFeature(String name, boolean value) throws XPathFactoryConfigurationException {
     if (name == null) {
-      throw new NullPointerException("Trying to set a feature with a null name: XPathFactoryImpl#setFeature( null, " + value + ")");
+      throw new NullPointerException("Trying to set a feature with a null name: XPathFactoryImpl#setFeature( null, "
+          + value + ")");
     }
     if (name.equals(XMLConstants.FEATURE_SECURE_PROCESSING)) {
       secure = value;

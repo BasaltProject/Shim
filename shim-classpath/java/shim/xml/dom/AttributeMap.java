@@ -62,7 +62,8 @@ public class AttributeMap extends NamedNodeMapImpl {
     if (attr.ownerElement != null && attr.ownerElement != ownerNode) {
       throw DomMessages.error(DOMException.INUSE_ATTRIBUTE_ERR);
     }
-    int i = attr.getLocalName() == null ? findName(attr.getNodeName()) : findNs(attr.getNamespaceURI(), attr.getLocalName());
+    int i = attr.getLocalName() == null ? findName(attr.getNodeName()) : findNs(attr.getNamespaceURI(),
+        attr.getLocalName());
     if (i >= 0) {
       AttrImpl previous = (AttrImpl) nodes.get(i);
       if (previous == attr) {

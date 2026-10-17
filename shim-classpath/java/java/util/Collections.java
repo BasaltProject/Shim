@@ -1073,7 +1073,8 @@ public class Collections {
       throw new UnsupportedOperationException();
     }
 
-    public V computeIfPresent(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    public V computeIfPresent(K key, java.util.function.BiFunction<? super K, ? super V,
+        ? extends V> remappingFunction) {
       throw new UnsupportedOperationException();
     }
 
@@ -1870,7 +1871,8 @@ public class Collections {
     @Override
     public Iterator<E> descendingIterator() { return emptyIterator(); }
     @Override
-    public NavigableSet<E> subSet(E fromElement, boolean fromInclusive, E toElement, boolean toInclusive) { return this; }
+    public NavigableSet<E> subSet(E fromElement, boolean fromInclusive, E toElement,
+        boolean toInclusive) { return this; }
     @Override
     public NavigableSet<E> headSet(E toElement, boolean inclusive) { return this; }
     @Override

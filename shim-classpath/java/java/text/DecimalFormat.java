@@ -99,12 +99,14 @@ public class DecimalFormat extends NumberFormat {
       number *= multiplier;
     }
     if (Double.isInfinite(number)) {
-      appendAffix(result, isNegative ? negativePrefix : positivePrefix, isNegative ? negPrefixPattern : posPrefixPattern);
+      appendAffix(result, isNegative ? negativePrefix : positivePrefix, isNegative ? negPrefixPattern
+          : posPrefixPattern);
       int start = result.length();
       result.append(symbols.getInfinity());
       markField(fieldPosition, INTEGER_FIELD, start, result.length());
       addSeg(NumberFormat.Field.INTEGER, start, result.length());
-      appendAffix(result, isNegative ? negativeSuffix : positiveSuffix, isNegative ? negSuffixPattern : posSuffixPattern);
+      appendAffix(result, isNegative ? negativeSuffix : positiveSuffix, isNegative ? negSuffixPattern
+          : posSuffixPattern);
       return result;
     }
     if (isNegative) {

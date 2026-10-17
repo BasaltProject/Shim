@@ -171,7 +171,8 @@ public class Throwable implements Serializable {
   }
 
   private void printStackTrace(StringBuilder sb, String nl) {
-    java.util.Set<Throwable> dejaVu = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+    java.util.Set<Throwable> dejaVu = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable,
+        Boolean>());
     dejaVu.add(this);
     sb.append(this).append(nl);
     StackTraceElement[] trace = resolveTrace();

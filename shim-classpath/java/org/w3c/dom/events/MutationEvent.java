@@ -23,5 +23,6 @@ public interface MutationEvent extends Event {
 
   short getAttrChange();
 
-  void initMutationEvent(String p0, boolean p1, boolean p2, org.w3c.dom.Node p3, String p4, String p5, String p6, short p7);
+  void initMutationEvent(String p0, boolean p1, boolean p2, org.w3c.dom.Node p3, String p4, String p5, String p6,
+      short p7);
 }

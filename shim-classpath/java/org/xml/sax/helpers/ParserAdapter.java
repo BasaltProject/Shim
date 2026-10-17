@@ -202,7 +202,6 @@ public class ParserAdapter implements XMLReader, DocumentHandler {
     nsSupport.pushContext();
     int length = qAtts.getLength();
     if (!prefixes) {
-      // attributes re-built below
     }
     for (int i = 0; i < length; i++) {
       String attQName = qAtts.getName(i);

@@ -225,7 +225,6 @@ public class MessageFormat extends Format {
       result.append('{').append(argumentNumbers[i]);
       Format fmt = formats[i];
       if (fmt == null) {
-        // plain string argument
       } else if (fmt instanceof NumberFormat) {
         if (fmt.equals(NumberFormat.getInstance(locale))) {
           result.append(",number");

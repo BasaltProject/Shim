@@ -442,7 +442,8 @@ public final class XmlPullParser {
         sc.read();
         break;
       }
-      if (!XmlChars.isValid(c) && !(Character.isHighSurrogate((char) c) && Character.isLowSurrogate((char) sc.peek(1)))) {
+      if (!XmlChars.isValid(c) && !(Character.isHighSurrogate((char) c)
+          && Character.isLowSurrogate((char) sc.peek(1)))) {
         throw error(XmlMessages.invalidChar("the comment", c));
       }
       sb.append((char) sc.read());
@@ -466,7 +467,6 @@ public final class XmlPullParser {
     }
     StringBuilder data = new StringBuilder();
     if (sc.skipString("?>")) {
-      // empty data
     } else {
       if (!sc.skipSpaces()) {
         if (sc.peek() < 0) {
@@ -484,7 +484,8 @@ public final class XmlPullParser {
           sc.read();
           break;
         }
-        if (!XmlChars.isValid(c) && !(Character.isHighSurrogate((char) c) && Character.isLowSurrogate((char) sc.peek(1)))) {
+        if (!XmlChars.isValid(c) && !(Character.isHighSurrogate((char) c)
+            && Character.isLowSurrogate((char) sc.peek(1)))) {
           throw error(XmlMessages.invalidChar("the processing instruction", c));
         }
         data.append((char) sc.read());
@@ -1090,14 +1091,16 @@ public final class XmlPullParser {
         String prefix = a.name.substring(0, ac);
         String uri = lookupPrefix(prefix);
         if (uri == null) {
-          throw error("The prefix \"" + prefix + "\" for attribute \"" + a.name + "\" associated with an element type \""
+          throw error("The prefix \"" + prefix + "\" for attribute \"" + a.name
+              + "\" associated with an element type \""
               + name + "\" is not bound.");
         }
         a.prefix = prefix;
         a.uri = uri;
         a.local = a.name.substring(ac + 1);
         if (!keys.add(uri + "\u0000" + a.local)) {
-          throw error("Attribute \"" + a.local + "\" bound to namespace \"" + uri + "\" was already specified for element \""
+          throw error("Attribute \"" + a.local + "\" bound to namespace \"" + uri
+              + "\" was already specified for element \""
               + name + "\".");
         }
       } else {
@@ -1248,7 +1251,8 @@ public final class XmlPullParser {
           sb.append((char) sc.read());
           continue;
         }
-        throw error(XmlMessages.invalidChar("the value of attribute \"" + attr + "\" and element is \"" + element + "\"", c));
+        throw error(XmlMessages.invalidChar("the value of attribute \"" + attr + "\" and element is \"" + element
+            + "\"", c));
       }
       sb.append((char) sc.read());
     }

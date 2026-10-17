@@ -162,7 +162,8 @@ public class Socket implements Closeable {
     }
     InetAddress addr = epoint.getAddress();
     if (addr.isAnyLocalAddress()) {
-      addr = addr instanceof Inet6Address ? InetAddress.getByAddress(new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1})
+      addr = addr instanceof Inet6Address ? InetAddress.getByAddress(new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 1})
           : InetAddress.getLoopbackAddress();
     }
     long h = net.begin();

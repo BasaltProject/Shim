@@ -75,10 +75,8 @@ public class EdwardsMontgomeryModern {
       XECPublicKey xp = (XECPublicKey) x.getPublic();
       PublicKey rt = kf.generatePublic(new XECPublicKeySpec(new NamedParameterSpec(n), xp.getU()));
       System.out.println(n + " pub " + rt.equals(xp) + " " + xp.getAlgorithm() + " " + xp.getFormat() + " " + H.formatHex(xp.getEncoded()).length());
-      // fixed vector from RFC 7748: derive public from k1, secret with k2's public
       KeyAgreement k = KeyAgreement.getInstance("XDH");
       k.init(a1);
-      // use base point as peer: u = 9 or 5 gives public key of a1
       k.doPhase(kf.generatePublic(new XECPublicKeySpec(new NamedParameterSpec(n), java.math.BigInteger.valueOf(n.equals("X25519") ? 9 : 5))), true);
       System.out.println(n + " pubfromk1 " + H.formatHex(k.generateSecret()));
       t(n + " small", () -> { KeyAgreement q = KeyAgreement.getInstance(n); q.init(a1); q.doPhase(kf.generatePublic(new XECPublicKeySpec(new NamedParameterSpec(n), java.math.BigInteger.ZERO)), true); return H.formatHex(q.generateSecret()); });

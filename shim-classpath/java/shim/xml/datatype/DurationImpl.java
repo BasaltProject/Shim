@@ -404,7 +404,8 @@ public final class DurationImpl extends Duration implements Serializable {
   private static void checkRange(Duration d, DatatypeConstants.Field field, BigInteger max, BigInteger min) {
     Number n = d.getField(field);
     if (n instanceof BigInteger && (((BigInteger) n).compareTo(max) > 0 || ((BigInteger) n).compareTo(min) < 0)) {
-      throw new UnsupportedOperationException("Value too large: " + d.getClass().getName() + "#compare(Duration duration)"
+      throw new UnsupportedOperationException("Value too large: " + d.getClass().getName()
+          + "#compare(Duration duration)"
           + field + " " + n);
     }
   }

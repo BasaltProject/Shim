@@ -216,7 +216,8 @@ public final class IDN {
       int w = 1;
       for (int k = kBase;; k += kBase) {
         char c = input.charAt(in++);
-        int d = c >= '0' && c <= '9' ? c - '0' + 26 : (c >= 'a' && c <= 'z' ? c - 'a' : (c >= 'A' && c <= 'Z' ? c - 'A' : -1));
+        int d = c >= '0' && c <= '9' ? c - '0' + 26 : (c >= 'a' && c <= 'z' ? c - 'a' : (c >= 'A' && c <= 'Z'
+            ? c - 'A' : -1));
         if (d < 0) {
           throw new IllegalArgumentException("bad input");
         }

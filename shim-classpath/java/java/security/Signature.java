@@ -63,7 +63,8 @@ public abstract class Signature extends SignatureSpi {
     return sig;
   }
 
-  private static final java.util.Map<String, Boolean> signatureInfo = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
+  private static final java.util.Map<String,
+      Boolean> signatureInfo = new java.util.concurrent.ConcurrentHashMap<String, Boolean>();
 
   private static boolean isSpi(Service s) {
     if (s.getType().equals("Cipher")) {

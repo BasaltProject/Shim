@@ -719,7 +719,8 @@ public class ObjectStreamClass implements Serializable {
         throw new InvalidClassException(model.isEnum ? "cannot bind enum descriptor to a non-enum class"
             : "cannot bind non-enum descriptor to an enum class");
       }
-      if (model.serializable == osc.serializable && !cl.isArray() && !cl.isRecord() && suid != osc.getSerialVersionUID()) {
+      if (model.serializable == osc.serializable && !cl.isArray() && !cl.isRecord()
+          && suid != osc.getSerialVersionUID()) {
         throw new InvalidClassException(osc.name, "local class incompatible: stream classdesc serialVersionUID = "
             + suid + ", local class serialVersionUID = " + osc.getSerialVersionUID());
       }
@@ -919,7 +920,6 @@ public class ObjectStreamClass implements Serializable {
     return d;
   }
 
-  /* ---- default serial version UID ---- */
 
   private static long computeDefaultSUID(Class<?> cl) {
     if (!Serializable.class.isAssignableFrom(cl) || java.lang.reflect.Proxy.isProxyClass(cl)) {

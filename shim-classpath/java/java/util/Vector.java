@@ -64,9 +64,11 @@ public class Vector<E> extends AbstractList<E> implements List<E>, RandomAccess,
 
   private Object[] grow(int minCapacity) {
     int oldCapacity = elementData.length;
-    int newCapacity = oldCapacity + Math.max(minCapacity - oldCapacity, capacityIncrement > 0 ? capacityIncrement : oldCapacity);
+    int newCapacity = oldCapacity + Math.max(minCapacity - oldCapacity, capacityIncrement > 0 ? capacityIncrement
+        : oldCapacity);
     if (newCapacity < 0) {
-      throw new OutOfMemoryError("Required array length " + oldCapacity + " + " + (minCapacity - oldCapacity) + " is too large");
+      throw new OutOfMemoryError("Required array length " + oldCapacity + " + " + (minCapacity - oldCapacity)
+          + " is too large");
     }
     return elementData = Arrays.copyOf(elementData, newCapacity);
   }

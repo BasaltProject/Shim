@@ -127,7 +127,6 @@ static class J1 {
     try { Subject.callAs(cs, () -> { throw new java.io.IOException("io"); }); } catch (Throwable t) { System.out.println("callAs " + fail(t) + " cause=" + t.getCause()); }
     System.out.println(Subject.doAs(cs, (PrivilegedAction<Boolean>) () -> Subject.current() == cs));
     try { Subject.doAs(cs, (PrivilegedExceptionAction<String>) () -> { throw new java.io.IOException("io2"); }); } catch (Throwable t) { System.out.println("doAs " + fail(t)); }
-    // callbacks
     String[] errs = new String[0];
     try { new NameCallback(""); } catch (Throwable t) { System.out.println("name " + fail(t)); }
     NameCallback nc = new NameCallback("user: ", "def"); nc.setName("n"); System.out.println(nc.getPrompt() + nc.getDefaultName() + nc.getName());
@@ -141,14 +140,12 @@ static class J1 {
     try { cf.setSelectedIndex(2); } catch (Throwable t) { System.out.println("confirm sel " + fail(t)); }
     TextInputCallback ti = new TextInputCallback("p", "d"); ti.setText("t"); System.out.println(ti.getPrompt() + ti.getDefaultText() + ti.getText());
     LanguageCallback lc0 = new LanguageCallback(); lc0.setLocale(Locale.FRANCE); System.out.println(lc0.getLocale());
-    // entries
     try { new AppConfigurationEntry("", AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, new HashMap<String, Object>()); } catch (Throwable t) { System.out.println("entry " + fail(t)); }
     try { new AppConfigurationEntry("x", null, new HashMap<String, Object>()); } catch (Throwable t) { System.out.println("entry2 " + fail(t)); }
     System.out.println(AppConfigurationEntry.LoginModuleControlFlag.REQUISITE + " " + AppConfigurationEntry.LoginModuleControlFlag.SUFFICIENT + " " + AppConfigurationEntry.LoginModuleControlFlag.OPTIONAL + " " + AppConfigurationEntry.LoginModuleControlFlag.REQUIRED);
     try { Configuration.getConfiguration(); } catch (Throwable t) { System.out.println("getConfiguration " + fail(t)); }
     try { new LoginContext("x"); } catch (Throwable t) { System.out.println("LoginContext default " + fail(t)); }
     System.out.println(new AuthPermission("createLoginContext").getName() + " " + new AuthPermission("modifyPrincipals").implies(new AuthPermission("modifyPrincipals")) + " " + new AuthPermission("createLoginContext.*").implies(new AuthPermission("createLoginContext.foo")));
-    // login contexts
     AppConfigurationEntry.LoginModuleControlFlag R = AppConfigurationEntry.LoginModuleControlFlag.REQUIRED, Q2 = AppConfigurationEntry.LoginModuleControlFlag.REQUISITE, S = AppConfigurationEntry.LoginModuleControlFlag.SUFFICIENT, O = AppConfigurationEntry.LoginModuleControlFlag.OPTIONAL;
     Map<String, AppConfigurationEntry[]> m = new HashMap<String, AppConfigurationEntry[]>();
     m.put("ok", new AppConfigurationEntry[]{e(R, "m1", "ok"), e(R, "m2", "ok")});

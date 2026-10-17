@@ -324,7 +324,6 @@ public class ObjectOutputStream extends OutputStream implements ObjectOutput, Ob
     putBytes(buf, 0, pos);
   }
 
-  /* ---- block data layer ---- */
 
   private void putByte(int b) throws IOException {
     if (blockPos >= kMaxBlock) {
@@ -390,7 +389,6 @@ public class ObjectOutputStream extends OutputStream implements ObjectOutput, Ob
     writeIntRaw((int) v);
   }
 
-  /* ---- object graph ---- */
 
   private void clear() {
     handles.clear();

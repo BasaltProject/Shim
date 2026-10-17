@@ -80,7 +80,8 @@ public class NamedNodeMapImpl implements NamedNodeMap, java.io.Serializable {
   }
 
   void checkWritable() {
-    if (ownerNode.ownerDocument != null && ownerNode.ownerDocument.errorChecking && (readOnlyMap || ownerNode.readOnly)) {
+    if (ownerNode.ownerDocument != null && ownerNode.ownerDocument.errorChecking && (readOnlyMap
+        || ownerNode.readOnly)) {
       throw DomMessages.error(DOMException.NO_MODIFICATION_ALLOWED_ERR);
     }
   }

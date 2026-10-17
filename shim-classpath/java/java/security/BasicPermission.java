@@ -132,7 +132,6 @@ final class BasicPermissionCollection extends PermissionCollection implements ja
     }
     BasicPermission bp = (BasicPermission) permission;
     if (permClass == null) {
-      // keeps the first class
     } else if (bp.getClass() != permClass) {
       throw new IllegalArgumentException("invalid permission: " + permission);
     }

@@ -249,7 +249,8 @@ public class GregorianCalendar extends Calendar {
 
   @Override
   public boolean equals(Object obj) {
-    return obj instanceof GregorianCalendar && super.equals(obj) && gregorianCutover == ((GregorianCalendar) obj).gregorianCutover;
+    return obj instanceof GregorianCalendar && super.equals(obj)
+        && gregorianCutover == ((GregorianCalendar) obj).gregorianCutover;
   }
 
   private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
@@ -383,7 +384,8 @@ public class GregorianCalendar extends Calendar {
     }
     internalSet(DAY_OF_YEAR, dayOfYear);
     int adjustedDom = dayOfMonth;
-    if (gregorian && fixedDateMonth1 == gregorianCutoverDate && gregorianFixed(year, month + 1, 1) < gregorianCutoverDate) {
+    if (gregorian && fixedDateMonth1 == gregorianCutoverDate && gregorianFixed(year, month + 1,
+        1) < gregorianCutoverDate) {
       long[] jd = new long[3];
       toJulian(gregorianCutoverDate - 1, jd);
       adjustedDom = (int) (fixedDate - gregorianCutoverDate) + (int) jd[2] + 1;
@@ -890,7 +892,8 @@ public class GregorianCalendar extends Calendar {
         long month1 = fd - dom + 1;
         int year = internalGetEra() == BCE ? 1 - internalGet(YEAR) : internalGet(YEAR);
         int monthLength = monthLengthActual(internalGet(MONTH), year);
-        if (isGregorianFixed(fd) && year == gregorianCutoverYear && toFixedJulianStartBefore(year, internalGet(MONTH))) {
+        if (isGregorianFixed(fd) && year == gregorianCutoverYear && toFixedJulianStartBefore(year,
+            internalGet(MONTH))) {
           month1 = gregorianCutoverDate;
           monthLength = (int) (toFixed(year, internalGet(MONTH) + 2 > 12 ? 1 : internalGet(MONTH) + 2,
               1) - month1);
@@ -930,7 +933,8 @@ public class GregorianCalendar extends Calendar {
       }
       case DAY_OF_WEEK_IN_MONTH: {
         int dom = internalGet(DAY_OF_MONTH);
-        int len = monthLengthActual(internalGet(MONTH), internalGetEra() == BCE ? 1 - internalGet(YEAR) : internalGet(YEAR));
+        int len = monthLengthActual(internalGet(MONTH), internalGetEra() == BCE ? 1 - internalGet(YEAR)
+            : internalGet(YEAR));
         int firstDay = ((dom - 1) % 7) + 1;
         int count = (len - firstDay) / 7 + 1;
         int n = (dom - 1) / 7 + 1;
@@ -1190,7 +1194,8 @@ public class GregorianCalendar extends Calendar {
     cal.setFirstDayOfWeek(MONDAY);
     cal.setMinimalDaysInFirstWeek(4);
     try {
-      cal.setTimeInMillis(Math.addExact(Math.multiplyExact(zdt.toEpochSecond(), 1000), zdt.get(java.time.temporal.ChronoField.MILLI_OF_SECOND)));
+      cal.setTimeInMillis(Math.addExact(Math.multiplyExact(zdt.toEpochSecond(), 1000),
+          zdt.get(java.time.temporal.ChronoField.MILLI_OF_SECOND)));
     } catch (ArithmeticException ex) {
       throw new IllegalArgumentException(ex);
     }

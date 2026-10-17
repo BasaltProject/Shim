@@ -140,7 +140,8 @@ public class CodeSource implements java.io.Serializable {
       if (!thatPath.startsWith(prefix)) {
         return false;
       }
-      return thatPath.indexOf('/', prefix.length()) < 0 || thatPath.indexOf('/', prefix.length()) == thatPath.length() - 1;
+      return thatPath.indexOf('/', prefix.length()) < 0 || thatPath.indexOf('/',
+          prefix.length()) == thatPath.length() - 1;
     }
     if (!thatPath.equals(path) && !thatPath.equals(path + "/")) {
       return false;

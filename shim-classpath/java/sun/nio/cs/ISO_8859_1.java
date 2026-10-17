@@ -19,7 +19,8 @@ public final class ISO_8859_1 extends Charset implements HistoricallyNamedCharse
   public static final ISO_8859_1 INSTANCE = new ISO_8859_1();
 
   private ISO_8859_1() {
-    super("ISO-8859-1", new String[] {"iso-ir-100", "ISO_8859-1", "latin1", "l1", "IBM819", "cp819", "csISOLatin1", "819",
+    super("ISO-8859-1", new String[] {"iso-ir-100", "ISO_8859-1", "latin1", "l1", "IBM819", "cp819", "csISOLatin1",
+        "819",
         "IBM-819", "ISO8859_1", "ISO_8859-1:1987", "ISO_8859_1", "8859_1", "ISO8859-1"});
   }
 

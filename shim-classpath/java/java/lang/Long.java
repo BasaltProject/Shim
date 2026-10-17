@@ -303,7 +303,8 @@ public final class Long extends Number implements Comparable<Long>,
     }
     char firstChar = s.charAt(beginIndex);
     if (firstChar == '-') {
-      throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s.subSequence(beginIndex, endIndex)));
+      throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.",
+          s.subSequence(beginIndex, endIndex)));
     }
     if (firstChar == '+') {
       beginIndex++;
@@ -322,7 +323,8 @@ public final class Long extends Number implements Comparable<Long>,
     }
     long result = first * radix + second;
     if (compareUnsigned(result, first) < 0 || divideUnsigned(result - second, radix) != first) {
-      throw new NumberFormatException(String.format("String value %s exceeds range of unsigned long.", s.subSequence(beginIndex, endIndex)));
+      throw new NumberFormatException(String.format("String value %s exceeds range of unsigned long.",
+          s.subSequence(beginIndex, endIndex)));
     }
     return result;
   }

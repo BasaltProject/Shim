@@ -269,7 +269,6 @@ public class ObjectInputStream extends InputStream implements ObjectInput, Objec
     return ObjectStreamClass.readNonProxy(this);
   }
 
-  /* ---- raw byte layer ---- */
 
   private int rawPeek() throws IOException {
     if (peeked < 0) {
@@ -316,7 +315,6 @@ public class ObjectInputStream extends InputStream implements ObjectInput, Objec
     return raw.available() + (peeked >= 0 ? 1 : 0);
   }
 
-  /* ---- block data layer ---- */
 
   private boolean setBlockMode(boolean mode) throws IOException {
     boolean old = blockMode;
@@ -416,7 +414,6 @@ public class ObjectInputStream extends InputStream implements ObjectInput, Objec
     }
   }
 
-  /* ---- DataInput / InputStream ---- */
 
   @Override
   public int read() throws IOException {
@@ -609,7 +606,6 @@ public class ObjectInputStream extends InputStream implements ObjectInput, Objec
     return (short) (((b[off] & 0xFF) << 8) | (b[off + 1] & 0xFF));
   }
 
-  /* ---- handles ---- */
 
   private int assign(Object obj) {
     handles.add(obj);
@@ -634,7 +630,6 @@ public class ObjectInputStream extends InputStream implements ObjectInput, Objec
     return o;
   }
 
-  /* ---- filter ---- */
 
   private void filterCheck(final Class<?> clazz, final long arrayLength) throws InvalidClassException {
     ObjectInputFilter f = serialFilter;
@@ -670,7 +665,6 @@ public class ObjectInputStream extends InputStream implements ObjectInput, Objec
     }
   }
 
-  /* ---- object graph ---- */
 
   private Object readObject0(boolean unshared) throws IOException, ClassNotFoundException {
     boolean oldMode = blockMode;

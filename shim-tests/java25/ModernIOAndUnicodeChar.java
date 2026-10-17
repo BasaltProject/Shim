@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 25
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOError;
@@ -109,7 +108,6 @@ public class ModernIOAndUnicodeChar {
       Charset.forName(null, StandardCharsets.UTF_8);
       throw new AssertionError("Expected IllegalArgumentException for null name");
     } catch (IllegalArgumentException expected) {
-      // expected
     }
   }
 

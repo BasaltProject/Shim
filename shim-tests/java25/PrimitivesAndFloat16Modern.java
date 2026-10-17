@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 21
 
 public class PrimitivesAndFloat16Modern {
   public static void main(String[] args) throws Exception {
@@ -65,14 +64,12 @@ public class PrimitivesAndFloat16Modern {
       Integer.parseUnsignedInt(seq, 12, 16, 10);
       throw new AssertionError("Expected NumberFormatException for negative unsigned");
     } catch (NumberFormatException expected) {
-      // Expected
     }
 
     try {
       Integer.parseInt(seq, 0, 100, 10);
       throw new AssertionError("Expected IndexOutOfBoundsException");
     } catch (IndexOutOfBoundsException expected) {
-      // Expected
     }
   }
 
@@ -120,14 +117,12 @@ public class PrimitivesAndFloat16Modern {
       Math.divideExact(Integer.MIN_VALUE, -1);
       throw new AssertionError("Expected ArithmeticException");
     } catch (ArithmeticException expected) {
-      // Expected
     }
 
     try {
       StrictMath.divideExact(Long.MIN_VALUE, -1L);
       throw new AssertionError("Expected ArithmeticException");
     } catch (ArithmeticException expected) {
-      // Expected
     }
 
     assertEquals(7.0, Math.fma(2.0, 3.0, 1.0));

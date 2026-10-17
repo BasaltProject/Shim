@@ -579,7 +579,8 @@ final class CheckedViews {
 
             public V setValue(V value) {
               if (value != null && !valueType.isInstance(value)) {
-                throw new ClassCastException("Attempt to insert " + value.getClass() + " value into map with value type "
+                throw new ClassCastException("Attempt to insert " + value.getClass()
+                    + " value into map with value type "
                                              + valueType);
               }
               return e.setValue(value);

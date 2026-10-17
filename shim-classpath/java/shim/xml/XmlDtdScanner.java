@@ -524,7 +524,8 @@ final class XmlDtdScanner {
       model = sb.toString();
       kind = model.startsWith("(#PCDATA") ? XmlDtd.kMixed : XmlDtd.kChildren;
     } else {
-      throw p.error("The constraint is required after the element type \"" + name + "\" in the element type declaration.");
+      throw p.error("The constraint is required after the element type \"" + name
+          + "\" in the element type declaration.");
     }
     spaces();
     if (sc.peek() != '>') {
@@ -735,7 +736,8 @@ final class XmlDtdScanner {
         }
         decl.notation = sc.scanName();
         if (decl.notation == null) {
-          throw p.error("The notation name is required after \"NDATA\" in the declaration for the entity \"" + name + "\".");
+          throw p.error("The notation name is required after \"NDATA\" in the declaration for the entity \"" + name
+              + "\".");
         }
       }
     }
@@ -800,7 +802,8 @@ final class XmlDtdScanner {
           if (sc.peek() == ';') {
             sc.read();
           }
-          throw p.error("The parameter entity reference \"%" + refName + ";\" cannot occur within markup in the internal subset of the DTD.");
+          throw p.error("The parameter entity reference \"%" + refName
+              + ";\" cannot occur within markup in the internal subset of the DTD.");
         }
         paramEntityRef(false);
         continue;

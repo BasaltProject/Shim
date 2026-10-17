@@ -82,7 +82,8 @@ final class RegexProperties {
     @Override
     public boolean is(int ch) {
       return Character.isAlphabetic(ch) || Character.getType(ch) == Character.NON_SPACING_MARK
-          || Character.getType(ch) == Character.ENCLOSING_MARK || Character.getType(ch) == Character.COMBINING_SPACING_MARK
+          || Character.getType(ch) == Character.ENCLOSING_MARK
+              || Character.getType(ch) == Character.COMBINING_SPACING_MARK
           || Character.getType(ch) == Character.CONNECTOR_PUNCTUATION || Character.isDigit(ch) || ch == 0x200C
           || ch == 0x200D;
     }

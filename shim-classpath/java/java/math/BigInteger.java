@@ -947,7 +947,8 @@ public class BigInteger extends Number implements Comparable<BigInteger> {
   private double scaledMagnitude(int significantBits) {
     int bl = ((mag.length - 1) << 5) + bitLengthForInt(mag[0]);
     int drop = bl - (significantBits + 1);
-    long top = BigIntegerMath.shiftRight(mag, drop).length == 0 ? 0 : new BigInteger(BigIntegerMath.shiftRight(mag, drop), 1).longValue();
+    long top = BigIntegerMath.shiftRight(mag, drop).length == 0 ? 0 : new BigInteger(BigIntegerMath.shiftRight(mag,
+        drop), 1).longValue();
     boolean sticky = BigIntegerMath.lowBitsNonZero(mag, drop);
     long m = top >>> 1;
     boolean roundBit = (top & 1) != 0;

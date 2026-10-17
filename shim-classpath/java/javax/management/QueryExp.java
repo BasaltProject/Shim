@@ -9,7 +9,8 @@
 package javax.management;
 
 public interface QueryExp extends java.io.Serializable {
-  boolean apply(ObjectName p0) throws BadStringOperationException, BadBinaryOpValueExpException, BadAttributeValueExpException, InvalidApplicationException;
+  boolean apply(ObjectName p0) throws BadStringOperationException, BadBinaryOpValueExpException,
+      BadAttributeValueExpException, InvalidApplicationException;
 
   void setMBeanServer(MBeanServer p0);
 }

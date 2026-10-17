@@ -42,7 +42,8 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager {
 
   X509TrustManagerImpl(boolean pkix, Collection<X509Certificate> trustedCerts) {
     this.pkix = pkix;
-    this.trusted = trustedCerts == null ? new ArrayList<X509Certificate>() : new ArrayList<X509Certificate>(trustedCerts);
+    this.trusted = trustedCerts == null ? new ArrayList<X509Certificate>()
+        : new ArrayList<X509Certificate>(trustedCerts);
     this.pkixParams = null;
   }
 

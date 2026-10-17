@@ -42,7 +42,8 @@ public final class Duration implements TemporalAmount, Comparable<Duration>, Ser
   private static final BigInteger BI_NANOS_PER_SECOND = BigInteger.valueOf(NANOS_PER_SECOND);
 
   private static final Pattern PATTERN = Pattern.compile(
-      "([-+]?)P(?:([-+]?[0-9]+)D)?" + "(T(?:([-+]?[0-9]+)H)?(?:([-+]?[0-9]+)M)?(?:([-+]?[0-9]+)(?:[.,]([0-9]{0,9}))?S)?)?");
+      "([-+]?)P(?:([-+]?[0-9]+)D)?"
+          + "(T(?:([-+]?[0-9]+)H)?(?:([-+]?[0-9]+)M)?(?:([-+]?[0-9]+)(?:[.,]([0-9]{0,9}))?S)?)?");
 
   private static class DurationUnits {
     static final List<TemporalUnit> UNITS =

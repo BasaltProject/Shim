@@ -45,7 +45,8 @@ public class DynamicConstantDesc<T> implements ConstantDesc {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> ConstantDesc ofCanonical(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc[] bootstrapArgs) {
+  public static <T> ConstantDesc ofCanonical(DirectMethodHandleDesc bootstrapMethod, String constantName,
+      ClassDesc constantType, ConstantDesc[] bootstrapArgs) {
     Objects.requireNonNull(bootstrapMethod, "bootstrapMethod");
     Objects.requireNonNull(constantName, "constantName");
     Objects.requireNonNull(constantType, "constantType");
@@ -62,11 +63,13 @@ public class DynamicConstantDesc<T> implements ConstantDesc {
     }
     if (bootstrapMethod.equals(ConstantDescs.BSM_VARHANDLE_STATIC_FIELD) && bootstrapArgs.length == 2
         && constantType.equals(ConstantDescs.CD_VarHandle)) {
-      return java.lang.invoke.VarHandle.VarHandleDesc.ofStaticField((ClassDesc) bootstrapArgs[0], constantName, (ClassDesc) bootstrapArgs[1]);
+      return java.lang.invoke.VarHandle.VarHandleDesc.ofStaticField((ClassDesc) bootstrapArgs[0], constantName,
+          (ClassDesc) bootstrapArgs[1]);
     }
     if (bootstrapMethod.equals(ConstantDescs.BSM_VARHANDLE_FIELD) && bootstrapArgs.length == 2
         && constantType.equals(ConstantDescs.CD_VarHandle)) {
-      return java.lang.invoke.VarHandle.VarHandleDesc.ofField((ClassDesc) bootstrapArgs[0], constantName, (ClassDesc) bootstrapArgs[1]);
+      return java.lang.invoke.VarHandle.VarHandleDesc.ofField((ClassDesc) bootstrapArgs[0], constantName,
+          (ClassDesc) bootstrapArgs[1]);
     }
     if (bootstrapMethod.equals(ConstantDescs.BSM_VARHANDLE_ARRAY) && bootstrapArgs.length == 1
         && constantType.equals(ConstantDescs.CD_VarHandle)) {

@@ -42,7 +42,8 @@ public final class AsynchronousFileChannelImpl extends AsynchronousFileChannel {
     this.channel = FileChannel.open(file, options, attrs);
     this.writable = options.contains(StandardOpenOption.WRITE);
     this.readable = options.contains(StandardOpenOption.READ) || !writable;
-    this.executor = executor != null ? executor : Executors.newCachedThreadPool(new java.util.concurrent.ThreadFactory() {
+    this.executor = executor != null ? executor
+        : Executors.newCachedThreadPool(new java.util.concurrent.ThreadFactory() {
       public Thread newThread(Runnable r) {
         Thread t = new Thread(r);
         t.setDaemon(true);

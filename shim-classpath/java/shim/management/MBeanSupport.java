@@ -143,7 +143,8 @@ public class MBeanSupport implements DynamicMBean {
         sig[i] = new MBeanParameterInfo("p" + (i + 1), typeName(pt[i]), "",
             mx ? OpenMapper.attributeDescriptor(pt[i]) : null);
       }
-      ops.add(new MBeanOperationInfo(m.getName(), mx ? m.getName() : "Operation exposed for management", sig, typeName(m.getReturnType()),
+      ops.add(new MBeanOperationInfo(m.getName(), mx ? m.getName() : "Operation exposed for management", sig,
+          typeName(m.getReturnType()),
           MBeanOperationInfo.UNKNOWN, mx ? OpenMapper.attributeDescriptor(m.getReturnType()) : null));
     }
     List<MBeanConstructorInfo> ctors = new ArrayList<MBeanConstructorInfo>();

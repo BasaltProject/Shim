@@ -246,7 +246,8 @@ public class DocumentImpl extends ParentNode implements Document {
 
   public Attr createAttributeNS(String namespaceURI, String qualifiedName) throws DOMException {
     String ns = DomNames.normalizeNamespace(namespaceURI);
-    String[] parts = errorChecking ? DomNames.checkAttribute(namespaceURI, qualifiedName) : DomNames.split(qualifiedName);
+    String[] parts = errorChecking ? DomNames.checkAttribute(namespaceURI, qualifiedName)
+        : DomNames.split(qualifiedName);
     return new AttrImpl(this, ns, qualifiedName, parts[1]);
   }
 

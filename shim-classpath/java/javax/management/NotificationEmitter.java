@@ -9,5 +9,6 @@
 package javax.management;
 
 public interface NotificationEmitter extends NotificationBroadcaster {
-  void removeNotificationListener(NotificationListener p0, NotificationFilter p1, Object p2) throws ListenerNotFoundException;
+  void removeNotificationListener(NotificationListener p0, NotificationFilter p1, Object p2)
+      throws ListenerNotFoundException;
 }

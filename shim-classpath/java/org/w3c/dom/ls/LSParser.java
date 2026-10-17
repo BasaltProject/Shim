@@ -29,7 +29,8 @@ public interface LSParser {
 
   org.w3c.dom.Document parseURI(String p0) throws org.w3c.dom.DOMException, LSException;
 
-  org.w3c.dom.Node parseWithContext(LSInput p0, org.w3c.dom.Node p1, short p2) throws org.w3c.dom.DOMException, LSException;
+  org.w3c.dom.Node parseWithContext(LSInput p0, org.w3c.dom.Node p1, short p2) throws org.w3c.dom.DOMException,
+      LSException;
 
   void abort();
 }

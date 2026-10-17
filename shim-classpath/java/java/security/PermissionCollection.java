@@ -63,7 +63,6 @@ public abstract class PermissionCollection implements java.io.Serializable {
         Permission p = enum_.nextElement();
         sb.append(' ').append(p).append('\n');
       } catch (java.util.NoSuchElementException e) {
-        // ignored
       }
     }
     sb.append(')').append('\n');

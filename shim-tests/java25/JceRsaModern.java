@@ -49,7 +49,6 @@ public class JceRsaModern {
     p("sig alias2", () -> Signature.getInstance("SHA256WithRSAEncryption").getAlgorithm());
     p("sig alias3", () -> Signature.getInstance("sha256withrsa").getAlgorithm());
     p("rsa toString", () -> { Signature s = Signature.getInstance("SHA256withRSA"); return s.toString(); });
-    // cipher
     byte[] data = "secret data".getBytes();
     p("cipher pkcs1", () -> { Cipher c = Cipher.getInstance("RSA/ECB/PKCS1Padding"); c.init(Cipher.ENCRYPT_MODE, pub); byte[] ct = c.doFinal(data); Cipher d = Cipher.getInstance("RSA/ECB/PKCS1Padding"); d.init(Cipher.DECRYPT_MODE, priv); return ct.length + " " + new String(d.doFinal(ct)) + " " + c.getBlockSize() + " " + c.getOutputSize(5) + " " + c.getIV() + " " + c.getParameters(); });
     p("cipher default", () -> { Cipher c = Cipher.getInstance("RSA"); c.init(Cipher.ENCRYPT_MODE, pub); byte[] ct = c.doFinal(data); Cipher d = Cipher.getInstance("RSA"); d.init(Cipher.DECRYPT_MODE, priv); return ct.length + " " + new String(d.doFinal(ct)); });

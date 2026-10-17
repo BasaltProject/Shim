@@ -11,7 +11,8 @@ package java.util;
 final class LocaleDisplayData {
   private LocaleDisplayData() { }
 
-  static final String[] kTags = {"en", "es", "fr", "de", "it", "pt", "ja", "zh", "zh-Hant", "ko", "ru", "nl", "pl", "tr", "sv", "ar", "hi", "th", "vi", "id", "cs", "da", "fi", "nb", "he", "el", "hu", "uk", "ro", "bg", "ca", "hr", "sk", "sl", };
+  static final String[] kTags = {"en", "es", "fr", "de", "it", "pt", "ja", "zh", "zh-Hant", "ko", "ru", "nl", "pl",
+      "tr", "sv", "ar", "hi", "th", "vi", "id", "cs", "da", "fi", "nb", "he", "el", "hu", "uk", "ro", "bg", "ca", "hr", "sk", "sl", };
 
   static String[] lines(String tag) {
     switch (tag) {

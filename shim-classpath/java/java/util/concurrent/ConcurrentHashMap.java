@@ -1432,7 +1432,8 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
   }
 
   public Map.Entry<K, V> reduceEntries(long parallelismThreshold,
-                                       BiFunction<Map.Entry<K, V>, Map.Entry<K, V>, ? extends Map.Entry<K, V>> reducer) {
+                                       BiFunction<Map.Entry<K, V>, Map.Entry<K, V>, ? extends Map.Entry<K,
+                                           V>> reducer) {
     if (reducer == null) {
       throw new NullPointerException();
     }

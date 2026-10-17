@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 21
 
 import java.util.Locale;
 import java.util.Scanner;

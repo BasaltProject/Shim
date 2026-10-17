@@ -416,7 +416,8 @@ public abstract class NodeImpl implements Node, NodeList, Cloneable, java.io.Ser
           if (namespace != null && namespace.equals("http://www.w3.org/2000/xmlns/")) {
             if (specifiedPrefix == null && attr.getNodeName().equals("xmlns")) {
               return value.length() > 0 ? value : null;
-            } else if (attrPrefix != null && attrPrefix.equals("xmlns") && attr.getLocalName().equals(specifiedPrefix)) {
+            } else if (attrPrefix != null && attrPrefix.equals("xmlns")
+                && attr.getLocalName().equals(specifiedPrefix)) {
               return value.length() > 0 ? value : null;
             }
           }

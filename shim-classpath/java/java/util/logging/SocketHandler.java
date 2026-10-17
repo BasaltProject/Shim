@@ -59,7 +59,6 @@ public class SocketHandler extends StreamHandler {
       try {
         sock.close();
       } catch (IOException ix) {
-        // drop through
       }
     }
     sock = null;

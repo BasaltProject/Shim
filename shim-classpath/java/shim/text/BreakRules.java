@@ -212,7 +212,8 @@ public final class BreakRules {
       if (j + Character.charCount(c) < n) {
         int nx = s.codePointAt(j + Character.charCount(c));
         int nk = wordClass(nx);
-        if (last == 4 && nk == 4 && (c == '\'' || c == '"' || c == '.' || c == '-' || c == 0x2010 || c == 0x2013 || c == '_')) {
+        if (last == 4 && nk == 4 && (c == '\'' || c == '"' || c == '.' || c == '-' || c == 0x2010 || c == 0x2013
+            || c == '_')) {
           j += 1;
           continue;
         }
@@ -426,7 +427,8 @@ public final class BreakRules {
         } else {
           brk = !isBreakAfterChar(next) && next != '"';
         }
-      } else if (Character.getType(next) == Character.START_PUNCTUATION && Character.getType(cp) != Character.START_PUNCTUATION) {
+      } else if (Character.getType(next) == Character.START_PUNCTUATION
+          && Character.getType(cp) != Character.START_PUNCTUATION) {
         brk = true;
       } else if (Character.getType(cp) == Character.END_PUNCTUATION && (Character.isLetterOrDigit(next))) {
         brk = true;

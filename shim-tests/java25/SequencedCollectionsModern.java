@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// Minimum release: 21
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

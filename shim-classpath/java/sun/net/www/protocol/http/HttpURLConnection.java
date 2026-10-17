@@ -485,7 +485,6 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
               try {
                 requests.add(key, cookieValue.substring(0, cookieValue.length() - 2));
               } catch (StringIndexOutOfBoundsException ignored) {
-                // empty cookie list
               }
             }
           }
@@ -576,7 +575,8 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
         }
         if (respCode == HTTP_PROXY_AUTH && http.getUsingProxy() && !"https".equalsIgnoreCase(url.getProtocol())) {
           AuthenticationHeader hdr = new AuthenticationHeader("Proxy-Authenticate", responses);
-          if (proxyAuthentication != null && proxyAuthentication.isAuthorizationStale(hdr.raw() == null ? "" : hdr.raw())) {
+          if (proxyAuthentication != null && proxyAuthentication.isAuthorizationStale(hdr.raw() == null ? ""
+              : hdr.raw())) {
             disconnectWeb();
             redirects++;
             requests.set(proxyAuthentication.getHeaderName(), proxyAuthentication.getHeaderValue(url, method));
@@ -648,7 +648,6 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
         try {
           cl = getContentLength();
         } catch (Exception ignored) {
-          // unknown length
         }
         if (respCode >= 400) {
           if (respCode == 404 || respCode == 410) {
@@ -896,7 +895,6 @@ public class HttpURLConnection extends java.net.HttpURLConnection {
         try {
           inputStream.close();
         } catch (IOException ioe) {
-          // already closed
         }
       } else {
         http.closeServer();
