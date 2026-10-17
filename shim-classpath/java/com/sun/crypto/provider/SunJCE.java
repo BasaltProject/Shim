@@ -80,6 +80,7 @@ public final class SunJCE extends Provider {
     add("SecretKeyFactory", "DESede", "com.sun.crypto.provider.DESedeKeyFactory", new String[] {"TripleDES"}, new String[] {});
     add("AlgorithmParameters", "DES", "com.sun.crypto.provider.DESParameters", new String[] {}, new String[] {});
     add("Cipher", "DES", "com.sun.crypto.provider.DESCipher", new String[] {}, new String[] {"SupportedKeyFormats", "RAW", "SupportedModes", "ECB|CBC|PCBC|CTR|CTS|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING"});
+    add("Cipher", "RC2", "com.sun.crypto.provider.RC2Cipher", new String[] {}, new String[] {"SupportedKeyFormats", "RAW", "SupportedModes", "ECB|CBC|PCBC|CTR|CTS|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING"});
     add("Mac", "HmacMD5", "com.sun.crypto.provider.HmacCore$HmacMD5", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
     add("KeyGenerator", "DESede", "com.sun.crypto.provider.DESedeKeyGenerator", new String[] {"TripleDES"}, new String[] {});
     add("AlgorithmParameters", "GCM", "com.sun.crypto.provider.GCMParameters", new String[] {}, new String[] {});
