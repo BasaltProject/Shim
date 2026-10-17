@@ -24,29 +24,36 @@
 package java.security;
 
 public abstract class Permission implements Guard, java.io.Serializable {
-
   private static final long serialVersionUID = -5636570222231596674L;
 
-  
-  protected String name;
-  
+  private String name;
+
   public Permission(String name) {
     this.name = name;
   }
-  
-  public String getName() {
+
+  public void checkGuard(Object object) throws SecurityException {
+    SecurityManager sm = System.getSecurityManager();
+    if (sm != null) {
+      sm.checkPermission(this);
+    }
+  }
+
+  public abstract boolean implies(Permission permission);
+
+  public abstract boolean equals(Object obj);
+
+  public abstract int hashCode();
+
+  public final String getName() {
     return name;
   }
-  
-  public boolean implies(Permission permission) {
-    return equals(permission);
-  }
 
-  public String getActions() {
-    return "";
-  }
+  public abstract String getActions();
 
-  public void checkGuard(Object object) throws SecurityException { }
+  public PermissionCollection newPermissionCollection() {
+    return null;
+  }
 
   @Override
   public String toString() {
@@ -55,9 +62,5 @@ public abstract class Permission implements Guard, java.io.Serializable {
       return "(\"" + getClass().getName() + "\" \"" + name + "\")";
     }
     return "(\"" + getClass().getName() + "\" \"" + name + "\" \"" + actions + "\")";
-  }
-  
-  public PermissionCollection newPermissionCollection() {
-    return null;
   }
 }

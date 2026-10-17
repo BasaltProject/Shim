@@ -23,12 +23,70 @@
 
 package java.security;
 
-public class AllPermission extends Permission {
+import java.util.Collections;
+import java.util.Enumeration;
+
+public final class AllPermission extends Permission {
   private static final long serialVersionUID = -2916474571451318075L;
- 
+
   public AllPermission() {
-    super("<all>");
+    super("<all permissions>");
   }
-  
-  
+
+  public AllPermission(String name, String actions) {
+    this();
+  }
+
+  @Override
+  public boolean implies(Permission p) {
+    return true;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    return obj instanceof AllPermission;
+  }
+
+  @Override
+  public int hashCode() {
+    return 1;
+  }
+
+  @Override
+  public String getActions() {
+    return "<all actions>";
+  }
+
+  @Override
+  public PermissionCollection newPermissionCollection() {
+    return new AllPermissionCollection();
+  }
+}
+
+final class AllPermissionCollection extends PermissionCollection implements java.io.Serializable {
+  private static final long serialVersionUID = -4023431423420167738L;
+
+  private boolean allAllowed;
+
+  @Override
+  public void add(Permission permission) {
+    if (!(permission instanceof AllPermission)) {
+      throw new IllegalArgumentException("invalid permission: " + permission);
+    }
+    if (isReadOnly()) {
+      throw new SecurityException("attempt to add a Permission to a readonly PermissionCollection");
+    }
+    allAllowed = true;
+  }
+
+  @Override
+  public boolean implies(Permission permission) {
+    return allAllowed;
+  }
+
+  @Override
+  public Enumeration<Permission> elements() {
+    return allAllowed ? Collections.<Permission>enumeration(Collections.<Permission>singletonList(new AllPermission()))
+        : Collections.<Permission>emptyEnumeration();
+  }
 }

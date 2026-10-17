@@ -23,20 +23,74 @@
 
 package java.security;
 
-/**
- * No real access control is implemented here.
- * 
- * @author zsombor
- *
- */
-public class AccessController {
+public final class AccessController {
+  private AccessController() {
+  }
 
-  public static <T> T doPrivileged (PrivilegedAction<T> action) {
+  public static <T> T doPrivileged(PrivilegedAction<T> action) {
     return action.run();
   }
-  
-  public static void checkPermission(Permission perm) throws AccessControlException {
-    
+
+  public static <T> T doPrivilegedWithCombiner(PrivilegedAction<T> action) {
+    return action.run();
   }
 
+  public static <T> T doPrivileged(PrivilegedAction<T> action, AccessControlContext context) {
+    return action.run();
+  }
+
+  public static <T> T doPrivileged(PrivilegedAction<T> action, AccessControlContext context,
+      Permission... perms) {
+    return action.run();
+  }
+
+  public static <T> T doPrivilegedWithCombiner(PrivilegedAction<T> action, AccessControlContext context,
+      Permission... perms) {
+    return action.run();
+  }
+
+  public static <T> T doPrivileged(PrivilegedExceptionAction<T> action) throws PrivilegedActionException {
+    return run(action);
+  }
+
+  public static <T> T doPrivilegedWithCombiner(PrivilegedExceptionAction<T> action)
+      throws PrivilegedActionException {
+    return run(action);
+  }
+
+  public static <T> T doPrivileged(PrivilegedExceptionAction<T> action, AccessControlContext context)
+      throws PrivilegedActionException {
+    return run(action);
+  }
+
+  public static <T> T doPrivileged(PrivilegedExceptionAction<T> action, AccessControlContext context,
+      Permission... perms) throws PrivilegedActionException {
+    return run(action);
+  }
+
+  public static <T> T doPrivilegedWithCombiner(PrivilegedExceptionAction<T> action, AccessControlContext context,
+      Permission... perms) throws PrivilegedActionException {
+    return run(action);
+  }
+
+  private static <T> T run(PrivilegedExceptionAction<T> action) throws PrivilegedActionException {
+    try {
+      return action.run();
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new PrivilegedActionException(e);
+    }
+  }
+
+  public static AccessControlContext getContext() {
+    return new AccessControlContext(new ProtectionDomain[0]);
+  }
+
+  public static void checkPermission(Permission perm) throws AccessControlException {
+    if (perm == null) {
+      throw new NullPointerException("permission can't be null");
+    }
+    throw new AccessControlException("checking permissions is not supported");
+  }
 }

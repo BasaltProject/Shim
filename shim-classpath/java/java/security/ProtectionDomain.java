@@ -24,17 +24,65 @@
 package java.security;
 
 public class ProtectionDomain {
-  private final CodeSource codeSource;
+  private final CodeSource codesource;
+  private final ClassLoader classloader;
+  private final Principal[] principals;
   private final PermissionCollection permissions;
 
-  public ProtectionDomain(CodeSource codeSource,
-                          PermissionCollection permissions)
-  {
-    this.codeSource = codeSource;
+  public ProtectionDomain(CodeSource codesource, PermissionCollection permissions) {
+    this.codesource = codesource;
+    if (permissions != null) {
+      permissions.setReadOnly();
+    }
     this.permissions = permissions;
+    this.classloader = null;
+    this.principals = new Principal[0];
   }
 
-  public CodeSource getCodeSource() {
-    return codeSource;
+  public ProtectionDomain(CodeSource codesource, PermissionCollection permissions, ClassLoader classloader,
+      Principal[] principals) {
+    this.codesource = codesource;
+    if (permissions != null) {
+      permissions.setReadOnly();
+    }
+    this.permissions = permissions;
+    this.classloader = classloader;
+    this.principals = principals != null ? principals.clone() : new Principal[0];
+  }
+
+  public final CodeSource getCodeSource() {
+    return codesource;
+  }
+
+  public final ClassLoader getClassLoader() {
+    return classloader;
+  }
+
+  public final Principal[] getPrincipals() {
+    return principals.clone();
+  }
+
+  public final PermissionCollection getPermissions() {
+    return permissions;
+  }
+
+  public boolean implies(Permission perm) {
+    return permissions != null && permissions.implies(perm);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder("ProtectionDomain  ");
+    sb.append(codesource).append('\n').append(' ').append(classloader).append('\n');
+    if (principals.length == 0) {
+      sb.append(" <no principals>\n");
+    } else {
+      sb.append(" principals:\n");
+      for (Principal p : principals) {
+        sb.append("  ").append(p).append('\n');
+      }
+    }
+    sb.append(' ').append(permissions).append('\n');
+    return sb.toString();
   }
 }

@@ -41,7 +41,15 @@ public class SystemClassLoader extends ClassLoader {
     throws ClassNotFoundException;
 
   protected Class findClass(String name) throws ClassNotFoundException {
-    return getClass(findVMClass(name));
+    try {
+      return getClass(findVMClass(name));
+    } catch (ClassNotFoundException e) {
+      String message = e.getMessage();
+      if (message != null && message.indexOf('/') >= 0 && name.indexOf('/') < 0) {
+        throw new ClassNotFoundException(name);
+      }
+      throw e;
+    }
   }
 
   public static native Class getClass(VMClass vmClass);
