@@ -15,7 +15,6 @@ public class ECParameterSpec implements AlgorithmParameterSpec {
   private final ECPoint g;
   private final BigInteger n;
   private final int h;
-  private String name;
 
   public ECParameterSpec(EllipticCurve curve, ECPoint g, BigInteger n, int h) {
     if (curve == null) {
@@ -53,18 +52,5 @@ public class ECParameterSpec implements AlgorithmParameterSpec {
 
   public int getCofactor() {
     return h;
-  }
-
-  public void setCurveName(String name) {
-    this.name = name;
-  }
-
-  public String getCurveName() {
-    return name;
-  }
-
-  @Override
-  public String toString() {
-    return name != null ? name : super.toString();
   }
 }

@@ -45,6 +45,7 @@ public final class SunJCE extends Provider {
     add("SecretKeyFactory", "PBKDF2WithHmacSHA1", "com.sun.crypto.provider.PBKDF2Core$HmacSHA1", new String[] {"OID.1.2.840.113549.1.5.12", "1.2.840.113549.1.5.12"}, new String[] {});
     add("Cipher", "AES_192/CBC/NoPadding", "com.sun.crypto.provider.AESCipher$AES192_CBC_NoPadding", new String[] {"OID.2.16.840.1.101.3.4.1.22", "2.16.840.1.101.3.4.1.22"}, new String[] {"SupportedKeyFormats", "RAW"});
     add("Cipher", "DESede", "com.sun.crypto.provider.DESedeCipher", new String[] {"TripleDES"}, new String[] {"SupportedKeyFormats", "RAW", "SupportedModes", "ECB|CBC|PCBC|CTR|CTS|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING"});
+    add("AlgorithmParameters", "OAEP", "com.sun.crypto.provider.OAEPParameters", new String[] {"OID.1.2.840.113549.1.1.7", "1.2.840.113549.1.1.7"}, new String[] {});
     add("Cipher", "AES_256/ECB/NoPadding", "com.sun.crypto.provider.AESCipher$AES256_ECB_NoPadding", new String[] {"OID.2.16.840.1.101.3.4.1.41", "2.16.840.1.101.3.4.1.41"}, new String[] {"SupportedKeyFormats", "RAW"});
     add("SecretKeyFactory", "PBKDF2WithHmacSHA384", "com.sun.crypto.provider.PBKDF2Core$HmacSHA384", new String[] {}, new String[] {});
     add("AlgorithmParameters", "DESede", "com.sun.crypto.provider.DESedeParameters", new String[] {"TripleDES"}, new String[] {});
@@ -52,6 +53,7 @@ public final class SunJCE extends Provider {
     add("SecretKeyFactory", "PBKDF2WithHmacSHA512/256", "com.sun.crypto.provider.PBKDF2Core$HmacSHA512_256", new String[] {}, new String[] {});
     add("Cipher", "AES", "com.sun.crypto.provider.AESCipher$General", new String[] {"OID.2.16.840.1.101.3.4.1", "2.16.840.1.101.3.4.1"}, new String[] {"SupportedKeyFormats", "RAW", "SupportedModes", "ECB|CBC|PCBC|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64|CFB72|CFB80|CFB88|CFB96|CFB104|CFB112|CFB120|CFB128|OFB72|OFB80|OFB88|OFB96|OFB104|OFB112|OFB120|OFB128", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING"});
     add("SecretKeyFactory", "PBKDF2WithHmacSHA256", "com.sun.crypto.provider.PBKDF2Core$HmacSHA256", new String[] {}, new String[] {});
+    add("Cipher", "RSA", "com.sun.crypto.provider.RSACipher", new String[] {}, new String[] {"SupportedKeyClasses", "java.security.interfaces.RSAPublicKey|java.security.interfaces.RSAPrivateKey", "SupportedModes", "ECB", "SupportedPaddings", "NOPADDING|PKCS1PADDING|OAEPPADDING|OAEPWITHMD5ANDMGF1PADDING|OAEPWITHSHA1ANDMGF1PADDING|OAEPWITHSHA-1ANDMGF1PADDING|OAEPWITHSHA-224ANDMGF1PADDING|OAEPWITHSHA-256ANDMGF1PADDING|OAEPWITHSHA-384ANDMGF1PADDING|OAEPWITHSHA-512ANDMGF1PADDING|OAEPWITHSHA-512/224ANDMGF1PADDING|OAEPWITHSHA-512/256ANDMGF1PADDING"});
     add("KeyGenerator", "HmacSHA224", "com.sun.crypto.provider.HmacKeyGenerators$HmacSHA224", new String[] {"OID.1.2.840.113549.2.8", "1.2.840.113549.2.8"}, new String[] {});
     add("KeyGenerator", "HmacSHA256", "com.sun.crypto.provider.HmacKeyGenerators$HmacSHA256", new String[] {"OID.1.2.840.113549.2.9", "1.2.840.113549.2.9"}, new String[] {});
     add("Cipher", "AES_128/CFB/NoPadding", "com.sun.crypto.provider.AESCipher$AES128_CFB_NoPadding", new String[] {"OID.2.16.840.1.101.3.4.1.4", "2.16.840.1.101.3.4.1.4"}, new String[] {"SupportedKeyFormats", "RAW"});
@@ -65,6 +67,7 @@ public final class SunJCE extends Provider {
     add("SecretKeyFactory", "PBKDF2WithHmacSHA512/224", "com.sun.crypto.provider.PBKDF2Core$HmacSHA512_224", new String[] {}, new String[] {});
     add("SecretKeyFactory", "PBKDF2WithHmacSHA224", "com.sun.crypto.provider.PBKDF2Core$HmacSHA224", new String[] {}, new String[] {});
     add("KeyGenerator", "HmacMD5", "com.sun.crypto.provider.HmacKeyGenerators$HmacMD5", new String[] {}, new String[] {});
+    add("Signature", "NONEwithRSA", "com.sun.crypto.provider.RSACipherAdaptor", new String[] {}, new String[] {"SupportedKeyClasses", "java.security.interfaces.RSAPublicKey|java.security.interfaces.RSAPrivateKey"});
     add("KeyGenerator", "DES", "com.sun.crypto.provider.DESKeyGenerator", new String[] {}, new String[] {});
     add("Cipher", "AES_128/CBC/NoPadding", "com.sun.crypto.provider.AESCipher$AES128_CBC_NoPadding", new String[] {"OID.2.16.840.1.101.3.4.1.2", "2.16.840.1.101.3.4.1.2"}, new String[] {"SupportedKeyFormats", "RAW"});
     add("Cipher", "AES_256/OFB/NoPadding", "com.sun.crypto.provider.AESCipher$AES256_OFB_NoPadding", new String[] {"OID.2.16.840.1.101.3.4.1.43", "2.16.840.1.101.3.4.1.43"}, new String[] {"SupportedKeyFormats", "RAW"});
