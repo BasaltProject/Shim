@@ -1,0 +1,36 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package java.util.prefs;
+
+public class NodeChangeEvent extends java.util.EventObject {
+  private static final long serialVersionUID = 8068949086596572957L;
+
+  private final Preferences child;
+
+  public NodeChangeEvent(Preferences parent, Preferences child) {
+    super(parent);
+    this.child = child;
+  }
+
+  public Preferences getParent() {
+    return (Preferences) getSource();
+  }
+
+  public Preferences getChild() {
+    return child;
+  }
+
+  private void writeObject(java.io.ObjectOutputStream out) throws java.io.NotSerializableException {
+    throw new java.io.NotSerializableException("Not serializable.");
+  }
+
+  private void readObject(java.io.ObjectInputStream in) throws java.io.NotSerializableException {
+    throw new java.io.NotSerializableException("Not serializable.");
+  }
+}

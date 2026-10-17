@@ -501,6 +501,12 @@ extern "C" SHIM_EXPORT void JNICALL
   t->m->system->exit(arguments[1]);
 }
 
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_java_lang_Runtime_halt(Thread* t, object, uintptr_t* arguments)
+{
+  t->m->system->exit(arguments[1]);
+}
+
 extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_Runtime_freeMemory(Thread* t, object, uintptr_t*)
 {

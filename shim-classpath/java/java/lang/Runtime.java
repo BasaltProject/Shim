@@ -470,6 +470,8 @@ public class Runtime {
 
   public native void exit(int code);
 
+  public native void halt(int code);
+
   public native long freeMemory();
 
   public native long totalMemory();
