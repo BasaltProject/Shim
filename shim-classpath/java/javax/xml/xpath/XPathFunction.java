@@ -1,0 +1,13 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package javax.xml.xpath;
+
+public interface XPathFunction {
+  Object evaluate(java.util.List<?> p0) throws XPathFunctionException;
+}
