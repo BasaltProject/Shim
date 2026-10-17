@@ -460,8 +460,9 @@ void referenceUnreachable(Thread* t, Heap::Visitor* v, GcJreference** p)
     fprintf(stderr, "reference %p unreachable (target %p)\n", *p, r->target());
   }
 
-  if (r->queue() and t->m->heap->status(r->queue()) != Heap::Unreachable) {
-    // queue is reachable - add the reference
+  // An unreachable reference object is never enqueued (cleaners still run)
+  if (r->queue() and t->m->heap->status(r->queue()) != Heap::Unreachable
+      and objectClass(t, r) == type(t, GcCleaner::Type)) {
     referenceTargetUnreachable(t, v, p);
   } else {
     *p = cast<GcJreference>(t, (*p)->vmNext());

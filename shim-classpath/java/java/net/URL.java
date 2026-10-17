@@ -370,9 +370,9 @@ public final class URL implements Serializable {
       }
     }
     if ("http".equals(protocol)) {
-      return new shim.http.Handler();
+      return new sun.net.www.protocol.http.Handler();
     } else if ("https".equals(protocol)) {
-      return new shim.https.Handler();
+      return new sun.net.www.protocol.https.Handler();
     } else if ("shimvmresource".equals(protocol)) {
       return new shim.shimvmresource.Handler();
     } else if ("file".equals(protocol)) {
