@@ -15,7 +15,7 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
-public final class Module {
+public final class Module implements java.lang.reflect.AnnotatedElement {
   private final String name;
   private final ClassLoader loader;
   private final ModuleDescriptor descriptor;
@@ -144,5 +144,21 @@ public final class Module {
       return "unnamed module @" + Integer.toHexString(hashCode());
     }
     return "module " + name;
+  }
+
+  @Override
+  public <T extends java.lang.annotation.Annotation> T getAnnotation(Class<T> annotationClass) {
+    Objects.requireNonNull(annotationClass);
+    return null;
+  }
+
+  @Override
+  public java.lang.annotation.Annotation[] getAnnotations() {
+    return new java.lang.annotation.Annotation[0];
+  }
+
+  @Override
+  public java.lang.annotation.Annotation[] getDeclaredAnnotations() {
+    return new java.lang.annotation.Annotation[0];
   }
 }

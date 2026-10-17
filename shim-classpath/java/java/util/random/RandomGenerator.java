@@ -16,7 +16,7 @@ public interface RandomGenerator {
   long nextLong();
 
   default boolean nextBoolean() {
-    return nextLong() < 0L;
+    return nextInt() < 0;
   }
 
   default void nextBytes(byte[] bytes) {
@@ -35,19 +35,27 @@ public interface RandomGenerator {
   }
 
   default float nextFloat(float bound) {
-    if (bound <= 0.0f || Float.isInfinite(bound) || Float.isNaN(bound)) {
-      throw new IllegalArgumentException("bound must be positive and finite: " + bound);
+    if (!(bound > 0.0f && bound < Float.POSITIVE_INFINITY)) {
+      throw new IllegalArgumentException("bound must be finite and positive");
     }
-    float result = nextFloat() * bound;
-    return (result >= bound) ? Float.intBitsToFloat(Float.floatToIntBits(bound) - 1) : result;
+    float r = nextFloat();
+    r = r * bound;
+    if (r >= bound) {
+      r = Math.nextDown(bound);
+    }
+    return r;
   }
 
   default float nextFloat(float origin, float bound) {
-    if (origin >= bound || Float.isInfinite(origin) || Float.isInfinite(bound) || Float.isNaN(origin) || Float.isNaN(bound)) {
-      throw new IllegalArgumentException("bound must be greater than origin: " + origin + " >= " + bound);
+    if (!(origin < bound && (bound - origin) < Float.POSITIVE_INFINITY)) {
+      throw new IllegalArgumentException("bound must be greater than origin");
     }
-    float result = origin + nextFloat() * (bound - origin);
-    return (result >= bound) ? Float.intBitsToFloat(Float.floatToIntBits(bound) - 1) : result;
+    float r = nextFloat();
+    r = r * (bound - origin) + origin;
+    if (r >= bound) {
+      r = Math.nextAfter(bound, origin);
+    }
+    return r;
   }
 
   default double nextDouble() {
@@ -55,19 +63,27 @@ public interface RandomGenerator {
   }
 
   default double nextDouble(double bound) {
-    if (bound <= 0.0 || Double.isInfinite(bound) || Double.isNaN(bound)) {
-      throw new IllegalArgumentException("bound must be positive and finite: " + bound);
+    if (!(bound > 0.0 && bound < Double.POSITIVE_INFINITY)) {
+      throw new IllegalArgumentException("bound must be finite and positive");
     }
-    double result = nextDouble() * bound;
-    return (result >= bound) ? Double.longBitsToDouble(Double.doubleToLongBits(bound) - 1L) : result;
+    double r = nextDouble();
+    r = r * bound;
+    if (r >= bound) {
+      r = Math.nextDown(bound);
+    }
+    return r;
   }
 
   default double nextDouble(double origin, double bound) {
-    if (origin >= bound || Double.isInfinite(origin) || Double.isInfinite(bound) || Double.isNaN(origin) || Double.isNaN(bound)) {
-      throw new IllegalArgumentException("bound must be greater than origin: " + origin + " >= " + bound);
+    if (!(origin < bound && (bound - origin) < Double.POSITIVE_INFINITY)) {
+      throw new IllegalArgumentException("bound must be greater than origin");
     }
-    double result = origin + nextDouble() * (bound - origin);
-    return (result >= bound) ? Double.longBitsToDouble(Double.doubleToLongBits(bound) - 1L) : result;
+    double r = nextDouble();
+    r = r * (bound - origin) + origin;
+    if (r >= bound) {
+      r = Math.nextAfter(bound, origin);
+    }
+    return r;
   }
 
   default int nextInt() {
@@ -76,63 +92,73 @@ public interface RandomGenerator {
 
   default int nextInt(int bound) {
     if (bound <= 0) {
-      throw new IllegalArgumentException("bound must be positive: " + bound);
+      throw new IllegalArgumentException("bound must be positive");
     }
-    int r = nextInt() >>> 1;
+    int r = nextInt();
     int m = bound - 1;
     if ((bound & m) == 0) {
-      return (int) ((bound * (long) r) >> 31);
+      r &= m;
+    } else {
+      for (int u = r >>> 1; u + m - (r = u % bound) < 0; u = nextInt() >>> 1) {
+      }
     }
-    for (int u = r; u - (r = u % bound) + m < 0; u = nextInt() >>> 1) {}
     return r;
   }
 
   default int nextInt(int origin, int bound) {
     if (origin >= bound) {
-      throw new IllegalArgumentException("bound must be greater than origin: " + origin + " >= " + bound);
+      throw new IllegalArgumentException("bound must be greater than origin");
     }
-    int n = bound - origin;
-    if (n > 0) {
-      return origin + nextInt(n);
+    int r = nextInt();
+    final int n = bound - origin;
+    final int m = n - 1;
+    if ((n & m) == 0) {
+      r = (r & m) + origin;
+    } else if (n > 0) {
+      for (int u = r >>> 1; u + m - (r = u % n) < 0; u = nextInt() >>> 1) {
+      }
+      r += origin;
+    } else {
+      while (r < origin || r >= bound) {
+        r = nextInt();
+      }
     }
-    int r;
-    do {
-      r = nextInt();
-    } while (r < origin || r >= bound);
     return r;
   }
 
   default long nextLong(long bound) {
     if (bound <= 0) {
-      throw new IllegalArgumentException("bound must be positive: " + bound);
+      throw new IllegalArgumentException("bound must be positive");
     }
-    long r = nextLong() >>> 1;
-    long m = bound - 1L;
+    long r = nextLong();
+    long m = bound - 1;
     if ((bound & m) == 0L) {
-      return (nextLong() & m);
+      r &= m;
+    } else {
+      for (long u = r >>> 1; u + m - (r = u % bound) < 0L; u = nextLong() >>> 1) {
+      }
     }
-    for (long u = r; u - (r = u % bound) + m < 0L; u = nextLong() >>> 1) {}
     return r;
   }
 
   default long nextLong(long origin, long bound) {
     if (origin >= bound) {
-      throw new IllegalArgumentException("bound must be greater than origin: " + origin + " >= " + bound);
+      throw new IllegalArgumentException("bound must be greater than origin");
     }
-    long n = bound - origin;
-    long m = n - 1L;
-    if (n > 0) {
-      if ((n & m) == 0L) {
-        return origin + (nextLong() & m);
+    long r = nextLong();
+    final long n = bound - origin;
+    final long m = n - 1;
+    if ((n & m) == 0L) {
+      r = (r & m) + origin;
+    } else if (n > 0L) {
+      for (long u = r >>> 1; u + m - (r = u % n) < 0L; u = nextLong() >>> 1) {
       }
-      long r = nextLong() >>> 1;
-      for (long u = r; u - (r = u % n) + m < 0L; u = nextLong() >>> 1) {}
-      return origin + r;
+      r += origin;
+    } else {
+      while (r < origin || r >= bound) {
+        r = nextLong();
+      }
     }
-    long r;
-    do {
-      r = nextLong();
-    } while (r < origin || r >= bound);
     return r;
   }
 
@@ -168,6 +194,9 @@ public interface RandomGenerator {
   }
 
   default IntStream ints(int origin, int bound) {
+    if (origin >= bound) {
+      throw new IllegalArgumentException("bound must be greater than origin");
+    }
     return IntStream.generate(() -> nextInt(origin, bound));
   }
 
@@ -186,6 +215,9 @@ public interface RandomGenerator {
   }
 
   default LongStream longs(long origin, long bound) {
+    if (origin >= bound) {
+      throw new IllegalArgumentException("bound must be greater than origin");
+    }
     return LongStream.generate(() -> nextLong(origin, bound));
   }
 
@@ -204,6 +236,9 @@ public interface RandomGenerator {
   }
 
   default DoubleStream doubles(double origin, double bound) {
+    if (!(origin < bound && (bound - origin) < Double.POSITIVE_INFINITY)) {
+      throw new IllegalArgumentException("bound must be greater than origin");
+    }
     return DoubleStream.generate(() -> nextDouble(origin, bound));
   }
 

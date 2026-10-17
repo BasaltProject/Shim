@@ -8,185 +8,261 @@
 
 package java.security;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Random;
+import sun.security.jca.GetInstance;
+import sun.security.jca.Providers;
 
 public class SecureRandom extends Random {
   private static final long serialVersionUID = 4940670005562187L;
 
-  private static final FileInputStream urandomStream;
+  private Provider provider = null;
+  private SecureRandomSpi secureRandomSpi = null;
+  private final String threadSafe = null;
+  private String algorithm;
+  private final boolean threadSafeFlag;
+  private final Object lock = new Object();
 
-  static {
-    FileInputStream stream = null;
-    try {
-      File urandom = new File("/dev/urandom");
-      if (urandom.exists() && urandom.canRead()) {
-        stream = new FileInputStream(urandom);
-      }
-    } catch (Throwable ignored) {
-    }
-    urandomStream = stream;
-  }
-
-  private final String algorithm;
-  private final MessageDigest digest;
-  private final byte[] state = new byte[32];
-  private long counter = 0;
-  private boolean seeded = false;
+  private static volatile SecureRandom seedGenerator;
 
   public SecureRandom() {
-    this("SHA1PRNG");
+    super(0);
+    threadSafeFlag = false;
+    getDefaultPRNG(false, null);
   }
 
   public SecureRandom(byte[] seed) {
-    this("SHA1PRNG");
-    setSeed(seed);
+    super(0);
+    threadSafeFlag = false;
+    getDefaultPRNG(true, seed);
   }
 
-  private SecureRandom(String algorithm) {
-    super(0L);
-    this.algorithm = algorithm;
-    MessageDigest md;
-    try {
-      md = MessageDigest.getInstance("SHA-256");
-    } catch (NoSuchAlgorithmException e) {
-      try {
-        md = MessageDigest.getInstance("SHA-1");
-      } catch (NoSuchAlgorithmException ex) {
-        throw new RuntimeException("No digest algorithm available for SecureRandom", ex);
+  private void getDefaultPRNG(boolean setSeed, byte[] seed) {
+    Provider.Service prngService = null;
+    String prngAlgorithm = null;
+    for (Provider p : Providers.list()) {
+      for (Provider.Service s : p.getServices()) {
+        if (s.getType().equals("SecureRandom")) {
+          prngService = s;
+          prngAlgorithm = s.getAlgorithm();
+          break;
+        }
+      }
+      if (prngService != null) {
+        break;
       }
     }
-    this.digest = md;
-    initDefaultSeed();
+    if (prngService == null) {
+      prngAlgorithm = "SHA1PRNG";
+      this.secureRandomSpi = new sun.security.provider.SecureRandom();
+      this.provider = Providers.named("SUN");
+    } else {
+      try {
+        this.secureRandomSpi = (SecureRandomSpi) prngService.newInstance(null);
+        this.provider = prngService.getProvider();
+      } catch (NoSuchAlgorithmException nsae) {
+        throw new RuntimeException(nsae);
+      }
+    }
+    if (setSeed) {
+      this.secureRandomSpi.engineSetSeed(seed);
+    }
+    this.algorithm = prngAlgorithm;
+  }
+
+  protected SecureRandom(SecureRandomSpi secureRandomSpi, Provider provider) {
+    this(secureRandomSpi, provider, null);
+  }
+
+  private SecureRandom(SecureRandomSpi secureRandomSpi, Provider provider, String algorithm) {
+    super(0);
+    this.secureRandomSpi = secureRandomSpi;
+    this.provider = provider;
+    this.algorithm = algorithm;
+    this.threadSafeFlag = false;
   }
 
   public static SecureRandom getInstance(String algorithm) throws NoSuchAlgorithmException {
-    Objects.requireNonNull(algorithm, "algorithm");
-    String norm = algorithm.toUpperCase(Locale.ROOT);
-    if ("SHA1PRNG".equals(norm) || "NATIVEPRNG".equals(norm) || "DRBG".equals(norm)
-        || "DEFAULT".equals(norm) || "PKCS11".equals(norm)) {
-      return new SecureRandom(algorithm);
-    }
-    throw new NoSuchAlgorithmException(algorithm + " SecureRandom not available");
+    Objects.requireNonNull(algorithm, "null algorithm name");
+    GetInstance.Instance instance = GetInstance.getInstance("SecureRandom", SecureRandomSpi.class, algorithm,
+        (Object) null);
+    return new SecureRandom((SecureRandomSpi) instance.impl, instance.provider, algorithm);
   }
 
-  public static SecureRandom getInstanceStrong() throws NoSuchAlgorithmException {
-    return new SecureRandom("NativePRNG");
+  public static SecureRandom getInstance(String algorithm, String provider)
+      throws NoSuchAlgorithmException, NoSuchProviderException {
+    Objects.requireNonNull(algorithm, "null algorithm name");
+    GetInstance.Instance instance = GetInstance.getInstance("SecureRandom", SecureRandomSpi.class, algorithm,
+        (Object) null, provider);
+    return new SecureRandom((SecureRandomSpi) instance.impl, instance.provider, algorithm);
+  }
+
+  public static SecureRandom getInstance(String algorithm, Provider provider) throws NoSuchAlgorithmException {
+    Objects.requireNonNull(algorithm, "null algorithm name");
+    GetInstance.Instance instance = GetInstance.getInstance("SecureRandom", SecureRandomSpi.class, algorithm,
+        (Object) null, provider);
+    return new SecureRandom((SecureRandomSpi) instance.impl, instance.provider, algorithm);
+  }
+
+  public static SecureRandom getInstance(String algorithm, SecureRandomParameters params)
+      throws NoSuchAlgorithmException {
+    Objects.requireNonNull(algorithm, "null algorithm name");
+    if (params == null) {
+      throw new IllegalArgumentException("params cannot be null");
+    }
+    GetInstance.Instance instance = GetInstance.getInstance("SecureRandom", SecureRandomSpi.class, algorithm, params);
+    return new SecureRandom((SecureRandomSpi) instance.impl, instance.provider, algorithm);
+  }
+
+  public static SecureRandom getInstance(String algorithm, SecureRandomParameters params, String provider)
+      throws NoSuchAlgorithmException, NoSuchProviderException {
+    Objects.requireNonNull(algorithm, "null algorithm name");
+    if (params == null) {
+      throw new IllegalArgumentException("params cannot be null");
+    }
+    GetInstance.Instance instance = GetInstance.getInstance("SecureRandom", SecureRandomSpi.class, algorithm, params,
+        provider);
+    return new SecureRandom((SecureRandomSpi) instance.impl, instance.provider, algorithm);
+  }
+
+  public static SecureRandom getInstance(String algorithm, SecureRandomParameters params, Provider provider)
+      throws NoSuchAlgorithmException {
+    Objects.requireNonNull(algorithm, "null algorithm name");
+    if (params == null) {
+      throw new IllegalArgumentException("params cannot be null");
+    }
+    GetInstance.Instance instance = GetInstance.getInstance("SecureRandom", SecureRandomSpi.class, algorithm, params,
+        provider);
+    return new SecureRandom((SecureRandomSpi) instance.impl, instance.provider, algorithm);
+  }
+
+  public final Provider getProvider() {
+    return provider;
   }
 
   public String getAlgorithm() {
-    return algorithm;
+    return algorithm != null ? algorithm : "unknown";
   }
 
-  private synchronized void initDefaultSeed() {
-    byte[] seedBytes = new byte[32];
-    boolean entropyGathered = false;
-
-    if (urandomStream != null) {
-      try {
-        synchronized (urandomStream) {
-          int offset = 0;
-          while (offset < seedBytes.length) {
-            int read = urandomStream.read(seedBytes, offset, seedBytes.length - offset);
-            if (read < 0) {
-              break;
-            }
-            offset += read;
-          }
-          if (offset == seedBytes.length) {
-            entropyGathered = true;
-          }
-        }
-      } catch (IOException ignored) {
-      }
-    }
-
-    if (!entropyGathered) {
-      throw new ProviderException("Operating-system entropy is unavailable");
-    }
-
-    setSeed(seedBytes);
-    this.seeded = false;
+  @Override
+  public String toString() {
+    return secureRandomSpi.toString();
   }
 
-  public synchronized void setSeed(byte[] seed) {
-    if (seed == null || seed.length == 0) {
-      return;
+  public SecureRandomParameters getParameters() {
+    return secureRandomSpi.engineGetParameters();
+  }
+
+  public void setSeed(byte[] seed) {
+    synchronized (lock) {
+      secureRandomSpi.engineSetSeed(seed);
     }
-    digest.update(state);
-    digest.update(seed);
-    byte[] newHash = digest.digest();
-    System.arraycopy(newHash, 0, state, 0, Math.min(state.length, newHash.length));
-    this.seeded = true;
   }
 
   @Override
   public void setSeed(long seed) {
-    if (seed == 0L) {
-      return;
+    if (seed != 0) {
+      setSeed(longToByteArray(seed));
     }
-    byte[] b = new byte[8];
-    for (int i = 0; i < 8; i++) {
-      b[i] = (byte) (seed >>> (i * 8));
-    }
-    setSeed(b);
   }
 
   @Override
-  public synchronized void nextBytes(byte[] bytes) {
-    Objects.requireNonNull(bytes, "bytes");
-    // Never derive future output from a block disclosed to the caller.
-    readEntropy(bytes);
+  public void nextBytes(byte[] bytes) {
+    synchronized (lock) {
+      secureRandomSpi.engineNextBytes(bytes);
+    }
   }
 
-  private static void readEntropy(byte[] bytes) {
-    if (bytes.length == 0) return;
-    if (urandomStream == null) throw new ProviderException("Operating-system entropy is unavailable");
-    try {
-      synchronized (urandomStream) {
-        int offset = 0;
-        while (offset < bytes.length) {
-          int count = urandomStream.read(bytes, offset, bytes.length - offset);
-          if (count <= 0) throw new IOException("Entropy source ended before filling request");
-          offset += count;
-        }
-      }
-    } catch (IOException failure) {
-      throw new ProviderException("Operating-system entropy read failed", failure);
+  public void nextBytes(byte[] bytes, SecureRandomParameters params) {
+    if (params == null) {
+      throw new IllegalArgumentException("params cannot be null");
+    }
+    synchronized (lock) {
+      secureRandomSpi.engineNextBytes(Objects.requireNonNull(bytes), params);
     }
   }
 
   @Override
   protected final int next(int numBits) {
-    if (numBits <= 0) {
-      return 0;
-    }
     int numBytes = (numBits + 7) / 8;
     byte[] b = new byte[numBytes];
+    int next = 0;
     nextBytes(b);
-
-    int val = 0;
     for (int i = 0; i < numBytes; i++) {
-      val = (val << 8) | (b[i] & 0xFF);
+      next = (next << 8) + (b[i] & 0xFF);
     }
-    return val >>> (numBytes * 8 - numBits);
+    return next >>> (numBytes * 8 - numBits);
   }
 
   public static byte[] getSeed(int numBytes) {
-    SecureRandom sr = new SecureRandom();
-    return sr.generateSeed(numBytes);
+    SecureRandom gen = seedGenerator;
+    if (gen == null) {
+      gen = new SecureRandom();
+      seedGenerator = gen;
+    }
+    return gen.generateSeed(numBytes);
   }
 
   public byte[] generateSeed(int numBytes) {
     if (numBytes < 0) {
-      throw new NegativeArraySizeException("Negative seed size");
+      throw new IllegalArgumentException("numBytes cannot be negative");
     }
-    byte[] seed = new byte[numBytes];
-    readEntropy(seed);
-    return seed;
+    return secureRandomSpi.engineGenerateSeed(numBytes);
+  }
+
+  private static byte[] longToByteArray(long l) {
+    byte[] retVal = new byte[8];
+    for (int i = 0; i < 8; i++) {
+      retVal[i] = (byte) l;
+      l >>= 8;
+    }
+    return retVal;
+  }
+
+  public static SecureRandom getInstanceStrong() throws NoSuchAlgorithmException {
+    String property = Security.getProperty("securerandom.strongAlgorithms");
+    if (property == null || property.isEmpty()) {
+      throw new NoSuchAlgorithmException("Null/empty securerandom.strongAlgorithms Security Property");
+    }
+    String remainder = property;
+    while (remainder != null) {
+      String algName;
+      String prov = null;
+      int comma = remainder.indexOf(',');
+      String token = comma < 0 ? remainder : remainder.substring(0, comma);
+      remainder = comma < 0 ? null : remainder.substring(comma + 1);
+      token = token.trim();
+      int colon = token.indexOf(':');
+      if (colon < 0) {
+        algName = token;
+      } else {
+        algName = token.substring(0, colon).trim();
+        prov = token.substring(colon + 1).trim();
+      }
+      try {
+        if (prov == null) {
+          return SecureRandom.getInstance(algName);
+        }
+        return SecureRandom.getInstance(algName, prov);
+      } catch (NoSuchAlgorithmException | NoSuchProviderException e) {
+        // try next
+      }
+    }
+    throw new NoSuchAlgorithmException("No strong SecureRandom impls available: " + property);
+  }
+
+  public void reseed() {
+    synchronized (lock) {
+      secureRandomSpi.engineReseed(null);
+    }
+  }
+
+  public void reseed(SecureRandomParameters params) {
+    if (params == null) {
+      throw new IllegalArgumentException("params cannot be null");
+    }
+    synchronized (lock) {
+      secureRandomSpi.engineReseed(params);
+    }
   }
 }
