@@ -41,6 +41,7 @@ final class XmlDtdScanner {
   }
 
   void start() throws IOException, XmlException {
+    sc.beginRecording();
     sc.skipString("<!DOCTYPE");
     if (!sc.skipSpaces()) {
       throw p.error("White space is required after \"<!DOCTYPE\" in the document type declaration.");
@@ -89,6 +90,10 @@ final class XmlDtdScanner {
       throw p.error(XmlMessages.doctypeUnterminated(dtd.rootName));
     }
     sc.read();
+    dtd.rawText = sc.endRecording();
+    dtd.endLine = sc.line();
+    dtd.endCol = sc.col();
+    dtd.endOffset = sc.offset();
     phase = 2;
   }
 

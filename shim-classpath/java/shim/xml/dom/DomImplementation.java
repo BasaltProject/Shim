@@ -102,6 +102,10 @@ public class DomImplementation implements DOMImplementation, DOMImplementationLS
     if (mode != DOMImplementationLS.MODE_SYNCHRONOUS) {
       throw DomMessages.error(DOMException.NOT_SUPPORTED_ERR);
     }
+    if (schemaType != null && !schemaType.equals("http://www.w3.org/2001/XMLSchema")
+        && !schemaType.equals("http://www.w3.org/TR/REC-xml")) {
+      throw DomMessages.error(DOMException.NOT_SUPPORTED_ERR);
+    }
     return new DomLsParser();
   }
 

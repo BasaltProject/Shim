@@ -71,6 +71,11 @@ public final class XmlPullParser {
     public String prefix = "";
     public String[] nsDecls;
     public String literal;
+    public int offset;
+    public int lookahead;
+    public int nextChar;
+    public boolean charRef;
+    public int staxPad;
   }
 
   private static final int kXmlDecl = 5;
@@ -94,6 +99,9 @@ public final class XmlPullParser {
   private IOException deferredIo;
 
   public boolean namespaceAware;
+  public boolean hasDeclaration;
+  public boolean splitCharRefs;
+  public boolean reportEntityRefs;
   private final ArrayList<String> nsPrefixes = new ArrayList<String>();
   private final ArrayList<String> nsUris = new ArrayList<String>();
   private final ArrayList<int[]> nsFrames = new ArrayList<int[]>();
@@ -116,6 +124,24 @@ public final class XmlPullParser {
 
   public Ev current() {
     return cur;
+  }
+
+  public void closeInput() {
+    sc.closeAll();
+  }
+
+  public int beginDocument() throws XmlException, IOException {
+    int kind = next();
+    if (state == kXmlDecl) {
+      scanXmlDecl();
+      state = kProlog;
+      if (hasDeclaration) {
+        cur.line = sc.line();
+        cur.col = sc.col();
+        cur.offset = sc.offset();
+      }
+    }
+    return kind;
   }
 
   public int line() {
@@ -164,6 +190,7 @@ public final class XmlPullParser {
     e.kind = kind;
     e.line = sc.line();
     e.col = sc.col();
+    e.offset = sc.offset();
     e.systemId = sc.systemId() != null ? sc.systemId() : input.systemId;
     return e;
   }
@@ -235,6 +262,7 @@ public final class XmlPullParser {
       return;
     }
     sc.skipString("<?xml");
+    hasDeclaration = true;
     sc.skipSpaces();
     String first = pseudoName();
     String firstValue = pseudoValue(first == null ? "version" : first);
@@ -536,6 +564,7 @@ public final class XmlPullParser {
   private boolean textAscii;
 
   private int text() throws IOException, XmlException {
+    boolean wasCharRef = false;
     textBuf.setLength(0);
     textAscii = true;
     int brackets = 0;
@@ -547,12 +576,19 @@ public final class XmlPullParser {
       }
       if (c == '&') {
         if (sc.peek(1) == '#') {
+          if (splitCharRefs && textBuf.length() > 0) {
+            break;
+          }
           sc.read();
           sc.read();
           int cp = charRef();
           appendCodePoint(textBuf, cp);
           allSpace = false;
           brackets = 0;
+          if (splitCharRefs) {
+            wasCharRef = true;
+            break;
+          }
           continue;
         }
         break;
@@ -598,9 +634,18 @@ public final class XmlPullParser {
     }
     cur = ev(ignorable ? kIgnorableWhitespace : kCharacters);
     cur.a = t;
+    cur.charRef = wasCharRef;
+    if (!wasCharRef && textAscii) {
+      int next = sc.peek();
+      cur.staxPad = next == '<' ? (sc.peek(1) == '/' ? 2 : 1) : next == '&' ? 1 : 0;
+    }
     if (sc.peek() == '<' && textAscii) {
       int d = sc.peek(1);
-      cur.col += (d == '/' || d == '!' || d == '?') ? 2 : 1;
+      int delta = (d == '/' || d == '!' || d == '?') ? 2 : 1;
+      cur.col += delta;
+      cur.offset += delta;
+      cur.lookahead = delta;
+      cur.nextChar = d;
     }
     return cur.kind;
   }
@@ -682,6 +727,12 @@ public final class XmlPullParser {
       return kEntityStart;
     }
     XmlDtd.EntityDecl decl = dtd == null ? null : dtd.generalEntities.get(name);
+    if (reportEntityRefs) {
+      cur = ev(kSkippedEntity);
+      cur.a = name;
+      cur.b = decl != null && !decl.external ? decl.value : null;
+      return kSkippedEntity;
+    }
     if (decl == null) {
       if (dtd != null && !standalone && (dtd.systemId != null || dtd.hasExternalParameterEntity)) {
         cur = ev(kSkippedEntity);
@@ -696,6 +747,9 @@ public final class XmlPullParser {
     if (sc.isActiveEntity(name)) {
       throw error(XmlMessages.recursiveReference(name, recursionPath(name)));
     }
+    int markLine = sc.line();
+    int markCol = sc.col();
+    int markOffset = sc.offset();
     if (!decl.external) {
       sc.pushInternal(name, decl.value, decl.baseUri);
     } else {
@@ -716,6 +770,9 @@ public final class XmlPullParser {
     entityFrames.add(new String[] {name, String.valueOf(elements.size())});
     cur = ev(kEntityStart);
     cur.a = name;
+    cur.line = markLine;
+    cur.col = markCol;
+    cur.offset = markOffset;
     return kEntityStart;
   }
 

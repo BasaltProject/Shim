@@ -56,6 +56,10 @@ public final class XmlDtd {
   }
 
   public String rootName;
+  public String rawText;
+  public int endLine;
+  public int endCol;
+  public int endOffset;
   public String publicId;
   public String systemId;
   public String internalSubset;

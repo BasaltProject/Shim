@@ -54,6 +54,9 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
   private boolean standaloneNoDeclaration;
   private boolean declarationForDocument = true;
 
+  private String rawDoctype;
+  private boolean lsMode;
+  private boolean skipBlankText;
   private boolean started;
   private boolean declWritten;
   private boolean docTypeWritten;
@@ -233,6 +236,10 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
       return;
     }
     docTypeWritten = true;
+    if (rawDoctype != null) {
+      raw(rawDoctype);
+      return;
+    }
     if (doctypeSystem == null) {
       return;
     }
@@ -445,6 +452,27 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
   }
 
   public void skippedEntity(String name) throws SAXException {
+    if (indent) {
+      addLeaf(Node.kRaw, null, "&" + name + ";");
+      return;
+    }
+    closeOpenTag();
+    if (!rootStarted && directStack.isEmpty()) {
+      writeDeclaration();
+    }
+    raw("&" + name + ";");
+  }
+
+  public void setRawDoctype(String text) {
+    this.rawDoctype = text;
+  }
+
+  public void setLsMode(boolean value) {
+    this.lsMode = value;
+  }
+
+  public void setSkipBlankText(boolean value) {
+    this.skipBlankText = value;
   }
 
   public void startDTD(String name, String publicId, String systemId) throws SAXException {
@@ -468,6 +496,9 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
     inCdata = false;
     if (!indent && !method.equals("text")) {
       closeOpenTag();
+      if (!rootStarted && directStack.isEmpty()) {
+        writeDeclaration();
+      }
       raw(cdataSection(cdataBuffer.toString()));
     }
   }
@@ -489,6 +520,9 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
   }
 
   private void addLeaf(int kind, String name, String data) {
+    if (skipBlankText && kind == Node.kText && data.trim().isEmpty() && !stack.isEmpty()) {
+      return;
+    }
     Node n = new Node();
     n.kind = kind;
     n.name = name;
@@ -519,7 +553,8 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
   }
 
   private boolean inlineText(Node e) {
-    return e.children.size() == 1 && (e.children.get(0).kind == Node.kText || e.children.get(0).kind == Node.kCdata);
+    return e.children.size() == 1 && (e.children.get(0).kind == Node.kText || e.children.get(0).kind == Node.kCdata
+        || lsMode && e.children.get(0).kind == Node.kRaw);
   }
 
   private void pad(StringBuilder sb, int depth) {
@@ -542,7 +577,9 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
       } else if (inlineText(n)) {
         sb.append('>');
         Node c = n.children.get(0);
-        if (c.kind == Node.kText) {
+        if (c.kind == Node.kRaw) {
+          sb.append(c.data);
+        } else if (c.kind == Node.kText) {
           if (cdataElements.contains(n.key)) {
             sb.append(cdataSection(c.data));
           } else {
@@ -592,6 +629,9 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
       break;
     case Node.kPi:
       sb.append("<?").append(c.name).append(c.data == null || c.data.isEmpty() ? "" : " " + c.data).append("?>");
+      break;
+    case Node.kRaw:
+      sb.append(c.data);
       break;
     default:
       break;
