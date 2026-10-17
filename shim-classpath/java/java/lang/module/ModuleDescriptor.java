@@ -126,6 +126,20 @@ public final class ModuleDescriptor implements Comparable<ModuleDescriptor> {
     return "module { name: " + name + " }";
   }
 
+  public static ModuleDescriptor read(java.io.InputStream in) throws java.io.IOException {
+    return shim.module.ModuleInfoReader.read(Objects.requireNonNull(in), Collections.<String>emptySet());
+  }
+
+  public static ModuleDescriptor read(java.nio.ByteBuffer bb) {
+    byte[] b = new byte[bb.remaining()];
+    bb.get(b);
+    try {
+      return read(new java.io.ByteArrayInputStream(b));
+    } catch (java.io.IOException e) {
+      throw new InvalidModuleDescriptorException(e.getMessage());
+    }
+  }
+
   public static Builder newModule(String name) {
     return new Builder(name, false);
   }
@@ -524,15 +538,48 @@ public final class ModuleDescriptor implements Comparable<ModuleDescriptor> {
     }
 
     public ModuleDescriptor build() {
+      Set<Requires> reqs = new HashSet<Requires>(requires);
+      if (!name.equals("java.base")) {
+        boolean has = false;
+        for (Requires r : reqs) {
+          if (r.name().equals("java.base")) {
+            has = true;
+          }
+        }
+        if (!has) {
+          reqs.add(new Requires(Collections.singleton(Requires.Modifier.MANDATED), "java.base", null, null));
+        }
+      }
+      Set<String> pkgs = new HashSet<String>(packages);
+      for (Exports e : exports) {
+        pkgs.add(e.source());
+      }
+      for (Opens o : opens) {
+        pkgs.add(o.source());
+      }
+      for (Provides pr : provides) {
+        for (String impl : pr.providers()) {
+          int dot = impl.lastIndexOf('.');
+          if (dot > 0) {
+            pkgs.add(impl.substring(0, dot));
+          }
+        }
+      }
+      if (mainClass != null) {
+        int dot = mainClass.lastIndexOf('.');
+        if (dot > 0) {
+          pkgs.add(mainClass.substring(0, dot));
+        }
+      }
       return new ModuleDescriptor(
           name,
           open,
           automatic,
-          packages,
+          pkgs,
           version,
           rawVersion,
           mainClass,
-          requires,
+          reqs,
           exports,
           opens,
           provides,

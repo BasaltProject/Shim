@@ -27,9 +27,23 @@ public class FieldPosition {
   int field = 0;
   int endIndex = 0;
   int beginIndex = 0;
+  private Format.Field attribute;
 
   public FieldPosition(int field) {
     this.field = field;
+  }
+
+  public FieldPosition(Format.Field attribute) {
+    this(attribute, -1);
+  }
+
+  public FieldPosition(Format.Field attribute, int fieldID) {
+    this.attribute = attribute;
+    this.field = fieldID;
+  }
+
+  public Format.Field getFieldAttribute() {
+    return attribute;
   }
 
   public int getField() {
@@ -61,7 +75,8 @@ public class FieldPosition {
       return false;
     }
     FieldPosition other = (FieldPosition) obj;
-    return beginIndex == other.beginIndex && endIndex == other.endIndex && field == other.field;
+    return beginIndex == other.beginIndex && endIndex == other.endIndex && field == other.field
+        && java.util.Objects.equals(attribute, other.attribute);
   }
 
   @Override
@@ -71,7 +86,7 @@ public class FieldPosition {
 
   @Override
   public String toString() {
-    return getClass().getName() + "[field=" + field + ",attribute=null,beginIndex=" + beginIndex + ",endIndex="
+    return getClass().getName() + "[field=" + field + ",attribute=" + attribute + ",beginIndex=" + beginIndex + ",endIndex="
         + endIndex + ']';
   }
 }

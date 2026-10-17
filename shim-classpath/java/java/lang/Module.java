@@ -21,6 +21,18 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   private final ModuleDescriptor descriptor;
   private final ModuleLayer layer;
   private final Set<String> packages;
+  private java.lang.module.ResolvedModule resolved;
+  private final Set<Module> extraReads = new HashSet<Module>();
+  private final java.util.Map<String, Set<Module>> extraExports = new java.util.HashMap<String, Set<Module>>();
+  private final java.util.Map<String, Set<Module>> extraOpens = new java.util.HashMap<String, Set<Module>>();
+
+  void define(java.lang.module.ResolvedModule r) {
+    this.resolved = r;
+  }
+
+  private boolean defined() {
+    return resolved != null;
+  }
 
   public static final Module JAVA_BASE;
 
@@ -74,45 +86,141 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
 
   public boolean canRead(Module other) {
     Objects.requireNonNull(other);
-    return true;
+    if (!defined() || other == this || !other.isNamed()) {
+      return true;
+    }
+    if (extraReads.contains(other)) {
+      return true;
+    }
+    for (java.lang.module.ResolvedModule r : resolved.reads()) {
+      if (r.name().equals(other.name) && (other.resolved == null || other.resolved.equals(r))) {
+        return true;
+      }
+    }
+    return other.resolved == null;
   }
 
   public Module addReads(Module other) {
     Objects.requireNonNull(other);
+    if (defined() && other.isNamed()) {
+      extraReads.add(other);
+    }
     return this;
   }
+
+  private boolean exportedTo(java.lang.module.ModuleDescriptor d, String pn, Module other, boolean opens) {
+    if (d.isOpen() || opens) {
+      if (d.isOpen()) {
+        return true;
+      }
+      for (java.lang.module.ModuleDescriptor.Opens o : d.opens()) {
+        if (o.source().equals(pn) && (!o.isQualified() || (other != null && o.targets().contains(other.name)))) {
+          return true;
+        }
+      }
+      return false;
+    }
+    for (java.lang.module.ModuleDescriptor.Exports e : d.exports()) {
+      if (e.source().equals(pn) && (!e.isQualified() || (other != null && e.targets().contains(other.name)))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean addedFor(java.util.Map<String, Set<Module>> m, String pn, Module other) {
+    Set<Module> to = m.get(pn);
+    return to != null && (to.contains(ALL_UNNAMED_MODULE) || (other != null && to.contains(other)));
+  }
+
+  private static final Module ALL_UNNAMED_MODULE = new Module(null);
 
   public boolean isExported(String pn, Module other) {
     Objects.requireNonNull(pn);
     Objects.requireNonNull(other);
-    return true;
+    if (!defined() || other == this) {
+      return !defined() || packages.contains(pn);
+    }
+    if (!packages.contains(pn)) {
+      return false;
+    }
+    return exportedTo(descriptor, pn, other, false) || addedFor(extraExports, pn, other)
+        || addedFor(extraOpens, pn, other) || exportedTo(descriptor, pn, other, true);
   }
 
   public boolean isExported(String pn) {
     Objects.requireNonNull(pn);
-    return true;
+    if (!defined()) {
+      return true;
+    }
+    if (!packages.contains(pn)) {
+      return false;
+    }
+    if (descriptor.isOpen()) {
+      return true;
+    }
+    for (java.lang.module.ModuleDescriptor.Exports e : descriptor.exports()) {
+      if (e.source().equals(pn) && !e.isQualified()) {
+        return true;
+      }
+    }
+    for (java.lang.module.ModuleDescriptor.Opens o : descriptor.opens()) {
+      if (o.source().equals(pn) && !o.isQualified()) {
+        return true;
+      }
+    }
+    return addedFor(extraExports, pn, null) || addedFor(extraOpens, pn, null);
   }
 
   public Module addExports(String pn, Module ordinary) {
     Objects.requireNonNull(pn);
     Objects.requireNonNull(ordinary);
+    if (defined() && !packages.contains(pn)) {
+      throw new IllegalArgumentException("package " + pn + " not in contents");
+    }
+    if (defined()) {
+      extraExports.computeIfAbsent(pn, k -> new HashSet<Module>()).add(ordinary);
+    }
     return this;
   }
 
   public boolean isOpen(String pn, Module other) {
     Objects.requireNonNull(pn);
     Objects.requireNonNull(other);
-    return true;
+    if (!defined() || other == this) {
+      return !defined() || packages.contains(pn);
+    }
+    return packages.contains(pn) && (exportedTo(descriptor, pn, other, true) || addedFor(extraOpens, pn, other));
   }
 
   public boolean isOpen(String pn) {
     Objects.requireNonNull(pn);
-    return true;
+    if (!defined()) {
+      return true;
+    }
+    if (!packages.contains(pn)) {
+      return false;
+    }
+    if (descriptor.isOpen()) {
+      return true;
+    }
+    for (java.lang.module.ModuleDescriptor.Opens o : descriptor.opens()) {
+      if (o.source().equals(pn) && !o.isQualified()) {
+        return true;
+      }
+    }
+    return addedFor(extraOpens, pn, null);
   }
 
   public Module addOpens(String pn, Module other) {
     Objects.requireNonNull(pn);
     Objects.requireNonNull(other);
+    if (defined() && !packages.contains(pn)) {
+      throw new IllegalArgumentException("package " + pn + " not in contents");
+    }
+    if (defined()) {
+      extraOpens.computeIfAbsent(pn, k -> new HashSet<Module>()).add(other);
+    }
     return this;
   }
 
