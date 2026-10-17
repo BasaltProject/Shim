@@ -488,7 +488,7 @@ public final class Character implements java.io.Serializable, Comparable<Charact
     }
 
     char high = sequence.charAt(offset);
-    if (! isHighSurrogate(high) || offset >= length) {
+    if (! isHighSurrogate(high) || offset + 1 >= length) {
       return high;
     }
     char low = sequence.charAt(offset + 1);
