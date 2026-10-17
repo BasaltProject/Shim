@@ -38,6 +38,10 @@ public class RuntimeException extends Exception {
     this(cause == null ? null : cause.toString(), cause);
   }
 
+  protected RuntimeException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+    super(message, cause, enableSuppression, writableStackTrace);
+  }
+
   public RuntimeException() {
     this(null, null);
   }

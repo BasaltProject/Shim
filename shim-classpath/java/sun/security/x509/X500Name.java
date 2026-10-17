@@ -551,6 +551,17 @@ public final class X500Name implements Principal {
     return sb.toString();
   }
 
+  public String getMostSpecificCommonName() {
+    for (int i = rdns.size() - 1; i >= 0; i--) {
+      for (AVA ava : rdns.get(i)) {
+        if (ava.oid.equals("2.5.4.3")) {
+          return stringValue(ava.value, 0);
+        }
+      }
+    }
+    return null;
+  }
+
   public String getRFC2253Name(Map<String, String> oidMap) {
     return format(0, oidMap);
   }

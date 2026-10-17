@@ -38,6 +38,10 @@ public class Exception extends Throwable {
     this(cause == null ? null : cause.toString(), cause);
   }
 
+  protected Exception(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+    super(message, cause, enableSuppression, writableStackTrace);
+  }
+
   public Exception() {
     this(null, null);
   }
