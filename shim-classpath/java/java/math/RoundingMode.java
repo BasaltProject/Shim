@@ -34,16 +34,32 @@ public enum RoundingMode {
   HALF_EVEN  (6),
   UNNECESSARY(7);
 
-  RoundingMode(int rm) {
-    roundingMode = rm;
+  RoundingMode(int oldMode) {
+    this.oldMode = oldMode;
   }
 
-  private final int roundingMode;
+  final int oldMode;
 
-  public static RoundingMode valueOf(int roundingMode) {
-    final RoundingMode[] values = values();
-    if (roundingMode < 0 || roundingMode >= values.length)
-      throw new IllegalArgumentException();
-    return values[roundingMode];
+  public static RoundingMode valueOf(int rm) {
+    switch (rm) {
+      case 0:
+        return UP;
+      case 1:
+        return DOWN;
+      case 2:
+        return CEILING;
+      case 3:
+        return FLOOR;
+      case 4:
+        return HALF_UP;
+      case 5:
+        return HALF_DOWN;
+      case 6:
+        return HALF_EVEN;
+      case 7:
+        return UNNECESSARY;
+      default:
+        throw new IllegalArgumentException("argument out of range");
+    }
   }
 }
