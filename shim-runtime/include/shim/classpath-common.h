@@ -306,7 +306,7 @@ GcStackTraceElement* makeStackTraceElement(Thread* t, GcTraceElement* e)
       = file ? t->m->classpath->makeString(t, file, 0, file->length() - 1) : 0;
 
   return makeStackTraceElement(
-      t, class_name_string, method_name_string, file_string, line);
+      t, 0, 0, 0, class_name_string, method_name_string, file_string, line);
 }
 
 GcObject* translateInvokeResult(Thread* t, unsigned returnCode, object o)

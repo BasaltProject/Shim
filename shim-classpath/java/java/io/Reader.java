@@ -99,6 +99,102 @@ public abstract class Reader implements Readable, Closeable {
     };
   }
 
+  public static Reader of(final CharSequence cs) {
+    Objects.requireNonNull(cs);
+    return new Reader() {
+      private boolean closed;
+      private int next;
+      private int mark;
+
+      private void ensureOpen() throws IOException {
+        if (closed) throw new IOException("Stream closed");
+      }
+
+      public int read() throws IOException {
+        synchronized (this) {
+          ensureOpen();
+          return next < cs.length() ? cs.charAt(next++) : -1;
+        }
+      }
+
+      public int read(char[] cbuf, int off, int len) throws IOException {
+        synchronized (this) {
+          ensureOpen();
+          Objects.checkFromIndexSize(off, len, cbuf.length);
+          if (len == 0) return 0;
+          if (next >= cs.length()) return -1;
+          int n = Math.min(cs.length() - next, len);
+          for (int i = 0; i < n; i++) cbuf[off + i] = cs.charAt(next + i);
+          next += n;
+          return n;
+        }
+      }
+
+      public long skip(long n) throws IOException {
+        synchronized (this) {
+          ensureOpen();
+          if (next >= cs.length()) return 0;
+          long r = Math.min(cs.length() - next, n);
+          r = Math.max(-next, r);
+          next += (int) r;
+          return r;
+        }
+      }
+
+      public boolean ready() throws IOException {
+        synchronized (this) {
+          ensureOpen();
+          return true;
+        }
+      }
+
+      public boolean markSupported() {
+        return true;
+      }
+
+      public void mark(int readAheadLimit) throws IOException {
+        if (readAheadLimit < 0) throw new IllegalArgumentException("Read-ahead limit < 0");
+        synchronized (this) {
+          ensureOpen();
+          mark = next;
+        }
+      }
+
+      public void reset() throws IOException {
+        synchronized (this) {
+          ensureOpen();
+          next = mark;
+        }
+      }
+
+      public void close() {
+        synchronized (this) {
+          closed = true;
+        }
+      }
+    };
+  }
+
+  public String readAllAsString() throws IOException {
+    StringBuilder result = new StringBuilder();
+    char[] cbuf = new char[kTransferBufferSize];
+    int nread;
+    while ((nread = read(cbuf, 0, cbuf.length)) != -1) {
+      result.append(cbuf, 0, nread);
+    }
+    return result.toString();
+  }
+
+  public java.util.List<String> readAllLines() throws IOException {
+    java.util.List<String> lines = new java.util.ArrayList<String>();
+    BufferedReader br = this instanceof BufferedReader ? (BufferedReader) this : new BufferedReader(this);
+    String line;
+    while ((line = br.readLine()) != null) {
+      lines.add(line);
+    }
+    return lines;
+  }
+
   protected Reader() {
     this.lock = this;
   }

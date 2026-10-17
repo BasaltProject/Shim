@@ -11,19 +11,41 @@ package java.util.logging;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.time.ZonedDateTime;
 
 public class SimpleFormatter extends Formatter {
-  private static final DateTimeFormatter formatter =
-      DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss.SSS");
+  private static final String kDefaultFormat = "%1$tb %1$td, %1$tY %1$tl:%1$tM:%1$tS %1$Tp %2$s%n%4$s: %5$s%6$s%n";
 
-  public synchronized String format(LogRecord record) {
-    LocalDateTime ldt = LocalDateTime.ofInstant(
-        record.getInstant() != null ? record.getInstant() : Instant.now(),
-        ZoneId.systemDefault());
+  private final String format;
+
+  static String getLoggingProperty(String name) {
+    return LogManager.getLogManager().getProperty(name);
+  }
+
+  public SimpleFormatter() {
+    String fmt = getLoggingProperty("java.util.logging.SimpleFormatter.format");
+    if (fmt == null) {
+      fmt = System.getProperty("java.util.logging.SimpleFormatter.format");
+    }
+    format = checkFormat(fmt);
+  }
+
+  private static String checkFormat(String fmt) {
+    if (fmt == null) {
+      return kDefaultFormat;
+    }
+    try {
+      String.format(fmt, ZonedDateTime.now(), "", "", "", "", "");
+    } catch (IllegalArgumentException e) {
+      return kDefaultFormat;
+    }
+    return fmt;
+  }
+
+  @Override
+  public String format(LogRecord record) {
+    ZonedDateTime zdt = ZonedDateTime.ofInstant(record.getInstant(), ZoneId.systemDefault());
     String source;
     if (record.getSourceClassName() != null) {
       source = record.getSourceClassName();
@@ -43,11 +65,7 @@ public class SimpleFormatter extends Formatter {
       pw.close();
       throwable = sw.toString();
     }
-    return String.format("%s %s %s: %s%s%n",
-        ldt.format(formatter),
-        source,
-        record.getLevel().getLocalizedName(),
-        message,
-        throwable);
+    return String.format(format, zdt, source, record.getLoggerName(), record.getLevel().getLocalizedLevelName(),
+        message, throwable);
   }
 }

@@ -386,53 +386,7 @@ public abstract class System {
     public Logger getLogger(String name, Module module) {
       Objects.requireNonNull(name, "name");
       Objects.requireNonNull(module, "module");
-      return new DefaultLogger(name);
-    }
-  }
-
-  private static final class DefaultLogger implements Logger {
-    private final String name;
-
-    DefaultLogger(String name) {
-      this.name = Objects.requireNonNull(name, "name");
-    }
-
-    @Override
-    public String getName() {
-      return name;
-    }
-
-    @Override
-    public boolean isLoggable(Level level) {
-      Objects.requireNonNull(level, "level");
-      return level.getSeverity() >= Level.INFO.getSeverity();
-    }
-
-    @Override
-    public void log(Level level, ResourceBundle bundle, String msg, Throwable thrown) {
-      Objects.requireNonNull(level, "level");
-      if (!isLoggable(level)) return;
-      System.err.println("[" + level.getName() + "] [" + name + "] " + (msg != null ? msg : ""));
-      if (thrown != null) {
-        thrown.printStackTrace(System.err);
-      }
-    }
-
-    @Override
-    public void log(Level level, ResourceBundle bundle, String format, Object... params) {
-      Objects.requireNonNull(level, "level");
-      if (!isLoggable(level)) return;
-      String formatted;
-      if (format != null && params != null && params.length > 0) {
-        try {
-          formatted = String.format(format, params);
-        } catch (Throwable ignored) {
-          formatted = format;
-        }
-      } else {
-        formatted = format;
-      }
-      System.err.println("[" + level.getName() + "] [" + name + "] " + (formatted != null ? formatted : ""));
+      return new sun.util.logging.internal.JulSystemLogger(name);
     }
   }
 

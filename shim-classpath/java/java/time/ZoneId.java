@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TimeZone;
 
 public abstract class ZoneId implements Serializable {
   public static final Map<String, String> SHORT_IDS;
@@ -60,21 +61,7 @@ public abstract class ZoneId implements Serializable {
   private static final long serialVersionUID = 8352817235686L;
 
   public static ZoneId systemDefault() {
-    String id = System.getProperty("user.timezone");
-    if (id == null || id.isEmpty()) {
-      id = System.getenv("TZ");
-    }
-    if (id != null && id.startsWith(":")) {
-      id = id.substring(1);
-    }
-    if (id != null && !id.isEmpty()) {
-      try {
-        return ZoneId.of(id, SHORT_IDS);
-      } catch (DateTimeException ex) {
-        return ZoneOffset.UTC;
-      }
-    }
-    return ZoneId.of("UTC");
+    return TimeZone.getDefault().toZoneId();
   }
 
   public static Set<String> getAvailableZoneIds() {

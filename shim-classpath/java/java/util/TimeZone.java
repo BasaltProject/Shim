@@ -331,11 +331,16 @@ public abstract class TimeZone implements Serializable, Cloneable {
       synchronized (TimeZone.class) {
         defaultZone = defaultTimeZone;
         if (defaultZone == null) {
-          ZoneId zone = ZoneId.systemDefault();
-          String id = zone.getId();
-          TimeZone tz = getTimeZone(id, false);
+          String id = System.getProperty("user.timezone");
+          if (id == null || id.isEmpty()) {
+            id = shim.PlatformZone.detect();
+            if (id != null) {
+              System.setProperty("user.timezone", id);
+            }
+          }
+          TimeZone tz = id == null ? null : getTimeZone(id, false);
           if (tz == null) {
-            tz = getTimeZone("GMT", true);
+            tz = getTimeZone(id == null ? "UTC" : "GMT", true);
           }
           defaultTimeZone = defaultZone = tz;
         }
