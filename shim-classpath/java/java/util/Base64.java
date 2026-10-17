@@ -455,7 +455,7 @@ public class Base64 {
         int val = table[b];
         if (val == -1) {
           if (isMime) continue;
-          throw new IllegalArgumentException("Illegal base64 character 0x" + Integer.toHexString(b));
+          throw new IllegalArgumentException("Illegal base64 character " + Integer.toString((byte) b, 16));
         }
         if (val == -2) {
           // padding '='

@@ -8,7 +8,9 @@
 
 package java.security.cert;
 
-public class CertStoreException extends java.security.GeneralSecurityException {
+import java.security.GeneralSecurityException;
+
+public class CertStoreException extends GeneralSecurityException {
   private static final long serialVersionUID = 2395296107471573245L;
 
   public CertStoreException() {
@@ -19,11 +21,11 @@ public class CertStoreException extends java.security.GeneralSecurityException {
     super(msg);
   }
 
-  public CertStoreException(String message, Throwable cause) {
-    super(message, cause);
-  }
-
   public CertStoreException(Throwable cause) {
     super(cause);
+  }
+
+  public CertStoreException(String msg, Throwable cause) {
+    super(msg, cause);
   }
 }
