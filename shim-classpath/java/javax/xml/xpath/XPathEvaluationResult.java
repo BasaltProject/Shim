@@ -30,7 +30,7 @@ public interface XPathEvaluationResult<T> {
 
     public static QName getQNameType(Class<?> type) {
       for (XPathResultType t : values()) {
-        if (t.clazz == type) {
+        if (t != ANY && t.clazz.isAssignableFrom(type)) {
           return t.qname;
         }
       }
