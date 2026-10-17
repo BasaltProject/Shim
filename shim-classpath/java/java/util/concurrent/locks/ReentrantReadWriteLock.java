@@ -73,6 +73,72 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
     }
   }
 
+  private final java.util.LinkedHashSet<Thread> queued = new java.util.LinkedHashSet<Thread>();
+
+  private void waitSync() throws InterruptedException {
+    Thread t = Thread.currentThread();
+    queued.add(t);
+    try {
+      sync.wait();
+    } finally {
+      queued.remove(t);
+    }
+  }
+
+  private void waitSync(long millis, int nanos) throws InterruptedException {
+    Thread t = Thread.currentThread();
+    queued.add(t);
+    try {
+      sync.wait(millis, nanos);
+    } finally {
+      queued.remove(t);
+    }
+  }
+
+  public final boolean hasQueuedThreads() {
+    synchronized (sync) {
+      return !queued.isEmpty();
+    }
+  }
+
+  public final boolean hasQueuedThread(Thread thread) {
+    java.util.Objects.requireNonNull(thread);
+    synchronized (sync) {
+      return queued.contains(thread);
+    }
+  }
+
+  public final int getQueueLength() {
+    synchronized (sync) {
+      return queued.size();
+    }
+  }
+
+  private WriteLock.WriteCondition waitConditionOf(Condition condition) {
+    if (condition == null) {
+      throw new NullPointerException();
+    }
+    if (!(condition instanceof WriteLock.WriteCondition)) {
+      throw new IllegalArgumentException("not owner");
+    }
+    WriteLock.WriteCondition c = (WriteLock.WriteCondition) condition;
+    if (c.lockOwner() != writerLock) {
+      throw new IllegalArgumentException("not owner");
+    }
+    if (!isWriteLockedByCurrentThread()) {
+      throw new IllegalMonitorStateException();
+    }
+    return c;
+  }
+
+  public boolean hasWaiters(Condition condition) {
+    return waitConditionOf(condition).waiters() > 0;
+  }
+
+  public int getWaitQueueLength(Condition condition) {
+    return waitConditionOf(condition).waiters();
+  }
+
   public int getReadHoldCount() {
     Integer c = readHolds.get();
     return c == null ? 0 : c.intValue();
@@ -92,7 +158,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
         boolean interrupted = false;
         while (rwLock.writerOwner != null && rwLock.writerOwner != current) {
           try {
-            rwLock.sync.wait();
+            rwLock.waitSync();
           } catch (InterruptedException e) {
             interrupted = true;
           }
@@ -113,7 +179,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
       synchronized (rwLock.sync) {
         Thread current = Thread.currentThread();
         while (rwLock.writerOwner != null && rwLock.writerOwner != current) {
-          rwLock.sync.wait();
+          rwLock.waitSync();
         }
         rwLock.readLockCount++;
         Integer h = rwLock.readHolds.get();
@@ -152,7 +218,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
           }
           long millis = remaining / 1000000L;
           int remNanos = (int) (remaining % 1000000L);
-          rwLock.sync.wait(millis, remNanos);
+          rwLock.waitSync(millis, remNanos);
         }
         rwLock.readLockCount++;
         Integer h = rwLock.readHolds.get();
@@ -207,7 +273,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
         boolean interrupted = false;
         while (rwLock.writerOwner != null || rwLock.readLockCount > 0) {
           try {
-            rwLock.sync.wait();
+            rwLock.waitSync();
           } catch (InterruptedException e) {
             interrupted = true;
           }
@@ -231,7 +297,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
           return;
         }
         while (rwLock.writerOwner != null || rwLock.readLockCount > 0) {
-          rwLock.sync.wait();
+          rwLock.waitSync();
         }
         rwLock.writerOwner = current;
         rwLock.writeHoldCount = 1;
@@ -276,7 +342,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
           }
           long millis = remaining / 1000000L;
           int remNanos = (int) (remaining % 1000000L);
-          rwLock.sync.wait(millis, remNanos);
+          rwLock.waitSync(millis, remNanos);
         }
         rwLock.writerOwner = current;
         rwLock.writeHoldCount = 1;
@@ -318,21 +384,53 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
       return super.toString() + ((o == null) ? "[Unlocked]" : "[Locked by thread " + o.getName() + "]");
     }
 
-    private class WriteCondition implements Condition, Serializable {
+    class WriteCondition implements Condition, Serializable {
       private static final long serialVersionUID = -3992448646407690164L;
       private final Object condSync = new Object();
+      private int waiting;
+
+      WriteLock lockOwner() {
+        return WriteLock.this;
+      }
+
+      int waiters() {
+        synchronized (condSync) {
+          return waiting;
+        }
+      }
+
+      private int release() {
+        synchronized (rwLock.sync) {
+          int count = rwLock.writeHoldCount;
+          rwLock.writeHoldCount = 0;
+          rwLock.writerOwner = null;
+          rwLock.sync.notifyAll();
+          return count;
+        }
+      }
+
+      private void waitOn(long millis, int nanos) throws InterruptedException {
+        waiting++;
+        try {
+          if (millis == 0 && nanos == 0) {
+            condSync.wait();
+          } else {
+            condSync.wait(millis, nanos);
+          }
+        } finally {
+          waiting--;
+        }
+      }
 
       public void await() throws InterruptedException {
         if (Thread.interrupted()) throw new InterruptedException();
         if (!isHeldByCurrentThread()) throw new IllegalMonitorStateException();
-        int count = rwLock.writeHoldCount;
-        rwLock.writeHoldCount = 0;
-        rwLock.writerOwner = null;
-        rwLock.sync.notifyAll();
+        int count;
         boolean interrupted = false;
         synchronized (condSync) {
+          count = release();
           try {
-            condSync.wait();
+            waitOn(0, 0);
           } catch (InterruptedException e) {
             interrupted = true;
           }
@@ -347,19 +445,17 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
         if (!isHeldByCurrentThread()) throw new IllegalMonitorStateException();
         long nanos = unit.toNanos(time);
         long deadline = System.nanoTime() + nanos;
-        int count = rwLock.writeHoldCount;
-        rwLock.writeHoldCount = 0;
-        rwLock.writerOwner = null;
-        rwLock.sync.notifyAll();
+        int count;
         boolean interrupted = false;
         boolean timedOut = false;
         synchronized (condSync) {
+          count = release();
           try {
             long remaining = deadline - System.nanoTime();
             if (remaining > 0) {
               long millis = remaining / 1000000L;
               int remNanos = (int) (remaining % 1000000L);
-              condSync.wait(millis, remNanos);
+              waitOn(millis, remNanos);
             }
             if (System.nanoTime() >= deadline) timedOut = true;
           } catch (InterruptedException e) {
@@ -377,18 +473,16 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
         if (!isHeldByCurrentThread()) throw new IllegalMonitorStateException();
         long start = System.nanoTime();
         long deadline = start + nanosTimeout;
-        int count = rwLock.writeHoldCount;
-        rwLock.writeHoldCount = 0;
-        rwLock.writerOwner = null;
-        rwLock.sync.notifyAll();
+        int count;
         boolean interrupted = false;
         synchronized (condSync) {
+          count = release();
           try {
             long remaining = deadline - System.nanoTime();
             if (remaining > 0) {
               long millis = remaining / 1000000L;
               int remNanos = (int) (remaining % 1000000L);
-              condSync.wait(millis, remNanos);
+              waitOn(millis, remNanos);
             }
           } catch (InterruptedException e) {
             interrupted = true;
@@ -403,15 +497,13 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
 
       public void awaitUninterruptibly() {
         if (!isHeldByCurrentThread()) throw new IllegalMonitorStateException();
-        int count = rwLock.writeHoldCount;
-        rwLock.writeHoldCount = 0;
-        rwLock.writerOwner = null;
-        rwLock.sync.notifyAll();
+        int count;
         boolean interrupted = false;
         synchronized (condSync) {
+          count = release();
           while (true) {
             try {
-              condSync.wait();
+              waitOn(0, 0);
               break;
             } catch (InterruptedException e) {
               interrupted = true;

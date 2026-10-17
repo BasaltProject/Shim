@@ -25,248 +25,432 @@ package java.util.zip;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.zip.CRC32;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.Deflater;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
-
-/**
- *  An as simple as possible implementation of ZipOutputStream
- *  Compression method defaults to DEFLATE
- *  All hardcoded defaults match the defaults for openJDK,
- *  including PKZip version, bit flags set, compression level, etc
- *  
- *  @author David Chau
- *  @author Aaron Davis
- *  @author Christopher Jordan
- *  @author Riley Moses
- *
- */
 public class ZipOutputStream extends DeflaterOutputStream {
-  private static final int SIGNATURE =                    0x04034b50;
-  private static final short VERSION =                    0x0014;
-  private static final short BITFLAG =                    0x0008;
-  private static final short METHOD =                     0x0008;
-  private static final int CENTRAL_FILE_HEADER =          0x02014b50;
-  private static final int DATA_DESCRIPTER_HEADER =       0x08074b50;
-  private static final int END_OF_CENTRAL_DIRECTORY_SIG = 0x06054b50;
-  private static final int DEFAULT_LEVEL =                6;
+  public static final int STORED = ZipEntry.STORED;
+  public static final int DEFLATED = ZipEntry.DEFLATED;
 
-  private static final int INPUT_BUFFER_SIZE =            1024;
-  
-  private List<ZipEntry> entries;
-  private CRC32 crc = new CRC32();
-  private ZipEntry currentEntry;        // holder for current entry
-  private int bytesWritten;             // a counter for total bytes written
-  private int sizeOfCentralDirectory;   // a counter for central dir size
+  private static final int USE_UTF8 = 0x800;
+  private static final int LOCSIG = 0x04034b50;
+  private static final int EXTSIG = 0x08074b50;
+  private static final int CENSIG = 0x02014b50;
+  private static final int ENDSIG = 0x06054b50;
 
-  // these are used for the function write(int b) to provide a speed increase
-  private byte[] inputBuffer = new byte[INPUT_BUFFER_SIZE];
-  private int bufferIndex;
-  
+  private static final class XEntry {
+    final ZipEntry entry;
+    final long offset;
 
-  public ZipOutputStream(OutputStream outStream) {
-    super(outStream, new Deflater(DEFAULT_LEVEL, true));
-    bytesWritten = 0;
-    sizeOfCentralDirectory = 0;
-    entries = new ArrayList<ZipEntry>();
+    XEntry(ZipEntry entry, long offset) {
+      this.entry = entry;
+      this.offset = offset;
+    }
   }
-  
+
+  private XEntry current;
+  private final List<XEntry> xentries = new ArrayList<XEntry>();
+  private final HashSet<String> names = new HashSet<String>();
+  private final CRC32 crc = new CRC32();
+  private long written;
+  private long locoff;
+  private byte[] comment;
+  private int method = DEFLATED;
+  private boolean finished;
+  private boolean closed;
+  private final Charset charset;
+
+  public ZipOutputStream(OutputStream out) {
+    this(out, StandardCharsets.UTF_8);
+  }
+
+  public ZipOutputStream(OutputStream out, Charset charset) {
+    super(out, new Deflater(Deflater.DEFAULT_COMPRESSION, true));
+    this.charset = Objects.requireNonNull(charset, "charset");
+    usesDefaultDeflater = true;
+  }
+
+  public void setComment(String comment) {
+    byte[] bytes = null;
+    if (comment != null) {
+      bytes = comment.getBytes(charset);
+      if (bytes.length > 0xffff) {
+        throw new IllegalArgumentException("ZIP file comment too long");
+      }
+    }
+    this.comment = bytes;
+  }
+
+  public void setMethod(int method) {
+    if (method != DEFLATED && method != STORED) {
+      throw new IllegalArgumentException("invalid compression method");
+    }
+    this.method = method;
+  }
+
+  public void setLevel(int level) {
+    def.setLevel(level);
+  }
+
+  private void ensureOpen() throws IOException {
+    if (closed) {
+      throw new IOException("Stream closed");
+    }
+  }
+
   public void putNextEntry(ZipEntry e) throws IOException {
-    e.offset = bytesWritten;
-    currentEntry = e;
-    entries.add(e);
-    writeLocalHeader(e);
+    ensureOpen();
+    if (current != null) {
+      closeEntry();
+    }
+    if (e.xdostime == -1) {
+      e.setTime(System.currentTimeMillis());
+    }
+    if (e.method == -1) {
+      e.method = method;
+    }
+    e.flag = 0;
+    switch (e.method) {
+    case DEFLATED:
+      if (e.size == -1 || e.csize == -1 || e.crc == -1) {
+        e.flag = 8;
+      }
+      break;
+    case STORED:
+      if (e.size == -1) {
+        e.size = e.csize;
+      } else if (e.csize == -1) {
+        e.csize = e.size;
+      } else if (e.size != e.csize) {
+        throw new ZipException("STORED entry where compressed != uncompressed size");
+      }
+      if (e.size == -1 || e.crc == -1) {
+        throw new ZipException("STORED entry missing size, compressed size, or crc-32");
+      }
+      break;
+    default:
+      throw new ZipException("unsupported compression method");
+    }
+    if (!names.add(e.name)) {
+      throw new ZipException("duplicate entry: " + e.name);
+    }
+    if (charset == StandardCharsets.UTF_8) {
+      e.flag |= USE_UTF8;
+    }
+    current = new XEntry(e, written);
+    xentries.add(current);
+    writeLOC(current);
   }
-  
+
   public void closeEntry() throws IOException {
-    if (currentEntry == null) {
+    ensureOpen();
+    if (current == null) {
       return;
     }
-    // write remainder of buffer if partially full
-    if (bufferIndex != 0) {
-      write(inputBuffer, 0, bufferIndex);
-      bufferIndex = 0;
+    ZipEntry e = current.entry;
+    switch (e.method) {
+    case DEFLATED:
+      def.finish();
+      while (!def.finished()) {
+        deflate();
+      }
+      if ((e.flag & 8) == 0) {
+        if (e.size != def.getBytesRead()) {
+          throw new ZipException("invalid entry size (expected " + e.size + " but got " + def.getBytesRead()
+              + " bytes)");
+        }
+        if (e.csize != def.getBytesWritten()) {
+          throw new ZipException("invalid entry compressed size (expected " + e.csize + " but got "
+              + def.getBytesWritten() + " bytes)");
+        }
+        if (e.crc != crc.getValue()) {
+          throw new ZipException("invalid entry CRC-32 (expected 0x" + Long.toHexString(e.crc) + " but got 0x"
+              + Long.toHexString(crc.getValue()) + ")");
+        }
+      } else {
+        e.size = def.getBytesRead();
+        e.csize = def.getBytesWritten();
+        e.crc = crc.getValue();
+        writeEXT(e);
+      }
+      def.reset();
+      written += e.csize;
+      break;
+    case STORED:
+      if (e.size != written - locoff) {
+        throw new ZipException("invalid entry size (expected " + e.size + " but got " + (written - locoff)
+            + " bytes)");
+      }
+      if (e.crc != crc.getValue()) {
+        throw new ZipException("invalid entry crc-32 (expected 0x" + Long.toHexString(e.crc) + " but got 0x"
+            + Long.toHexString(crc.getValue()) + ")");
+      }
+      break;
+    default:
+      throw new ZipException("invalid compression method");
     }
-
-    finishDeflateEntry();
-
-    currentEntry.crc = (int) crc.getValue();
     crc.reset();
-    writeDataDescriptor(currentEntry);
-    currentEntry = null;
+    current = null;
   }
-  
+
   @Override
-  public void write(byte[] b, int offset, int length) throws IOException {
-    if (offset < 0 || length < 0 || b.length - (offset + length) < 0)
+  public synchronized void write(byte[] b, int off, int len) throws IOException {
+    ensureOpen();
+    if (off < 0 || len < 0 || off > b.length - len) {
       throw new IndexOutOfBoundsException();
-
-    currentEntry.uncompSize += length;
-    crc.update(b, offset, length);
-    currentEntry.crc = (int) crc.getValue();
-    
-    def.setInput(b, offset, length);
-    while (def.getRemaining() > 0)
-      deflate();
-  }
-
-  @Override
-  public void write(int b) throws IOException {
-    byte[] one = new byte[1];
-    one[0] = (byte) b;
-    write(one, 0, 1);
-  }
-
-  @Override
-  protected void deflate() throws IOException {
-    int len = def.deflate(buf, 0, buf.length);
-    currentEntry.compSize += len;
-    bytesWritten += len;
-    if (len > 0)
-      out.write(buf, 0, len);
-  }
-
-  private void writeLocalHeader(ZipEntry e) throws IOException {
-    byte[] tmpBuffer = new byte[30];
-
-    addFourBytes(SIGNATURE, 0, tmpBuffer);        // local header signature
-    addTwoBytes(VERSION, 4, tmpBuffer);           // version used
-    addTwoBytes(BITFLAG, 6, tmpBuffer);           // flags
-    addTwoBytes(METHOD, 8, tmpBuffer);            // compression method
-    addFourBytes(e.modTimeDate, 10, tmpBuffer);   // last mod date and time 
-    addFourBytes(0, 14, tmpBuffer);               // CRC is 0 for local header
-
-    // with default flag settings (bit 3 set) the compressed and uncompressed size
-    // is written here as 0 and written correctly in the data descripter
-    addFourBytes(0, 18, tmpBuffer);               // compressed size
-    addFourBytes(0, 22, tmpBuffer);               // uncompressed size
-    addTwoBytes(e.name.length(), 26, tmpBuffer);  // length of file name
-
-    // extra field length, in this implementation extra field in not used
-    addTwoBytes(0, 28, tmpBuffer);
-
-    out.write(tmpBuffer, 0, 30);
-
-    // write file name, return the number of bytes written
-    int len = writeUTF8(e.getName());
-
-    bytesWritten += 30 + len;
-  }
-  
-  private void writeDataDescriptor(ZipEntry currentEntry) throws IOException {
-    byte[] tmpBuffer = new byte[16];
-
-    addFourBytes(DATA_DESCRIPTER_HEADER, 0, tmpBuffer);  // data descripter header
-    addFourBytes(currentEntry.crc, 4, tmpBuffer);        // crc value
-    addFourBytes((int)currentEntry.compSize, 8, tmpBuffer);   // compressed size
-    addFourBytes((int)currentEntry.uncompSize, 12, tmpBuffer);// uncompressed size
-    out.write(tmpBuffer, 0, 16);
-    bytesWritten += 16;
-  }
-  
-  private void writeCentralDirectoryHeader(ZipEntry e) throws IOException {
-    byte[] tmpBuffer = new byte[46];
-
-    addFourBytes(CENTRAL_FILE_HEADER, 0, tmpBuffer);  // central directory header signature
-    addTwoBytes(VERSION, 4, tmpBuffer);               // version made by
-    addTwoBytes(VERSION, 6, tmpBuffer);               // version needed
-    addTwoBytes(BITFLAG, 8, tmpBuffer);               // flags
-    addTwoBytes(METHOD, 10, tmpBuffer);               // compression method
-    
-    addFourBytes(e.modTimeDate, 12, tmpBuffer);       // last mod date and time
-    addFourBytes(e.crc, 16, tmpBuffer);               // crc
-    addFourBytes((int)e.compSize, 20, tmpBuffer);          // compressed size
-    addFourBytes((int)e.uncompSize, 24, tmpBuffer);        // uncompressed size
-   
-    addTwoBytes(e.getName().length(), 28, tmpBuffer); // file name length
-
-    // the following 5 fields are all 0 for a simple default compression
-    addTwoBytes(0, 30, tmpBuffer);                    // extra field length (not used)
-    addTwoBytes(0, 32, tmpBuffer);                    // comment length (not used)
-    addTwoBytes(0, 34, tmpBuffer);                    // disk number start
-    addTwoBytes(0, 36, tmpBuffer);                    // internal file attribute
-    addFourBytes(0, 38, tmpBuffer);                   // external file attribute
-
-    addFourBytes((int) e.offset, 42, tmpBuffer);      // relative offset of local header
-
-    out.write(tmpBuffer, 0, 46);
-
-    int len = writeUTF8(e.getName());
-
-    bytesWritten += 46 + len;
-    sizeOfCentralDirectory += 46 + len;
-  }
-  
-  private void writeEndofCentralDirectory(int offset) throws IOException {
-    byte[] tmpBuffer = new byte[22];
-
-    short numEntries = (short) entries.size();
-    addFourBytes(END_OF_CENTRAL_DIRECTORY_SIG, 0, tmpBuffer);  // end of central directory signature
-    addTwoBytes(0, 4, tmpBuffer);                              // disk number
-    addTwoBytes(0, 6, tmpBuffer);                              // disk number where central dir starts
-    addTwoBytes(numEntries, 8, tmpBuffer);                     // number of entries on this disk
-    addTwoBytes(numEntries, 10, tmpBuffer);                    // number of entries in central dir
-    addFourBytes(sizeOfCentralDirectory, 12, tmpBuffer);       // length of central directory
-    addFourBytes(offset, 16, tmpBuffer);                       // offset of central directory
-    addTwoBytes(0, 20, tmpBuffer);                             // length of added comments (not used)
-    out.write(tmpBuffer, 0, 22);
-    bytesWritten += 22;
-  }
-
-  private boolean finished;
-
-  private void finishDeflateEntry() throws IOException {
-    def.finish();
-    while (!def.finished()) {
-      deflate();
+    } else if (len == 0) {
+      return;
     }
-    def.reset();
+    if (current == null) {
+      throw new ZipException("no current ZIP entry");
+    }
+    ZipEntry entry = current.entry;
+    switch (entry.method) {
+    case DEFLATED:
+      super.write(b, off, len);
+      break;
+    case STORED:
+      written += len;
+      if (written - locoff > entry.size) {
+        throw new ZipException("attempt to write past end of STORED entry");
+      }
+      out.write(b, off, len);
+      break;
+    default:
+      throw new ZipException("invalid compression method");
+    }
+    crc.update(b, off, len);
   }
 
   @Override
   public void finish() throws IOException {
+    ensureOpen();
     if (finished) {
       return;
     }
-    if (currentEntry != null) {
+    if (current != null) {
       closeEntry();
     }
-    int centralDirOffset = bytesWritten;
-    for (ZipEntry e : entries) {
-      writeCentralDirectoryHeader(e);
+    long off = written;
+    for (XEntry xentry : xentries) {
+      writeCEN(xentry);
     }
-    writeEndofCentralDirectory(centralDirOffset);
+    writeEND(off, written - off);
     finished = true;
   }
 
   @Override
   public void close() throws IOException {
-    if (!finished) {
-      finish();
+    if (!closed) {
+      super.close();
+      closed = true;
     }
-    def.dispose();
-    out.close();
-  }
-  
-  private void addTwoBytes(int bytes, int offset, byte[] buffer) throws IOException {
-    buffer[offset] = (byte) (bytes & 0xff);
-    buffer[offset + 1] = (byte) ((bytes >> 8) & 0xff);
-  }
-  
-  private void addFourBytes(long bytes, int offset, byte[] buffer) throws IOException {
-    buffer[offset] = (byte) (bytes & 0xff);
-    buffer[offset + 1] = (byte) ((bytes >> 8) & 0xff);
-    buffer[offset + 2] = (byte) ((bytes >> 16) & 0xff);
-    buffer[offset + 3] = (byte) ((bytes >> 24) & 0xff);
   }
 
-  private int writeUTF8(String text) throws IOException {
-    byte[] bytes = text.getBytes("UTF-8");
-    out.write(bytes, 0, bytes.length);
-    return bytes.length;
-  }  
+  private int version(ZipEntry e) throws ZipException {
+    switch (e.method) {
+    case DEFLATED:
+      return 20;
+    case STORED:
+      return 10;
+    default:
+      throw new ZipException("unsupported compression method");
+    }
+  }
+
+  private byte[] timestampExtra(ZipEntry e, boolean cen) {
+    int flags = 0;
+    int n = 0;
+    long um = -1;
+    long ua = -1;
+    long uc = -1;
+    if (e.mtime != null) {
+      flags |= 1;
+      n++;
+      um = e.mtime.to(TimeUnit.SECONDS);
+    }
+    if (e.atime != null) {
+      flags |= 2;
+      ua = e.atime.to(TimeUnit.SECONDS);
+      if (!cen) {
+        n++;
+      }
+    }
+    if (e.ctime != null) {
+      flags |= 4;
+      uc = e.ctime.to(TimeUnit.SECONDS);
+      if (!cen) {
+        n++;
+      }
+    }
+    if (flags == 0) {
+      return new byte[0];
+    }
+    boolean ntfs = um > ZipEntry.UPPER_UNIXTIME_BOUND || ua > ZipEntry.UPPER_UNIXTIME_BOUND
+        || uc > ZipEntry.UPPER_UNIXTIME_BOUND;
+    byte[] out;
+    if (ntfs) {
+      out = new byte[36];
+      put16(out, 0, 0x000a);
+      put16(out, 2, 32);
+      put16(out, 8, 1);
+      put16(out, 10, 24);
+      put64(out, 12, fileTimeToWin(e.mtime));
+      put64(out, 20, fileTimeToWin(e.atime));
+      put64(out, 28, fileTimeToWin(e.ctime));
+      return out;
+    }
+    out = new byte[n * 4 + 5];
+    put16(out, 0, 0x5455);
+    put16(out, 2, n * 4 + 1);
+    out[4] = (byte) flags;
+    int pos = 5;
+    if ((flags & 1) != 0) {
+      put32(out, pos, um);
+      pos += 4;
+    }
+    if (!cen && (flags & 2) != 0) {
+      put32(out, pos, ua);
+      pos += 4;
+    }
+    if (!cen && (flags & 4) != 0) {
+      put32(out, pos, uc);
+    }
+    return out;
+  }
+
+  private static long fileTimeToWin(FileTime t) {
+    return t == null ? Long.MIN_VALUE : t.to(TimeUnit.MICROSECONDS) * 10 + 116444736000000000L;
+  }
+
+  private byte[] filteredExtra(byte[] extra) {
+    if (extra == null) {
+      return new byte[0];
+    }
+    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+    int off = 0;
+    int len = extra.length;
+    while (off + 4 <= len) {
+      int tag = ZipEntry.get16(extra, off);
+      int sz = ZipEntry.get16(extra, off + 2);
+      if (off + 4 + sz > len) {
+        break;
+      }
+      if (tag != 0x5455 && tag != 0x0001) {
+        bo.write(extra, off, 4 + sz);
+      }
+      off += 4 + sz;
+    }
+    if (off < len) {
+      bo.write(extra, off, len - off);
+    }
+    return bo.toByteArray();
+  }
+
+  private byte[] extraBlock(ZipEntry e, boolean cen) {
+    byte[] ts = timestampExtra(e, cen);
+    byte[] ex = filteredExtra(e.extra);
+    byte[] all = new byte[ts.length + ex.length];
+    System.arraycopy(ts, 0, all, 0, ts.length);
+    System.arraycopy(ex, 0, all, ts.length, ex.length);
+    return all;
+  }
+
+  private void writeLOC(XEntry xentry) throws IOException {
+    ZipEntry e = xentry.entry;
+    int flag = e.flag;
+    byte[] nameBytes = e.name.getBytes(charset);
+    byte[] extra = extraBlock(e, false);
+    byte[] h = new byte[30];
+    put32(h, 0, LOCSIG & 0xffffffffL);
+    put16(h, 4, version(e));
+    put16(h, 6, flag);
+    put16(h, 8, e.method);
+    put32(h, 10, e.xdostime);
+    if ((flag & 8) == 0) {
+      put32(h, 14, e.crc);
+      put32(h, 18, e.csize);
+      put32(h, 22, e.size);
+    }
+    put16(h, 26, nameBytes.length);
+    put16(h, 28, extra.length);
+    out.write(h);
+    out.write(nameBytes);
+    out.write(extra);
+    written += 30 + nameBytes.length + extra.length;
+    locoff = written;
+  }
+
+  private void writeEXT(ZipEntry e) throws IOException {
+    byte[] h = new byte[16];
+    put32(h, 0, EXTSIG & 0xffffffffL);
+    put32(h, 4, e.crc);
+    put32(h, 8, e.csize);
+    put32(h, 12, e.size);
+    out.write(h);
+    written += 16;
+  }
+
+  private void writeCEN(XEntry xentry) throws IOException {
+    ZipEntry e = xentry.entry;
+    byte[] nameBytes = e.name.getBytes(charset);
+    byte[] extra = extraBlock(e, true);
+    byte[] commentBytes = e.comment != null ? e.comment.getBytes(charset) : new byte[0];
+    byte[] h = new byte[46];
+    put32(h, 0, CENSIG & 0xffffffffL);
+    put16(h, 4, version(e));
+    put16(h, 6, version(e));
+    put16(h, 8, e.flag);
+    put16(h, 10, e.method);
+    put32(h, 12, e.xdostime);
+    put32(h, 16, e.crc);
+    put32(h, 20, e.csize);
+    put32(h, 24, e.size);
+    put16(h, 28, nameBytes.length);
+    put16(h, 30, extra.length);
+    put16(h, 32, commentBytes.length);
+    put32(h, 42, xentry.offset);
+    out.write(h);
+    out.write(nameBytes);
+    out.write(extra);
+    out.write(commentBytes);
+    written += 46 + nameBytes.length + extra.length + commentBytes.length;
+  }
+
+  private void writeEND(long off, long len) throws IOException {
+    byte[] h = new byte[22];
+    put32(h, 0, ENDSIG & 0xffffffffL);
+    put16(h, 8, xentries.size());
+    put16(h, 10, xentries.size());
+    put32(h, 12, len);
+    put32(h, 16, off);
+    put16(h, 20, comment != null ? comment.length : 0);
+    out.write(h);
+    written += 22;
+    if (comment != null) {
+      out.write(comment);
+      written += comment.length;
+    }
+  }
+
+  private static void put16(byte[] b, int off, int v) {
+    b[off] = (byte) v;
+    b[off + 1] = (byte) (v >> 8);
+  }
+
+  private static void put32(byte[] b, int off, long v) {
+    put16(b, off, (int) v);
+    put16(b, off + 2, (int) (v >> 16));
+  }
+
+  private static void put64(byte[] b, int off, long v) {
+    put32(b, off, v);
+    put32(b, off + 4, v >> 32);
+  }
 }

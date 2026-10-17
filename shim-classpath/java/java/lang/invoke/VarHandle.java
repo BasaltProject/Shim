@@ -179,6 +179,312 @@ public abstract class VarHandle implements java.lang.constant.Constable {
     return getAndAdd(args);
   }
 
+  private static final int OP_OR = 0;
+  private static final int OP_AND = 1;
+  private static final int OP_XOR = 2;
+
+  private Object bitwise(int op, String name, Object[] args) {
+    Class<?> t = varType;
+    if (t != int.class && t != long.class && t != short.class && t != byte.class && t != char.class
+        && t != boolean.class) {
+      throw new UnsupportedOperationException(name);
+    }
+    int n = coordinateTypes.size();
+    Object[] coords = Arrays.copyOf(args, n);
+    Object value = args[n];
+    while (true) {
+      Object old = get(coords);
+      Object next = combine(op, t, old, value);
+      Object[] cas = Arrays.copyOf(coords, n + 2);
+      cas[n] = old;
+      cas[n + 1] = next;
+      if (compareAndSet(cas)) {
+        return old;
+      }
+    }
+  }
+
+  private static Object combine(int op, Class<?> t, Object a, Object b) {
+    if (t == boolean.class) {
+      boolean x = (Boolean) a;
+      boolean y = (Boolean) b;
+      return op == OP_OR ? (x | y) : op == OP_AND ? (x & y) : (x ^ y);
+    }
+    long x = a instanceof Character ? (Character) a : ((Number) a).longValue();
+    long y = b instanceof Character ? (Character) b : ((Number) b).longValue();
+    long r = op == OP_OR ? (x | y) : op == OP_AND ? (x & y) : (x ^ y);
+    if (t == int.class) {
+      return (int) r;
+    } else if (t == long.class) {
+      return r;
+    } else if (t == short.class) {
+      return (short) r;
+    } else if (t == byte.class) {
+      return (byte) r;
+    }
+    return (char) r;
+  }
+
+  public Object getAndBitwiseOr(Object... args) {
+    return bitwise(OP_OR, "getAndBitwiseOr", args);
+  }
+
+  public Object getAndBitwiseOrAcquire(Object... args) {
+    return bitwise(OP_OR, "getAndBitwiseOrAcquire", args);
+  }
+
+  public Object getAndBitwiseOrRelease(Object... args) {
+    return bitwise(OP_OR, "getAndBitwiseOrRelease", args);
+  }
+
+  public Object getAndBitwiseAnd(Object... args) {
+    return bitwise(OP_AND, "getAndBitwiseAnd", args);
+  }
+
+  public Object getAndBitwiseAndAcquire(Object... args) {
+    return bitwise(OP_AND, "getAndBitwiseAndAcquire", args);
+  }
+
+  public Object getAndBitwiseAndRelease(Object... args) {
+    return bitwise(OP_AND, "getAndBitwiseAndRelease", args);
+  }
+
+  public Object getAndBitwiseXor(Object... args) {
+    return bitwise(OP_XOR, "getAndBitwiseXor", args);
+  }
+
+  public Object getAndBitwiseXorAcquire(Object... args) {
+    return bitwise(OP_XOR, "getAndBitwiseXorAcquire", args);
+  }
+
+  public Object getAndBitwiseXorRelease(Object... args) {
+    return bitwise(OP_XOR, "getAndBitwiseXorRelease", args);
+  }
+
+  private static final Object FENCE = new Object();
+
+  public static void fullFence() {
+    synchronized (FENCE) {
+    }
+  }
+
+  public static void acquireFence() {
+    fullFence();
+  }
+
+  public static void releaseFence() {
+    fullFence();
+  }
+
+  public static void loadLoadFence() {
+    fullFence();
+  }
+
+  public static void storeStoreFence() {
+    fullFence();
+  }
+
+  public boolean hasInvokeExactBehavior() {
+    return false;
+  }
+
+  public VarHandle withInvokeExactBehavior() {
+    return new ExactView(this);
+  }
+
+  public VarHandle withInvokeBehavior() {
+    return this;
+  }
+
+  private static final class ExactView extends VarHandle {
+    private final VarHandle target;
+
+    ExactView(VarHandle target) {
+      super(target.varType(), target.coordinateTypes());
+      this.target = target;
+    }
+
+    @Override
+    public boolean hasInvokeExactBehavior() {
+      return true;
+    }
+
+    @Override
+    public VarHandle withInvokeExactBehavior() {
+      return this;
+    }
+
+    @Override
+    public VarHandle withInvokeBehavior() {
+      return target;
+    }
+
+    @Override
+    public Object get(Object... args) {
+      return target.get(args);
+    }
+
+    @Override
+    public void set(Object... args) {
+      target.set(args);
+    }
+
+    @Override
+    public Object getVolatile(Object... args) {
+      return target.getVolatile(args);
+    }
+
+    @Override
+    public void setVolatile(Object... args) {
+      target.setVolatile(args);
+    }
+
+    @Override
+    public Object getOpaque(Object... args) {
+      return target.getOpaque(args);
+    }
+
+    @Override
+    public void setOpaque(Object... args) {
+      target.setOpaque(args);
+    }
+
+    @Override
+    public Object getAcquire(Object... args) {
+      return target.getAcquire(args);
+    }
+
+    @Override
+    public void setRelease(Object... args) {
+      target.setRelease(args);
+    }
+
+    @Override
+    public boolean compareAndSet(Object... args) {
+      return target.compareAndSet(args);
+    }
+
+    @Override
+    public Object getAndSet(Object... args) {
+      return target.getAndSet(args);
+    }
+
+    @Override
+    public Object getAndAdd(Object... args) {
+      return target.getAndAdd(args);
+    }
+
+    @Override
+    public Object compareAndExchange(Object... args) {
+      return target.compareAndExchange(args);
+    }
+
+    @Override
+    public Object compareAndExchangeAcquire(Object... args) {
+      return target.compareAndExchangeAcquire(args);
+    }
+
+    @Override
+    public Object compareAndExchangeRelease(Object... args) {
+      return target.compareAndExchangeRelease(args);
+    }
+
+    @Override
+    public boolean weakCompareAndSetPlain(Object... args) {
+      return target.weakCompareAndSetPlain(args);
+    }
+
+    @Override
+    public boolean weakCompareAndSet(Object... args) {
+      return target.weakCompareAndSet(args);
+    }
+
+    @Override
+    public boolean weakCompareAndSetAcquire(Object... args) {
+      return target.weakCompareAndSetAcquire(args);
+    }
+
+    @Override
+    public boolean weakCompareAndSetRelease(Object... args) {
+      return target.weakCompareAndSetRelease(args);
+    }
+
+    @Override
+    public Object getAndSetAcquire(Object... args) {
+      return target.getAndSetAcquire(args);
+    }
+
+    @Override
+    public Object getAndSetRelease(Object... args) {
+      return target.getAndSetRelease(args);
+    }
+
+    @Override
+    public Object getAndAddAcquire(Object... args) {
+      return target.getAndAddAcquire(args);
+    }
+
+    @Override
+    public Object getAndAddRelease(Object... args) {
+      return target.getAndAddRelease(args);
+    }
+
+    @Override
+    public Object getAndBitwiseOr(Object... args) {
+      return target.getAndBitwiseOr(args);
+    }
+
+    @Override
+    public Object getAndBitwiseOrAcquire(Object... args) {
+      return target.getAndBitwiseOrAcquire(args);
+    }
+
+    @Override
+    public Object getAndBitwiseOrRelease(Object... args) {
+      return target.getAndBitwiseOrRelease(args);
+    }
+
+    @Override
+    public Object getAndBitwiseAnd(Object... args) {
+      return target.getAndBitwiseAnd(args);
+    }
+
+    @Override
+    public Object getAndBitwiseAndAcquire(Object... args) {
+      return target.getAndBitwiseAndAcquire(args);
+    }
+
+    @Override
+    public Object getAndBitwiseAndRelease(Object... args) {
+      return target.getAndBitwiseAndRelease(args);
+    }
+
+    @Override
+    public Object getAndBitwiseXor(Object... args) {
+      return target.getAndBitwiseXor(args);
+    }
+
+    @Override
+    public Object getAndBitwiseXorAcquire(Object... args) {
+      return target.getAndBitwiseXorAcquire(args);
+    }
+
+    @Override
+    public Object getAndBitwiseXorRelease(Object... args) {
+      return target.getAndBitwiseXorRelease(args);
+    }
+
+    @Override
+    public boolean isAccessModeSupported(AccessMode accessMode) {
+      return target.isAccessModeSupported(accessMode);
+    }
+
+    @Override
+    public String toString() {
+      return target.toString();
+    }
+  }
+
   public MethodType accessModeType(AccessMode accessMode) {
     switch (accessMode.atype) {
     case GET:
@@ -216,6 +522,15 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
   public boolean isAccessModeSupported(AccessMode accessMode) {
     Objects.requireNonNull(accessMode);
+    String n = accessMode.methodName();
+    boolean integral = varType == int.class || varType == long.class || varType == short.class
+        || varType == byte.class || varType == char.class;
+    if (n.startsWith("getAndAdd")) {
+      return integral || varType == float.class || varType == double.class;
+    }
+    if (n.startsWith("getAndBitwise")) {
+      return integral || varType == boolean.class;
+    }
     return true;
   }
 

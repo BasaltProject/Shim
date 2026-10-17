@@ -34,7 +34,7 @@ public class JarEntry extends ZipEntry {
   CodeSigner[] signers;
 
   public JarEntry() {
-    super((String) null);
+    super("");
   }
 
   public JarEntry(String name) {

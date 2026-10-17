@@ -187,14 +187,9 @@ public class Thread implements Runnable {
     try {
       t.run();
     } catch (Throwable e) {
-      UncaughtExceptionHandler eh = t.exceptionHandler;
-      UncaughtExceptionHandler deh = defaultExceptionHandler;
-      if (eh != null) {
-        eh.uncaughtException(t, e);
-      } else if (deh != null) {
-        deh.uncaughtException(t, e);
-      } else {
-        throw e;
+      try {
+        t.getUncaughtExceptionHandler().uncaughtException(t, e);
+      } catch (Throwable ignore) {
       }
     } finally {
       synchronized (t) {
@@ -390,6 +385,39 @@ public class Thread implements Runnable {
 
   public ThreadGroup getThreadGroup() {
     return group;
+  }
+
+  @Deprecated(since = "17", forRemoval = true)
+  public final void checkAccess() {
+  }
+
+  @Deprecated(since = "20", forRemoval = true)
+  public final void stop() {
+    throw new UnsupportedOperationException();
+  }
+
+  public static void dumpStack() {
+    new Exception("Stack trace").printStackTrace();
+  }
+
+  public static Map<Thread, StackTraceElement[]> getAllStackTraces() {
+    Thread[] all = new Thread[activeCount() + 8];
+    int n = enumerate(all);
+    Map<Thread, StackTraceElement[]> m = new java.util.HashMap<Thread, StackTraceElement[]>();
+    for (int i = 0; i < n; i++) {
+      m.put(all[i], all[i].getStackTrace());
+    }
+    return m;
+  }
+
+  @Override
+  public String toString() {
+    if (isVirtual) {
+      return "VirtualThread[#" + threadId() + (name == null || name.isEmpty() ? "" : "," + name) + "]";
+    }
+    ThreadGroup g = getThreadGroup();
+    return "Thread[#" + threadId() + "," + getName() + "," + getPriority() + ","
+        + (g != null ? g.getName() : "") + "]";
   }
 
   public static native boolean holdsLock(Object o);
