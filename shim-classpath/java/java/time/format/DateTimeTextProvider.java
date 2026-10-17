@@ -76,8 +76,26 @@ final class DateTimeTextProvider {
     return names[(int) index];
   }
 
+  private static final String[] kHijrahFull = {"Muharram", "Safar", "Rabi\u02bb I", "Rabi\u02bb II", "Jumada I",
+      "Jumada II", "Rajab", "Sha\u02bbban", "Ramadan", "Shawwal", "Dhu\u02bbl-Qi\u02bbdah", "Dhu\u02bbl-Hijjah"};
+  private static final String[] kHijrahShort = {"Muh.", "Saf.", "Rab. I", "Rab. II", "Jum. I", "Jum. II", "Raj.",
+      "Sha.", "Ram.", "Shaw.", "Dhu\u02bbl-Q.", "Dhu\u02bbl-H."};
+  private static final String[] kHijrahNarrow = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"};
+
+  private static boolean isHijrahMonth(java.time.chrono.Chronology chrono, TemporalField field) {
+    return field == ChronoField.MONTH_OF_YEAR && chrono instanceof java.time.chrono.HijrahChronology;
+  }
+
+  private static String[] hijrahMonths(TextStyle style) {
+    TextStyle normal = style.asNormal();
+    return normal == TextStyle.FULL ? kHijrahFull : normal == TextStyle.SHORT ? kHijrahShort : kHijrahNarrow;
+  }
+
   String getText(java.time.chrono.Chronology chrono, TemporalField field, long value, TextStyle style,
       Locale locale) {
+    if (isHijrahMonth(chrono, field)) {
+      return value >= 1 && value <= 12 ? hijrahMonths(style)[(int) value - 1] : null;
+    }
     if (field == ChronoField.ERA && chrono != null && chrono != java.time.chrono.IsoChronology.INSTANCE) {
       try {
         return chrono.eraOf((int) value).getDisplayName(style, locale);
@@ -95,13 +113,16 @@ final class DateTimeTextProvider {
         : new TextStyle[] {style};
     boolean any = false;
     for (TextStyle s : styles) {
-      String[] names = table(field, s);
+      String[] names = isHijrahMonth(chrono, field) ? hijrahMonths(s) : table(field, s);
       if (field == ChronoField.ERA && chrono != null && chrono != java.time.chrono.IsoChronology.INSTANCE) {
         List<java.time.chrono.Era> eras = chrono.eras();
         names = new String[eras.size()];
         for (int i = 0; i < names.length; i++) {
           names[i] = eras.get(i).getDisplayName(s, locale);
+          unique.put(names[i], Long.valueOf(eras.get(i).getValue()));
         }
+        any = true;
+        continue;
       }
       if (names == null) {
         continue;

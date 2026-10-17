@@ -71,18 +71,19 @@ public final class DateTimeFormatterBuilder {
     String datePattern = null;
     String timePattern = null;
     if (dateStyle != null) {
+      boolean iso = chrono == java.time.chrono.IsoChronology.INSTANCE;
       switch (dateStyle) {
         case FULL:
-          datePattern = "EEEE, MMMM d, y";
+          datePattern = iso ? "EEEE, MMMM d, y" : "EEEE, MMMM d, y G";
           break;
         case LONG:
-          datePattern = "MMMM d, y";
+          datePattern = iso ? "MMMM d, y" : "MMMM d, y G";
           break;
         case MEDIUM:
-          datePattern = "MMM d, y";
+          datePattern = iso ? "MMM d, y" : "MMM d, y G";
           break;
         default:
-          datePattern = "M/d/yy";
+          datePattern = iso ? "M/d/yy" : "M/d/y GGGGG";
           break;
       }
     }
@@ -333,7 +334,8 @@ public final class DateTimeFormatterBuilder {
     if (dateStyle == null && timeStyle == null) {
       throw new IllegalArgumentException("Either the date or time style must be non-null");
     }
-    return appendPattern(getLocalizedDateTimePattern(dateStyle, timeStyle, IsoChronology.INSTANCE, Locale.US));
+    appendInternal(new LocalizedPrinterParser(dateStyle, timeStyle));
+    return this;
   }
 
   public DateTimeFormatterBuilder appendLiteral(char literal) {
@@ -794,6 +796,38 @@ public final class DateTimeFormatterBuilder {
     }
     CompositePrinterParser pp = new CompositePrinterParser(printerParsers, false);
     return new DateTimeFormatter(pp, locale, DecimalStyle.STANDARD, resolverStyle, null, chrono, null);
+  }
+
+  static final class LocalizedPrinterParser implements DateTimePrinterParser {
+    private final FormatStyle dateStyle;
+    private final FormatStyle timeStyle;
+
+    LocalizedPrinterParser(FormatStyle dateStyle, FormatStyle timeStyle) {
+      this.dateStyle = dateStyle;
+      this.timeStyle = timeStyle;
+    }
+
+    private DateTimeFormatter formatter(Locale locale, Chronology chrono) {
+      String pattern = getLocalizedDateTimePattern(dateStyle, timeStyle, chrono, locale);
+      return new DateTimeFormatterBuilder().appendPattern(pattern).toFormatter(locale);
+    }
+
+    @Override
+    public boolean format(DateTimePrintContext context, StringBuilder buf) {
+      Chronology chrono = Chronology.from(context.getTemporal());
+      return formatter(context.getLocale(), chrono).toPrinterParser(false).format(context, buf);
+    }
+
+    @Override
+    public int parse(DateTimeParseContext context, CharSequence text, int position) {
+      Chronology chrono = context.getEffectiveChronology();
+      return formatter(context.getLocale(), chrono).toPrinterParser(false).parse(context, text, position);
+    }
+
+    @Override
+    public String toString() {
+      return "Localized(" + (dateStyle != null ? dateStyle : "") + "," + (timeStyle != null ? timeStyle : "") + ")";
+    }
   }
 
   interface DateTimePrinterParser {

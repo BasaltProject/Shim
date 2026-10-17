@@ -16,10 +16,13 @@ public abstract class AbstractChronology implements Chronology {
 
   static java.util.List<Chronology> all() {
     return java.util.Arrays.<Chronology>asList(IsoChronology.INSTANCE, MinguoChronology.INSTANCE,
-        ThaiBuddhistChronology.INSTANCE);
+        ThaiBuddhistChronology.INSTANCE, JapaneseChronology.INSTANCE, HijrahChronology.INSTANCE);
   }
 
   static Chronology byId(String id) {
+    if ("Hijrah".equals(id)) {
+      return HijrahChronology.INSTANCE;
+    }
     for (Chronology c : all()) {
       if (c.getId().equals(id)) {
         return c;
