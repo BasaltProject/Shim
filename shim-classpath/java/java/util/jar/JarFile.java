@@ -24,10 +24,13 @@
 package java.util.jar;
 
 import java.io.File;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
-import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Spliterator;
 import java.util.Spliterators;
@@ -40,10 +43,13 @@ public class JarFile extends ZipFile {
   public static final String MANIFEST_NAME = "META-INF/MANIFEST.MF";
 
   private static final Runtime.Version BASE_VERSION = Runtime.Version.parse("8");
+  private static final String kVersionsPrefix = "META-INF/versions/";
 
   private Manifest manifest;
   private boolean manifestLoaded;
+  private Boolean multiRelease;
   private final Runtime.Version version;
+  private final int versionFeature;
 
   public JarFile(String name) throws IOException {
     this(new File(name), true, ZipFile.OPEN_READ, baseVersion());
@@ -68,10 +74,13 @@ public class JarFile extends ZipFile {
   public JarFile(File file, boolean verify, int mode, Runtime.Version version) throws IOException {
     super(file, mode);
     Objects.requireNonNull(version, "version");
-    if (version.feature() < 8) {
-      throw new IllegalArgumentException("Version feature must be at least 8: " + version);
+    if (version.feature() <= 8) {
+      this.version = BASE_VERSION;
+      this.versionFeature = 8;
+    } else {
+      this.version = version;
+      this.versionFeature = version.feature();
     }
-    this.version = version;
   }
 
   public static Runtime.Version baseVersion() {
@@ -82,161 +91,178 @@ public class JarFile extends ZipFile {
     return Runtime.version();
   }
 
-  public Runtime.Version getVersion() {
+  public final Runtime.Version getVersion() {
     return version;
   }
 
-  public Manifest getManifest() throws IOException {
-    if (!manifestLoaded) {
-      ZipEntry ze = super.getEntry(MANIFEST_NAME);
-      if (ze != null) {
-        try (InputStream is = getInputStream(ze)) {
-          manifest = new Manifest(is);
+  public final boolean isMultiRelease() {
+    if (multiRelease == null) {
+      boolean mr = false;
+      try {
+        Manifest man = getManifest();
+        if (man != null) {
+          String v = man.getMainAttributes().getValue(Attributes.Name.MULTI_RELEASE);
+          mr = v != null && "true".equalsIgnoreCase(v.trim());
         }
+      } catch (IOException ignored) {
       }
-      manifestLoaded = true;
+      multiRelease = mr;
     }
-    return manifest;
+    return multiRelease;
   }
 
-  public boolean isMultiRelease() {
-    try {
-      Manifest man = getManifest();
-      if (man != null) {
-        Attributes attr = man.getMainAttributes();
-        String mr = attr.getValue(Attributes.Name.MULTI_RELEASE);
-        return mr != null && "true".equalsIgnoreCase(mr.trim());
+  public Manifest getManifest() throws IOException {
+    synchronized (this) {
+      if (!manifestLoaded) {
+        ZipEntry ze = super.getEntry(MANIFEST_NAME);
+        if (ze != null) {
+          try (InputStream is = super.getInputStream(ze)) {
+            manifest = new Manifest(is);
+          }
+        }
+        manifestLoaded = true;
       }
-    } catch (IOException ignored) {
+      return manifest;
     }
-    return false;
+  }
+
+  public JarEntry getJarEntry(String name) {
+    return (JarEntry) getEntry(name);
   }
 
   @Override
   public ZipEntry getEntry(String name) {
-    return getJarEntry(name);
+    ZipEntry ze = super.getEntry(name);
+    JarEntry je = ze == null ? null : new JarFileEntry(ze);
+    if (isMultiRelease()) {
+      return getVersionedEntry(name, je);
+    }
+    return je;
   }
 
-  public JarEntry getJarEntry(String name) {
-    if (name == null) {
-      throw new NullPointerException("name");
-    }
-    while (name.startsWith("/")) {
-      name = name.substring(1);
-    }
-    if (isMultiRelease() && version.feature() >= 9 && !name.startsWith("META-INF/")) {
-      int targetVer = version.feature();
-      for (int v = targetVer; v >= 9; v--) {
-        String versionedName = "META-INF/versions/" + v + "/" + name;
-        JarEntry ve = (JarEntry) super.getEntry(new JarEntryFactory(this, name), versionedName);
-        if (ve != null) {
-          return ve;
+  private JarEntry getVersionedEntry(String name, JarEntry je) {
+    if (versionFeature > 8 && !name.startsWith("META-INF/")) {
+      for (int v = versionFeature; v >= 9; v--) {
+        ZipEntry vze = super.getEntry(kVersionsPrefix + v + "/" + name);
+        if (vze != null) {
+          return new JarFileEntry(name, vze);
         }
       }
     }
-    return (JarEntry) super.getEntry(new JarEntryFactory(this, name), name);
+    return je;
   }
 
   @Override
   public Enumeration<JarEntry> entries() {
-    return (Enumeration<JarEntry>) makeEnumeration(new JarEntryFactory(this));
+    final Enumeration<? extends ZipEntry> en = super.entries();
+    return new Enumeration<JarEntry>() {
+      @Override
+      public boolean hasMoreElements() {
+        return en.hasMoreElements();
+      }
+
+      @Override
+      public JarEntry nextElement() {
+        if (!en.hasMoreElements()) {
+          throw new NoSuchElementException();
+        }
+        return new JarFileEntry(en.nextElement());
+      }
+    };
   }
 
   @Override
   public Stream<JarEntry> stream() {
+    final Enumeration<JarEntry> en = entries();
     return StreamSupport.stream(
-        Spliterators.spliterator(
-            new Iterator<JarEntry>() {
-              private final Enumeration<JarEntry> e = entries();
-              public boolean hasNext() { return e.hasMoreElements(); }
-              public JarEntry next() { return e.nextElement(); }
-            },
-            size(),
-            Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.IMMUTABLE | Spliterator.NONNULL),
+        Spliterators.spliterator(new java.util.Iterator<JarEntry>() {
+          @Override
+          public boolean hasNext() {
+            return en.hasMoreElements();
+          }
+
+          @Override
+          public JarEntry next() {
+            return en.nextElement();
+          }
+        }, size(), Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.IMMUTABLE | Spliterator.NONNULL),
         false);
   }
 
-  private static class MyJarEntry extends JarEntry implements MyEntry {
-    private final JarFile jarFile;
-    private final String baseName;
-    public final Window window;
-    public final int pointer;
+  public Stream<JarEntry> versionedStream() {
+    if (isMultiRelease()) {
+      List<String> names = new ArrayList<String>();
+      Enumeration<? extends ZipEntry> en = super.entries();
+      while (en.hasMoreElements()) {
+        String base = getBasename(en.nextElement().getName());
+        if (base != null && !names.contains(base)) {
+          names.add(base);
+        }
+      }
+      List<JarEntry> out = new ArrayList<JarEntry>();
+      for (String n : names) {
+        JarEntry je = getJarEntry(n);
+        if (je != null) {
+          out.add(je);
+        }
+      }
+      return out.stream();
+    }
+    return stream();
+  }
 
-    public MyJarEntry(JarFile jarFile, String baseName, Window window, int pointer) {
-      super();
-      this.jarFile = jarFile;
-      this.baseName = baseName;
-      this.window = window;
-      this.pointer = pointer;
+  private String getBasename(String name) {
+    if (name.startsWith(kVersionsPrefix)) {
+      int off = kVersionsPrefix.length();
+      int index = name.indexOf('/', off);
+      try {
+        if (index == -1 || index == name.length() - 1) {
+          return null;
+        }
+        int v = Integer.parseInt(name.substring(off, index));
+        if (v > 0 && v <= versionFeature) {
+          return name.substring(index + 1);
+        }
+      } catch (NumberFormatException ignored) {
+      }
+      return null;
+    }
+    return name;
+  }
+
+  @Override
+  public InputStream getInputStream(ZipEntry ze) throws IOException {
+    Objects.requireNonNull(ze, "entry");
+    return super.getInputStream(ze);
+  }
+
+  private final class JarFileEntry extends JarEntry {
+    private final String basename;
+
+    JarFileEntry(ZipEntry ze) {
+      super(ze);
+      this.basename = null;
+    }
+
+    JarFileEntry(String name, ZipEntry vze) {
+      super(vze);
+      this.basename = name;
     }
 
     @Override
     public String getName() {
-      return baseName != null ? baseName : getRealName();
+      return basename != null ? basename : super.getName();
     }
 
     @Override
     public String getRealName() {
-      try {
-        return entryName(window, pointer);
-      } catch (IOException e) {
-        return null;
-      }
+      return super.getName();
     }
 
     @Override
     public Attributes getAttributes() throws IOException {
-      if (attr != null) {
-        return attr;
-      }
-      if (jarFile != null) {
-        Manifest man = jarFile.getManifest();
-        if (man != null) {
-          attr = man.getAttributes(getName());
-        }
-      }
-      return attr;
-    }
-
-    @Override
-    public long getCompressedSize() {
-      try {
-        return compressedSize(window, pointer);
-      } catch (IOException e) {
-        return 0;
-      }
-    }
-
-    @Override
-    public long getSize() {
-      try {
-        return uncompressedSize(window, pointer);
-      } catch (IOException e) {
-        return 0;
-      }
-    }
-
-    @Override
-    public int pointer() {
-      return pointer;
-    }
-  }
-
-  private static class JarEntryFactory implements EntryFactory {
-    private final JarFile jarFile;
-    private final String baseName;
-
-    public JarEntryFactory(JarFile jarFile) {
-      this(jarFile, null);
-    }
-
-    public JarEntryFactory(JarFile jarFile, String baseName) {
-      this.jarFile = jarFile;
-      this.baseName = baseName;
-    }
-
-    public ZipEntry makeEntry(Window window, int pointer) {
-      return new MyJarEntry(jarFile, baseName, window, pointer);
+      Manifest man = JarFile.this.getManifest();
+      return man == null ? null : man.getAttributes(getName());
     }
   }
 }

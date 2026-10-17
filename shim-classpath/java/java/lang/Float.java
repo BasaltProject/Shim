@@ -51,6 +51,11 @@ public final class Float extends Number implements Comparable<Float>,
     this.value = parseFloat(value);
   }
 
+  @Deprecated(since = "9", forRemoval = true)
+  public Float(double value) {
+    this.value = (float) value;
+  }
+
   public Float(float value) {
     this.value = value;
   }

@@ -162,7 +162,7 @@ public class Attributes implements Map<Object, Object>, Cloneable {
         }
       }
       this.name = s.intern();
-      this.hashCode = s.toLowerCase(Locale.ROOT).hashCode();
+      this.hashCode = s.toUpperCase(Locale.ROOT).hashCode();
     }
 
     public boolean equals(Object o) {

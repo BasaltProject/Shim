@@ -40,6 +40,27 @@ public final class Short extends Number implements Comparable<Short>, java.lang.
     this.value = value;
   }
 
+  @Deprecated(since = "9", forRemoval = true)
+  public Short(String s) throws NumberFormatException {
+    this.value = parseShort(s, 10);
+  }
+
+  public static Short valueOf(String s, int radix) throws NumberFormatException {
+    return valueOf(parseShort(s, radix));
+  }
+
+  public static Short valueOf(String s) throws NumberFormatException {
+    return valueOf(s, 10);
+  }
+
+  public static Short decode(String nm) throws NumberFormatException {
+    int i = Integer.decode(nm);
+    if (i < MIN_VALUE || i > MAX_VALUE) {
+      throw new NumberFormatException("Value " + i + " out of range from input " + nm);
+    }
+    return valueOf((short) i);
+  }
+
   public static Short valueOf(short value) {
     return new Short(value);
   }

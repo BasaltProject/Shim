@@ -40,6 +40,27 @@ public final class Byte extends Number implements Comparable<Byte>, java.lang.co
     this.value = value;
   }
 
+  @Deprecated(since = "9", forRemoval = true)
+  public Byte(String s) throws NumberFormatException {
+    this.value = parseByte(s, 10);
+  }
+
+  public static Byte valueOf(String s, int radix) throws NumberFormatException {
+    return valueOf(parseByte(s, radix));
+  }
+
+  public static Byte valueOf(String s) throws NumberFormatException {
+    return valueOf(s, 10);
+  }
+
+  public static Byte decode(String nm) throws NumberFormatException {
+    int i = Integer.decode(nm);
+    if (i < MIN_VALUE || i > MAX_VALUE) {
+      throw new NumberFormatException("Value " + i + " out of range from input " + nm);
+    }
+    return valueOf((byte) i);
+  }
+
   public static Byte valueOf(byte value) {
     return new Byte(value);
   }

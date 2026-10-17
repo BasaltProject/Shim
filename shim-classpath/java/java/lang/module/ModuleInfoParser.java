@@ -6,29 +6,33 @@
  * SPDX-License-Identifier: MIT
  */
 
-package shim.module;
+package java.lang.module;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.module.InvalidModuleDescriptorException;
-import java.lang.module.ModuleDescriptor;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
-public final class ModuleInfoReader {
+final class ModuleInfoParser {
   private final DataInputStream in;
   private Object[] pool;
-  private int[] tags;
 
-  private ModuleInfoReader(InputStream is) {
+  private ModuleInfoParser(InputStream is) {
     this.in = new DataInputStream(is);
   }
 
-  public static ModuleDescriptor read(InputStream is, Set<String> extraPackages) throws IOException {
-    return new ModuleInfoReader(is).parse(extraPackages);
+  static ModuleDescriptor read(InputStream is, Supplier<Set<String>> packageFinder) throws IOException {
+    return new ModuleInfoParser(is).parse(packageFinder);
+  }
+
+  private static InvalidModuleDescriptorException invalid(String msg) {
+    return new InvalidModuleDescriptorException(msg);
   }
 
   private String utf(int i) {
@@ -43,18 +47,16 @@ public final class ModuleInfoReader {
     return ref(i).replace('/', '.');
   }
 
-  private ModuleDescriptor parse(Set<String> extra) throws IOException {
+  private ModuleDescriptor parse(Supplier<Set<String>> packageFinder) throws IOException {
     if (in.readInt() != 0xCAFEBABE) {
-      throw new InvalidModuleDescriptorException("Bad magic number");
+      throw invalid("Bad magic number");
     }
     in.readUnsignedShort();
     in.readUnsignedShort();
     int n = in.readUnsignedShort();
     pool = new Object[n];
-    tags = new int[n];
     for (int i = 1; i < n; i++) {
       int tag = in.readUnsignedByte();
-      tags[i] = tag;
       switch (tag) {
       case 1:
         pool[i] = in.readUTF();
@@ -88,12 +90,12 @@ public final class ModuleInfoReader {
         in.readUnsignedShort();
         break;
       default:
-        throw new InvalidModuleDescriptorException("Unknown constant pool tag " + tag);
+        throw invalid("Unknown constant pool tag " + tag);
       }
     }
     int access = in.readUnsignedShort();
     if (access != 0x8000) {
-      throw new InvalidModuleDescriptorException("access_flags should be ACC_MODULE");
+      throw invalid("access_flags should be ACC_MODULE");
     }
     in.readUnsignedShort();
     in.readUnsignedShort();
@@ -111,7 +113,7 @@ public final class ModuleInfoReader {
       }
     }
     ModuleDescriptor.Builder b = null;
-    Set<String> packages = new HashSet<String>();
+    Set<String> allPackages = null;
     String mainClass = null;
     int attrs = in.readUnsignedShort();
     for (int a = 0; a < attrs; a++) {
@@ -120,9 +122,10 @@ public final class ModuleInfoReader {
       if (name.equals("Module")) {
         b = module();
       } else if (name.equals("ModulePackages")) {
+        allPackages = new HashSet<String>();
         int c = in.readUnsignedShort();
         for (int i = 0; i < c; i++) {
-          packages.add(binaryName(in.readUnsignedShort()));
+          allPackages.add(binaryName(in.readUnsignedShort()));
         }
       } else if (name.equals("ModuleMainClass")) {
         mainClass = binaryName(in.readUnsignedShort());
@@ -131,13 +134,26 @@ public final class ModuleInfoReader {
       }
     }
     if (b == null) {
-      throw new InvalidModuleDescriptorException("Module attribute not found");
+      throw invalid("Module attribute not found");
     }
     if (mainClass != null) {
       b.mainClass(mainClass);
     }
-    packages.addAll(extra);
-    b.packages(packages);
+    if (allPackages == null && packageFinder != null) {
+      try {
+        allPackages = packageFinder.get();
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
+      }
+    }
+    if (allPackages != null) {
+      for (String pn : new java.util.TreeSet<String>(b.currentPackages())) {
+        if (!allPackages.contains(pn)) {
+          throw invalid("Package " + pn + " not found in module");
+        }
+      }
+      b.packages(allPackages);
+    }
     return b.build();
   }
 
@@ -157,8 +173,17 @@ public final class ModuleInfoReader {
     String name = modName(in.readUnsignedShort());
     int flags = in.readUnsignedShort();
     int ver = in.readUnsignedShort();
-    ModuleDescriptor.Builder b = (flags & 0x20) != 0 ? ModuleDescriptor.newOpenModule(name)
-        : ModuleDescriptor.newModule(name);
+    Set<ModuleDescriptor.Modifier> mods = EnumSet.noneOf(ModuleDescriptor.Modifier.class);
+    if ((flags & 0x20) != 0) {
+      mods.add(ModuleDescriptor.Modifier.OPEN);
+    }
+    if ((flags & 0x1000) != 0) {
+      mods.add(ModuleDescriptor.Modifier.SYNTHETIC);
+    }
+    if ((flags & 0x8000) != 0) {
+      mods.add(ModuleDescriptor.Modifier.MANDATED);
+    }
+    ModuleDescriptor.Builder b = ModuleDescriptor.builderFor(name, mods, false);
     if (ver != 0) {
       b.version(utf(ver));
     }
@@ -167,7 +192,7 @@ public final class ModuleInfoReader {
       String r = modName(in.readUnsignedShort());
       int rf = in.readUnsignedShort();
       int rv = in.readUnsignedShort();
-      Set<ModuleDescriptor.Requires.Modifier> ms = new HashSet<ModuleDescriptor.Requires.Modifier>();
+      Set<ModuleDescriptor.Requires.Modifier> ms = EnumSet.noneOf(ModuleDescriptor.Requires.Modifier.class);
       if ((rf & 0x20) != 0) {
         ms.add(ModuleDescriptor.Requires.Modifier.TRANSITIVE);
       }
@@ -180,13 +205,17 @@ public final class ModuleInfoReader {
       if ((rf & 0x8000) != 0) {
         ms.add(ModuleDescriptor.Requires.Modifier.MANDATED);
       }
-      b.requires(ms, r);
+      if (rv != 0) {
+        b.requires(ms, r, utf(rv));
+      } else {
+        b.requires(ms, r);
+      }
     }
     int ec = in.readUnsignedShort();
     for (int i = 0; i < ec; i++) {
       String pn = ref(in.readUnsignedShort()).replace('/', '.');
       int ef = in.readUnsignedShort();
-      Set<ModuleDescriptor.Exports.Modifier> ms = new HashSet<ModuleDescriptor.Exports.Modifier>();
+      Set<ModuleDescriptor.Exports.Modifier> ms = EnumSet.noneOf(ModuleDescriptor.Exports.Modifier.class);
       if ((ef & 0x1000) != 0) {
         ms.add(ModuleDescriptor.Exports.Modifier.SYNTHETIC);
       }
@@ -198,13 +227,17 @@ public final class ModuleInfoReader {
       for (int j = 0; j < tc; j++) {
         targets.add(modName(in.readUnsignedShort()));
       }
-      b.exports(ms, pn, targets);
+      if (targets.isEmpty()) {
+        b.exports(ms, pn);
+      } else {
+        b.exports(ms, pn, targets);
+      }
     }
     int oc = in.readUnsignedShort();
     for (int i = 0; i < oc; i++) {
       String pn = ref(in.readUnsignedShort()).replace('/', '.');
       int of = in.readUnsignedShort();
-      Set<ModuleDescriptor.Opens.Modifier> ms = new HashSet<ModuleDescriptor.Opens.Modifier>();
+      Set<ModuleDescriptor.Opens.Modifier> ms = EnumSet.noneOf(ModuleDescriptor.Opens.Modifier.class);
       if ((of & 0x1000) != 0) {
         ms.add(ModuleDescriptor.Opens.Modifier.SYNTHETIC);
       }
@@ -216,7 +249,11 @@ public final class ModuleInfoReader {
       for (int j = 0; j < tc; j++) {
         targets.add(modName(in.readUnsignedShort()));
       }
-      b.opens(ms, pn, targets);
+      if (targets.isEmpty()) {
+        b.opens(ms, pn);
+      } else {
+        b.opens(ms, pn, targets);
+      }
     }
     int uc = in.readUnsignedShort();
     for (int i = 0; i < uc; i++) {

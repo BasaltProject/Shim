@@ -24,6 +24,15 @@ public interface ClassDesc extends ConstantDesc, TypeDescriptor.OfField<ClassDes
     return ofDescriptor("L" + internal + ";");
   }
 
+  static ClassDesc ofInternalName(String name) {
+    Objects.requireNonNull(name, "name");
+    if (name.isEmpty() || name.indexOf('.') >= 0 || name.indexOf(';') >= 0 || name.indexOf('[') >= 0
+        || name.startsWith("/") || name.endsWith("/") || name.contains("//")) {
+      throw new IllegalArgumentException("Invalid class name: " + name);
+    }
+    return ofDescriptor("L" + name + ";");
+  }
+
   static ClassDesc of(String packageName, String className) {
     Objects.requireNonNull(packageName, "packageName");
     Objects.requireNonNull(className, "className");
