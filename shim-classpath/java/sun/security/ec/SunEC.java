@@ -41,6 +41,24 @@ public final class SunEC extends Provider {
     add("Signature", "SHA384withECDSAinP1363Format", "sun.security.ec.ECDSASignature$SHA384withECDSAinP1363Format", new String[] {}, new String[] {});
     add("Signature", "SHA512withECDSAinP1363Format", "sun.security.ec.ECDSASignature$SHA512withECDSAinP1363Format", new String[] {}, new String[] {});
     add("Signature", "SHA1withECDSA", "sun.security.ec.ECDSASignature$SHA1withECDSA", new String[] {"OID.1.2.840.10045.4.1", "1.2.840.10045.4.1"}, new String[] {"ImplementedIn", "Software", "KeySize", "256", "SupportedKeyClasses", "java.security.interfaces.ECPublicKey|java.security.interfaces.ECPrivateKey"});
+    add("KeyPairGenerator", "XDH", "sun.security.ec.XDH$KeyPairGenAny", new String[] {}, new String[] {});
+    add("KeyPairGenerator", "X25519", "sun.security.ec.XDH$KeyPairGen25519", new String[] {"1.3.101.110", "OID.1.3.101.110"}, new String[] {});
+    add("KeyPairGenerator", "X448", "sun.security.ec.XDH$KeyPairGen448", new String[] {"1.3.101.111", "OID.1.3.101.111"}, new String[] {});
+    add("KeyFactory", "XDH", "sun.security.ec.XDH$FactoryAny", new String[] {}, new String[] {});
+    add("KeyFactory", "X25519", "sun.security.ec.XDH$Factory25519", new String[] {"1.3.101.110", "OID.1.3.101.110"}, new String[] {});
+    add("KeyFactory", "X448", "sun.security.ec.XDH$Factory448", new String[] {"1.3.101.111", "OID.1.3.101.111"}, new String[] {});
+    add("KeyAgreement", "XDH", "sun.security.ec.XDH$AgreementAny", new String[] {}, new String[] {});
+    add("KeyAgreement", "X25519", "sun.security.ec.XDH$Agreement25519", new String[] {"1.3.101.110", "OID.1.3.101.110"}, new String[] {});
+    add("KeyAgreement", "X448", "sun.security.ec.XDH$Agreement448", new String[] {"1.3.101.111", "OID.1.3.101.111"}, new String[] {});
+    add("KeyPairGenerator", "EdDSA", "sun.security.ec.EdDSA$KeyPairGenAny", new String[] {}, new String[] {});
+    add("KeyPairGenerator", "Ed25519", "sun.security.ec.EdDSA$KeyPairGen25519", new String[] {"1.3.101.112", "OID.1.3.101.112"}, new String[] {});
+    add("KeyPairGenerator", "Ed448", "sun.security.ec.EdDSA$KeyPairGen448", new String[] {"1.3.101.113", "OID.1.3.101.113"}, new String[] {});
+    add("KeyFactory", "EdDSA", "sun.security.ec.EdDSA$FactoryAny", new String[] {}, new String[] {});
+    add("KeyFactory", "Ed25519", "sun.security.ec.EdDSA$Factory25519", new String[] {"1.3.101.112", "OID.1.3.101.112"}, new String[] {});
+    add("KeyFactory", "Ed448", "sun.security.ec.EdDSA$Factory448", new String[] {"1.3.101.113", "OID.1.3.101.113"}, new String[] {});
+    add("Signature", "EdDSA", "sun.security.ec.EdDSA$SigAny", new String[] {}, new String[] {});
+    add("Signature", "Ed25519", "sun.security.ec.EdDSA$Sig25519", new String[] {"1.3.101.112", "OID.1.3.101.112"}, new String[] {});
+    add("Signature", "Ed448", "sun.security.ec.EdDSA$Sig448", new String[] {"1.3.101.113", "OID.1.3.101.113"}, new String[] {});
     add("KeyAgreement", "ECDH", "sun.security.ec.ECDHKeyAgreement", new String[] {}, new String[] {"ImplementedIn", "Software", "KeySize", "256", "SupportedKeyClasses", "java.security.interfaces.ECPublicKey|java.security.interfaces.ECPrivateKey"});
     add("Signature", "SHA1withECDSAinP1363Format", "sun.security.ec.ECDSASignature$SHA1withECDSAinP1363Format", new String[] {}, new String[] {});
   }
