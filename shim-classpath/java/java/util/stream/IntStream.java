@@ -28,6 +28,12 @@ import java.util.function.ObjIntConsumer;
 import java.util.function.Supplier;
 
 public interface IntStream extends BaseStream<Integer, IntStream> {
+  @Override
+  IntStream sequential();
+
+  @Override
+  IntStream parallel();
+
   IntStream filter(IntPredicate predicate);
 
   IntStream map(IntUnaryOperator mapper);

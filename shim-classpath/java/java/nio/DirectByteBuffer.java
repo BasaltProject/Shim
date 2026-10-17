@@ -11,18 +11,10 @@
  * SPDX-License-Identifier: ISC AND MIT
  */
 
-/* Copyright (c) 2008-2015, Avian Contributors
-
-   Permission to use, copy, modify, and/or distribute this software
-   for any purpose with or without fee is hereby granted, provided
-   that the above copyright notice and this permission notice appear
-   in all copies.
-
-   There is NO WARRANTY for this software.  See license.txt for
-   details. */
 
 package java.nio;
 
+import java.util.Objects;
 import sun.misc.Unsafe;
 
 public class DirectByteBuffer extends MappedByteBuffer {
@@ -30,18 +22,21 @@ public class DirectByteBuffer extends MappedByteBuffer {
   private static final int baseOffset = unsafe.arrayBaseOffset(byte[].class);
 
   protected final long address;
+  private long mapBase;
+  private long mapLength;
 
   public DirectByteBuffer(long address, int capacity, boolean readOnly) {
-    super(readOnly);
-
-    this.address = address;
-    this.capacity = capacity;
-    this.limit = capacity;
-    this.position = 0;
+    this(address, -1, 0, capacity, capacity, readOnly);
   }
 
   public DirectByteBuffer(long address, int capacity) {
     this(address, capacity, false);
+  }
+
+  DirectByteBuffer(long address, int mark, int pos, int lim, int cap, boolean readOnly) {
+    super(mark, pos, lim, cap);
+    this.address = address;
+    this.isReadOnly = readOnly;
   }
 
   public long address() {
@@ -49,94 +44,168 @@ public class DirectByteBuffer extends MappedByteBuffer {
   }
 
   @Override
+  long directAddress() {
+    return address;
+  }
+
+  public void mapped(long base, long length) {
+    mapBase = base;
+    mapLength = length;
+  }
+
+  void forceMapped() {
+    if (mapLength > 0) {
+      shim.NioNative.msync(mapBase, mapLength);
+    }
+  }
+
+  DirectByteBuffer make(long address, int mark, int pos, int lim, int cap, boolean readOnly) {
+    return new DirectByteBuffer(address, mark, pos, lim, cap, readOnly);
+  }
+
+  @Override
+  String bufferName() {
+    return "java.nio.DirectByteBuffer" + (isReadOnly ? "R" : "");
+  }
+
+  @Override
+  public boolean isReadOnly() {
+    return isReadOnly;
+  }
+
+  @Override
   public boolean isDirect() {
     return true;
   }
 
-  public ByteBuffer asReadOnlyBuffer() {
-    ByteBuffer b = new DirectByteBuffer(address, capacity, true);
-    b.position(position());
-    b.limit(limit());
-    return b;
-  }
-
-  public ByteBuffer slice() {
-    return new DirectByteBuffer(address + position, remaining(), isReadOnly());
-  }
-
-  public ByteBuffer slice(int index, int length) {
-    java.util.Objects.checkFromIndexSize(index, length, limit());
-    return new DirectByteBuffer(address + index, length, isReadOnly());
-  }
-
-  protected void doPut(int position, byte val) {
-    unsafe.putByte(address + position, val);
-  }
-
-  public ByteBuffer put(ByteBuffer src) {
-    if (src instanceof DirectByteBuffer) {
-      checkPut(position, src.remaining(), false);
-
-      DirectByteBuffer b = (DirectByteBuffer) src;
-
-      unsafe.copyMemory
-        (b.address + b.position, address + position, b.remaining());
-
-      position += b.remaining();
-      b.position += b.remaining();
-
-      return this;
-    } else {
-      return super.put(src);
-    }
-  }
-
-  public ByteBuffer put(byte[] src, int offset, int length) {
-    if (offset < 0 || offset + length > src.length) {
-      throw new ArrayIndexOutOfBoundsException();
-    }
-
-    checkPut(position, length, false);
-
-    unsafe.copyMemory
-      (src, baseOffset + offset, null, address + position, length);
-
-    position += length;
-
-    return this;
-  }
-
-  public ByteBuffer get(byte[] dst, int offset, int length) {
-    if (offset < 0 || offset + length > dst.length) {
-      throw new ArrayIndexOutOfBoundsException();
-    }
-
-    checkGet(position, length, false);
-
-    unsafe.copyMemory
-      (null, address + position, dst, baseOffset + offset, length);
-
-    position += length;
-
-    return this;
-  }
-
-  protected byte doGet(int position) {
-    return unsafe.getByte(address + position);
-  }
-
-  public String toString() {
-    return "(DirectByteBuffer with address: " + address
-      + " position: " + position
-      + " limit: " + limit
-      + " capacity: " + capacity + ")";
+  @Override
+  public MappedByteBuffer slice() {
+    int pos = position();
+    int lim = limit();
+    int rem = pos <= lim ? lim - pos : 0;
+    return make(address + pos, -1, 0, rem, rem, isReadOnly);
   }
 
   @Override
-  public ByteBuffer duplicate() {
-    ByteBuffer b = new DirectByteBuffer(address, capacity, isReadOnly());
-    b.limit(this.limit());
-    b.position(this.position());
-    return b;
+  public MappedByteBuffer slice(int index, int length) {
+    Objects.checkFromIndexSize(index, length, limit());
+    return make(address + index, -1, 0, length, length, isReadOnly);
+  }
+
+  @Override
+  public MappedByteBuffer duplicate() {
+    return make(address, markValue(), position(), limit(), capacity(), isReadOnly);
+  }
+
+  @Override
+  public ByteBuffer asReadOnlyBuffer() {
+    return make(address, markValue(), position(), limit(), capacity(), true);
+  }
+
+  @Override
+  byte doGet(int index) {
+    return unsafe.getByte(address + index);
+  }
+
+  @Override
+  void doPut(int index, byte b) {
+    unsafe.putByte(address + index, b);
+  }
+
+  @Override
+  public byte get() {
+    return unsafe.getByte(address + nextGetIndex());
+  }
+
+  @Override
+  public byte get(int index) {
+    return unsafe.getByte(address + checkIndex(index));
+  }
+
+  @Override
+  public ByteBuffer put(byte b) {
+    if (isReadOnly) {
+      throw new ReadOnlyBufferException();
+    }
+    unsafe.putByte(address + nextPutIndex(), b);
+    return this;
+  }
+
+  @Override
+  public ByteBuffer put(int index, byte b) {
+    if (isReadOnly) {
+      throw new ReadOnlyBufferException();
+    }
+    unsafe.putByte(address + checkIndex(index), b);
+    return this;
+  }
+
+  @Override
+  public ByteBuffer get(byte[] dst, int offset, int length) {
+    Objects.checkFromIndexSize(offset, length, dst.length);
+    int pos = position();
+    if (length > limit() - pos) {
+      throw new BufferUnderflowException();
+    }
+    unsafe.copyMemory(null, address + pos, dst, baseOffset + offset, length);
+    position(pos + length);
+    return this;
+  }
+
+  @Override
+  public ByteBuffer put(byte[] src, int offset, int length) {
+    if (isReadOnly) {
+      throw new ReadOnlyBufferException();
+    }
+    Objects.checkFromIndexSize(offset, length, src.length);
+    int pos = position();
+    if (length > limit() - pos) {
+      throw new BufferOverflowException();
+    }
+    unsafe.copyMemory(src, baseOffset + offset, null, address + pos, length);
+    position(pos + length);
+    return this;
+  }
+
+  @Override
+  public ByteBuffer put(ByteBuffer src) {
+    if (src instanceof DirectByteBuffer && src != this) {
+      DirectByteBuffer sb = (DirectByteBuffer) src;
+      long from = sb.address + sb.position();
+      long to = address + position();
+      int n = sb.remaining();
+      if (to + n <= from || from + n <= to) {
+        if (isReadOnly) {
+          throw new ReadOnlyBufferException();
+        }
+        if (n > remaining()) {
+          throw new BufferOverflowException();
+        }
+        unsafe.copyMemory(from, to, n);
+        sb.position(sb.position() + n);
+        position(position() + n);
+        return this;
+      }
+    }
+    return super.put(src);
+  }
+
+  @Override
+  public MappedByteBuffer compact() {
+    if (isReadOnly) {
+      throw new ReadOnlyBufferException();
+    }
+    int pos = position();
+    int lim = limit();
+    int rem = pos <= lim ? lim - pos : 0;
+    if (rem > 0 && pos > 0) {
+      byte[] tmp = new byte[rem];
+      unsafe.copyMemory(null, address + pos, tmp, baseOffset, rem);
+      unsafe.copyMemory(tmp, baseOffset, null, address, rem);
+    }
+    position(rem);
+    limit(capacity());
+    discardMark();
+    return this;
   }
 }

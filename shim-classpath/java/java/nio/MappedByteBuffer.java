@@ -1,11 +1,16 @@
 /*
- * Copyright (c) 2026 BasaltMC.
+ * Based on Avian (https://github.com/ReadyTalk/avian).
+ * Original work Copyright (c) 2008-2015, Avian Contributors.
+ * Original work licensed under ISC; see LICENSE.txt:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE.txt
  *
- * Licensed under the MIT License; see LICENSE:
+ * Modifications Copyright (c) 2026 BasaltMC.
+ * Modifications licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: ISC AND MIT
  */
+
 
 package java.nio;
 
@@ -13,9 +18,21 @@ import java.util.Objects;
 
 public abstract class MappedByteBuffer extends ByteBuffer {
 
-  protected MappedByteBuffer(boolean readOnly) {
-    super(readOnly);
+  MappedByteBuffer(int mark, int pos, int lim, int cap) {
+    super(mark, pos, lim, cap);
   }
+
+  @Override
+  public abstract MappedByteBuffer slice();
+
+  @Override
+  public abstract MappedByteBuffer slice(int index, int length);
+
+  @Override
+  public abstract MappedByteBuffer duplicate();
+
+  @Override
+  public abstract MappedByteBuffer compact();
 
   public final boolean isLoaded() {
     return true;
@@ -26,52 +43,58 @@ public abstract class MappedByteBuffer extends ByteBuffer {
   }
 
   public final MappedByteBuffer force() {
+    if (this instanceof DirectByteBuffer) {
+      ((DirectByteBuffer) this).forceMapped();
+    }
     return this;
   }
 
   public final MappedByteBuffer force(int index, int length) {
     Objects.checkFromIndexSize(index, length, limit());
+    if (this instanceof DirectByteBuffer) {
+      ((DirectByteBuffer) this).forceMapped();
+    }
     return this;
   }
 
   @Override
-  public MappedByteBuffer position(int newPosition) {
+  public final MappedByteBuffer position(int newPosition) {
     super.position(newPosition);
     return this;
   }
 
   @Override
-  public MappedByteBuffer limit(int newLimit) {
+  public final MappedByteBuffer limit(int newLimit) {
     super.limit(newLimit);
     return this;
   }
 
   @Override
-  public MappedByteBuffer mark() {
+  public final MappedByteBuffer mark() {
     super.mark();
     return this;
   }
 
   @Override
-  public MappedByteBuffer reset() {
+  public final MappedByteBuffer reset() {
     super.reset();
     return this;
   }
 
   @Override
-  public MappedByteBuffer clear() {
+  public final MappedByteBuffer clear() {
     super.clear();
     return this;
   }
 
   @Override
-  public MappedByteBuffer flip() {
+  public final MappedByteBuffer flip() {
     super.flip();
     return this;
   }
 
   @Override
-  public MappedByteBuffer rewind() {
+  public final MappedByteBuffer rewind() {
     super.rewind();
     return this;
   }

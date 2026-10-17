@@ -28,6 +28,22 @@ import shim.FileNative;
 public final class FileDescriptor {
   int fd;
 
+  static {
+    jdk.internal.access.SharedSecrets.setJavaIOFileDescriptorAccess(new jdk.internal.access.JavaIOFileDescriptorAccess() {
+      public void set(FileDescriptor fdo, int fd) {
+        fdo.fd = fd;
+      }
+
+      public int get(FileDescriptor fdo) {
+        return fdo.fd;
+      }
+
+      public void close(FileDescriptor fdo) throws IOException {
+        fdo.closeAll();
+      }
+    });
+  }
+
   public static final FileDescriptor in = new FileDescriptor(0);
   public static final FileDescriptor out = new FileDescriptor(1);
   public static final FileDescriptor err = new FileDescriptor(2);

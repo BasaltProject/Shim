@@ -8,9 +8,11 @@
 
 #include "jni.h"
 #include "jni-util.h"
+#include "utf8-util.h"
 
 #include <errno.h>
 #include <fcntl.h>
+#include <locale.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -102,7 +104,9 @@ enum {
   kCreateNew = 16,
   kTruncate = 32,
   kSync = 64,
-  kDsync = 128
+  kDsync = 128,
+  kNoFollow = 256,
+  kAllowDir = 512
 };
 
 bool toPath(JNIEnv* e, jstring s, FsString& out)
@@ -119,13 +123,11 @@ bool toPath(JNIEnv* e, jstring s, FsString& out)
   e->ReleaseStringChars(s, chars);
   return ok;
 #else
-  const char* chars = e->GetStringUTFChars(s, 0);
-  if (chars == 0) {
+  shimutf8::Utf8 chars(e, s);
+  if (chars.chars == 0) {
     return false;
   }
-  bool ok = out.assign(chars, strlen(chars));
-  e->ReleaseStringUTFChars(s, chars);
-  return ok;
+  return out.assign(chars.chars, strlen(chars.chars));
 #endif
 }
 
@@ -134,7 +136,7 @@ jstring fromPath(JNIEnv* e, const FsString& s)
 #ifdef PLATFORM_WINDOWS
   return e->NewString(reinterpret_cast<const jchar*>(s.c_str()), static_cast<jsize>(s.length));
 #else
-  return e->NewStringUTF(s.c_str());
+  return shimutf8::fromUtf8(e, s.c_str());
 #endif
 }
 
@@ -188,6 +190,11 @@ extern "C" JNIEXPORT jint JNICALL
 #ifdef O_CLOEXEC
   oflags |= O_CLOEXEC;
 #endif
+#ifdef O_NOFOLLOW
+  if (flags & kNoFollow) {
+    oflags |= O_NOFOLLOW;
+  }
+#endif
 #ifdef PLATFORM_WINDOWS
   oflags |= _O_BINARY;
 #endif
@@ -199,7 +206,7 @@ extern "C" JNIEXPORT jint JNICALL
     return err();
   }
 #ifndef PLATFORM_WINDOWS
-  if ((flags & (kWrite | kAppend)) == 0) {
+  if ((flags & (kWrite | kAppend | kAllowDir)) == 0) {
     struct stat st;
     if (fstat(fd, &st) == 0 && S_ISDIR(st.st_mode)) {
       close(fd);
@@ -569,7 +576,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_realpath(JNIEnv* e, jc
   if (realpath(p.c_str(), buffer) == 0) {
     return 0;
   }
-  return e->NewStringUTF(buffer);
+  return shimutf8::fromUtf8(e, buffer);
 #endif
 }
 
@@ -631,7 +638,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_FileNative_list(JNIEnv* e, j
     while (struct dirent* entry = readdir(dir)) {
       if (!isDotEntry(entry->d_name)) {
         if (pass == 1 && index < count) {
-          e->SetObjectArrayElement(result, index, e->NewStringUTF(entry->d_name));
+          e->SetObjectArrayElement(result, index, shimutf8::fromUtf8(e, entry->d_name));
         }
         ++index;
       }
@@ -682,7 +689,15 @@ extern "C" JNIEXPORT jint JNICALL
 
 extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_strerror(JNIEnv* e, jclass, jint number)
 {
-  return e->NewStringUTF(strerror(number));
+#ifndef PLATFORM_WINDOWS
+  static bool localeSet = false;
+  if (!localeSet) {
+    localeSet = true;
+    setlocale(LC_MESSAGES, "");
+    setlocale(LC_CTYPE, "");
+  }
+#endif
+  return shimutf8::fromUtf8(e, strerror(number));
 }
 
 extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_cwd(JNIEnv* e, jclass)
@@ -698,6 +713,6 @@ extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_cwd(JNIEnv* e, jclass)
   if (getcwd(buffer, sizeof(buffer)) == 0) {
     return 0;
   }
-  return e->NewStringUTF(buffer);
+  return shimutf8::fromUtf8(e, buffer);
 #endif
 }

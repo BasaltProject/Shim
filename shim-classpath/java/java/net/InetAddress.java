@@ -255,7 +255,7 @@ public class InetAddress implements Serializable {
       }
     }
     if (result == null || (bracketed && result instanceof Inet4Address)) {
-      throw new IllegalArgumentException("Invalid IP address literal: " + ipAddressLiteral);
+      throw new IllegalArgumentException(("Invalid IP address literal: " + ipAddressLiteral.strip()).stripTrailing());
     }
     return result;
   }

@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2026 BasaltMC.
- *
- * Licensed under the MIT License; see LICENSE:
+ * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
  *
  * SPDX-License-Identifier: MIT
@@ -10,7 +9,6 @@
 package java.nio.channels;
 
 import java.io.IOException;
-import java.util.Objects;
 
 public abstract class FileLock implements AutoCloseable {
   private final Channel channel;
@@ -19,31 +17,43 @@ public abstract class FileLock implements AutoCloseable {
   private final boolean shared;
 
   protected FileLock(FileChannel channel, long position, long size, boolean shared) {
-    if (position < 0 || size < 0 || position + size < 0) {
-      throw new IllegalArgumentException("Negative position or size");
+    if (position < 0) {
+      throw new IllegalArgumentException("Negative position");
     }
-    this.channel = Objects.requireNonNull(channel, "channel");
+    if (size < 0) {
+      throw new IllegalArgumentException("Negative size");
+    }
+    if (position + size < 0) {
+      throw new IllegalArgumentException("Negative position + size");
+    }
+    this.channel = channel;
     this.position = position;
     this.size = size;
     this.shared = shared;
   }
 
-  protected FileLock(Channel channel, long position, long size, boolean shared) {
-    if (position < 0 || size < 0 || position + size < 0) {
-      throw new IllegalArgumentException("Negative position or size");
+  protected FileLock(AsynchronousFileChannel channel, long position, long size, boolean shared) {
+    if (position < 0) {
+      throw new IllegalArgumentException("Negative position");
     }
-    this.channel = Objects.requireNonNull(channel, "channel");
+    if (size < 0) {
+      throw new IllegalArgumentException("Negative size");
+    }
+    if (position + size < 0) {
+      throw new IllegalArgumentException("Negative position + size");
+    }
+    this.channel = channel;
     this.position = position;
     this.size = size;
     this.shared = shared;
-  }
-
-  public final Channel acquiredBy() {
-    return channel;
   }
 
   public final FileChannel channel() {
     return (channel instanceof FileChannel) ? (FileChannel) channel : null;
+  }
+
+  public Channel acquiredBy() {
+    return channel;
   }
 
   public final long position() {
@@ -59,8 +69,12 @@ public abstract class FileLock implements AutoCloseable {
   }
 
   public final boolean overlaps(long position, long size) {
-    if (position + size <= this.position) return false;
-    if (this.position + this.size <= position) return false;
+    if (position + size <= this.position) {
+      return false;
+    }
+    if (this.position + this.size <= position) {
+      return false;
+    }
     return true;
   }
 
@@ -68,13 +82,12 @@ public abstract class FileLock implements AutoCloseable {
 
   public abstract void release() throws IOException;
 
-  @Override
   public final void close() throws IOException {
     release();
   }
 
-  @Override
-  public String toString() {
-    return getClass().getName() + "[position=" + position + ", size=" + size + ", shared=" + shared + ", valid=" + isValid() + "]";
+  public final String toString() {
+    return (this.getClass().getName() + "[" + position + ":" + size + " " + (shared ? "shared" : "exclusive") + " "
+        + (isValid() ? "valid" : "invalid") + "]");
   }
 }

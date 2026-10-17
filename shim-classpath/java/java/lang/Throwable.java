@@ -101,9 +101,10 @@ public class Throwable implements Serializable {
 
   public String toString() {
     StringBuilder sb = new StringBuilder();
+    String m = getLocalizedMessage();
     sb.append(getClass().getName());
-    if (message != null) {
-      sb.append(": ").append(message);
+    if (m != null) {
+      sb.append(": ").append(m);
     }
     return sb.toString();
   }

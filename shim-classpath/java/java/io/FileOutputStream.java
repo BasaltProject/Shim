@@ -24,7 +24,6 @@
 package java.io;
 
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileChannelImpl;
 import java.util.Objects;
 import shim.FileNative;
 
@@ -123,7 +122,7 @@ public class FileOutputStream extends OutputStream {
   public FileChannel getChannel() {
     synchronized (this) {
       if (channel == null) {
-        channel = new FileChannelImpl(new RandomAccessFile(fd, path, false, true), false, true, append);
+        channel = sun.nio.ch.FileChannelImpl.open(fd, path, false, true, append, this);
       }
       return channel;
     }

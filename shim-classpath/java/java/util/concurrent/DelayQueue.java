@@ -63,6 +63,11 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E>
   }
 
   @Override
+  public E remove() {
+    return super.remove();
+  }
+
+  @Override
   public E poll() {
     lock.lock();
     try {

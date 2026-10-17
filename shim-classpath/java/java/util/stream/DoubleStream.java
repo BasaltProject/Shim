@@ -27,6 +27,12 @@ import java.util.function.ObjDoubleConsumer;
 import java.util.function.Supplier;
 
 public interface DoubleStream extends BaseStream<Double, DoubleStream> {
+  @Override
+  DoubleStream sequential();
+
+  @Override
+  DoubleStream parallel();
+
   DoubleStream filter(DoublePredicate predicate);
 
   DoubleStream map(DoubleUnaryOperator mapper);

@@ -204,4 +204,14 @@ public final class Inet6Address extends InetAddress {
     }
     return Arrays.equals(holderAddress, ((Inet6Address) obj).holderAddress);
   }
+
+  public static InetAddress ofLiteral(String ipAddressLiteral) {
+    if (ipAddressLiteral == null) {
+      throw new NullPointerException();
+    }
+    if (ipAddressLiteral.indexOf(':') < 0) {
+      throw new IllegalArgumentException(("Invalid IP address literal: " + ipAddressLiteral.strip()).stripTrailing());
+    }
+    return InetAddress.ofLiteral(ipAddressLiteral);
+  }
 }

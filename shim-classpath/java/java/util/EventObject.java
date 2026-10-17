@@ -23,10 +23,10 @@
 
 package java.util;
 
-public class EventObject {
+public class EventObject implements java.io.Serializable {
   private static final long serialVersionUID = 5516075349620653480L;
 
-  protected Object source;
+  protected transient Object source;
 
   public EventObject(Object source) {
     this.source = source;

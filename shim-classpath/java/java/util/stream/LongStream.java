@@ -28,6 +28,12 @@ import java.util.function.ObjLongConsumer;
 import java.util.function.Supplier;
 
 public interface LongStream extends BaseStream<Long, LongStream> {
+  @Override
+  LongStream sequential();
+
+  @Override
+  LongStream parallel();
+
   LongStream filter(LongPredicate predicate);
 
   LongStream map(LongUnaryOperator mapper);

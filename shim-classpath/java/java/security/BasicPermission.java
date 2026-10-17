@@ -23,7 +23,8 @@
 
 package java.security;
 
-public class BasicPermission extends Permission {
+public class BasicPermission extends Permission implements java.io.Serializable {
+
   private static final long serialVersionUID = 6279438298436773498L;
 
 

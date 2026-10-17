@@ -229,8 +229,20 @@ public final class Class <T>
     } else if (isArray()) {
       String componentName = getComponentType().getCanonicalName();
       return componentName == null ? null : componentName + "[]";
+    } else if (isLocalClass() || isAnonymousClass()) {
+      return null;
+    } else if (isMemberClass()) {
+      Class<?> enclosing = getDeclaringClass();
+      if (enclosing == null) {
+        return null;
+      }
+      String enclosingName = enclosing.getCanonicalName();
+      if (enclosingName == null) {
+        return null;
+      }
+      return enclosingName + "." + getSimpleName();
     } else {
-      return getName().replace('$', '.');
+      return getName();
     }
   }
 
@@ -239,14 +251,26 @@ public final class Class <T>
       return getName();
     } else if (isArray()) {
       return getComponentType().getSimpleName() + "[]";
-    } else {
-      String name = isHidden() ? getName() : getCanonicalName();
-      int index = name.lastIndexOf('.');
-      if (index >= 0) {
-        return name.substring(index + 1);
-      } else {
-        return name;
+    } else if (isHidden()) {
+      String name = getName();
+      return name.substring(name.lastIndexOf('.') + 1);
+    } else if (isAnonymousClass()) {
+      return "";
+    } else if (isLocalClass() || isMemberClass()) {
+      String name = getName();
+      int index = name.lastIndexOf('$');
+      String simple = index >= 0 ? name.substring(index + 1) : name.substring(name.lastIndexOf('.') + 1);
+      if (isLocalClass()) {
+        int i = 0;
+        while (i < simple.length() && Character.isDigit(simple.charAt(i))) {
+          i++;
+        }
+        simple = simple.substring(i);
       }
+      return simple;
+    } else {
+      String name = getName();
+      return name.substring(name.lastIndexOf('.') + 1);
     }
   }
 
@@ -607,6 +631,9 @@ public final class Class <T>
   }
 
   public Class getSuperclass() {
+    if (isInterface() || (vmClass.vmFlags & PrimitiveFlag) != 0) {
+      return null;
+    }
     return (vmClass.super_ == null ? null : SystemClassLoader.getClass(vmClass.super_));
   }
   
@@ -644,15 +671,15 @@ public final class Class <T>
   }
     
   public boolean isAnonymousClass () {
-    return getClassType() == ClassType.ANONYMOUS;
+    return !isArray() && getClassType() == ClassType.ANONYMOUS;
   }
   
   public boolean isLocalClass () {
-    return getClassType() == ClassType.LOCAL;
+    return !isArray() && getClassType() == ClassType.LOCAL;
   }
 
   public boolean isMemberClass () {
-    return getClassType() == ClassType.MEMBER;
+    return !isArray() && getClassType() == ClassType.MEMBER;
   }
 
   public boolean isArray() {
@@ -705,13 +732,16 @@ public final class Class <T>
 
   public <T> Class<? extends T> asSubclass(Class<T> c) {
     if (! c.isAssignableFrom(this)) {
-      throw new ClassCastException();
+      throw new ClassCastException(this.toString());
     }
 
     return (Class<? extends T>) this;
   }
 
   public T cast(Object o) {
+    if (o != null && !isInstance(o)) {
+      throw new ClassCastException("Cannot cast " + o.getClass().getName() + " to " + getName());
+    }
     return (T) o;
   }
 

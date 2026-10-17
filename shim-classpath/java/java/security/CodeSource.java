@@ -26,7 +26,8 @@ package java.security;
 import java.net.URL;
 import java.security.cert.Certificate;
 
-public class CodeSource {
+public class CodeSource implements java.io.Serializable {
+
   private static final long serialVersionUID = 4977541819976013951L;
 
   private final URL url;
