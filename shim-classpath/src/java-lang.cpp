@@ -870,13 +870,17 @@ extern "C" JNIEXPORT jobjectArray JNICALL
   e->SetObjectArrayElement(array, index++, e->NewStringUTF("os.arch=x86"));
 
 #elif defined ARCH_x86_64
+#ifdef __APPLE__
   e->SetObjectArrayElement(array, index++, e->NewStringUTF("os.arch=x86_64"));
+#else
+  e->SetObjectArrayElement(array, index++, e->NewStringUTF("os.arch=amd64"));
+#endif
 
 #elif defined ARCH_arm
   e->SetObjectArrayElement(array, index++, e->NewStringUTF("os.arch=arm"));
 
 #elif defined ARCH_arm64
-  e->SetObjectArrayElement(array, index++, e->NewStringUTF("os.arch=arm64"));
+  e->SetObjectArrayElement(array, index++, e->NewStringUTF("os.arch=aarch64"));
 
 #else
 #error "unknown architecture"

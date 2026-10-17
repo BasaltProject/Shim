@@ -106,7 +106,7 @@ class MyClasspath : public Classpath {
 
   virtual object makeJField(Thread* t, GcField* vmField)
   {
-    return makeJfield(t, vmField, false);
+    return makeJfield(t, vmField, false, false);
   }
 
   virtual GcField* getVMField(Thread* t UNUSED, GcJfield* jfield)
@@ -623,7 +623,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_Thread_enumerate(Thread* t, object, uintptr_t* arguments)
 {
-  GcArray* array = cast<GcArray>(t, reinterpret_cast<object>(*arguments));
+  GcArray* array = reinterpret_cast<GcArray*>(*arguments);
 
   ACQUIRE_RAW(t, t->m->stateLock);
 

@@ -76,19 +76,31 @@ public class Proxy implements java.io.Serializable {
       }
     }
 
-    int number;
-    synchronized (Proxy.class) {
-      number = nextNumber++;
+    List<Object> key = new ArrayList<Object>(interfaces.length + 1);
+    key.add(loader);
+    for (Class c: interfaces) {
+      key.add(c);
     }
 
-    try {
-      return makeClass(loader, interfaces, "Proxy-" + number);
-    } catch (IOException e) {
-      AssertionError error = new AssertionError();
-      error.initCause(e);
-      throw error;      
+    synchronized (Proxy.class) {
+      Class cached = classCache.get(key);
+      if (cached != null) {
+        return cached;
+      }
+      int number = nextNumber++;
+      try {
+        Class made = makeClass(loader, interfaces, "Proxy-" + number);
+        classCache.put(key, made);
+        return made;
+      } catch (IOException e) {
+        AssertionError error = new AssertionError();
+        error.initCause(e);
+        throw error;
+      }
     }
   }
+
+  private static final Map<List<Object>, Class> classCache = new HashMap<List<Object>, Class>();
 
   public static boolean isProxyClass(Class c) {
     if (c == null) {
