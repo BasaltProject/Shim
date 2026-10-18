@@ -4005,6 +4005,21 @@ void doCollect(Thread* t, Heap::CollectionType type, int pendingAllocation)
 
   postCollect(m->rootThread);
 
+  static int64_t statsStart = 0;
+  static bool statsDone = false;
+  if (not statsDone) {
+    if (const char* after = getenv("SHIM_HEAP_STATS_AFTER")) {
+      if (statsStart == 0) {
+        statsStart = m->system->now();
+      } else if (m->system->now() - statsStart >= static_cast<int64_t>(atoi(after)) * 1000) {
+        statsDone = true;
+        dumpHeapStats(t, stderr);
+      }
+    } else {
+      statsDone = true;
+    }
+  }
+
   killZombies(t, m->rootThread);
 
   for (unsigned i = 0; i < m->heapPoolIndex; ++i) {
