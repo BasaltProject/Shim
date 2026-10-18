@@ -456,6 +456,31 @@ public class Properties extends Hashtable<Object, Object> {
     bw.flush();
   }
 
+  public synchronized void loadFromXML(InputStream in) throws IOException, InvalidPropertiesFormatException {
+    PropertiesXml.load(this, in);
+  }
+
+  public void storeToXML(OutputStream os, String comment) throws IOException {
+    PropertiesXml.store(this, os, comment, java.nio.charset.StandardCharsets.UTF_8);
+  }
+
+  public void storeToXML(OutputStream os, String comment, String encoding) throws IOException {
+    Objects.requireNonNull(os);
+    PropertiesXml.store(this, os, comment, PropertiesXml.charsetFor(encoding));
+  }
+
+  public void storeToXML(OutputStream os, String comment, java.nio.charset.Charset charset) throws IOException {
+    PropertiesXml.store(this, os, comment, charset);
+  }
+
+  @Deprecated
+  public void save(OutputStream out, String comments) {
+    try {
+      store(out, comments);
+    } catch (IOException e) {
+    }
+  }
+
   public String getProperty(String key) {
     Object oval = map.get(key);
     String sval = (oval instanceof String) ? (String) oval : null;
