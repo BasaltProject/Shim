@@ -159,6 +159,9 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static String toString(int codePoint) {
+    if (!isValidCodePoint(codePoint)) {
+      throw new IllegalArgumentException(String.format("Not a valid Unicode code point: 0x%X", codePoint));
+    }
     return new String(toChars(codePoint));
   }
 
@@ -441,7 +444,7 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static int toCodePoint(char high, char low) {
-    return (((high & 0x3FF) << 10) | (low & 0x3FF)) + 0x10000;
+    return ((high << 10) + low) + (0x10000 - (0xD800 << 10) - 0xDC00);
   }
 
   public static boolean isValidCodePoint(int codePoint) {
@@ -466,7 +469,7 @@ public final class Character implements java.io.Serializable, Comparable<Charact
 
   public static char[] toChars(int codePoint) {
     if (!isValidCodePoint(codePoint)) {
-      throw new IllegalArgumentException();
+      throw new IllegalArgumentException(String.format("Not a valid Unicode code point: 0x%X", codePoint));
     }
     if (isSupplementaryCodePoint(codePoint)) {
       int cpPrime = codePoint - 0x10000;
@@ -482,12 +485,8 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static int codePointAt(CharSequence sequence, int offset) {
-    int length = sequence.length();
-    if (offset < 0 || offset >= length) {
-      throw new IndexOutOfBoundsException();
-    }
-
     char high = sequence.charAt(offset);
+    int length = sequence.length();
     if (! isHighSurrogate(high) || offset + 1 >= length) {
       return high;
     }
@@ -500,10 +499,6 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static int codePointBefore(CharSequence sequence, int index) {
-    int length = sequence.length();
-    if (index < 1 || index > length) {
-      throw new IndexOutOfBoundsException();
-    }
     char low = sequence.charAt(index - 1);
     if (isLowSurrogate(low) && index > 1) {
       char high = sequence.charAt(index - 2);
@@ -515,10 +510,7 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static int codePointCount(CharSequence sequence, int start, int end) {
-    int length = sequence.length();
-    if (start < 0 || start > end || end > length) {
-      throw new IndexOutOfBoundsException();
-    }
+    java.util.Objects.checkFromToIndex(start, end, sequence.length());
 
     int count = 0;
     for (int i = start; i < end; ++i) {
@@ -575,11 +567,19 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static int codePointAt(char[] a, int index) {
-    return codePointAt(a, index, a.length);
+    int limit = a.length;
+    char c1 = a[index];
+    if (isHighSurrogate(c1) && ++index < limit) {
+      char c2 = a[index];
+      if (isLowSurrogate(c2)) {
+        return toCodePoint(c1, c2);
+      }
+    }
+    return c1;
   }
 
   public static int codePointAt(char[] a, int index, int limit) {
-    if (index >= limit || index < 0 || limit > a.length) {
+    if (index >= limit || index < 0 || limit < 0 || limit > a.length) {
       throw new IndexOutOfBoundsException();
     }
     char c1 = a[index];
@@ -593,7 +593,14 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static int codePointBefore(char[] a, int index) {
-    return codePointBefore(a, index, 0);
+    char c2 = a[--index];
+    if (isLowSurrogate(c2) && index > 0) {
+      char c1 = a[--index];
+      if (isHighSurrogate(c1)) {
+        return toCodePoint(c1, c2);
+      }
+    }
+    return c2;
   }
 
   public static int codePointBefore(char[] a, int index, int start) {
@@ -611,9 +618,7 @@ public final class Character implements java.io.Serializable, Comparable<Charact
   }
 
   public static int codePointCount(char[] a, int offset, int count) {
-    if (count > a.length - offset || offset < 0 || count < 0) {
-      throw new IndexOutOfBoundsException();
-    }
+    java.util.Objects.checkFromIndexSize(offset, count, a.length);
     int endIndex = offset + count;
     int n = count;
     for (int i = offset; i < endIndex; ) {

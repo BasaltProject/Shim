@@ -57,6 +57,15 @@ public class CoreLangEdgeModern {
     t("enumFinal", () -> Thread.State.NEW.equals(Thread.State.NEW) + " " + Thread.State.NEW.hashCode() * 0);
     t("lambdaCast", () -> { Function f = (Function<String, Integer>) s -> s.length(); return f.apply(3); });
     t("lambdaArrayCast", () -> { Comparator c = Comparator.naturalOrder(); return c.compare(new int[1], null); });
+    t("arrayIndexMsg", () -> { int[] a = new int[3]; int i = args.length + 5; return a[i]; });
+    t("arrayNegMsg", () -> { long[] a = new long[2]; int i = args.length - 1; a[i] = 1; return a; });
+    t("arrayObjMsg", () -> { Object[] a = new Object[1]; int i = args.length + 1; return a[i]; });
+    t("toCodePoint", () -> Character.toCodePoint('a', 'a'));
+    t("charToStringBad", () -> Character.toString(-1));
+    t("codePointAtArray", () -> Character.codePointAt(new char[0], 0));
+    t("codePointCountArray", () -> Character.codePointCount(new char[1], 0, 2));
+    t("codePointAtSeq", () -> Character.codePointAt("", 0));
+    t("booleanUpper", () -> Boolean.valueOf("TRUE") + " " + Boolean.getBoolean(null));
     t("arraysAsList", () -> Arrays.asList(1, 2).getClass().getName());
   }
 }

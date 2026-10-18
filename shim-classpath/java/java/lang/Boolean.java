@@ -46,8 +46,7 @@ public final class Boolean implements java.io.Serializable, Comparable<Boolean>,
   }
 
   public static Boolean valueOf(String s) {
-    Boolean.TRUE.booleanValue();
-    return ("true".equals(s) ? Boolean.TRUE : Boolean.FALSE);
+    return parseBoolean(s) ? Boolean.TRUE : Boolean.FALSE;
   }
 
   public int compareTo(Boolean o) {
@@ -95,7 +94,7 @@ public final class Boolean implements java.io.Serializable, Comparable<Boolean>,
   }
 
   public static boolean getBoolean(String name) {
-    return parseBoolean(System.getProperty(name));
+    return name != null && !name.isEmpty() && parseBoolean(System.getProperty(name));
   }
 
   public static boolean parseBoolean(String string) {
