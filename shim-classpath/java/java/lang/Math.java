@@ -260,7 +260,9 @@ public final class Math {
 
   public static native double tan(double v);
 
-  public static native double cosh(double v);
+  public static double cosh(double v) {
+    return shim.FdLibm.cosh(v);
+  }
 
   public static native double sinh(double v);
 
@@ -272,7 +274,9 @@ public final class Math {
 
   public static native double atan(double v);
 
-  public static native double atan2(double y, double x);
+  public static double atan2(double y, double x) {
+    return shim.FdLibm.atan2(y, x);
+  }
 
   public static native double sqrt(double v);
 
@@ -640,7 +644,9 @@ public final class Math {
 
   public static native double log1p(double v);
 
-  public static native double hypot(double x, double y);
+  public static double hypot(double x, double y) {
+    return shim.FdLibm.hypot(x, y);
+  }
 
   public static native double IEEEremainder(double dividend, double divisor);
 
