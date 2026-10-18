@@ -61,25 +61,37 @@ public final class Math {
   }
 
   public static int clamp(long value, int minimum, int maximum) {
-    if (minimum > maximum) throw new IllegalArgumentException("Invalid clamp range");
+    if (minimum > maximum) throw new IllegalArgumentException(minimum + " > " + maximum);
     return (int) max((long) minimum, min(value, (long) maximum));
   }
 
   public static long clamp(long value, long minimum, long maximum) {
-    if (minimum > maximum) throw new IllegalArgumentException("Invalid clamp range");
+    if (minimum > maximum) throw new IllegalArgumentException(minimum + " > " + maximum);
     return max(minimum, min(value, maximum));
   }
 
   public static float clamp(float value, float minimum, float maximum) {
-    if (Float.isNaN(minimum) || Float.isNaN(maximum) || Float.compare(minimum, maximum) > 0) {
-      throw new IllegalArgumentException("Invalid clamp range");
+    if (Float.isNaN(minimum)) {
+      throw new IllegalArgumentException("min is NaN");
+    }
+    if (Float.isNaN(maximum)) {
+      throw new IllegalArgumentException("max is NaN");
+    }
+    if (Float.compare(minimum, maximum) > 0) {
+      throw new IllegalArgumentException(minimum + " > " + maximum);
     }
     return max(minimum, min(value, maximum));
   }
 
   public static double clamp(double value, double minimum, double maximum) {
-    if (Double.isNaN(minimum) || Double.isNaN(maximum) || Double.compare(minimum, maximum) > 0) {
-      throw new IllegalArgumentException("Invalid clamp range");
+    if (Double.isNaN(minimum)) {
+      throw new IllegalArgumentException("min is NaN");
+    }
+    if (Double.isNaN(maximum)) {
+      throw new IllegalArgumentException("max is NaN");
+    }
+    if (Double.compare(minimum, maximum) > 0) {
+      throw new IllegalArgumentException(minimum + " > " + maximum);
     }
     return max(minimum, min(value, maximum));
   }
@@ -710,7 +722,7 @@ public final class Math {
   public static int unsignedMultiplyExact(int x, int y) {
     long r = Integer.toUnsignedLong(x) * Integer.toUnsignedLong(y);
     if ((r >>> 32) != 0) {
-      throw new ArithmeticException("integer overflow");
+      throw new ArithmeticException("unsigned integer overflow");
     }
     return (int) r;
   }
@@ -722,14 +734,14 @@ public final class Math {
   public static long unsignedMultiplyExact(long x, long y) {
     long hi = unsignedMultiplyHigh(x, y);
     if (hi != 0) {
-      throw new ArithmeticException("long overflow");
+      throw new ArithmeticException("unsigned long overflow");
     }
     return x * y;
   }
 
   public static int powExact(int base, int exponent) {
     if (exponent < 0) {
-      throw new ArithmeticException("Negative exponent");
+      throw new ArithmeticException("negative exponent");
     }
     int result = 1;
     while (exponent > 0) {
@@ -746,7 +758,7 @@ public final class Math {
 
   public static long powExact(long base, int exponent) {
     if (exponent < 0) {
-      throw new ArithmeticException("Negative exponent");
+      throw new ArithmeticException("negative exponent");
     }
     long result = 1;
     while (exponent > 0) {
@@ -763,7 +775,7 @@ public final class Math {
 
   public static int unsignedPowExact(int base, int exponent) {
     if (exponent < 0) {
-      throw new ArithmeticException("Negative exponent");
+      throw new ArithmeticException("negative exponent");
     }
     int result = 1;
     while (exponent > 0) {
@@ -780,7 +792,7 @@ public final class Math {
 
   public static long unsignedPowExact(long base, int exponent) {
     if (exponent < 0) {
-      throw new ArithmeticException("Negative exponent");
+      throw new ArithmeticException("negative exponent");
     }
     long result = 1;
     while (exponent > 0) {

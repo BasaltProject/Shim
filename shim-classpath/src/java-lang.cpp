@@ -1237,6 +1237,9 @@ extern "C" JNIEXPORT jdouble JNICALL
 extern "C" JNIEXPORT jdouble JNICALL
     Java_java_lang_Math_pow(JNIEnv*, jclass, jdouble val, jdouble exp)
 {
+  if (exp != exp || (isinf(exp) && (val == 1.0 || val == -1.0))) {
+    return NAN;
+  }
   return pow(val, exp);
 }
 
@@ -1291,7 +1294,7 @@ extern "C" JNIEXPORT jdouble JNICALL
 extern "C" JNIEXPORT jdouble JNICALL
     Java_java_lang_Math_exp(JNIEnv*, jclass, jdouble exp)
 {
-  return pow(M_E, exp);
+  return ::exp(exp);
 }
 
 extern "C" JNIEXPORT jint JNICALL

@@ -1752,11 +1752,11 @@ loop:
     int32_t a = popInt(t);
 
     if (UNLIKELY(b == 0)) {
-      exception = makeThrowable(t, GcArithmeticException::Type);
+      exception = makeThrowable(t, GcArithmeticException::Type, "/ by zero");
       goto throw_;
     }
 
-    pushInt(t, a / b);
+    pushInt(t, b == -1 ? static_cast<int32_t>(0u - static_cast<uint32_t>(a)) : a / b);
   }
     goto loop;
 
@@ -2116,11 +2116,11 @@ loop:
     int32_t a = popInt(t);
 
     if (UNLIKELY(b == 0)) {
-      exception = makeThrowable(t, GcArithmeticException::Type);
+      exception = makeThrowable(t, GcArithmeticException::Type, "/ by zero");
       goto throw_;
     }
 
-    pushInt(t, a % b);
+    pushInt(t, b == -1 ? 0 : a % b);
   }
     goto loop;
 
@@ -2379,11 +2379,11 @@ loop:
     int64_t a = popLong(t);
 
     if (UNLIKELY(b == 0)) {
-      exception = makeThrowable(t, GcArithmeticException::Type);
+      exception = makeThrowable(t, GcArithmeticException::Type, "/ by zero");
       goto throw_;
     }
 
-    pushLong(t, a / b);
+    pushLong(t, b == -1 ? static_cast<int64_t>(0ull - static_cast<uint64_t>(a)) : a / b);
   }
     goto loop;
 
@@ -2476,11 +2476,11 @@ loop:
     int64_t a = popLong(t);
 
     if (UNLIKELY(b == 0)) {
-      exception = makeThrowable(t, GcArithmeticException::Type);
+      exception = makeThrowable(t, GcArithmeticException::Type, "/ by zero");
       goto throw_;
     }
 
-    pushLong(t, a % b);
+    pushLong(t, b == -1 ? 0 : a % b);
   }
     goto loop;
 

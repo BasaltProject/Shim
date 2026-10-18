@@ -1332,10 +1332,28 @@ void divideRR(Context* c,
 
   c->client->save(rdx);
 
+  // x86 idiv traps on MIN_VALUE / -1; Java defines the quotient as -dividend
+  maybeRex(c, aSize, a);
+  opcode(c, 0x83, 0xf8 + regCode(a));
+  c->code.append(0xff);
+  opcode(c, 0x75);
+  unsigned normal = c->code.length();
+  c->code.append(0);
+  maybeRex(c, aSize, b);
+  opcode(c, 0xf7, 0xd8 + regCode(b));
+  opcode(c, 0xeb);
+  unsigned done = c->code.length();
+  c->code.append(0);
+  int8_t offset = c->code.length() - normal - 1;
+  c->code.set(normal, &offset, 1);
+
   maybeRex(c, aSize, a, b);
   opcode(c, 0x99);  // cdq
   maybeRex(c, aSize, b, a);
   opcode(c, 0xf7, 0xf8 + regCode(a));
+
+  offset = c->code.length() - done - 1;
+  c->code.set(done, &offset, 1);
 }
 
 void remainderRR(Context* c,
@@ -1351,10 +1369,26 @@ void remainderRR(Context* c,
 
   c->client->save(rdx);
 
+  maybeRex(c, aSize, a);
+  opcode(c, 0x83, 0xf8 + regCode(a));
+  c->code.append(0xff);
+  opcode(c, 0x75);
+  unsigned normal = c->code.length();
+  c->code.append(0);
+  opcode(c, 0x31, 0xd2);  // xor edx, edx
+  opcode(c, 0xeb);
+  unsigned done = c->code.length();
+  c->code.append(0);
+  int8_t offset = c->code.length() - normal - 1;
+  c->code.set(normal, &offset, 1);
+
   maybeRex(c, aSize, a, b);
   opcode(c, 0x99);  // cdq
   maybeRex(c, aSize, b, a);
   opcode(c, 0xf7, 0xf8 + regCode(a));
+
+  offset = c->code.length() - done - 1;
+  c->code.set(done, &offset, 1);
 
   lir::RegisterPair dx(rdx);
   moveRR(c, vm::TargetBytesPerWord, &dx, vm::TargetBytesPerWord, b);
