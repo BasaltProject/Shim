@@ -802,6 +802,7 @@ class Context {
         freshCopyCapacity(0),
         gen2Threshold(InitialGen2CapacityInBytes / BytesPerWord),
         logMajor(getenv("SHIM_GC_STATS") != 0),
+        headroomPercent(getenv("SHIM_GC_HEADROOM_PERCENT") ? atoi(getenv("SHIM_GC_HEADROOM_PERCENT")) : 25),
         compactNext(false),
         retiredMemory(0),
         retiredBytes(0)
@@ -905,6 +906,7 @@ class Context {
   unsigned freshCopyCapacity;
   unsigned gen2Threshold;
   bool logMajor;
+  unsigned headroomPercent;
   bool compactNext;
   void* retiredMemory;
   size_t retiredBytes;
@@ -1346,7 +1348,7 @@ void sweepGen2(Context* c)
   unsigned accountedAfter = previousEnd - c->freeWords;
   c->count -= (accountedBefore - accountedAfter) * BytesPerWord;
 
-  unsigned headroom = max(accountedAfter / 4,
+  unsigned headroom = max(accountedAfter / 100 * c->headroomPercent,
                           MinimumGen2HeadroomInBytes / BytesPerWord);
   c->gen2Threshold = accountedAfter + headroom;
   c->compactNext = c->gen2.position() > c->gen2.capacity() / 2;
