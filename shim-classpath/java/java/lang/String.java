@@ -207,8 +207,24 @@ public final class String
     if (copy) {
       Object c;
       if (data instanceof char[]) {
-        c = new char[length];
-        System.arraycopy(data, offset, c, 0, length);
+        char[] source = (char[]) data;
+        boolean ascii = true;
+        for (int i = offset; i < offset + length; ++i) {
+          if (source[i] >= 0x80) {
+            ascii = false;
+            break;
+          }
+        }
+        if (ascii) {
+          byte[] narrow = new byte[length];
+          for (int i = 0; i < length; ++i) {
+            narrow[i] = (byte) source[offset + i];
+          }
+          c = narrow;
+        } else {
+          c = new char[length];
+          System.arraycopy(data, offset, c, 0, length);
+        }
       } else {
         c = Utf8.decode((byte[])data, offset, length);
         if(c instanceof char[]) length = ((char[])c).length;
