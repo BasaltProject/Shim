@@ -2648,9 +2648,11 @@ unsigned traceSize(Thread* t)
          + (counter.count * pad(GcTraceElement::FixedSize));
 }
 
+const unsigned MessageReserve = 1024;
+
 void NO_RETURN throwArithmetic(MyThread* t)
 {
-  if (ensure(t, GcArithmeticException::FixedSize + traceSize(t))) {
+  if (ensure(t, GcArithmeticException::FixedSize + traceSize(t) + MessageReserve)) {
     t->setFlag(Thread::TracingFlag);
     THREAD_RESOURCE0(t, t->clearFlag(Thread::TracingFlag));
 
@@ -2774,7 +2776,10 @@ void storeReferenceArray(MyThread* t, object array, uint32_t index, object value
   PROTECT(t, array);
   PROTECT(t, value);
   if (UNLIKELY(array == 0)) throwNew(t, GcNullPointerException::Type);
-  if (UNLIKELY(index >= objectArrayLength(t, array))) throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+  if (UNLIKELY(index >= objectArrayLength(t, array))) {
+    throwNew(t, GcArrayIndexOutOfBoundsException::Type, "Index %d out of bounds for length %d",
+             static_cast<int32_t>(index), static_cast<int32_t>(objectArrayLength(t, array)));
+  }
   if (value && !instanceOf(t, objectClass(t, array)->arrayElementClass(), value)) {
     throwNew(t, GcArrayStoreException::Type);
   }
@@ -2786,11 +2791,17 @@ void storeByteArray(MyThread* t, object array, uint32_t index, uint32_t value)
   if (UNLIKELY(array == 0)) throwNew(t, GcNullPointerException::Type);
   if (objectClass(t, array) == type(t, GcBooleanArray::Type)) {
     GcBooleanArray* target = cast<GcBooleanArray>(t, array);
-    if (UNLIKELY(index >= target->length())) throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+    if (UNLIKELY(index >= target->length())) {
+      throwNew(t, GcArrayIndexOutOfBoundsException::Type, "Index %d out of bounds for length %d",
+               static_cast<int32_t>(index), static_cast<int32_t>(target->length()));
+    }
     target->body()[index] = value & 1;
   } else {
     GcByteArray* target = cast<GcByteArray>(t, array);
-    if (UNLIKELY(index >= target->length())) throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+    if (UNLIKELY(index >= target->length())) {
+      throwNew(t, GcArrayIndexOutOfBoundsException::Type, "Index %d out of bounds for length %d",
+               static_cast<int32_t>(index), static_cast<int32_t>(target->length()));
+    }
     target->body()[index] = value;
   }
 }
@@ -2902,12 +2913,18 @@ uint64_t makeMultidimensionalArrayFromReference(MyThread* t,
       offset);
 }
 
-void NO_RETURN throwArrayIndexOutOfBounds(MyThread* t)
+void NO_RETURN throwArrayIndexOutOfBounds(MyThread* t, int32_t first, int32_t second, int32_t swapped)
 {
-  if (ensure(t, GcArrayIndexOutOfBoundsException::FixedSize + traceSize(t))) {
+  bool detailed = t->arch->argumentRegisterCount() >= 4;
+  int32_t index = swapped ? second : first;
+  int32_t length = swapped ? first : second;
+  if (ensure(t, GcArrayIndexOutOfBoundsException::FixedSize + traceSize(t) + MessageReserve)) {
     t->setFlag(Thread::TracingFlag);
     THREAD_RESOURCE0(t, t->clearFlag(Thread::TracingFlag));
 
+    if (detailed) {
+      throwNew(t, GcArrayIndexOutOfBoundsException::Type, "Index %d out of bounds for length %d", index, length);
+    }
     throwNew(t, GcArrayIndexOutOfBoundsException::Type);
   } else {
     // not enough memory available for a new exception and stack trace
@@ -10617,7 +10634,26 @@ void compileThunks(MyThread* t, FixedAllocator* allocator)
     p->thunks.aioob.frameSavedOffset = a->length();
 
     lir::RegisterPair thread(t->arch->thread());
-    a->pushFrame(1, TargetBytesPerWord, lir::Operand::Type::RegisterPair, &thread);
+    if (t->arch->argumentRegisterCount() >= 4) {
+      lir::RegisterPair first(t->arch->argumentRegister(1));
+      lir::RegisterPair second(t->arch->argumentRegister(2));
+      lir::RegisterPair swapped(t->arch->argumentRegister(3));
+      a->pushFrame(4,
+                   TargetBytesPerWord,
+                   lir::Operand::Type::RegisterPair,
+                   &thread,
+                   4,
+                   lir::Operand::Type::RegisterPair,
+                   &first,
+                   4,
+                   lir::Operand::Type::RegisterPair,
+                   &second,
+                   4,
+                   lir::Operand::Type::RegisterPair,
+                   &swapped);
+    } else {
+      a->pushFrame(1, TargetBytesPerWord, lir::Operand::Type::RegisterPair, &thread);
+    }
 
     compileCall(t, &context, throwArrayIndexOutOfBoundsIndex);
 

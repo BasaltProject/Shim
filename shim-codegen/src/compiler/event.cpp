@@ -1993,6 +1993,39 @@ void appendJump(Context* c,
   append(c, new (c->zone) JumpEvent(c, op, address, exit, cleanLocals));
 }
 
+void loadBoundsArguments(Context* c, Value* index, Value* length)
+{
+  Architecture* arch = c->arch;
+  if (arch->argumentRegisterCount() < 4) {
+    return;
+  }
+  Register first = arch->argumentRegister(1);
+  Register second = arch->argumentRegister(2);
+  Register flag = arch->argumentRegister(3);
+  Site* indexSite = index->source;
+  Site* lengthSite = length->source;
+  bool lengthInFirst = lengthSite->type(c) == lir::Operand::Type::RegisterPair
+                       and static_cast<RegisterSite*>(lengthSite)->number == first;
+  bool indexInSecond = indexSite->type(c) == lir::Operand::Type::RegisterPair
+                       and static_cast<RegisterSite*>(indexSite)->number == second;
+  bool swapped = lengthInFirst and indexInSecond;
+
+  RegisterSite firstDst(RegisterMask(first), first);
+  RegisterSite secondDst(RegisterMask(second), second);
+  if (not swapped) {
+    if (lengthInFirst) {
+      apply(c, lir::Move, 4, lengthSite, lengthSite, 4, &secondDst, &secondDst);
+      apply(c, lir::Move, 4, indexSite, indexSite, 4, &firstDst, &firstDst);
+    } else {
+      apply(c, lir::Move, 4, indexSite, indexSite, 4, &firstDst, &firstDst);
+      apply(c, lir::Move, 4, lengthSite, lengthSite, 4, &secondDst, &secondDst);
+    }
+  }
+  ConstantSite flagValue(resolvedPromise(c, swapped ? 1 : 0));
+  RegisterSite flagDst(RegisterMask(flag), flag);
+  apply(c, lir::Move, 4, &flagValue, &flagValue, 4, &flagDst, &flagDst);
+}
+
 class BoundsCheckEvent : public Event {
  public:
   BoundsCheckEvent(Context* c,
@@ -2022,6 +2055,7 @@ class BoundsCheckEvent : public Event {
 
     if (constant) {
       if (constant->value->value() < 0) {
+        loadBoundsArguments(c, index, length);
         lir::Constant handlerConstant(resolvedPromise(c, handler));
         a->apply(lir::Call,
                  OperandInfo(c->targetInfo.pointerSize,
@@ -2071,6 +2105,7 @@ class BoundsCheckEvent : public Event {
         outOfBoundsPromise->offset = a->offset();
       }
 
+      loadBoundsArguments(c, index, length);
       lir::Constant handlerConstant(resolvedPromise(c, handler));
       a->apply(lir::Call,
                OperandInfo(c->targetInfo.pointerSize,
