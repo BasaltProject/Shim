@@ -23,21 +23,130 @@
 
 package java.lang;
 
+import java.io.FileDescriptor;
+import java.net.InetAddress;
+import java.security.AccessControlContext;
 import java.security.AccessController;
 import java.security.Permission;
-import java.security.SecurityPermission;
 
 public class SecurityManager {
-
   public SecurityManager() {
   }
-  
-  public void checkPermission(Permission perm) {
-    AccessController.checkPermission(perm);
-  }
-  
-  public void checkSecurityAccess(String target) {
-    checkPermission(new SecurityPermission(target));
+
+  public Object getSecurityContext() {
+    return AccessController.getContext();
   }
 
+  public void checkPermission(Permission perm) {
+    throw new SecurityException();
+  }
+
+  public void checkPermission(Permission perm, Object context) {
+    throw new SecurityException();
+  }
+
+  public void checkCreateClassLoader() {
+    throw new SecurityException();
+  }
+
+  public void checkAccess(Thread t) {
+    throw new SecurityException();
+  }
+
+  public void checkAccess(ThreadGroup g) {
+    throw new SecurityException();
+  }
+
+  public void checkExit(int status) {
+    throw new SecurityException();
+  }
+
+  public void checkExec(String cmd) {
+    throw new SecurityException();
+  }
+
+  public void checkLink(String lib) {
+    throw new SecurityException();
+  }
+
+  public void checkRead(FileDescriptor fd) {
+    throw new SecurityException();
+  }
+
+  public void checkRead(String file) {
+    throw new SecurityException();
+  }
+
+  public void checkRead(String file, Object context) {
+    throw new SecurityException();
+  }
+
+  public void checkWrite(FileDescriptor fd) {
+    throw new SecurityException();
+  }
+
+  public void checkWrite(String file) {
+    throw new SecurityException();
+  }
+
+  public void checkDelete(String file) {
+    throw new SecurityException();
+  }
+
+  public void checkConnect(String host, int port) {
+    throw new SecurityException();
+  }
+
+  public void checkConnect(String host, int port, Object context) {
+    throw new SecurityException();
+  }
+
+  public void checkListen(int port) {
+    throw new SecurityException();
+  }
+
+  public void checkAccept(String host, int port) {
+    throw new SecurityException();
+  }
+
+  public void checkMulticast(InetAddress maddr) {
+    throw new SecurityException();
+  }
+
+  public void checkPropertiesAccess() {
+    throw new SecurityException();
+  }
+
+  public void checkPropertyAccess(String key) {
+    throw new SecurityException();
+  }
+
+  public void checkPrintJobAccess() {
+    throw new SecurityException();
+  }
+
+  public void checkPackageAccess(String pkg) {
+    throw new SecurityException();
+  }
+
+  public void checkPackageDefinition(String pkg) {
+    throw new SecurityException();
+  }
+
+  public void checkSetFactory() {
+    throw new SecurityException();
+  }
+
+  public void checkSecurityAccess(String target) {
+    throw new SecurityException();
+  }
+
+  @Deprecated(since = "1.4")
+  public void checkMulticast(InetAddress maddr, byte ttl) {
+    throw new SecurityException();
+  }
+
+  public ThreadGroup getThreadGroup() {
+    return Thread.currentThread().getThreadGroup();
+  }
 }
