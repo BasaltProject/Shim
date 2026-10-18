@@ -39,6 +39,10 @@ public final class IsoChronology extends AbstractChronology implements Serializa
   }
 
   @Override
+  public boolean isIsoBased() {
+    return true;
+  }
+
   public String getCalendarType() {
     return "iso8601";
   }

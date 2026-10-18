@@ -1,243 +1,93 @@
-// Minimum release: 21
 /*
  * Copyright (c) 2026 BasaltMC.
- *
  * Licensed under MIT; see LICENSE:
  * https://github.com/BasaltProject/Shim/blob/main/LICENSE
- *
  * SPDX-License-Identifier: MIT
+ * Minimum release: 21
  */
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-
+import java.lang.invoke.*;
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.concurrent.Callable;
 public class MethodHandleCombinatorsModern {
-
-  public static int add3(int a, int b, int c) {
-    return a + b + c;
+  interface Th { Object call() throws Throwable; }
+  static void t(String n, Th c) { try { System.out.println(n + ": " + c.call()); } catch (Throwable e) { System.out.println(n + ": !" + e.getClass().getName() + ":" + (e instanceof NullPointerException ? null : e.getMessage())); } }
+  public static int f1(int sel, String s) { return s.length() + 100; }
+  public static int f2(int sel, String s) { return s.length() + 200; }
+  public static int fb(int sel, String s) { return -sel; }
+  public static String join3(String a, String b, String c) { return a + "|" + b + "|" + c; }
+  public static String join2(String a, String b) { return a + "|" + b; }
+  public static String ints(int a, long b, short c, byte d, char e, float f, double g, boolean h) { return a + "," + b + "," + c + "," + d + "," + (int) e + "," + f + "," + g + "," + h; }
+  public static long retLong(int x) { return x * 3L; }
+  public static void sideEffect(String s) { }
+  public static String vsum(String... parts) { return String.join("+", parts); }
+  int field;
+  public static void main(String[] a) throws Throwable {
+    MethodHandles.Lookup l = MethodHandles.lookup();
+    MethodHandle h1 = l.findStatic(MethodHandleCombinatorsModern.class, "f1", MethodType.methodType(int.class, int.class, String.class));
+    MethodHandle h2 = l.findStatic(MethodHandleCombinatorsModern.class, "f2", MethodType.methodType(int.class, int.class, String.class));
+    MethodHandle fb = l.findStatic(MethodHandleCombinatorsModern.class, "fb", MethodType.methodType(int.class, int.class, String.class));
+    MethodHandle ts = MethodHandles.tableSwitch(fb, h1, h2);
+    t("tableSwitch", () -> (int) ts.invokeExact(0, "abc") + " " + (int) ts.invokeExact(1, "abcd") + " " + (int) ts.invokeExact(2, "x") + " " + (int) ts.invokeExact(-1, "x") + " " + ts.type());
+    t("tableSwitchEmpty", () -> MethodHandles.tableSwitch(fb));
+    t("tableSwitchBadType", () -> MethodHandles.tableSwitch(fb, l.findStatic(MethodHandleCombinatorsModern.class, "join2", MethodType.methodType(String.class, String.class, String.class))));
+    t("tableSwitchNoInt", () -> MethodHandles.tableSwitch(l.findStatic(MethodHandleCombinatorsModern.class, "join2", MethodType.methodType(String.class, String.class, String.class)), h1));
+    t("tableSwitchNull", () -> MethodHandles.tableSwitch(null, h1));
+    MethodHandle j3 = l.findStatic(MethodHandleCombinatorsModern.class, "join3", MethodType.methodType(String.class, String.class, String.class, String.class));
+    MethodHandle d1 = MethodHandles.dropArgumentsToMatch(j3, 1, List.of(String.class, int.class, String.class, String.class, double.class), 2);
+    t("dropToMatch", () -> d1.type() + " " + d1.invoke("A", "B", 5, "C", "D", 2.5));
+    t("dropToMatch0", () -> { MethodHandle d = MethodHandles.dropArgumentsToMatch(j3, 0, List.of(String.class, String.class, String.class, long.class), 0); return d.type() + " " + d.invoke("a", "b", "c", 9L); });
+    t("dropToMatchBad", () -> MethodHandles.dropArgumentsToMatch(j3, 1, List.of(String.class, int.class), 0));
+    t("dropToMatchBadType", () -> MethodHandles.dropArgumentsToMatch(j3, 0, List.of(int.class, String.class, String.class), 0));
+    t("dropToMatchBadPos", () -> MethodHandles.dropArgumentsToMatch(j3, 0, List.of(String.class, String.class, String.class), 5));
+    t("dropToMatchBadSkip", () -> MethodHandles.dropArgumentsToMatch(j3, 4, List.of(String.class), 0));
+    MethodHandle im = l.findStatic(MethodHandleCombinatorsModern.class, "ints", MethodType.methodType(String.class, int.class, long.class, short.class, byte.class, char.class, float.class, double.class, boolean.class));
+    MethodHandle ec = MethodHandles.explicitCastArguments(im, MethodType.methodType(String.class, double.class, double.class, double.class, double.class, double.class, double.class, double.class, int.class));
+    t("explicitDoubles", () -> ec.invoke(300.7, 1e19, -70000.5, 200.0, 65.9, 3.99, 2.5, 3));
+    t("explicitNaN", () -> ec.invoke(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 1e10, -1.0, 1.5, 2.5, 2));
+    MethodHandle ec2 = MethodHandles.explicitCastArguments(im, MethodType.methodType(Object.class, Integer.class, Long.class, Short.class, Byte.class, Character.class, Float.class, Double.class, Boolean.class));
+    t("explicitBoxed", () -> ec2.invoke(null, null, null, null, null, null, null, null));
+    t("explicitBoxed2", () -> ec2.invoke(7, 8L, (short) 9, (byte) 10, 'c', 1.5f, 2.5, true));
+    MethodHandle ec3 = MethodHandles.explicitCastArguments(im, MethodType.methodType(String.class, long.class, int.class, int.class, int.class, int.class, int.class, int.class, long.class));
+    t("explicitLongs", () -> ec3.invoke(5000000000L, 70000, 70000, 300, 70000, 16777217, 5, 3L));
+    MethodHandle rl = l.findStatic(MethodHandleCombinatorsModern.class, "retLong", MethodType.methodType(long.class, int.class));
+    MethodHandle rec = MethodHandles.explicitCastArguments(rl, MethodType.methodType(byte.class, long.class));
+    t("explicitRet", () -> (byte) rec.invokeExact(100L));
+    MethodHandle rec2 = MethodHandles.explicitCastArguments(rl, MethodType.methodType(void.class, int.class));
+    t("explicitVoid", () -> rec2.type() + " " + rec2.invoke(1));
+    MethodHandle rec3 = MethodHandles.explicitCastArguments(rl, MethodType.methodType(Object.class, Object.class));
+    t("explicitObj", () -> rec3.invoke(7));
+    t("explicitObjBad", () -> rec3.invoke("str"));
+    t("explicitArity", () -> MethodHandles.explicitCastArguments(rl, MethodType.methodType(long.class, int.class, int.class)));
+    t("explicitSame", () -> MethodHandles.explicitCastArguments(rl, rl.type()) == rl);
+    VarHandle vh = l.findVarHandle(MethodHandleCombinatorsModern.class, "field", int.class);
+    MethodHandle vi = MethodHandles.varHandleInvoker(VarHandle.AccessMode.GET_AND_ADD, MethodType.methodType(int.class, MethodHandleCombinatorsModern.class, int.class));
+    MethodHandleCombinatorsModern o = new MethodHandleCombinatorsModern(); o.field = 5;
+    t("varHandleInvoker", () -> vi.type() + " " + (int) vi.invoke(vh, o, 3) + " " + o.field);
+    MethodHandle ve = MethodHandles.varHandleExactInvoker(VarHandle.AccessMode.GET, MethodType.methodType(int.class, MethodHandleCombinatorsModern.class));
+    t("varHandleExact", () -> (int) ve.invoke(vh, o));
+    MethodHandle veBad = MethodHandles.varHandleExactInvoker(VarHandle.AccessMode.GET, MethodType.methodType(long.class, MethodHandleCombinatorsModern.class));
+    t("varHandleExactBad", () -> veBad.invoke(vh, o));
+    t("reflectAs", () -> MethodHandles.reflectAs(Method.class, h1) + " " + MethodHandles.reflectAs(Field.class, l.findGetter(MethodHandleCombinatorsModern.class, "field", int.class)) + " " + MethodHandles.reflectAs(Constructor.class, l.findConstructor(MethodHandleCombinatorsModern.class, MethodType.methodType(void.class))));
+    t("reflectAsBad", () -> MethodHandles.reflectAs(Field.class, h1));
+    MethodHandle vs = l.findStatic(MethodHandleCombinatorsModern.class, "vsum", MethodType.methodType(String.class, String[].class));
+    t("withVarargs", () -> vs.isVarargsCollector() + " " + vs.withVarargs(true).isVarargsCollector() + " " + vs.withVarargs(true).invoke("a", "b", "c") + " " + vs.withVarargs(true).withVarargs(false).isVarargsCollector());
+    t("withVarargsBad", () -> j3.withVarargs(true));
+    t("withVarargsNoop", () -> j3.withVarargs(false) == j3);
+    MethodHandle sp = j3.asSpreader(1, Object[].class, 2);
+    t("asSpreaderPos", () -> sp.type() + " " + sp.invoke("a", new Object[] {"b", "c"}));
+    t("asSpreaderPos0", () -> { MethodHandle s0 = j3.asSpreader(0, String[].class, 3); return s0.type() + " " + s0.invoke((Object) new String[] {"x", "y", "z"}); });
+    t("asSpreaderBadPos", () -> j3.asSpreader(4, Object[].class, 0));
+    t("asSpreaderBadLen", () -> j3.asSpreader(2, Object[].class, 2));
+    t("asSpreaderBadType", () -> j3.asSpreader(0, String.class, 1));
+        t("asCollectorBadParam", () -> j3.asCollector(1, String[].class, 0));
+    t("asCollectorPos", () -> { MethodHandle c1 = l.findStatic(MethodHandleCombinatorsModern.class, "vsum", MethodType.methodType(String.class, String[].class)); MethodHandle t3 = MethodHandles.insertArguments(MethodHandles.dropArguments(c1, 1, String.class), 1, "I"); return t3.type(); });
+    MethodHandle mid = l.findStatic(Arrays.class, "asList", MethodType.methodType(List.class, Object[].class));
+    t("asCollectorPos2", () -> { MethodHandle t4 = l.findStatic(MethodHandleCombinatorsModern.class, "mix", MethodType.methodType(String.class, String.class, String[].class, String.class)); MethodHandle c = t4.asCollector(1, String[].class, 2); return c.type() + " " + c.invoke("A", "x", "y", "Z"); });
+    t("asCollectorBadPos", () -> j3.asCollector(5, String[].class, 1));
+    t("asCollectorNotArray", () -> j3.asCollector(0, String.class, 1));
+    t("invokeReflect", () -> MethodHandle.class.getMethod("invokeExact", Object[].class).getReturnType().getSimpleName());
   }
-
-  public static String concat(String a, int b) {
-    return a + ":" + b;
-  }
-
-  public static String filterStr(String s) {
-    return "[" + s + "]";
-  }
-
-  public static int filterInt(int x) {
-    return x * 10;
-  }
-
-  public static String combine(int a, int b) {
-    return "{" + a + "," + b + "}";
-  }
-
-  public static String targetForFold(String comb, int a, int b) {
-    return comb + "->" + (a + b);
-  }
-
-  private static int sideEffectCount = 0;
-
-  public static void sideEffect(int a) {
-    sideEffectCount += a;
-  }
-
-  public static String targetForVoidFold(int x, int a) {
-    return x + ":" + a;
-  }
-
-  public static boolean isEven(int n) {
-    return (n % 2) == 0;
-  }
-
-  public static String evenBranch(int n) {
-    return "even:" + n;
-  }
-
-  public static String oddBranch(int n) {
-    return "odd:" + n;
-  }
-
-  public static String fallible(String input) throws Exception {
-    if ("fail".equals(input)) {
-      throw new IllegalArgumentException("planned-failure");
-    }
-    return "success:" + input;
-  }
-
-  public static String rescue(IllegalArgumentException ex, String input) {
-    return "rescued:" + ex.getMessage() + ":" + input;
-  }
-
-  public static void main(String[] args) throws Throwable {
-    testInsertArguments();
-    testFilterArguments();
-    testPermuteArguments();
-    testFoldArguments();
-    testFoldArgumentsVoid();
-    testGuardWithTest();
-    testCatchException();
-    testZeroAndEmpty();
-    testArrayCombinators();
-    System.out.println("ALL TESTS PASSED");
-  }
-
-  private static void testInsertArguments() throws Throwable {
-    MethodHandles.Lookup lookup = MethodHandles.lookup();
-    MethodHandle mh = lookup.findStatic(MethodHandleCombinatorsModern.class, "add3",
-        MethodType.methodType(int.class, int.class, int.class, int.class));
-
-    MethodHandle bound = MethodHandles.insertArguments(mh, 1, 20);
-    if (!bound.type().equals(MethodType.methodType(int.class, int.class, int.class))) {
-      throw new AssertionError("insertArguments type mismatch: " + bound.type());
-    }
-    int res = (Integer) bound.invokeWithArguments(5, 3);
-    if (res != 28) { // 5 + 20 + 3
-      throw new AssertionError("insertArguments result mismatch: " + res);
-    }
-  }
-
-  private static void testFilterArguments() throws Throwable {
-    MethodHandles.Lookup lookup = MethodHandles.lookup();
-    MethodHandle target = lookup.findStatic(MethodHandleCombinatorsModern.class, "concat",
-        MethodType.methodType(String.class, String.class, int.class));
-    MethodHandle fStr = lookup.findStatic(MethodHandleCombinatorsModern.class, "filterStr",
-        MethodType.methodType(String.class, String.class));
-    MethodHandle fInt = lookup.findStatic(MethodHandleCombinatorsModern.class, "filterInt",
-        MethodType.methodType(int.class, int.class));
-
-    MethodHandle filtered = MethodHandles.filterArguments(target, 0, fStr, fInt);
-    String res = (String) filtered.invokeWithArguments("apple", 7);
-    if (!"[apple]:70".equals(res)) {
-      throw new AssertionError("filterArguments result mismatch: " + res);
-    }
-
-    MethodHandle partialFilter = MethodHandles.filterArguments(target, 1, fInt);
-    String res2 = (String) partialFilter.invokeWithArguments("orange", 3);
-    if (!"orange:30".equals(res2)) {
-      throw new AssertionError("partial filterArguments result mismatch: " + res2);
-    }
-  }
-
-  private static void testPermuteArguments() throws Throwable {
-    MethodHandles.Lookup lookup = MethodHandles.lookup();
-    MethodHandle target = lookup.findStatic(MethodHandleCombinatorsModern.class, "concat",
-        MethodType.methodType(String.class, String.class, int.class));
-
-    // Incoming type: (int, String)String -> reordered to (1, 0)
-    MethodType newType = MethodType.methodType(String.class, int.class, String.class);
-    MethodHandle permuted = MethodHandles.permuteArguments(target, newType, 1, 0);
-    String res = (String) permuted.invokeWithArguments(42, "num");
-    if (!"num:42".equals(res)) {
-      throw new AssertionError("permuteArguments result mismatch: " + res);
-    }
-  }
-
-  private static void testFoldArguments() throws Throwable {
-    MethodHandles.Lookup lookup = MethodHandles.lookup();
-    MethodHandle target = lookup.findStatic(MethodHandleCombinatorsModern.class, "targetForFold",
-        MethodType.methodType(String.class, String.class, int.class, int.class));
-    MethodHandle comb = lookup.findStatic(MethodHandleCombinatorsModern.class, "combine",
-        MethodType.methodType(String.class, int.class, int.class));
-
-    MethodHandle folded = MethodHandles.foldArguments(target, comb);
-    if (!folded.type().equals(MethodType.methodType(String.class, int.class, int.class))) {
-      throw new AssertionError("folded type mismatch: " + folded.type());
-    }
-    String res = (String) folded.invokeWithArguments(3, 4);
-    if (!"{3,4}->7".equals(res)) {
-      throw new AssertionError("folded result mismatch: " + res);
-    }
-  }
-
-  private static void testFoldArgumentsVoid() throws Throwable {
-    MethodHandles.Lookup lookup = MethodHandles.lookup();
-    MethodHandle target = lookup.findStatic(MethodHandleCombinatorsModern.class, "targetForVoidFold",
-        MethodType.methodType(String.class, int.class, int.class));
-    MethodHandle comb = lookup.findStatic(MethodHandleCombinatorsModern.class, "sideEffect",
-        MethodType.methodType(void.class, int.class));
-
-    sideEffectCount = 0;
-    MethodHandle folded = MethodHandles.foldArguments(target, 1, comb);
-    String res = (String) folded.invokeWithArguments(100, 50);
-    if (!"100:50".equals(res) || sideEffectCount != 50) {
-      throw new AssertionError("void fold mismatch: res=" + res + ", sideEffectCount=" + sideEffectCount);
-    }
-  }
-
-  private static void testGuardWithTest() throws Throwable {
-    MethodHandles.Lookup lookup = MethodHandles.lookup();
-    MethodHandle test = lookup.findStatic(MethodHandleCombinatorsModern.class, "isEven",
-        MethodType.methodType(boolean.class, int.class));
-    MethodHandle tBranch = lookup.findStatic(MethodHandleCombinatorsModern.class, "evenBranch",
-        MethodType.methodType(String.class, int.class));
-    MethodHandle fBranch = lookup.findStatic(MethodHandleCombinatorsModern.class, "oddBranch",
-        MethodType.methodType(String.class, int.class));
-
-    MethodHandle gwt = MethodHandles.guardWithTest(test, tBranch, fBranch);
-    String even = (String) gwt.invokeWithArguments(10);
-    String odd = (String) gwt.invokeWithArguments(7);
-    if (!"even:10".equals(even) || !"odd:7".equals(odd)) {
-      throw new AssertionError("guardWithTest mismatch: even=" + even + ", odd=" + odd);
-    }
-  }
-
-  private static void testCatchException() throws Throwable {
-    MethodHandles.Lookup lookup = MethodHandles.lookup();
-    MethodHandle target = lookup.findStatic(MethodHandleCombinatorsModern.class, "fallible",
-        MethodType.methodType(String.class, String.class));
-    MethodHandle handler = lookup.findStatic(MethodHandleCombinatorsModern.class, "rescue",
-        MethodType.methodType(String.class, IllegalArgumentException.class, String.class));
-
-    MethodHandle wrapped = MethodHandles.catchException(target, IllegalArgumentException.class, handler);
-    String ok = (String) wrapped.invokeWithArguments("test");
-    if (!"success:test".equals(ok)) {
-      throw new AssertionError("catchException success mismatch: " + ok);
-    }
-    String rescued = (String) wrapped.invokeWithArguments("fail");
-    if (!"rescued:planned-failure:fail".equals(rescued)) {
-      throw new AssertionError("catchException handler mismatch: " + rescued);
-    }
-  }
-
-  private static void testZeroAndEmpty() throws Throwable {
-    MethodHandle zInt = MethodHandles.zero(int.class);
-    if ((Integer) zInt.invokeWithArguments() != 0) {
-      throw new AssertionError("zero int mismatch");
-    }
-    MethodHandle zLong = MethodHandles.zero(long.class);
-    if ((Long) zLong.invokeWithArguments() != 0L) {
-      throw new AssertionError("zero long mismatch");
-    }
-    MethodHandle zStr = MethodHandles.zero(String.class);
-    if (zStr.invokeWithArguments() != null) {
-      throw new AssertionError("zero String mismatch");
-    }
-
-    MethodHandle empty = MethodHandles.empty(MethodType.methodType(String.class, int.class, double.class));
-    if (empty.invokeWithArguments(12, 3.4) != null) {
-      throw new AssertionError("empty mismatch");
-    }
-  }
-
-  private static void testArrayCombinators() throws Throwable {
-    MethodHandle ctor = MethodHandles.arrayConstructor(String[].class);
-    MethodHandle len = MethodHandles.arrayLength(String[].class);
-    MethodHandle getter = MethodHandles.arrayElementGetter(String[].class);
-    MethodHandle setter = MethodHandles.arrayElementSetter(String[].class);
-
-    String[] arr = (String[]) ctor.invokeWithArguments(3);
-    if (arr.length != 3) {
-      throw new AssertionError("arrayConstructor length mismatch");
-    }
-    setter.invokeWithArguments(arr, 1, "shim-val");
-    if ((Integer) len.invokeWithArguments((Object) arr) != 3) {
-      throw new AssertionError("arrayLength mismatch");
-    }
-    if (!"shim-val".equals(getter.invokeWithArguments(arr, 1))) {
-      throw new AssertionError("arrayElementGetter mismatch");
-    }
-  }
+  public static String mix(String a, String[] mid, String z) { return a + Arrays.toString(mid) + z; }
 }

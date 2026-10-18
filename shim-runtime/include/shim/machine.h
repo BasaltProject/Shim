@@ -2666,6 +2666,8 @@ inline void NO_RETURN
   }
 }
 
+void NO_RETURN throwClassCast(Thread* t, GcClass* from, GcClass* to);
+
 object findInHierarchyOrNull(
     Thread* t,
     GcClass* class_,

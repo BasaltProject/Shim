@@ -4398,6 +4398,55 @@ void Thread::dispose()
   m->processor->dispose(this);
 }
 
+static void dottedName(GcByteArray* name, char* out, unsigned size)
+{
+  unsigned n = name->length() - 1;
+  if (n >= size) n = size - 1;
+  for (unsigned i = 0; i < n; ++i) {
+    char c = static_cast<char>(name->body()[i]);
+    out[i] = c == '/' ? '.' : c;
+  }
+  out[n] = 0;
+}
+
+static void moduleDescription(Thread* t, GcClass* c, char* out, unsigned size)
+{
+  GcClassLoader* loader = c->loader();
+  if (loader == 0 or loader == roots(t)->bootLoader()) {
+    snprintf(out, size, "module java.base of loader 'bootstrap'");
+  } else if (loader == roots(t)->appLoader()) {
+    snprintf(out, size, "unnamed module of loader 'app'");
+  } else {
+    char loaderClass[256];
+    dottedName(objectClass(t, loader)->name(), loaderClass, sizeof(loaderClass));
+    snprintf(out, size, "unnamed module of loader %s", loaderClass);
+  }
+}
+
+void NO_RETURN throwClassCast(Thread* t, GcClass* from, GcClass* to)
+{
+  char a[512];
+  char b[512];
+  char ma[320];
+  char mb[320];
+  dottedName(from->name(), a, sizeof(a));
+  dottedName(to->name(), b, sizeof(b));
+  moduleDescription(t, from, ma, sizeof(ma));
+  moduleDescription(t, to, mb, sizeof(mb));
+  if (::strcmp(ma, mb) == 0) {
+    throwNew(t, GcClassCastException::Type, "class %s cannot be cast to class %s (%s and %s are in %s)", a, b, a, b, ma);
+  }
+  throwNew(t,
+           GcClassCastException::Type,
+           "class %s cannot be cast to class %s (%s is in %s; %s is in %s)",
+           a,
+           b,
+           a,
+           ma,
+           b,
+           mb);
+}
+
 void shutDown(Thread* t)
 {
   ACQUIRE(t, t->m->shutdownLock);

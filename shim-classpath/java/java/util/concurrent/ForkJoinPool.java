@@ -345,6 +345,10 @@ public class ForkJoinPool extends AbstractExecutorService implements ScheduledEx
     }
   }
 
+  int queueSizeOf(WorkQueue q) {
+    return queueSize(q);
+  }
+
   int queueSize(WorkQueue q) {
     synchronized (lock) {
       return q.deque.size();

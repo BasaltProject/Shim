@@ -33,6 +33,10 @@ public final class KEM {
     this.services = services;
   }
 
+  public String getAlgorithm() {
+    return algorithm;
+  }
+
   public static final class Encapsulated {
     private final SecretKey key;
     private final byte[] encapsulation;

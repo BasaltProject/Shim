@@ -1120,13 +1120,7 @@ loop:
         goto throw_;
 
       if (not instanceOf(t, class_, peekObject(t, sp - 1))) {
-        exception = makeThrowable(
-            t,
-            GcClassCastException::Type,
-            "%s as %s",
-            objectClass(t, peekObject(t, sp - 1))->name()->body().begin(),
-            class_->name()->body().begin());
-        goto throw_;
+        throwClassCast(t, objectClass(t, peekObject(t, sp - 1)), class_);
       }
     }
   }

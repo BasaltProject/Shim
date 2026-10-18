@@ -169,6 +169,178 @@ public class MethodHandles {
     return VarHandle.makeCollectCoordinates(target, pos, filter);
   }
 
+  public static MethodHandle tableSwitch(MethodHandle fallback, MethodHandle... targets) {
+    Objects.requireNonNull(fallback);
+    Objects.requireNonNull(targets);
+    MethodType type = fallback.type();
+    if (type.parameterCount() < 1 || type.parameterType(0) != int.class) {
+      throw new IllegalArgumentException("Case actions must have int as leading parameter: "
+          + java.util.Arrays.toString(targets));
+    }
+    if (targets.length == 0) {
+      throw new IllegalArgumentException("Not enough cases: " + java.util.Arrays.toString(targets));
+    }
+    for (MethodHandle t : targets) {
+      Objects.requireNonNull(t);
+      if (!t.type().equals(type)) {
+        throw new IllegalArgumentException("Case actions must have the same type: "
+            + java.util.Arrays.toString(targets));
+      }
+    }
+    final MethodHandle[] cases = targets.clone();
+    return new MethodHandle.FunctionMethodHandle(type, args -> {
+      int selector = ((Integer) args[0]).intValue();
+      MethodHandle chosen = selector >= 0 && selector < cases.length ? cases[selector] : fallback;
+      return chosen.invokeWithArguments(args);
+    });
+  }
+
+  public static MethodHandle dropArgumentsToMatch(MethodHandle target, int skippedArgumentCount,
+      List<Class<?>> newTypes, int pos) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(newTypes);
+    MethodType oldType = target.type();
+    int oldCount = oldType.parameterCount();
+    int newCount = newTypes.size();
+    if (skippedArgumentCount < 0 || skippedArgumentCount > oldCount) {
+      throw new IllegalArgumentException("illegal skip: " + skippedArgumentCount + ", " + target);
+    }
+    if (pos < 0 || pos > newCount) {
+      throw new IllegalArgumentException("illegal pos: " + pos + ", " + newTypes);
+    }
+    int remaining = oldCount - skippedArgumentCount;
+    List<Class<?>> oldRest = oldType.parameterList().subList(skippedArgumentCount, oldCount);
+    List<Class<?>> newSlice = newTypes.subList(pos, Math.min(newCount, pos + remaining));
+    if (!oldRest.equals(newSlice)) {
+      throw new IllegalArgumentException("argument lists do not match: " + oldRest + ", " + newSlice);
+    }
+    MethodType newType = oldType.dropParameterTypes(skippedArgumentCount, oldCount)
+        .insertParameterTypes(skippedArgumentCount, newTypes);
+    final int skipped = skippedArgumentCount;
+    final int offset = pos;
+    return new MethodHandle.FunctionMethodHandle(newType, args -> {
+      Object[] forward = new Object[oldCount];
+      System.arraycopy(args, 0, forward, 0, skipped);
+      System.arraycopy(args, skipped + offset, forward, skipped, remaining);
+      return target.invokeWithArguments(forward);
+    });
+  }
+
+  public static MethodHandle explicitCastArguments(MethodHandle target, MethodType newType) {
+    Objects.requireNonNull(target);
+    Objects.requireNonNull(newType);
+    MethodType oldType = target.type();
+    if (oldType.parameterCount() != newType.parameterCount()) {
+      throw new WrongMethodTypeException("cannot explicitly cast " + target + " to " + newType);
+    }
+    if (oldType.equals(newType)) {
+      return target;
+    }
+    return new MethodHandle.FunctionMethodHandle(newType, args -> {
+      Object[] converted = new Object[args.length];
+      for (int i = 0; i < args.length; i++) {
+        converted[i] = explicitCast(args[i], newType.parameterType(i), oldType.parameterType(i));
+      }
+      Object result = target.invokeWithArguments(converted);
+      return explicitCast(result, oldType.returnType(), newType.returnType());
+    });
+  }
+
+  private static Object explicitCast(Object value, Class<?> from, Class<?> to) {
+    if (to == void.class) {
+      return null;
+    }
+    if (from == void.class) {
+      return to.isPrimitive() ? zeroOf(to) : null;
+    }
+    if (!to.isPrimitive()) {
+      if (value == null) {
+        return null;
+      }
+      return to.cast(value);
+    }
+    if (value == null) {
+      return zeroOf(to);
+    }
+    if (value instanceof Boolean) {
+      boolean b = (Boolean) value;
+      return numberOf(to, b ? 1 : 0, b ? 1.0 : 0.0, b, false);
+    }
+    if (value instanceof Character) {
+      char c = (Character) value;
+      return numberOf(to, c, c, (c & 1) != 0, false);
+    }
+    Number n = (Number) value;
+    boolean floating = n instanceof Float || n instanceof Double;
+    long whole = floating ? (long) n.doubleValue() : n.longValue();
+    return numberOf(to, n.longValue(), n.doubleValue(), (whole & 1L) != 0, floating);
+  }
+
+  private static Object zeroOf(Class<?> t) {
+    return numberOf(t, 0, 0.0, false, false);
+  }
+
+  private static Object numberOf(Class<?> to, long l, double d, boolean bit, boolean floating) {
+    if (to == boolean.class) {
+      return bit;
+    }
+    if (to == int.class) {
+      return floating ? (int) d : (int) l;
+    }
+    if (to == long.class) {
+      return floating ? (long) d : l;
+    }
+    if (to == short.class) {
+      return floating ? (short) (int) d : (short) l;
+    }
+    if (to == byte.class) {
+      return floating ? (byte) (int) d : (byte) l;
+    }
+    if (to == char.class) {
+      return floating ? (char) (int) d : (char) l;
+    }
+    if (to == float.class) {
+      return floating ? (float) d : (float) l;
+    }
+    return floating ? d : (double) l;
+  }
+
+  public static MethodHandle varHandleInvoker(VarHandle.AccessMode accessMode, MethodType type) {
+    Objects.requireNonNull(accessMode);
+    Objects.requireNonNull(type);
+    MethodType full = type.insertParameterTypes(0, VarHandle.class);
+    return new MethodHandle.FunctionMethodHandle(full, args -> {
+      VarHandle vh = (VarHandle) args[0];
+      Object[] rest = new Object[args.length - 1];
+      System.arraycopy(args, 1, rest, 0, rest.length);
+      return shim.PolymorphicStubs.varHandle(vh, accessMode.methodName(), rest);
+    });
+  }
+
+  public static MethodHandle varHandleExactInvoker(VarHandle.AccessMode accessMode, MethodType type) {
+    Objects.requireNonNull(accessMode);
+    Objects.requireNonNull(type);
+    MethodType full = type.insertParameterTypes(0, VarHandle.class);
+    return new MethodHandle.FunctionMethodHandle(full, args -> {
+      VarHandle vh = (VarHandle) args[0];
+      MethodType expected = vh.accessModeType(accessMode);
+      if (!expected.equals(type)) {
+        throw new WrongMethodTypeException("handle's method type " + expected.insertParameterTypes(0, VarHandle.class)
+            + " but found " + full);
+      }
+      Object[] rest = new Object[args.length - 1];
+      System.arraycopy(args, 1, rest, 0, rest.length);
+      return shim.PolymorphicStubs.varHandle(vh, accessMode.methodName(), rest);
+    });
+  }
+
+  public static <T extends java.lang.reflect.Member> T reflectAs(Class<T> expected, MethodHandle target) {
+    Objects.requireNonNull(expected);
+    Objects.requireNonNull(target);
+    Lookup lookup = lookup();
+    return lookup.revealDirect(target).reflectAs(expected, lookup);
+  }
+
   public static MethodHandle identity(Class<?> type) {
     Objects.requireNonNull(type);
     return new MethodHandle.IdentityMethodHandle(type);
@@ -703,7 +875,7 @@ public class MethodHandles {
       }
       checkAccess(refc, m.getDeclaringClass(), m.getModifiers(), name);
       int kind = refc.isInterface() ? MethodHandle.REF_invokeInterface : MethodHandle.REF_invokeVirtual;
-      return new MethodHandle(kind, refc.getClassLoader(), m.vmMethod);
+      return varargsAware(new MethodHandle(kind, refc.getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle findStatic(Class<?> refc, String name, MethodType type)
@@ -722,7 +894,7 @@ public class MethodHandles {
         throw new IllegalAccessException("Method is not static: " + name);
       }
       checkAccess(refc, m.getDeclaringClass(), m.getModifiers(), name);
-      return new MethodHandle(MethodHandle.REF_invokeStatic, refc.getClassLoader(), m.vmMethod);
+      return varargsAware(new MethodHandle(MethodHandle.REF_invokeStatic, refc.getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle findSpecial(Class<?> refc, String name, MethodType type, Class<?> specialCaller)
@@ -738,7 +910,7 @@ public class MethodHandles {
       if (!m.getReturnType().equals(type.returnType())) {
         throw new NoSuchMethodException(name);
       }
-      return new MethodHandle(MethodHandle.REF_invokeSpecial, refc.getClassLoader(), m.vmMethod);
+      return varargsAware(new MethodHandle(MethodHandle.REF_invokeSpecial, refc.getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle findConstructor(Class<?> refc, MethodType type)
@@ -750,29 +922,29 @@ public class MethodHandles {
       }
       Constructor<?> c = refc.getDeclaredConstructor(type.parameterArray());
       checkAccess(refc, refc, c.getModifiers(), "<init>");
-      return new MethodHandle(MethodHandle.REF_newInvokeSpecial, refc.getClassLoader(), c.method.vmMethod);
+      return varargsAware(new MethodHandle(MethodHandle.REF_newInvokeSpecial, refc.getClassLoader(), c.method.vmMethod));
     }
 
     public MethodHandle unreflect(Method m) throws IllegalAccessException {
       Objects.requireNonNull(m);
       if (!m.isAccessible()) checkAccess(m.getDeclaringClass(), m.getDeclaringClass(), m.getModifiers(), m.getName());
       if ((m.getModifiers() & Modifier.STATIC) != 0) {
-        return new MethodHandle(MethodHandle.REF_invokeStatic, m.getDeclaringClass().getClassLoader(), m.vmMethod);
+        return varargsAware(new MethodHandle(MethodHandle.REF_invokeStatic, m.getDeclaringClass().getClassLoader(), m.vmMethod));
       }
       int kind = m.getDeclaringClass().isInterface() ? MethodHandle.REF_invokeInterface : MethodHandle.REF_invokeVirtual;
-      return new MethodHandle(kind, m.getDeclaringClass().getClassLoader(), m.vmMethod);
+      return varargsAware(new MethodHandle(kind, m.getDeclaringClass().getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle unreflectSpecial(Method m, Class<?> specialCaller)
         throws IllegalAccessException {
       Objects.requireNonNull(m);
-      return new MethodHandle(MethodHandle.REF_invokeSpecial, m.getDeclaringClass().getClassLoader(), m.vmMethod);
+      return varargsAware(new MethodHandle(MethodHandle.REF_invokeSpecial, m.getDeclaringClass().getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle unreflectConstructor(Constructor<?> c) throws IllegalAccessException {
       Objects.requireNonNull(c);
       if (!c.isAccessible()) checkAccess(c.getDeclaringClass(), c.getDeclaringClass(), c.getModifiers(), "<init>");
-      return new MethodHandle(MethodHandle.REF_newInvokeSpecial, c.getDeclaringClass().getClassLoader(), c.method.vmMethod);
+      return varargsAware(new MethodHandle(MethodHandle.REF_newInvokeSpecial, c.getDeclaringClass().getClassLoader(), c.method.vmMethod));
     }
 
     public MethodHandle findGetter(Class<?> refc, String name, Class<?> type)
@@ -893,8 +1065,19 @@ public class MethodHandles {
       return findVirtual(receiver.getClass(), name, type).bindTo(receiver);
     }
 
+    private static MethodHandle varargsAware(MethodHandle h) {
+      if (h.method != null && (h.method.flags & 0x80) != 0 && h.type().parameterCount() > 0) {
+        Class<?> last = h.type().parameterType(h.type().parameterCount() - 1);
+        if (last.isArray()) {
+          return h.asVarargsCollector(last);
+        }
+      }
+      return h;
+    }
+
     public MethodHandleInfo revealDirect(MethodHandle target) {
       Objects.requireNonNull(target, "target");
+      target = target.asFixedArity();
       if (target instanceof MethodHandle.FieldMethodHandle) {
         MethodHandle.FieldMethodHandle fmh = (MethodHandle.FieldMethodHandle) target;
         return new DirectMethodHandleInfo(fmh.kind, fmh.targetField);

@@ -181,6 +181,85 @@ public class MethodHandle implements java.lang.constant.Constable {
     return new VarargsCollectorMethodHandle(this, arrayType);
   }
 
+  public final Object invokeExact(Object... args) throws Throwable {
+    return invokeWithArguments(args);
+  }
+
+  public final Object invoke(Object... args) throws Throwable {
+    return invokeWithArguments(args);
+  }
+
+  public MethodHandle withVarargs(boolean makeVarargs) {
+    if (makeVarargs == isVarargsCollector()) {
+      return this;
+    }
+    if (makeVarargs) {
+      int n = type().parameterCount();
+      if (n == 0 || !type().parameterType(n - 1).isArray()) {
+        throw new IllegalArgumentException("not an array type: " + (n == 0 ? "none" : type().parameterType(n - 1)));
+      }
+      return asVarargsCollector(type().parameterType(n - 1));
+    }
+    return asFixedArity();
+  }
+
+  public MethodHandle asSpreader(int pos, Class<?> arrayType, int arrayLength) {
+    Objects.requireNonNull(arrayType, "arrayType");
+    if (!arrayType.isArray()) {
+      throw new IllegalArgumentException("not an array type: " + arrayType);
+    }
+    MethodType targetType = type();
+    int paramCount = targetType.parameterCount();
+    if (pos < 0 || pos > paramCount || arrayLength > paramCount - pos) {
+      throw new IllegalArgumentException("bad spread position");
+    }
+    if (arrayLength < 0) {
+      throw new IllegalArgumentException("bad spread array length");
+    }
+    MethodType newType = targetType.dropParameterTypes(pos, pos + arrayLength).insertParameterTypes(pos, arrayType);
+    return new SpreaderMethodHandle(this, newType, pos, arrayLength);
+  }
+
+  public MethodHandle asCollector(int pos, Class<?> arrayType, int arrayLength) {
+    Objects.requireNonNull(arrayType, "arrayType");
+    if (!arrayType.isArray()) {
+      throw new IllegalArgumentException("not an array type: " + arrayType);
+    }
+    if (arrayLength < 0) {
+      throw new IllegalArgumentException("bad collector length: " + arrayLength);
+    }
+    MethodType targetType = type();
+    if (pos < 0 || pos >= targetType.parameterCount()) {
+      throw new IllegalArgumentException("bad collect position");
+    }
+    if (!targetType.parameterType(pos).isAssignableFrom(arrayType)) {
+      throw new IllegalArgumentException("array type not assignable to argument: " + this + ", " + arrayType);
+    }
+    Class<?> componentType = arrayType.getComponentType();
+    Class<?>[] paramTypes = new Class<?>[arrayLength];
+    Arrays.fill(paramTypes, componentType);
+    MethodType newType = targetType.dropParameterTypes(pos, pos + 1).insertParameterTypes(pos, paramTypes);
+    return new CollectorMethodHandle(this, newType, pos, arrayType, arrayLength);
+  }
+
+  interface Body {
+    Object invoke(Object[] arguments) throws Throwable;
+  }
+
+  static class FunctionMethodHandle extends MethodHandle {
+    private final Body body;
+
+    FunctionMethodHandle(MethodType type, Body body) {
+      super(type);
+      this.body = body;
+    }
+
+    @Override
+    public Object invokeWithArguments(Object... arguments) throws Throwable {
+      return body.invoke(arguments);
+    }
+  }
+
   public MethodHandle asSpreader(Class<?> arrayType, int arrayLength) {
     Objects.requireNonNull(arrayType, "arrayType");
     if (!arrayType.isArray()) {
@@ -1233,6 +1312,19 @@ public class MethodHandle implements java.lang.constant.Constable {
     @Override
     public boolean isVarargsCollector() {
       return true;
+    }
+
+    @Override
+    public MethodHandle asType(MethodType newType) {
+      int paramCount = target.type().parameterCount();
+      if (newType.parameterCount() == paramCount) {
+        return super.asType(newType);
+      }
+      if (newType.parameterCount() < paramCount - 1) {
+        throw new WrongMethodTypeException("cannot convert " + this + " to " + newType);
+      }
+      int collect = newType.parameterCount() - (paramCount - 1);
+      return target.asCollector(arrayType, collect).asType(newType);
     }
 
     @Override

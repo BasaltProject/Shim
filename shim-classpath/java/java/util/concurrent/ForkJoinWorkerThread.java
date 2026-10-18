@@ -30,6 +30,10 @@ public class ForkJoinWorkerThread extends Thread {
     return pool;
   }
 
+  public int getQueuedTaskCount() {
+    return pool.queueSizeOf(workQueue);
+  }
+
   public int getPoolIndex() {
     return workQueue.index;
   }
