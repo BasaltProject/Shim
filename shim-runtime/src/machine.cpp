@@ -4707,6 +4707,11 @@ void enter(Thread* t, Thread::State s)
   }
 }
 
+void NO_RETURN throwOutOfMemory(Thread* t)
+{
+  throw_(t, roots(t)->outOfMemoryError());
+}
+
 object allocate2(Thread* t, unsigned sizeInBytes, bool objectMask)
 {
   return allocate3(

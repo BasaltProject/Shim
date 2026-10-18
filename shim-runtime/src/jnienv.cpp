@@ -3348,7 +3348,7 @@ uint64_t boot(Thread* t, uintptr_t*)
   // sequence point, for gc (don't recombine statements)
   roots(t)->setArrayIndexOutOfBoundsException(t, throwable);
 
-  throwable = makeThrowable(t, GcOutOfMemoryError::Type);
+  throwable = makeThrowable(t, GcOutOfMemoryError::Type, "Java heap space");
   // sequence point, for gc (don't recombine statements)
   roots(t)->setOutOfMemoryError(t, throwable);
 
