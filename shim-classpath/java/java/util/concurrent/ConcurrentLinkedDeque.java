@@ -283,7 +283,7 @@ public class ConcurrentLinkedDeque<E> extends AbstractCollection<E>
   @Override
   public boolean removeFirstOccurrence(Object o) {
     if (o == null) {
-      return false;
+      throw new NullPointerException();
     }
     lock.lock();
     try {
@@ -302,7 +302,7 @@ public class ConcurrentLinkedDeque<E> extends AbstractCollection<E>
   @Override
   public boolean removeLastOccurrence(Object o) {
     if (o == null) {
-      return false;
+      throw new NullPointerException();
     }
     lock.lock();
     try {

@@ -133,12 +133,12 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     try {
       Node<K, V> curr = head;
       for (int i = level - 1; i >= 0; i--) {
-        while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+        while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
           curr = curr.forward[i];
         }
       }
       curr = curr.forward[0];
-      if (curr != null && compare(curr.key, key) == 0) {
+      if (curr != null && compare(key, curr.key) == 0) {
         return curr.value;
       }
       return null;
@@ -157,13 +157,13 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
       Node<K, V>[] update = (Node<K, V>[]) new Node[MAX_LEVEL];
       Node<K, V> curr = head;
       for (int i = level - 1; i >= 0; i--) {
-        while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+        while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
           curr = curr.forward[i];
         }
         update[i] = curr;
       }
       Node<K, V> next = curr.forward[0];
-      if (next != null && compare(next.key, key) == 0) {
+      if (next != null && compare(key, next.key) == 0) {
         V oldVal = next.value;
         next.value = value;
         return oldVal;
@@ -205,13 +205,13 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
       Node<K, V>[] update = (Node<K, V>[]) new Node[MAX_LEVEL];
       Node<K, V> curr = head;
       for (int i = level - 1; i >= 0; i--) {
-        while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+        while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
           curr = curr.forward[i];
         }
         update[i] = curr;
       }
       Node<K, V> next = curr.forward[0];
-      if (next != null && compare(next.key, key) == 0) {
+      if (next != null && compare(key, next.key) == 0) {
         return next.value;
       }
 
@@ -244,7 +244,7 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
   @Override
   public V remove(Object key) {
     if (key == null) {
-      return null;
+      throw new NullPointerException();
     }
     lock.writeLock().lock();
     try {
@@ -252,13 +252,13 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
       Node<K, V>[] update = (Node<K, V>[]) new Node[MAX_LEVEL];
       Node<K, V> curr = head;
       for (int i = level - 1; i >= 0; i--) {
-        while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+        while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
           curr = curr.forward[i];
         }
         update[i] = curr;
       }
       Node<K, V> target = curr.forward[0];
-      if (target != null && compare(target.key, key) == 0) {
+      if (target != null && compare(key, target.key) == 0) {
         for (int i = 0; i < level; i++) {
           if (update[i].forward[i] != target) {
             break;
@@ -282,7 +282,10 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
 
   @Override
   public boolean remove(Object key, Object value) {
-    if (key == null || value == null) {
+    if (key == null) {
+      throw new NullPointerException();
+    }
+    if (value == null) {
       return false;
     }
     lock.writeLock().lock();
@@ -291,13 +294,13 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
       Node<K, V>[] update = (Node<K, V>[]) new Node[MAX_LEVEL];
       Node<K, V> curr = head;
       for (int i = level - 1; i >= 0; i--) {
-        while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+        while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
           curr = curr.forward[i];
         }
         update[i] = curr;
       }
       Node<K, V> target = curr.forward[0];
-      if (target != null && compare(target.key, key) == 0 && value.equals(target.value)) {
+      if (target != null && compare(key, target.key) == 0 && value.equals(target.value)) {
         for (int i = 0; i < level; i++) {
           if (update[i].forward[i] != target) {
             break;
@@ -328,12 +331,12 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     try {
       Node<K, V> curr = head;
       for (int i = level - 1; i >= 0; i--) {
-        while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+        while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
           curr = curr.forward[i];
         }
       }
       curr = curr.forward[0];
-      if (curr != null && compare(curr.key, key) == 0 && oldValue.equals(curr.value)) {
+      if (curr != null && compare(key, curr.key) == 0 && oldValue.equals(curr.value)) {
         curr.value = newValue;
         return true;
       }
@@ -351,12 +354,12 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     try {
       Node<K, V> curr = head;
       for (int i = level - 1; i >= 0; i--) {
-        while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+        while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
           curr = curr.forward[i];
         }
       }
       curr = curr.forward[0];
-      if (curr != null && compare(curr.key, key) == 0) {
+      if (curr != null && compare(key, curr.key) == 0) {
         V old = curr.value;
         curr.value = value;
         return old;
@@ -395,7 +398,7 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     Objects.requireNonNull(key);
     Node<K, V> curr = head;
     for (int i = level - 1; i >= 0; i--) {
-      while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+      while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
         curr = curr.forward[i];
       }
     }
@@ -406,7 +409,7 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     Objects.requireNonNull(key);
     Node<K, V> curr = head;
     for (int i = level - 1; i >= 0; i--) {
-      while (curr.forward[i] != null && compare(curr.forward[i].key, key) <= 0) {
+      while (curr.forward[i] != null && compare(key, curr.forward[i].key) >= 0) {
         curr = curr.forward[i];
       }
     }
@@ -417,7 +420,7 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     Objects.requireNonNull(key);
     Node<K, V> curr = head;
     for (int i = level - 1; i >= 0; i--) {
-      while (curr.forward[i] != null && compare(curr.forward[i].key, key) <= 0) {
+      while (curr.forward[i] != null && compare(key, curr.forward[i].key) >= 0) {
         curr = curr.forward[i];
       }
     }
@@ -428,7 +431,7 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     Objects.requireNonNull(key);
     Node<K, V> curr = head;
     for (int i = level - 1; i >= 0; i--) {
-      while (curr.forward[i] != null && compare(curr.forward[i].key, key) < 0) {
+      while (curr.forward[i] != null && compare(key, curr.forward[i].key) > 0) {
         curr = curr.forward[i];
       }
     }

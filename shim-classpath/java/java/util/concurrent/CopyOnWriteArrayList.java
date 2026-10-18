@@ -390,7 +390,7 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
     Object[] es = getArray();
     int len = es.length;
     if (index < 0 || index > len) {
-      throw new IndexOutOfBoundsException("Index: " + index);
+      throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + len);
     }
     return new COWIterator<E>(es, index);
   }

@@ -17,6 +17,10 @@ import java.util.WeakHashMap;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class UtilEdgeModern {
   static void t(String name, Callable<Object> op) {
@@ -92,6 +96,16 @@ public class UtilEdgeModern {
       map.put("k", "v");
       return map.headMap(new int[0], true);
     });
+    t("skiplist-cast", () -> {
+      ConcurrentSkipListMap<Object, String> map = new ConcurrentSkipListMap<>();
+      map.put(1, "a");
+      return map.ceilingEntry("s");
+    });
+    t("skiplist-null-remove", () -> new ConcurrentSkipListMap<Integer, String>().remove(null));
+    t("skiplist-null-value-remove", () -> new ConcurrentSkipListMap<Integer, String>().remove(1, null));
+    t("skipset-null-remove", () -> new ConcurrentSkipListSet<Integer>().remove(null));
+    t("deque-null-remove", () -> new ConcurrentLinkedDeque<Integer>().remove(null));
+    t("cow-iterator-index", () -> new CopyOnWriteArrayList<>(java.util.List.of(1, 2)).listIterator(5));
     t("spliterator-negative", () -> Arrays.spliterator(new long[3], -1, 2));
   }
 }
