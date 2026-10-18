@@ -111,7 +111,10 @@ public class UtilEdgeModern {
     t("deque-null-remove", () -> new ConcurrentLinkedDeque<Integer>().remove(null));
     t("cow-iterator-index", () -> new CopyOnWriteArrayList<>(java.util.List.of(1, 2)).listIterator(5));
     t("bitset-range", () -> new BitSet().get(-1, 2));
-    t("bitset-order", () -> new BitSet().clear(5, 2));
+    t("bitset-order", () -> {
+      new BitSet().clear(5, 2);
+      return "ok";
+    });
     t("crc-range", () -> {
       new CRC32().update(new byte[3], 2, 5);
       return "ok";
