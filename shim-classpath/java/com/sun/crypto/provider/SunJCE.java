@@ -175,6 +175,90 @@ public final class SunJCE extends Provider {
     add("KDF", "HKDF-SHA256", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA256", new String[] {}, new String[] {});
     add("KDF", "HKDF-SHA384", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA384", new String[] {}, new String[] {});
     add("KDF", "HKDF-SHA512", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA512", new String[] {}, new String[] {});
+    add("Cipher", "PBEWithHmacSHA1AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA1AndAES_128", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA1AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA1AndAES_128", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA1AndAES_128", "com.sun.crypto.provider.PBES2Parameters$HmacSHA1AndAES_128", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA1AndAES_256", "com.sun.crypto.provider.PBES2Core$HmacSHA1AndAES_256", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA1AndAES_256", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA1AndAES_256", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA1AndAES_256", "com.sun.crypto.provider.PBES2Parameters$HmacSHA1AndAES_256", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA224AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA224AndAES_128", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA224AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA224AndAES_128", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA224AndAES_128", "com.sun.crypto.provider.PBES2Parameters$HmacSHA224AndAES_128", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA224AndAES_256", "com.sun.crypto.provider.PBES2Core$HmacSHA224AndAES_256", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA224AndAES_256", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA224AndAES_256", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA224AndAES_256", "com.sun.crypto.provider.PBES2Parameters$HmacSHA224AndAES_256", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA256AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA256AndAES_128", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA256AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA256AndAES_128", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA256AndAES_128", "com.sun.crypto.provider.PBES2Parameters$HmacSHA256AndAES_128", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA256AndAES_256", "com.sun.crypto.provider.PBES2Core$HmacSHA256AndAES_256", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA256AndAES_256", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA256AndAES_256", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA256AndAES_256", "com.sun.crypto.provider.PBES2Parameters$HmacSHA256AndAES_256", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA384AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA384AndAES_128", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA384AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA384AndAES_128", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA384AndAES_128", "com.sun.crypto.provider.PBES2Parameters$HmacSHA384AndAES_128", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA384AndAES_256", "com.sun.crypto.provider.PBES2Core$HmacSHA384AndAES_256", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA384AndAES_256", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA384AndAES_256", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA384AndAES_256", "com.sun.crypto.provider.PBES2Parameters$HmacSHA384AndAES_256", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA512AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA512AndAES_128", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA512AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA512AndAES_128", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA512AndAES_128", "com.sun.crypto.provider.PBES2Parameters$HmacSHA512AndAES_128", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA512AndAES_256", "com.sun.crypto.provider.PBES2Core$HmacSHA512AndAES_256", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA512AndAES_256", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA512AndAES_256", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA512AndAES_256", "com.sun.crypto.provider.PBES2Parameters$HmacSHA512AndAES_256", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA512/224AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA512_224AndAES_128", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA512/224AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA512_224AndAES_128", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA512/224AndAES_128", "com.sun.crypto.provider.PBES2Parameters$HmacSHA512_224AndAES_128", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA512/224AndAES_256", "com.sun.crypto.provider.PBES2Core$HmacSHA512_224AndAES_256", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA512/224AndAES_256", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA512_224AndAES_256", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA512/224AndAES_256", "com.sun.crypto.provider.PBES2Parameters$HmacSHA512_224AndAES_256", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA512/256AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA512_256AndAES_128", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA512/256AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA512_256AndAES_128", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA512/256AndAES_128", "com.sun.crypto.provider.PBES2Parameters$HmacSHA512_256AndAES_128", new String[] {},
+        new String[] {});
+    add("Cipher", "PBEWithHmacSHA512/256AndAES_256", "com.sun.crypto.provider.PBES2Core$HmacSHA512_256AndAES_256", new String[] {},
+        new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
+    add("SecretKeyFactory", "PBEWithHmacSHA512/256AndAES_256", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA512_256AndAES_256", new String[] {},
+        new String[] {});
+    add("AlgorithmParameters", "PBEWithHmacSHA512/256AndAES_256", "com.sun.crypto.provider.PBES2Parameters$HmacSHA512_256AndAES_256", new String[] {},
+        new String[] {});
   }
 
   private void add(String type, String algorithm, String className, String[] aliases, String[] attrs) {

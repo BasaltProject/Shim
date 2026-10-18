@@ -39,6 +39,9 @@ public class DerValue {
   }
 
   public DerValue(byte[] encoded) throws IOException {
+    if (encoded.length == 0) {
+      throw new IOException("Too short");
+    }
     DerInputStream in = new DerInputStream(encoded);
     DerValue v = in.getDerValue();
     if (in.available() != 0) {
