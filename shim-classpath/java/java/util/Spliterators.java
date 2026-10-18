@@ -283,8 +283,14 @@ public final class Spliterators {
   }
 
   private static void checkFromToBounds(int arrayLength, int origin, int fence) {
-    if (origin < 0 || origin > fence || fence > arrayLength) {
-      throw new ArrayIndexOutOfBoundsException("origin=" + origin + " fence=" + fence + " length=" + arrayLength);
+    if (origin > fence) {
+      throw new ArrayIndexOutOfBoundsException("origin(" + origin + ") > fence(" + fence + ")");
+    }
+    if (origin < 0) {
+      throw new ArrayIndexOutOfBoundsException("Array index out of range: " + origin);
+    }
+    if (fence > arrayLength) {
+      throw new ArrayIndexOutOfBoundsException("Array index out of range: " + fence);
     }
   }
 

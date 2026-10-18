@@ -80,6 +80,70 @@ bool compatibleArrayTypes(Thread* t UNUSED, GcClass* a, GcClass* b)
       or not ((source->vmFlags() | destination->vmFlags()) & PrimitiveFlag);
 }
 
+void externalClassName(GcClass* c, char* out, size_t capacity)
+{
+  GcByteArray* name = c->name();
+  const char* in = reinterpret_cast<const char*>(name->body().begin());
+  size_t n = name->length() - 1;
+  unsigned dims = 0;
+  while (dims < n and in[dims] == '[') ++dims;
+  const char* base = in + dims;
+  size_t baseLength = n - dims;
+  const char* primitive = 0;
+  if (dims) {
+    switch (*base) {
+    case 'Z': primitive = "boolean"; break;
+    case 'B': primitive = "byte"; break;
+    case 'C': primitive = "char"; break;
+    case 'S': primitive = "short"; break;
+    case 'I': primitive = "int"; break;
+    case 'J': primitive = "long"; break;
+    case 'F': primitive = "float"; break;
+    case 'D': primitive = "double"; break;
+    default: break;
+    }
+    if (not primitive and *base == 'L') {
+      ++base;
+      baseLength -= 2;
+    }
+  }
+  size_t o = 0;
+  if (primitive) {
+    for (; *primitive and o + 1 < capacity; ++primitive) out[o++] = *primitive;
+  } else {
+    for (size_t i = 0; i < baseLength and o + 1 < capacity; ++i) out[o++] = base[i] == '/' ? '.' : base[i];
+  }
+  for (unsigned d = 0; d < dims and o + 2 < capacity; ++d) {
+    out[o++] = '[';
+    out[o++] = ']';
+  }
+  out[o] = 0;
+}
+
+void arrayTypeLabel(GcClass* c, char* out, size_t capacity)
+{
+  GcByteArray* name = c->name();
+  const char* in = reinterpret_cast<const char*>(name->body().begin());
+  const char* primitive = 0;
+  if (name->length() == 3) {
+    switch (in[1]) {
+    case 'Z': primitive = "boolean"; break;
+    case 'B': primitive = "byte"; break;
+    case 'C': primitive = "char"; break;
+    case 'S': primitive = "short"; break;
+    case 'I': primitive = "int"; break;
+    case 'J': primitive = "long"; break;
+    case 'F': primitive = "float"; break;
+    case 'D': primitive = "double"; break;
+    default: break;
+    }
+  }
+  snprintf(out, capacity, "%s[", primitive ? primitive : "object array");
+  size_t n = strlen(out);
+  out[n] = ']';
+  out[n + 1] = 0;
+}
+
 void arrayCopy(Thread* t,
                object src,
                int32_t srcOffset,
@@ -94,18 +158,66 @@ void arrayCopy(Thread* t,
   GcClass* destinationClass = objectClass(t, dst);
   PROTECT(t, sourceClass);
   PROTECT(t, destinationClass);
+  char sourceName[256];
+  char destinationName[256];
+  if (UNLIKELY(not sourceClass->arrayElementSize())) {
+    externalClassName(sourceClass, sourceName, sizeof(sourceName));
+    throwNew(t, GcArrayStoreException::Type, "arraycopy: source type %s is not an array", sourceName);
+  }
+  if (UNLIKELY(not destinationClass->arrayElementSize())) {
+    externalClassName(destinationClass, destinationName, sizeof(destinationName));
+    throwNew(t, GcArrayStoreException::Type, "arraycopy: destination type %s is not an array", destinationName);
+  }
   if (UNLIKELY(not compatibleArrayTypes(t, sourceClass, destinationClass))) {
-    throwNew(t, GcArrayStoreException::Type);
+    char sourceLabel[256];
+    char destinationLabel[256];
+    arrayTypeLabel(sourceClass, sourceLabel, sizeof(sourceLabel));
+    arrayTypeLabel(destinationClass, destinationLabel, sizeof(destinationLabel));
+    throwNew(t,
+             GcArrayStoreException::Type,
+             "arraycopy: type mismatch: can not copy %s into %s",
+             sourceLabel,
+             destinationLabel);
   }
 
   uintptr_t sourceLength = fieldAtOffset<uintptr_t>(src, BytesPerWord);
   uintptr_t destinationLength = fieldAtOffset<uintptr_t>(dst, BytesPerWord);
   if (UNLIKELY(length < 0 or srcOffset < 0 or dstOffset < 0
-      or static_cast<uintptr_t>(srcOffset) > sourceLength
-      or static_cast<uintptr_t>(length) > sourceLength - static_cast<uintptr_t>(srcOffset)
-      or static_cast<uintptr_t>(dstOffset) > destinationLength
-      or static_cast<uintptr_t>(length) > destinationLength - static_cast<uintptr_t>(dstOffset))) {
-    throwNew(t, GcArrayIndexOutOfBoundsException::Type);
+      or static_cast<uintptr_t>(srcOffset) + static_cast<uintptr_t>(length) > sourceLength
+      or static_cast<uintptr_t>(dstOffset) + static_cast<uintptr_t>(length) > destinationLength)) {
+    arrayTypeLabel(sourceClass, sourceName, sizeof(sourceName));
+    arrayTypeLabel(destinationClass, destinationName, sizeof(destinationName));
+    char* sourceBracket = strchr(sourceName, '[');
+    char* destinationBracket = strchr(destinationName, '[');
+    snprintf(sourceBracket, 32, "[%lu]", static_cast<unsigned long>(sourceLength));
+    snprintf(destinationBracket, 32, "[%lu]", static_cast<unsigned long>(destinationLength));
+    if (srcOffset < 0) {
+      throwNew(t,
+               GcArrayIndexOutOfBoundsException::Type,
+               "arraycopy: source index %d out of bounds for %s",
+               srcOffset,
+               sourceName);
+    } else if (dstOffset < 0) {
+      throwNew(t,
+               GcArrayIndexOutOfBoundsException::Type,
+               "arraycopy: destination index %d out of bounds for %s",
+               dstOffset,
+               destinationName);
+    } else if (length < 0) {
+      throwNew(t, GcArrayIndexOutOfBoundsException::Type, "arraycopy: length %d is negative", length);
+    } else if (static_cast<uintptr_t>(srcOffset) + static_cast<uintptr_t>(length) > sourceLength) {
+      throwNew(t,
+               GcArrayIndexOutOfBoundsException::Type,
+               "arraycopy: last source index %ld out of bounds for %s",
+               static_cast<long>(srcOffset) + static_cast<long>(length),
+               sourceName);
+    } else {
+      throwNew(t,
+               GcArrayIndexOutOfBoundsException::Type,
+               "arraycopy: last destination index %ld out of bounds for %s",
+               static_cast<long>(dstOffset) + static_cast<long>(length),
+               destinationName);
+    }
   }
   if (length == 0) return;
 
@@ -116,7 +228,19 @@ void arrayCopy(Thread* t,
       object value = (&fieldAtOffset<object>(src, ArrayBody))[srcOffset + i];
       PROTECT(t, value);
       if (value and not instanceOf(t, destinationClass->arrayElementClass(), value)) {
-        throwNew(t, GcArrayStoreException::Type);
+        GcByteArray* elementName = destinationClass->arrayElementClass()->name();
+        const char* in = reinterpret_cast<const char*>(elementName->body().begin());
+        size_t n = elementName->length() - 1;
+        if (n >= sizeof(destinationName)) n = sizeof(destinationName) - 1;
+        for (size_t k = 0; k < n; ++k) destinationName[k] = in[k] == '/' ? '.' : in[k];
+        destinationName[n] = 0;
+        externalClassName(sourceClass, sourceName, sizeof(sourceName));
+        throwNew(t,
+                 GcArrayStoreException::Type,
+                 "arraycopy: element type mismatch: can not cast one of the elements of %s to the type of the "
+                 "destination array, %s",
+                 sourceName,
+                 destinationName);
       }
       (&fieldAtOffset<object>(dst, ArrayBody))[dstOffset + i] = value;
       t->m->heap->mark(dst, ArrayBody / BytesPerWord + dstOffset + i, 1);
