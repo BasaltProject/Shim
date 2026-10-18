@@ -444,4 +444,8 @@ public final class Instant implements Temporal, TemporalAdjuster, Comparable<Ins
   public String toString() {
     return DateTimeFormatter.ISO_INSTANT.format(this);
   }
+
+  public java.time.Duration until(Instant endExclusive) {
+    return java.time.Duration.between(this, endExclusive);
+  }
 }

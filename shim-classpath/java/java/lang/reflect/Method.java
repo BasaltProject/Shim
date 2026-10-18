@@ -420,4 +420,8 @@ public class Method extends Executable {
   public AnnotatedType getAnnotatedReturnType() {
     return new AnnotatedTypeImpl(getGenericReturnType());
   }
+
+  public boolean isBridge() {
+    return (getModifiers() & 0x40) != 0;
+  }
 }

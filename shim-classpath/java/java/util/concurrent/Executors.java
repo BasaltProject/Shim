@@ -386,4 +386,23 @@ public class Executors {
       }
     }
   }
+
+  public static Callable<Object> callable(final java.security.PrivilegedExceptionAction<?> action) {
+    if (action == null) {
+      throw new NullPointerException();
+    }
+    return new Callable<Object>() {
+      @Override
+      public Object call() throws Exception {
+        return action.run();
+      }
+    };
+  }
+
+  public static <T> Callable<T> privilegedCallableUsingCurrentClassLoader(Callable<T> callable) {
+    if (callable == null) {
+      throw new NullPointerException();
+    }
+    return callable;
+  }
 }

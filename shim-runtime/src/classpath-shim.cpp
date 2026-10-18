@@ -539,6 +539,30 @@ extern "C" SHIM_EXPORT void JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Runtime_removeShutdownHook0(Thread* t, object, uintptr_t* arguments)
+{
+  object hook = reinterpret_cast<object>(arguments[1]);
+  PROTECT(t, hook);
+
+  ACQUIRE(t, t->m->shutdownLock);
+
+  GcPair* previous = 0;
+  for (GcPair* p = roots(t)->shutdownHooks(); p; p = cast<GcPair>(t, p->second())) {
+    if (p->first() == hook) {
+      GcPair* next = cast<GcPair>(t, p->second());
+      if (previous) {
+        previous->setSecond(t, next);
+      } else {
+        roots(t)->setShutdownHooks(t, next);
+      }
+      return 1;
+    }
+    previous = p;
+  }
+  return 0;
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_Throwable_trace(Thread* t, object, uintptr_t* arguments)
 {
   return reinterpret_cast<int64_t>(getTrace(t, arguments[0]));

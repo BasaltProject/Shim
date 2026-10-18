@@ -304,4 +304,13 @@ public abstract class ClassLoader {
   static native Class getCaller();
 
   static native void load(String name, Class caller, boolean mapName);
+
+  public java.util.stream.Stream<URL> resources(String name) {
+    java.util.Objects.requireNonNull(name);
+    try {
+      return java.util.Collections.list(getResources(name)).stream();
+    } catch (IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    }
+  }
 }

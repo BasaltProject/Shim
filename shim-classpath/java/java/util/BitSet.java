@@ -566,4 +566,31 @@ public class BitSet implements Serializable, Cloneable {
         Spliterators.spliteratorUnknownSize(it, Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.SORTED),
         false);
   }
+
+  public static BitSet valueOf(java.nio.ByteBuffer bb) {
+    bb = bb.slice().order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    int n;
+    for (n = bb.remaining(); n > 0 && bb.get(n - 1) == 0; n--) {
+    }
+    long[] words = new long[(n + 7) / 8];
+    bb.limit(n);
+    int i = 0;
+    while (bb.remaining() >= 8) {
+      words[i++] = bb.getLong();
+    }
+    for (int remaining = bb.remaining(), j = 0; j < remaining; j++) {
+      words[i] |= (bb.get() & 0xffL) << (8 * j);
+    }
+    return BitSet.valueOf(words);
+  }
+
+  public static BitSet valueOf(java.nio.LongBuffer lb) {
+    lb = lb.slice();
+    int n;
+    for (n = lb.remaining(); n > 0 && lb.get(n - 1) == 0; n--) {
+    }
+    long[] words = new long[n];
+    lb.get(words);
+    return BitSet.valueOf(words);
+  }
 }

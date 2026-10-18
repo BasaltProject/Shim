@@ -459,6 +459,17 @@ public class Runtime {
 
   public native void addShutdownHook(Thread t);
 
+  private native boolean removeShutdownHook0(Thread t);
+
+  public boolean removeShutdownHook(Thread hook) {
+    java.util.Objects.requireNonNull(hook);
+    return removeShutdownHook0(hook);
+  }
+
+  @Deprecated(since = "18", forRemoval = true)
+  public void runFinalization() {
+  }
+
   private static native void exec(String[] command, long[] process)
     throws IOException;
 

@@ -371,4 +371,12 @@ public abstract class TimeZone implements Serializable, Cloneable {
       throw new InternalError(e);
     }
   }
+
+  public static java.util.stream.Stream<String> availableIDs() {
+    return java.util.Arrays.stream(getAvailableIDs());
+  }
+
+  public static java.util.stream.Stream<String> availableIDs(int rawOffset) {
+    return java.util.Arrays.stream(getAvailableIDs(rawOffset));
+  }
 }

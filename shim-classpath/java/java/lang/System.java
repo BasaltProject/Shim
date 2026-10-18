@@ -246,6 +246,14 @@ public abstract class System {
     ClassLoader.load(name, ClassLoader.getCaller(), true);
   }
 
+  @Deprecated(since = "18", forRemoval = true)
+  public static void runFinalization() {
+  }
+
+  public static java.nio.channels.Channel inheritedChannel() throws java.io.IOException {
+    return null;
+  }
+
   public static void gc() {
     Runtime.getRuntime().gc();
   }

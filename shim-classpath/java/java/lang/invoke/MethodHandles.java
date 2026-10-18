@@ -585,6 +585,7 @@ public class MethodHandles {
 
     final shim.VMClass class_;
     private final int modes;
+    private Class<?> previous;
 
     Lookup(shim.VMClass class_, int modes) {
       this.class_ = class_;
@@ -593,6 +594,10 @@ public class MethodHandles {
 
     public Class<?> lookupClass() {
       return shim.SystemClassLoader.getClass(class_);
+    }
+
+    public Class<?> previousLookupClass() {
+      return previous;
     }
 
     public int lookupModes() {
@@ -612,7 +617,9 @@ public class MethodHandles {
       if (!requestedLookupClass.getPackageName().equals(lookupClass().getPackageName())) {
         newModes &= ~PACKAGE;
       }
-      return new Lookup(shim.Classes.toVMClass(requestedLookupClass), newModes);
+      Lookup result = new Lookup(shim.Classes.toVMClass(requestedLookupClass), newModes);
+      result.previous = requestedLookupClass.getModule() != lookupClass().getModule() ? lookupClass() : previous;
+      return result;
     }
 
     public Lookup dropLookupMode(int modeToDrop) {

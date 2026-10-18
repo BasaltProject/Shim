@@ -173,4 +173,8 @@ public class DateFormatSymbols implements Serializable, Cloneable {
   public int hashCode() {
     return Arrays.hashCode(months);
   }
+
+  public static Locale[] getAvailableLocales() {
+    return DateFormat.getAvailableLocales();
+  }
 }

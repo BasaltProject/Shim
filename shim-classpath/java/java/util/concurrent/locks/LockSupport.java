@@ -42,6 +42,10 @@ public class LockSupport {
     }
   }
   
+  public static void setCurrentBlocker(Object blocker) {
+    unsafe.putObject(Thread.currentThread(), parkBlockerOffset, blocker);
+  }
+
   public static void unpark(Thread thread) {
     if (thread != null) {
       unsafe.unpark(thread);

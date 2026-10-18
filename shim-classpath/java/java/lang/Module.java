@@ -269,4 +269,8 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   public java.lang.annotation.Annotation[] getDeclaredAnnotations() {
     return new java.lang.annotation.Annotation[0];
   }
+
+  public boolean isNativeAccessEnabled() {
+    return isNamed() && loader == null;
+  }
 }

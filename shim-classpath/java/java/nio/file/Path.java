@@ -140,4 +140,20 @@ public interface Path extends Comparable<Path>, Iterable<Path>, Watchable {
   default WatchKey register(WatchService watcher, WatchEvent.Kind<?>... events) throws IOException {
     return register(watcher, events, new WatchEvent.Modifier[0]);
   }
+
+  default Path resolve(String first, String... more) {
+    Path result = resolve(first);
+    for (String segment : more) {
+      result = result.resolve(segment);
+    }
+    return result;
+  }
+
+  default Path resolve(Path first, Path... more) {
+    Path result = resolve(first);
+    for (Path segment : more) {
+      result = result.resolve(segment);
+    }
+    return result;
+  }
 }
