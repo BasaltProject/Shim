@@ -16,6 +16,17 @@ public class InvalidClassException extends ObjectStreamException {
     super(reason);
   }
 
+  public InvalidClassException(String reason, Throwable cause) {
+    super(reason);
+    initCause(cause);
+  }
+
+  public InvalidClassException(String cname, String reason, Throwable cause) {
+    super(reason);
+    classname = cname;
+    initCause(cause);
+  }
+
   public InvalidClassException(String cname, String reason) {
     super(reason);
     classname = cname;

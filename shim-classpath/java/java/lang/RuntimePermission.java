@@ -33,4 +33,8 @@ public class RuntimePermission extends BasicPermission {
     super(name);
   }
 
+  public RuntimePermission(String name, String actions) {
+    super(name, actions);
+  }
+
 }

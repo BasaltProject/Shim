@@ -38,6 +38,14 @@ public class IndexOutOfBoundsException extends RuntimeException {
     this(cause == null ? null : cause.toString(), cause);
   }
 
+  public IndexOutOfBoundsException(int index) {
+    this("Index out of range: " + index, null);
+  }
+
+  public IndexOutOfBoundsException(long index) {
+    this("Index out of range: " + index, null);
+  }
+
   public IndexOutOfBoundsException() {
     this(null, null);
   }

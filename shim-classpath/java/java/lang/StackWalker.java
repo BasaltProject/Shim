@@ -21,7 +21,8 @@ public final class StackWalker {
   public enum Option {
     RETAIN_CLASS_REFERENCE,
     SHOW_REFLECT_FRAMES,
-    SHOW_HIDDEN_FRAMES
+    SHOW_HIDDEN_FRAMES,
+    DROP_METHOD_INFO
   }
 
   public interface StackFrame {

@@ -31,4 +31,8 @@ public class SecurityPermission extends BasicPermission {
     super(name);
   }
 
+  public SecurityPermission(String name, String actions) {
+    super(name, actions);
+  }
+
 }
