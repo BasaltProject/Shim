@@ -95,6 +95,19 @@ public final class ModuleLayer {
     return define(cf, parentLayers, clf);
   }
 
+  public ModuleLayer defineModules(java.lang.module.Configuration cf,
+      java.util.function.Function<String, ClassLoader> clf) {
+    return defineModules(cf, List.of(this), clf).layer();
+  }
+
+  public ModuleLayer defineModulesWithOneLoader(java.lang.module.Configuration cf, ClassLoader parentLoader) {
+    return defineModulesWithOneLoader(cf, List.of(this), parentLoader).layer();
+  }
+
+  public ModuleLayer defineModulesWithManyLoaders(java.lang.module.Configuration cf, ClassLoader parentLoader) {
+    return defineModulesWithManyLoaders(cf, List.of(this), parentLoader).layer();
+  }
+
   public static Controller defineModulesWithOneLoader(java.lang.module.Configuration cf,
       List<ModuleLayer> parentLayers, ClassLoader parentLoader) {
     ClassLoader loader = parentLoader != null ? parentLoader : ClassLoader.getSystemClassLoader();

@@ -2032,13 +2032,13 @@ public class Arrays {
 
   @SafeVarargs
   public static <T> List<T> asList(T... array) {
-    return new ArrayAsList<T>(array);
+    return new ArrayList<T>(array);
   }
 
-  private static final class ArrayAsList<E> extends AbstractList<E> implements RandomAccess, java.io.Serializable {
+  private static final class ArrayList<E> extends AbstractList<E> implements RandomAccess, java.io.Serializable {
     private final E[] a;
 
-    ArrayAsList(E[] array) {
+    ArrayList(E[] array) {
       a = Objects.requireNonNull(array);
     }
 

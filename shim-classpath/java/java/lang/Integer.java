@@ -78,6 +78,9 @@ public final class Integer extends Number implements Comparable<Integer>,
   }
 
   public static String toString(int v, int radix) {
+    if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+      radix = 10;
+    }
     return Long.toString(v, radix);
   }
 
@@ -287,9 +290,15 @@ public final class Integer extends Number implements Comparable<Integer>,
   public static int parseUnsignedInt(CharSequence s, int beginIndex, int endIndex, int radix) {
     java.util.Objects.requireNonNull(s);
     java.util.Objects.checkFromToIndex(beginIndex, endIndex, s.length());
+    if (radix < Character.MIN_RADIX) {
+      throw new NumberFormatException("radix " + radix + " less than Character.MIN_RADIX");
+    }
+    if (radix > Character.MAX_RADIX) {
+      throw new NumberFormatException("radix " + radix + " greater than Character.MAX_RADIX");
+    }
     int len = endIndex - beginIndex;
     if (len == 0) {
-      throw new NumberFormatException("For input string: \"\"");
+      throw new NumberFormatException("For input string: \"\"" + (radix == 10 ? "" : " under radix " + radix));
     }
     char firstChar = s.charAt(beginIndex);
     if (firstChar == '-') {
@@ -320,7 +329,25 @@ public final class Integer extends Number implements Comparable<Integer>,
     if (s == null) {
       throw new NumberFormatException("Cannot parse null string");
     }
-    return parseUnsignedInt(s, 0, s.length(), radix);
+    int len = s.length();
+    if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+      return parseUnsignedInt(s, 0, len, radix);
+    }
+    if (len > 0) {
+      char firstChar = s.charAt(0);
+      if (firstChar == '-') {
+        throw new NumberFormatException(String.format("Illegal leading minus sign on unsigned string %s.", s));
+      }
+      if (len <= 5 || (radix == 10 && len <= 9)) {
+        return parseInt(s, radix);
+      }
+      long ell = Long.parseLong(s, radix);
+      if ((ell & 0xFFFFFFFF00000000L) == 0) {
+        return (int) ell;
+      }
+      throw new NumberFormatException(String.format("String value %s exceeds range of unsigned int.", s));
+    }
+    return parseInt(s, radix);
   }
 
   public static int parseUnsignedInt(String s) {

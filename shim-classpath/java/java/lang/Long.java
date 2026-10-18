@@ -78,8 +78,8 @@ public final class Long extends Number implements Comparable<Long>,
   }
 
   public static String toString(long v, int radix) {
-    if (radix < 1 || radix > 36) {
-      throw new IllegalArgumentException("radix " + radix + " not in [1,36]");
+    if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+      radix = 10;
     }
 
     if (v == 0) {
@@ -297,9 +297,15 @@ public final class Long extends Number implements Comparable<Long>,
   public static long parseUnsignedLong(CharSequence s, int beginIndex, int endIndex, int radix) {
     java.util.Objects.requireNonNull(s);
     java.util.Objects.checkFromToIndex(beginIndex, endIndex, s.length());
+    if (radix < Character.MIN_RADIX) {
+      throw new NumberFormatException("radix " + radix + " less than Character.MIN_RADIX");
+    }
+    if (radix > Character.MAX_RADIX) {
+      throw new NumberFormatException("radix " + radix + " greater than Character.MAX_RADIX");
+    }
     int len = endIndex - beginIndex;
     if (len == 0) {
-      throw new NumberFormatException("For input string: \"\"");
+      throw new NumberFormatException("For input string: \"\"" + (radix == 10 ? "" : " under radix " + radix));
     }
     char firstChar = s.charAt(beginIndex);
     if (firstChar == '-') {
@@ -333,7 +339,14 @@ public final class Long extends Number implements Comparable<Long>,
     if (s == null) {
       throw new NumberFormatException("Cannot parse null string");
     }
-    return parseUnsignedLong(s, 0, s.length(), radix);
+    int len = s.length();
+    if (len > 0 && radix >= Character.MIN_RADIX && radix <= Character.MAX_RADIX && s.charAt(0) != '-') {
+      int digits = s.charAt(0) == '+' ? len - 1 : len;
+      if (digits > 0 && (digits <= 12 || (radix == 10 && digits <= 18))) {
+        return parseLong(s, radix);
+      }
+    }
+    return parseUnsignedLong(s, 0, len, radix);
   }
 
   public static long parseUnsignedLong(String s) {

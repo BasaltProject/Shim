@@ -37,6 +37,14 @@ public abstract class Enum<E extends Enum<E>> implements Comparable<E>, java.lan
     this.ordinal = ordinal;
   }
 
+  public final boolean equals(Object other) {
+    return this == other;
+  }
+
+  public final int hashCode() {
+    return super.hashCode();
+  }
+
   public int compareTo(E other) {
     if (getDeclaringClass() != other.getDeclaringClass()) {
       throw new ClassCastException();

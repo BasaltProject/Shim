@@ -94,12 +94,8 @@ public final class Short extends Number implements Comparable<Short>, java.lang.
     return toString(value);
   }
 
-  public static String toString(short v, int radix) {
-    return Long.toString(v, radix);
-  }
-
   public static String toString(short v) {
-    return toString(v, 10);
+    return Integer.toString(v, 10);
   }
 
   public static short parseShort(String s) {
