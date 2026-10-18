@@ -65,7 +65,7 @@ public abstract class ZoneId implements Serializable {
   }
 
   public static Set<String> getAvailableZoneIds() {
-    return ZoneRulesProvider.getAvailableZoneIds();
+    return new java.util.HashSet<String>(ZoneRulesProvider.getAvailableZoneIds());
   }
 
   public static ZoneId of(String zoneId, Map<String, String> aliasMap) {

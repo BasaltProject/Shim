@@ -182,8 +182,8 @@ public abstract class DateFormat extends Format {
   }
 
   public static final DateFormat getDateTimeInstance(int dateStyle, int timeStyle, Locale aLocale) {
-    checkStyle(dateStyle);
     checkTimeStyle(timeStyle);
+    checkStyle(dateStyle);
     return new SimpleDateFormat(kDatePatterns[dateStyle] + ", " + kTimePatterns[timeStyle], aLocale);
   }
 

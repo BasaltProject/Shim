@@ -123,11 +123,25 @@ final class LocaleTags {
   }
 
   static String lower(String s) {
-    return s.toLowerCase(Locale.ROOT);
+    return mapAscii(s, 'A', 'Z', 32);
   }
 
   static String upper(String s) {
-    return s.toUpperCase(Locale.ROOT);
+    return mapAscii(s, 'a', 'z', -32);
+  }
+
+  private static String mapAscii(String s, char from, char to, int delta) {
+    char[] chars = null;
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (c >= from && c <= to) {
+        if (chars == null) {
+          chars = s.toCharArray();
+        }
+        chars[i] = (char) (c + delta);
+      }
+    }
+    return chars == null ? s : new String(chars);
   }
 
   static String title(String s) {

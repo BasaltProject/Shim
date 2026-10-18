@@ -116,6 +116,7 @@ public abstract class NumberFormat extends Format {
   }
 
   public static NumberFormat getNumberInstance(Locale inLocale) {
+    Objects.requireNonNull(inLocale);
     return new DecimalFormat("#,##0.###", DecimalFormatSymbols.getInstance(inLocale));
   }
 
@@ -124,6 +125,7 @@ public abstract class NumberFormat extends Format {
   }
 
   public static NumberFormat getIntegerInstance(Locale inLocale) {
+    Objects.requireNonNull(inLocale);
     DecimalFormat df = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(inLocale));
     df.setMaximumFractionDigits(0);
     df.setDecimalSeparatorAlwaysShown(false);
@@ -136,6 +138,7 @@ public abstract class NumberFormat extends Format {
   }
 
   public static NumberFormat getCurrencyInstance(Locale inLocale) {
+    Objects.requireNonNull(inLocale);
     DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(inLocale);
     String language = inLocale.getLanguage();
     boolean suffix = !language.equals("en") && !language.isEmpty() && !language.equals("ja") && !language.equals("zh")
@@ -148,6 +151,7 @@ public abstract class NumberFormat extends Format {
   }
 
   public static NumberFormat getPercentInstance(Locale inLocale) {
+    Objects.requireNonNull(inLocale);
     String language = inLocale.getLanguage();
     boolean spaced = !language.equals("en") && !language.isEmpty() && !language.equals("ja") && !language.equals("zh")
         && !language.equals("ko") && !language.equals("pt") && !language.equals("nl") && !language.equals("it");
