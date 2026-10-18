@@ -35,7 +35,7 @@ import java.util.jar.JarFile;
 import java.util.jar.JarEntry;
 
 public class Handler extends URLStreamHandler {
-  protected URLConnection openConnection(URL url) {
+  protected URLConnection openConnection(URL url) throws IOException {
     return new MyJarURLConnection(url);
   }
 
@@ -93,6 +93,9 @@ public class Handler extends URLStreamHandler {
     }
     try {
       String innerSpec = spec.substring(0, index - 1);
+      if (innerSpec.regionMatches(true, 0, "jar:", 0, 4)) {
+        throw new NullPointerException("Nested JAR URLs are not supported");
+      }
       url = new URL(innerSpec);
     } catch (MalformedURLException e) {
       throw new NullPointerException("invalid url: " + spec + " (" + e + ")");
@@ -153,39 +156,139 @@ public class Handler extends URLStreamHandler {
   }
 
   private static class MyJarURLConnection extends JarURLConnection {
-    private final JarFile file;
-    private final JarEntry entry;
+    private JarFile file;
+    private JarEntry entry;
 
-    public MyJarURLConnection(URL url) {
+    MyJarURLConnection(URL url) throws MalformedURLException {
       super(url);
-
-      String s = url.getFile();
-      int index = s.indexOf("!/");
-
-      try {
-        this.file = new JarFile(new URL(s.substring(0, index)).getFile());
-        this.entry = this.file.getJarEntry(s.substring(index + 2));
-      } catch (MalformedURLException e) {
-        throw new RuntimeException(e);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
     }
 
+    @Override
+    public synchronized void connect() throws IOException {
+      if (connected) {
+        return;
+      }
+      URL jarUrl = getJarFileURL();
+      String path = java.net.URLDecoder.decode(jarUrl.getFile().replace("+", "%2B"), "UTF-8");
+      if (!"file".equals(jarUrl.getProtocol())) {
+        throw new IOException("Unsupported jar file url protocol: " + jarUrl.getProtocol());
+      }
+      file = new JarFile(path);
+      String name = getEntryName();
+      if (name != null) {
+        entry = file.getJarEntry(name);
+        if (entry == null) {
+          file.close();
+          file = null;
+          throw new FileNotFoundException("JAR entry not found in jar file");
+        }
+      }
+      jarFileURLConnection = jarUrl.openConnection();
+      connected = true;
+    }
+
+    @Override
     public JarFile getJarFile() throws IOException {
+      connect();
       return file;
     }
 
+    @Override
+    public JarEntry getJarEntry() throws IOException {
+      connect();
+      return entry;
+    }
+
+    @Override
     public int getContentLength() {
-      return (int)entry.getSize();
+      long l = getContentLengthLong();
+      return l > Integer.MAX_VALUE ? -1 : (int) l;
     }
 
+    @Override
+    public long getContentLengthLong() {
+      try {
+        connect();
+        if (entry != null) {
+          return entry.getSize();
+        }
+        return new java.io.File(file.getName()).length();
+      } catch (IOException e) {
+        return -1;
+      }
+    }
+
+    @Override
+    public String getContentType() {
+      try {
+        connect();
+      } catch (IOException e) {
+        return null;
+      }
+      if (entry == null) {
+        return "x-java/jar";
+      }
+      String type = guessContentTypeFromName(getEntryName());
+      return type != null ? type : "content/unknown";
+    }
+
+    @Override
+    public long getLastModified() {
+      try {
+        connect();
+      } catch (IOException e) {
+        return 0;
+      }
+      return jarFileURLConnection.getLastModified();
+    }
+
+    @Override
+    public String getHeaderField(String name) {
+      try {
+        connect();
+      } catch (IOException e) {
+        return null;
+      }
+      return jarFileURLConnection.getHeaderField(name);
+    }
+
+    @Override
+    public String getHeaderField(int n) {
+      try {
+        connect();
+      } catch (IOException e) {
+        return null;
+      }
+      return jarFileURLConnection.getHeaderField(n);
+    }
+
+    @Override
+    public String getHeaderFieldKey(int n) {
+      try {
+        connect();
+      } catch (IOException e) {
+        return null;
+      }
+      return jarFileURLConnection.getHeaderFieldKey(n);
+    }
+
+    @Override
+    public java.util.Map<String, java.util.List<String>> getHeaderFields() {
+      try {
+        connect();
+      } catch (IOException e) {
+        return java.util.Collections.emptyMap();
+      }
+      return jarFileURLConnection.getHeaderFields();
+    }
+
+    @Override
     public InputStream getInputStream() throws IOException {
+      connect();
+      if (entry == null) {
+        throw new IOException("no entry name specified");
+      }
       return file.getInputStream(entry);
-    }
-
-    public void connect() {
-      // ignore
     }
   }
 }
