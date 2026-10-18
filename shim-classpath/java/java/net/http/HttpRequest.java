@@ -34,6 +34,23 @@ public abstract class HttpRequest {
     return new BuilderImpl();
   }
 
+  public static Builder newBuilder(HttpRequest request, java.util.function.BiPredicate<String, String> filter) {
+    Objects.requireNonNull(request);
+    Objects.requireNonNull(filter);
+    Builder b = newBuilder().uri(request.uri()).expectContinue(request.expectContinue());
+    request.timeout().ifPresent(b::timeout);
+    request.version().ifPresent(b::version);
+    request.headers().map().forEach((name, values) -> {
+      for (String v : values) {
+        if (filter.test(name, v)) {
+          b.header(name, v);
+        }
+      }
+    });
+    b.method(request.method(), request.bodyPublisher().orElse(null));
+    return b;
+  }
+
   public static Builder newBuilder(URI uri) {
     return new BuilderImpl(uri);
   }
@@ -64,6 +81,11 @@ public abstract class HttpRequest {
     Builder POST(BodyPublisher bodyPublisher);
     Builder PUT(BodyPublisher bodyPublisher);
     Builder DELETE();
+
+    default Builder HEAD() {
+      return method("HEAD", BodyPublishers.noBody());
+    }
+
     Builder method(String method, BodyPublisher bodyPublisher);
     Builder copy();
     HttpRequest build();
@@ -101,6 +123,61 @@ public abstract class HttpRequest {
     public static BodyPublisher ofInputStream(Supplier<? extends InputStream> streamSupplier) {
       Objects.requireNonNull(streamSupplier, "streamSupplier");
       return new InputStreamPublisher(streamSupplier);
+    }
+
+    public static BodyPublisher fromPublisher(Flow.Publisher<? extends ByteBuffer> publisher) {
+      Objects.requireNonNull(publisher, "publisher");
+      return new StreamPublisher(publisher, -1);
+    }
+
+    public static BodyPublisher fromPublisher(Flow.Publisher<? extends ByteBuffer> publisher, long contentLength) {
+      Objects.requireNonNull(publisher, "publisher");
+      if (contentLength < 1) {
+        throw new IllegalArgumentException("non-positive contentLength: " + contentLength);
+      }
+      return new StreamPublisher(publisher, contentLength);
+    }
+
+    public static BodyPublisher ofFile(java.nio.file.Path path) throws java.io.FileNotFoundException {
+      Objects.requireNonNull(path, "path");
+      if (!java.nio.file.Files.isRegularFile(path)) {
+        throw new java.io.FileNotFoundException(path + " not found");
+      }
+      try {
+        return new ByteArrayPublisher(java.nio.file.Files.readAllBytes(path));
+      } catch (java.io.IOException e) {
+        throw new java.io.UncheckedIOException(e);
+      }
+    }
+
+    public static BodyPublisher ofByteArrays(Iterable<byte[]> iter) {
+      Objects.requireNonNull(iter, "iter");
+      java.io.ByteArrayOutputStream all = new java.io.ByteArrayOutputStream();
+      for (byte[] b : iter) {
+        all.write(b, 0, b.length);
+      }
+      return new StreamPublisher(ofByteArray(all.toByteArray()), -1);
+    }
+
+    private static class StreamPublisher implements BodyPublisher {
+      private final Flow.Publisher<? extends ByteBuffer> publisher;
+      private final long length;
+
+      StreamPublisher(Flow.Publisher<? extends ByteBuffer> publisher, long length) {
+        this.publisher = publisher;
+        this.length = length;
+      }
+
+      @Override
+      public long contentLength() {
+        return length;
+      }
+
+      @Override
+      @SuppressWarnings("unchecked")
+      public void subscribe(Flow.Subscriber<? super ByteBuffer> subscriber) {
+        ((Flow.Publisher<ByteBuffer>) publisher).subscribe(subscriber);
+      }
     }
 
     public static BodyPublisher noBody() {
@@ -235,7 +312,7 @@ public abstract class HttpRequest {
     private Duration timeout;
     private HttpClient.Version version;
     private boolean expectContinue;
-    private final Map<String, List<String>> headers = new HashMap<String, List<String>>();
+    private final Map<String, List<String>> headers = new java.util.TreeMap<String, List<String>>(String.CASE_INSENSITIVE_ORDER);
 
     BuilderImpl() {}
 
@@ -246,6 +323,13 @@ public abstract class HttpRequest {
     @Override
     public Builder uri(URI uri) {
       this.uri = Objects.requireNonNull(uri, "uri");
+      return this;
+    }
+
+    @Override
+    public Builder HEAD() {
+      this.method = "HEAD";
+      this.publisher = null;
       return this;
     }
 

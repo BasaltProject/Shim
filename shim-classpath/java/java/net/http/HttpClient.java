@@ -11,6 +11,7 @@ package java.net.http;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Authenticator;
@@ -46,6 +47,14 @@ public abstract class HttpClient implements AutoCloseable {
   }
 
   public interface Builder {
+    public static final ProxySelector NO_PROXY = ProxySelector.of(null);
+
+    default Builder localAddress(java.net.InetAddress localAddr) {
+      throw new UnsupportedOperationException();
+    }
+
+    Builder sslContext(javax.net.ssl.SSLContext sslContext);
+    Builder sslParameters(javax.net.ssl.SSLParameters sslParameters);
     Builder cookieHandler(CookieHandler cookieHandler);
     Builder connectTimeout(Duration duration);
     Builder followRedirects(Redirect policy);
@@ -65,6 +74,8 @@ public abstract class HttpClient implements AutoCloseable {
     return new BuilderImpl();
   }
 
+  public abstract javax.net.ssl.SSLContext sslContext();
+  public abstract javax.net.ssl.SSLParameters sslParameters();
   public abstract Optional<CookieHandler> cookieHandler();
   public abstract Optional<Duration> connectTimeout();
   public abstract Redirect followRedirects();
@@ -115,6 +126,27 @@ public abstract class HttpClient implements AutoCloseable {
     private ProxySelector proxySelector;
     private Authenticator authenticator;
     private Executor executor;
+    private javax.net.ssl.SSLContext sslContext;
+    private javax.net.ssl.SSLParameters sslParameters;
+    private java.net.InetAddress localAddress;
+
+    @Override
+    public Builder localAddress(java.net.InetAddress localAddr) {
+      this.localAddress = localAddr;
+      return this;
+    }
+
+    @Override
+    public Builder sslContext(javax.net.ssl.SSLContext sslContext) {
+      this.sslContext = Objects.requireNonNull(sslContext);
+      return this;
+    }
+
+    @Override
+    public Builder sslParameters(javax.net.ssl.SSLParameters sslParameters) {
+      this.sslParameters = Objects.requireNonNull(sslParameters);
+      return this;
+    }
 
     @Override
     public Builder cookieHandler(CookieHandler cookieHandler) {
@@ -179,8 +211,20 @@ public abstract class HttpClient implements AutoCloseable {
     private final Optional<ProxySelector> proxy;
     private final Optional<Authenticator> authenticator;
     private final Optional<Executor> executor;
+    private final javax.net.ssl.SSLContext sslContext;
+    private final javax.net.ssl.SSLParameters sslParameters;
 
     HttpClientImpl(BuilderImpl b) {
+      javax.net.ssl.SSLContext context = b.sslContext;
+      if (context == null) {
+        try {
+          context = javax.net.ssl.SSLContext.getDefault();
+        } catch (java.security.NoSuchAlgorithmException e) {
+          throw new UncheckedIOException(new IOException(e));
+        }
+      }
+      this.sslContext = context;
+      this.sslParameters = b.sslParameters != null ? b.sslParameters : new javax.net.ssl.SSLParameters();
       this.cookieHandler = Optional.ofNullable(b.cookieHandler);
       this.connectTimeout = Optional.ofNullable(b.connectTimeout);
       this.followRedirects = b.followRedirects;
@@ -188,6 +232,26 @@ public abstract class HttpClient implements AutoCloseable {
       this.proxy = Optional.ofNullable(b.proxySelector);
       this.authenticator = Optional.ofNullable(b.authenticator);
       this.executor = Optional.ofNullable(b.executor);
+    }
+
+    @Override
+    public javax.net.ssl.SSLContext sslContext() {
+      return sslContext;
+    }
+
+    @Override
+    public javax.net.ssl.SSLParameters sslParameters() {
+      javax.net.ssl.SSLParameters p = sslParameters;
+      javax.net.ssl.SSLParameters copy = new javax.net.ssl.SSLParameters(p.getCipherSuites(), p.getProtocols());
+      copy.setWantClientAuth(p.getWantClientAuth());
+      copy.setNeedClientAuth(p.getNeedClientAuth());
+      copy.setEndpointIdentificationAlgorithm(p.getEndpointIdentificationAlgorithm());
+      copy.setUseCipherSuitesOrder(p.getUseCipherSuitesOrder());
+      copy.setApplicationProtocols(p.getApplicationProtocols());
+      if (p.getServerNames() != null) {
+        copy.setServerNames(p.getServerNames());
+      }
+      return copy;
     }
 
     @Override
@@ -443,7 +507,7 @@ public abstract class HttpClient implements AutoCloseable {
     }
 
     @Override
-    public Optional<Object> sslSession() {
+    public Optional<javax.net.ssl.SSLSession> sslSession() {
       return Optional.empty();
     }
 
