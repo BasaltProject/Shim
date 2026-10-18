@@ -61,8 +61,18 @@ public final class Byte extends Number implements Comparable<Byte>, java.lang.co
     return valueOf((byte) i);
   }
 
+  private static final class Cache {
+    static final Byte[] kValues = new Byte[256];
+
+    static {
+      for (int i = 0; i < kValues.length; i++) {
+        kValues[i] = new Byte((byte) (i - 128));
+      }
+    }
+  }
+
   public static Byte valueOf(byte value) {
-    return new Byte(value);
+    return Cache.kValues[value + 128];
   }
 
   public boolean equals(Object o) {

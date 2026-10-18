@@ -33,7 +33,7 @@ import java.util.Collections;
 public class Data {
   public static int nextPowerOfTwo(int n) {
     int r = 1;
-    while (r < n) r <<= 1;
+    while (r < n && r < (1 << 30)) r <<= 1;
     return r;
   }
 

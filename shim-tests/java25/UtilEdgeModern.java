@@ -11,6 +11,9 @@ import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Currency;
+import java.util.IdentityHashMap;
+import java.util.TreeMap;
+import java.util.WeakHashMap;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.concurrent.Callable;
@@ -61,6 +64,33 @@ public class UtilEdgeModern {
     t("sort-mixed", () -> {
       Arrays.sort(new Object[] {"b", 1});
       return "sorted";
+    });
+    t("box-cache", () -> {
+      Object a = 1;
+      Object b = 1;
+      Integer c = 128;
+      Integer d = 128;
+      Character e = 'a';
+      Character f = 'a';
+      return (a == b) + " " + (c == d) + " " + (Long.valueOf(-128) == Long.valueOf(-128)) + " "
+          + (Short.valueOf((short) 5) == Short.valueOf((short) 5)) + " "
+          + (Byte.valueOf((byte) -1) == Byte.valueOf((byte) -1)) + " " + (e == f) + " "
+          + (Character.valueOf('\u00e9') == Character.valueOf('\u00e9'));
+    });
+    t("identity-map", () -> {
+      IdentityHashMap<Integer, String> map = new IdentityHashMap<>();
+      map.put(1, "a");
+      return map.get(1) + " " + map.entrySet() + " " + map.clone() + " " + map.containsKey(1);
+    });
+    t("weak-map-entries", () -> {
+      WeakHashMap<Integer, String> map = new WeakHashMap<>();
+      map.put(7, "x");
+      return map.entrySet() + " " + map.entrySet().iterator().next().hashCode() + " " + map.keySet();
+    });
+    t("tree-submap-type", () -> {
+      TreeMap<Object, String> map = new TreeMap<>();
+      map.put("k", "v");
+      return map.headMap(new int[0], true);
     });
     t("spliterator-negative", () -> Arrays.spliterator(new long[3], -1, 2));
   }

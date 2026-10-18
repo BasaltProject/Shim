@@ -46,10 +46,23 @@ public final class Long extends Number implements Comparable<Long>,
   }
 
   public static Long valueOf(String value) {
-    return new Long(value);
+    return valueOf(parseLong(value, 10));
+  }
+
+  private static final class Cache {
+    static final Long[] kValues = new Long[256];
+
+    static {
+      for (int i = 0; i < kValues.length; i++) {
+        kValues[i] = new Long(i - 128);
+      }
+    }
   }
 
   public static Long valueOf(long value) {
+    if (value >= -128 && value <= 127) {
+      return Cache.kValues[(int) value + 128];
+    }
     return new Long(value);
   }
 

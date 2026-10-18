@@ -61,7 +61,20 @@ public final class Short extends Number implements Comparable<Short>, java.lang.
     return valueOf((short) i);
   }
 
+  private static final class Cache {
+    static final Short[] kValues = new Short[256];
+
+    static {
+      for (int i = 0; i < kValues.length; i++) {
+        kValues[i] = new Short((short) (i - 128));
+      }
+    }
+  }
+
   public static Short valueOf(short value) {
+    if (value >= -128 && value <= 127) {
+      return Cache.kValues[value + 128];
+    }
     return new Short(value);
   }
 

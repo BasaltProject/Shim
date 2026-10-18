@@ -163,8 +163,25 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
       this.next = next;
     }
 
-    public int hashCode() {
+    public int bucketHash() {
       return hashCode;
+    }
+
+    public int hashCode() {
+      K key = get();
+      return (key == null ? 0 : key.hashCode()) ^ (value == null ? 0 : value.hashCode());
+    }
+
+    public boolean equals(Object o) {
+      if (!(o instanceof Map.Entry)) {
+        return false;
+      }
+      Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+      return Objects.equals(get(), e.getKey()) && Objects.equals(value, e.getValue());
+    }
+
+    public String toString() {
+      return get() + "=" + value;
     }
   }
 

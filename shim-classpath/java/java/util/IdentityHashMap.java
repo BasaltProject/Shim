@@ -70,6 +70,12 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V
     this(0);
   }
 
+  public Object clone() {
+    IdentityHashMap<K, V> copy = new IdentityHashMap<K, V>(size());
+    copy.putAll(this);
+    return copy;
+  }
+
   public boolean isEmpty() {
     return map.isEmpty();
   }
