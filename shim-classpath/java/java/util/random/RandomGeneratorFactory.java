@@ -181,7 +181,8 @@ public final class RandomGeneratorFactory<T extends RandomGenerator> {
     Objects.requireNonNull(name, "name");
     RandomGeneratorFactory<? extends RandomGenerator> factory = FACTORIES.get(name);
     if (factory == null) {
-      throw new IllegalArgumentException("Unknown algorithm: " + name);
+      throw new IllegalArgumentException("No implementation of the random number generator algorithm \"" + name
+          + "\" is available");
     }
     return (RandomGeneratorFactory<T>) factory;
   }
@@ -192,7 +193,8 @@ public final class RandomGeneratorFactory<T extends RandomGenerator> {
     Objects.requireNonNull(category, "category");
     RandomGeneratorFactory<? extends RandomGenerator> factory = FACTORIES.get(name);
     if (factory == null) {
-      throw new IllegalArgumentException("Unknown algorithm: " + name);
+      throw new IllegalArgumentException("No implementation of the random number generator algorithm \"" + name
+          + "\" is available");
     }
     if (!category.isAssignableFrom(factory.generatorClass)) {
       throw new IllegalArgumentException(name + " does not implement " + category.getName());
