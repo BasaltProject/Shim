@@ -24,8 +24,61 @@ public final class ArraySorts {
     if (count < 2) {
       return;
     }
+    if (count < kInsertionLimit) {
+      int run = countRunAndMakeAscending(a, from, to, comparator);
+      binarySort(a, from, to, from + run, comparator);
+      return;
+    }
     Object[] aux = new Object[count / 2 + 1];
     mergeSort(a, aux, from, to, comparator);
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static int compare(Object x, Object y, Comparator comparator) {
+    return comparator == null ? ((Comparable) x).compareTo(y) : comparator.compare(x, y);
+  }
+
+  private static int countRunAndMakeAscending(Object[] a, int lo, int hi, Comparator<?> comparator) {
+    int runHi = lo + 1;
+    if (runHi == hi) {
+      return 1;
+    }
+    if (compare(a[runHi++], a[lo], comparator) < 0) {
+      while (runHi < hi && compare(a[runHi], a[runHi - 1], comparator) < 0) {
+        runHi++;
+      }
+      for (int i = lo, j = runHi - 1; i < j; i++, j--) {
+        Object t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+      }
+    } else {
+      while (runHi < hi && compare(a[runHi], a[runHi - 1], comparator) >= 0) {
+        runHi++;
+      }
+    }
+    return runHi - lo;
+  }
+
+  private static void binarySort(Object[] a, int lo, int hi, int start, Comparator<?> comparator) {
+    if (start == lo) {
+      start++;
+    }
+    for (; start < hi; start++) {
+      Object pivot = a[start];
+      int left = lo;
+      int right = start;
+      while (left < right) {
+        int mid = (left + right) >>> 1;
+        if (compare(pivot, a[mid], comparator) < 0) {
+          right = mid;
+        } else {
+          left = mid + 1;
+        }
+      }
+      System.arraycopy(a, left, a, left + 1, start - left);
+      a[left] = pivot;
+    }
   }
 
   private static void insertion(Object[] a, int from, int to, Comparator<?> comparator) {

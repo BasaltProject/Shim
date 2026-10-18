@@ -49,6 +49,19 @@ public class UtilEdgeModern {
     t("zone-ids-mutable", () -> java.time.ZoneId.getAvailableZoneIds().remove("UTC"));
     t("stream-range", () -> Arrays.stream(new int[3], 7, 10));
     t("stream-order", () -> Arrays.stream(new int[3], 100, 0));
+    t("sort-order", () -> {
+      StringBuilder log = new StringBuilder();
+      Integer[] values = {7, 3, 9, 3, 1, 8, 2, 5, 5, 0};
+      Arrays.sort(values, (a, b) -> {
+        log.append(a).append(':').append(b).append(' ');
+        return a - b;
+      });
+      return log + Arrays.toString(values);
+    });
+    t("sort-mixed", () -> {
+      Arrays.sort(new Object[] {"b", 1});
+      return "sorted";
+    });
     t("spliterator-negative", () -> Arrays.spliterator(new long[3], -1, 2));
   }
 }
