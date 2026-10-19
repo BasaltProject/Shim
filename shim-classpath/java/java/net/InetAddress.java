@@ -226,7 +226,7 @@ public class InetAddress implements Serializable {
     NetNative.init();
     byte[][] all = NetNative.lookup(host);
     if (all == null || all.length == 0) {
-      throw new UnknownHostException(host + ": Name or service not known");
+      throw new UnknownHostException(host + ": " + NetNative.lookupError());
     }
     InetAddress[] result = new InetAddress[all.length];
     for (int i = 0; i < all.length; i++) {

@@ -1223,12 +1223,34 @@ public final class URI implements Comparable<URI>, Serializable {
       string = s;
     }
 
+    private String reported() {
+      StringBuilder sb = new StringBuilder(input.length());
+      boolean previousSpace = true;
+      for (int i = 0; i < input.length(); i++) {
+        char c = input.charAt(i);
+        if (c == ' ') {
+          if (!previousSpace) {
+            sb.append(c);
+          }
+          previousSpace = true;
+        } else {
+          sb.append(c);
+          previousSpace = false;
+        }
+      }
+      int length = sb.length();
+      if (length > 0 && sb.charAt(length - 1) == ' ') {
+        sb.setLength(length - 1);
+      }
+      return sb.toString();
+    }
+
     private void fail(String reason) throws URISyntaxException {
-      throw new URISyntaxException(input, reason);
+      throw new URISyntaxException(reported(), reason);
     }
 
     private void fail(String reason, int p) throws URISyntaxException {
-      throw new URISyntaxException(input, reason, p);
+      throw new URISyntaxException(reported(), reason, p);
     }
 
     private void failExpecting(String expected, int p) throws URISyntaxException {
