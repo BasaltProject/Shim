@@ -63,8 +63,31 @@ public final class LocaleDb {
     return new int[] {first, minimal};
   }
 
+  public static String calendarType(Locale locale) {
+    String type = locale.getUnicodeLocaleType("ca");
+    if (type != null) {
+      return type.equals("buddhist") || type.equals("japanese") ? type : "gregory";
+    }
+    String found = get(locale, "CT");
+    return found == null ? "gregory" : found;
+  }
+
+  public static String[] eraNames(Locale locale, String calendar) {
+    return list(locale, calendar.equals("buddhist") ? "GB" : "GJ");
+  }
+
   public static String formatPattern(Locale locale, int dateStyle, int timeStyle) {
-    return pattern(locale, dateStyle, timeStyle, dateStyle < 0 ? "FT" : timeStyle < 0 ? "FP" : "FD");
+    String key = dateStyle < 0 ? "FT" : timeStyle < 0 ? "FP" : "FD";
+    if (dateStyle >= 0) {
+      String type = calendarType(locale);
+      if (!type.equals("gregory")) {
+        String specific = pattern(locale, dateStyle, timeStyle, key + (type.equals("buddhist") ? "B" : "J"));
+        if (specific != null) {
+          return specific;
+        }
+      }
+    }
+    return pattern(locale, dateStyle, timeStyle, key);
   }
 
   public static String pattern(Locale locale, int dateStyle, int timeStyle) {
