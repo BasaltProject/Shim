@@ -28,6 +28,21 @@
 #include "jni.h"
 #include "jni-util.h"
 
+// Java keeps the uncomplemented running remainder; zlib accepts/returns the
+// complemented public CRC value. Pin only for the duration of the native scan.
+extern "C" JNIEXPORT jint JNICALL
+    Java_java_util_zip_CRC32_updateBytes(JNIEnv* e, jclass, jint remainder,
+                                       jbyteArray array, jint offset, jint length)
+{
+  void* data = e->GetPrimitiveArrayCritical(array, 0);
+  if (data == 0) return remainder;
+  uLong crc = crc32(static_cast<uLong>(static_cast<unsigned int>(~remainder)),
+                   static_cast<const Bytef*>(data) + offset,
+                   static_cast<uInt>(length));
+  e->ReleasePrimitiveArrayCritical(array, data, JNI_ABORT);
+  return static_cast<jint>(~static_cast<unsigned int>(crc));
+}
+
 extern "C" JNIEXPORT jlong JNICALL
     Java_java_util_zip_Inflater_make(JNIEnv* e, jclass, jboolean nowrap)
 {

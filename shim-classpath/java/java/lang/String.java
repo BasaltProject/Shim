@@ -154,6 +154,15 @@ public final class String
     this(s.toCharArray());
   }
 
+  // The source is already decoded and immutable. A slice must not scan its entire
+  // backing array again as the raw-byte constructor does to recognize UTF-8.
+  // Bounds are checked by substring before entering this trusted storage path.
+  private String(String source, int start, int length) {
+    this.data = source.data;
+    this.offset = source.offset + start;
+    this.length = length;
+  }
+
   public String(byte[] data, String charset)
     throws UnsupportedEncodingException
   {
@@ -174,6 +183,10 @@ public final class String
     if (offset < 0 || length < 0 || offset > bytes.length - length) {
       throw new StringIndexOutOfBoundsException("Range [" + offset + ", " + offset + " + " + length
                                                 + ") out of bounds for length " + bytes.length);
+    }
+    if (charset == sun.nio.cs.UTF_8.INSTANCE || charset == sun.nio.cs.US_ASCII.INSTANCE) {
+      char[] ascii = decodeAsciiBytes(bytes, offset, length);
+      if (ascii != null) return ascii;
     }
     return sun.nio.cs.StringCoding.decode(charset, bytes, offset, length);
   }
@@ -207,24 +220,7 @@ public final class String
     if (copy) {
       Object c;
       if (data instanceof char[]) {
-        char[] source = (char[]) data;
-        boolean ascii = true;
-        for (int i = offset; i < offset + length; ++i) {
-          if (source[i] >= 0x80) {
-            ascii = false;
-            break;
-          }
-        }
-        if (ascii) {
-          byte[] narrow = new byte[length];
-          for (int i = 0; i < length; ++i) {
-            narrow[i] = (byte) source[offset + i];
-          }
-          c = narrow;
-        } else {
-          c = new char[length];
-          System.arraycopy(data, offset, c, 0, length);
-        }
+        c = copyCharStorage((char[]) data, offset, length);
       } else {
         c = Utf8.decode((byte[])data, offset, length);
         if(c instanceof char[]) length = ((char[])c).length;
@@ -245,6 +241,15 @@ public final class String
     }
   }
 
+  // Private storage helpers: callers validate ranges before entering the VM.
+  private static native char[] decodeAsciiBytes(byte[] source, int offset, int length);
+  private static native Object copyCharStorage(char[] source, int offset, int length);
+  private static native void widenBytes(byte[] source, int offset, char[] target, int targetOffset, int length);
+  private native int indexOfString(String target, int start);
+  private native int indexOfCodePoint(int codePoint, int start);
+  private native int hashStorage();
+  private native int compareStorage(String target);
+
   @Override
   public String toString() {
     return this;
@@ -258,9 +263,7 @@ public final class String
   @Override
   public int hashCode() {
     if (hashCode == 0) {
-      int h = 0;
-      for (int i = 0; i < length; ++i) h = (h * 31) + charAt(i);
-      hashCode = h;
+      hashCode = hashStorage();
     }
     return hashCode;
   }
@@ -289,18 +292,8 @@ public final class String
   public int compareTo(String s) {
     if (this == s) return 0;
 
-    int idx = 0;
-    int result;
-
-    int end = (length < s.length ? length : s.length);
-
-    while (idx < end) {
-      if ((result = charAt(idx) - s.charAt(idx)) != 0) {
-        return result;
-      }
-      idx++;
-    }
-    return length - s.length;
+    if (s == null) throw new NullPointerException();
+    return compareStorage(s);
   }
 
   private boolean isLatin1() {
@@ -499,21 +492,8 @@ public final class String
 
   public int indexOf(int c, int start) {
     if (start < 0) start = 0;
-    if (c < Character.MIN_SUPPLEMENTARY_CODE_POINT) {
-      for (int i = start; i < length; ++i) {
-        if (charAt(i) == c) {
-          return i;
-        }
-      }
-      return -1;
-    }
-    if (!Character.isValidCodePoint(c)) return -1;
-    char high = Character.highSurrogate(c);
-    char low = Character.lowSurrogate(c);
-    for (int i = start; i < length - 1; ++i) {
-      if (charAt(i) == high && charAt(i + 1) == low) return i;
-    }
-    return -1;
+    if (start >= length || c < 0 || c > 0x10ffff) return -1;
+    return indexOfCodePoint(c, start);
   }
 
   public int lastIndexOf(int ch) {
@@ -528,19 +508,8 @@ public final class String
     if (start < 0) start = 0;
     if (s.length == 0) return Math.min(start, length);
 
-    for (int i = start; i < length - s.length + 1; ++i) {
-      int j = 0;
-      for (; j < s.length; ++j) {
-        if (charAt(i + j) != s.charAt(j)) {
-          break;
-        }
-      }
-      if (j == s.length) {
-        return i;
-      }
-    }
-
-    return -1;
+    if (start > length - s.length) return -1;
+    return indexOfString(s, start);
   }
 
   public int lastIndexOf(String s) {
@@ -615,7 +584,7 @@ public final class String
     else if (end - start == 0)
       return "";
     else
-      return new String(data, offset + start, newLen, false);
+      return new String(this, start, newLen);
   }
 
   public boolean startsWith(String s) {
@@ -722,10 +691,7 @@ public final class String
       char[] src = (char[]) data;
       System.arraycopy(src, offset + srcOffset, dst, dstOffset, srcLength);
     } else {
-      byte[] src = (byte[]) data;
-      for (int i = 0; i < srcLength; ++i) {
-        dst[i + dstOffset] = (char) src[i + offset + srcOffset];
-      }
+      widenBytes((byte[]) data, offset + srcOffset, dst, dstOffset, srcLength);
     }
   }
 
@@ -753,6 +719,36 @@ public final class String
   }
 
   public String[] split(String regex, int limit) {
+    // Avoid constructing a regex machine for a single literal delimiter.
+    // Surrogates must retain Pattern's code-point matching semantics.
+    char delimiter = 0;
+    boolean literal = false;
+    if (regex.length() == 1) {
+      delimiter = regex.charAt(0);
+      literal = "\\.^$|?*+()[]{}".indexOf(delimiter) < 0;
+    } else if (regex.length() == 2 && regex.charAt(0) == '\\') {
+      delimiter = regex.charAt(1);
+      literal = "\\.^$|?*+()[]{}-/".indexOf(delimiter) >= 0;
+    }
+    if (literal && (delimiter < 0xd800 || delimiter > 0xdfff)) {
+      ArrayList<String> parts = new ArrayList<String>();
+      int start = 0;
+      int end;
+      while ((limit <= 0 || parts.size() < limit - 1)
+          && (end = indexOf(delimiter, start)) >= 0) {
+        parts.add(substring(start, end));
+        start = end + 1;
+      }
+      if (start == 0) return new String[] {this};
+      parts.add(substring(start));
+      int size = parts.size();
+      if (limit == 0) {
+        while (size > 0 && parts.get(size - 1).isEmpty()) --size;
+      }
+      String[] result = new String[size];
+      for (int i = 0; i < size; ++i) result[i] = parts.get(i);
+      return result;
+    }
     return Pattern.compile(regex).split(this, limit);
   }
 
@@ -781,17 +777,17 @@ public final class String
     String targetString = target.toString();
     String replaceString = replace.toString();
 
-    int targetSize = target.length();
+    int targetSize = targetString.length();
+    int index = indexOf(targetString);
+    if (index == -1) return this;
 
     StringBuilder returnValue = new StringBuilder();
     String unhandled = this;
-
-    int index = -1;
-    while ((index = unhandled.indexOf(targetString)) != -1) {
+    do {
       returnValue.append(unhandled.substring(0, index)).append(replaceString);
-      unhandled = unhandled.substring(index + targetSize,
-                                      unhandled.length());
-    }
+      unhandled = unhandled.substring(index + targetSize, unhandled.length());
+      index = unhandled.indexOf(targetString);
+    } while (index != -1);
 
     returnValue.append(unhandled);
     return returnValue.toString();

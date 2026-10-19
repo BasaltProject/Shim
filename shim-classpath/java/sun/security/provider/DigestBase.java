@@ -31,6 +31,16 @@ abstract class DigestBase extends MessageDigestSpi implements Cloneable {
 
   abstract void implCompress(byte[] b, int ofs);
 
+  // Providers may process a contiguous sequence of complete blocks at once.
+  // The default retains the existing per-block behavior for other algorithms.
+  void implCompressBlocks(byte[] b, int ofs, int length) {
+    while (length != 0) {
+      implCompress(b, ofs);
+      ofs += blockSize;
+      length -= blockSize;
+    }
+  }
+
   abstract void implDigest(byte[] out, int ofs);
 
   abstract void implReset();
@@ -73,10 +83,11 @@ abstract class DigestBase extends MessageDigestSpi implements Cloneable {
         bufOfs = 0;
       }
     }
-    while (len >= blockSize) {
-      implCompress(b, ofs);
-      len -= blockSize;
-      ofs += blockSize;
+    int complete = len - len % blockSize;
+    if (complete != 0) {
+      implCompressBlocks(b, ofs, complete);
+      len -= complete;
+      ofs += complete;
     }
     if (len > 0) {
       System.arraycopy(b, ofs, buffer, 0, len);
