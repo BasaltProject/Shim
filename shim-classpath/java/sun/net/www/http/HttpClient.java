@@ -30,6 +30,7 @@ public class HttpClient {
   protected Socket serverSocket;
   protected PrintStream serverOutput;
   protected InputStream serverInput;
+  protected InputStream rawInput;
   protected URL url;
   protected boolean usingProxy;
   protected Proxy proxy;
@@ -115,6 +116,7 @@ public class HttpClient {
     serverSocket = s;
     serverOutput = new PrintStream(new BufferedOutputStream(s.getOutputStream()), false, StandardCharsets.ISO_8859_1);
     serverInput = new BufferedInputStream(s.getInputStream());
+    rawInput = serverInput;
     afterConnect();
   }
 
@@ -134,7 +136,7 @@ public class HttpClient {
       return false;
     }
     try {
-      return serverInput.available() == 0;
+      return rawInput.available() == 0;
     } catch (IOException e) {
       return false;
     }
@@ -259,7 +261,7 @@ public class HttpClient {
     keepAliveTimeout = 0;
     boolean ret = false;
     byte[] b = new byte[8];
-    InputStream in = serverInput;
+    InputStream in = rawInput;
     in.mark(10);
     int nread = 0;
     while (nread < 8) {

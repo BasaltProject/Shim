@@ -314,6 +314,9 @@ public abstract class HttpClient implements AutoCloseable {
         connection.setReadTimeout((int) request.timeout().get().toMillis());
       }
 
+      if (connection instanceof javax.net.ssl.HttpsURLConnection) {
+        ((javax.net.ssl.HttpsURLConnection) connection).setSSLSocketFactory(sslContext.getSocketFactory());
+      }
       if (connection instanceof HttpURLConnection) {
         HttpURLConnection http = (HttpURLConnection) connection;
         http.setRequestMethod(request.method());
@@ -321,6 +324,8 @@ public abstract class HttpClient implements AutoCloseable {
           http.setInstanceFollowRedirects(true);
         } else if (followRedirects == Redirect.NEVER) {
           http.setInstanceFollowRedirects(false);
+        } else {
+          http.setInstanceFollowRedirects(true);
         }
       }
 
@@ -446,7 +451,11 @@ public abstract class HttpClient implements AutoCloseable {
         throw new IOException(cause);
       }
 
-      return new HttpResponseImpl<T>(code, request, respHeaders, body, uri, this.version);
+      URI finalUri = uri;
+      try {
+        finalUri = connection.getURL().toURI();
+      } catch (java.net.URISyntaxException ignore) { }
+      return new HttpResponseImpl<T>(code, request, respHeaders, body, finalUri, this.version);
     }
 
     @Override
