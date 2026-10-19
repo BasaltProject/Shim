@@ -802,7 +802,7 @@ class Context {
         freshCopyCapacity(0),
         gen2Threshold(InitialGen2CapacityInBytes / BytesPerWord),
         logMajor(getenv("SHIM_GC_STATS") != 0),
-        headroomPercent(getenv("SHIM_GC_HEADROOM_PERCENT") ? atoi(getenv("SHIM_GC_HEADROOM_PERCENT")) : 25),
+        headroomPercent(getenv("SHIM_GC_HEADROOM_PERCENT") ? atoi(getenv("SHIM_GC_HEADROOM_PERCENT")) : 12),
         compactNext(false),
         retiredMemory(0),
         retiredBytes(0)
