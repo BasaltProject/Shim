@@ -68,6 +68,13 @@ public final class DateTimeFormatterBuilder {
     if (dateStyle == null && timeStyle == null) {
       throw new IllegalArgumentException("Either dateStyle or timeStyle must be non-null");
     }
+    if (chrono == java.time.chrono.IsoChronology.INSTANCE) {
+      String found = shim.LocaleDb.pattern(locale, dateStyle == null ? -1 : dateStyle.ordinal(),
+          timeStyle == null ? -1 : timeStyle.ordinal());
+      if (found != null) {
+        return found;
+      }
+    }
     String datePattern = null;
     String timePattern = null;
     if (dateStyle != null) {
@@ -2300,9 +2307,10 @@ public final class DateTimeFormatterBuilder {
       this.style = style;
     }
 
-    private static String[] periods(boolean narrow) {
-      return new String[] {narrow ? "mi" : "midnight", "in the morning", narrow ? "n" : "noon", "in the afternoon",
-          "in the evening", "at night"};
+    private String[] runs(Locale locale) {
+      String key = style.asNormal() == TextStyle.FULL ? "DPF" : style.asNormal() == TextStyle.SHORT ? "DPS" : "DPN";
+      String[] runs = shim.LocaleDb.list(locale, key);
+      return runs == null ? new String[] {"0=AM", "720=PM"} : runs;
     }
 
     @Override
@@ -2311,23 +2319,17 @@ public final class DateTimeFormatterBuilder {
       if (value == null) {
         return false;
       }
-      String[] names = periods(style.asNormal() == TextStyle.NARROW);
-      long m = value;
-      int index;
-      if (m == 0) {
-        index = 0;
-      } else if (m < 720) {
-        index = 1;
-      } else if (m == 720) {
-        index = 2;
-      } else if (m < 1080) {
-        index = 3;
-      } else if (m < 1260) {
-        index = 4;
-      } else {
-        index = 5;
+      String[] runs = runs(context.getLocale());
+      String found = null;
+      for (String run : runs) {
+        int eq = run.indexOf('=');
+        if (Integer.parseInt(run.substring(0, eq)) <= value.longValue()) {
+          found = run.substring(eq + 1);
+        } else {
+          break;
+        }
       }
-      buf.append(names[index]);
+      buf.append(found);
       return true;
     }
 
@@ -2336,20 +2338,21 @@ public final class DateTimeFormatterBuilder {
       if (position < 0 || position > text.length()) {
         throw new IndexOutOfBoundsException();
       }
-      String[] names = periods(false);
-      int[] minutes = {0, 6 * 60, 12 * 60, 12 * 60 + 1, 18 * 60, 21 * 60};
-      int best = -1;
-      for (int i = 0; i < names.length; i++) {
-        if (context.subSequenceEquals(names[i], 0, text, position, names[i].length())
-            && (best < 0 || names[i].length() > names[best].length())) {
-          best = i;
+      String[] runs = runs(context.getLocale());
+      int bestMinute = -1;
+      int bestLength = -1;
+      for (String run : runs) {
+        int eq = run.indexOf('=');
+        String name = run.substring(eq + 1);
+        if (name.length() > bestLength && context.subSequenceEquals(name, 0, text, position, name.length())) {
+          bestMinute = Integer.parseInt(run.substring(0, eq));
+          bestLength = name.length();
         }
       }
-      if (best < 0) {
+      if (bestLength < 0) {
         return ~position;
       }
-      return context.setParsedField(ChronoField.MINUTE_OF_DAY, minutes[best], position, position
-          + names[best].length());
+      return context.setParsedField(ChronoField.MINUTE_OF_DAY, bestMinute, position, position + bestLength);
     }
 
     @Override

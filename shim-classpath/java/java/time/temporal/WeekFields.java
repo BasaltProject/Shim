@@ -39,11 +39,6 @@ public final class WeekFields implements Serializable {
   public static final WeekFields SUNDAY_START = WeekFields.of(DayOfWeek.SUNDAY, 1);
   public static final TemporalUnit WEEK_BASED_YEARS = IsoFields.WEEK_BASED_YEARS;
 
-  private static final String kMonday4 = " AD AN AT AX BE BG CH CZ DE DK EE ES FI FJ FO FR GB GF GG GI GP GR HU IE IM"
-      + " IS IT JE LI LT LU MC MQ NL NO PL RE RU SE SJ SK SM VA ";
-  private static final String kMonday1 = " AL AM AR AU AZ BA BM BN BY CL CM CN CR CY EC GE HR KG KZ LB LK LV MD ME MK"
-      + " MN MY NZ RO RS SI TJ TM TR UA UY UZ VN XK ZA ";
-  private static final String kSaturday1 = " AE AF BH DJ DZ EG IQ IR JO KW LY OM QA SD SY ";
 
   private final DayOfWeek firstDayOfWeek;
   private final int minimalDays;
@@ -55,20 +50,9 @@ public final class WeekFields implements Serializable {
 
   public static WeekFields of(Locale locale) {
     Objects.requireNonNull(locale, "locale");
-    String country = locale.getCountry();
-    String key = " " + country + " ";
-    DayOfWeek first = DayOfWeek.SUNDAY;
-    int min = 1;
-    if (country.length() > 0) {
-      if (kMonday4.contains(key)) {
-        first = DayOfWeek.MONDAY;
-        min = 4;
-      } else if (kMonday1.contains(key)) {
-        first = DayOfWeek.MONDAY;
-      } else if (kSaturday1.contains(key)) {
-        first = DayOfWeek.SATURDAY;
-      }
-    }
+    int[] data = shim.LocaleDb.weekData(locale);
+    DayOfWeek first = DayOfWeek.of(data[0]);
+    int min = data[1];
     return WeekFields.of(first, min);
   }
 

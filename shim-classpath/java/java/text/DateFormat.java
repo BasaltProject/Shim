@@ -157,7 +157,8 @@ public abstract class DateFormat extends Format {
 
   public static final DateFormat getTimeInstance(int style, Locale aLocale) {
     checkTimeStyle(style);
-    return new SimpleDateFormat(kTimePatterns[style], aLocale);
+    String pattern = shim.LocaleDb.formatPattern(aLocale, -1, style);
+    return new SimpleDateFormat(pattern != null ? pattern : kTimePatterns[style], aLocale);
   }
 
   public static final DateFormat getDateInstance() {
@@ -170,7 +171,8 @@ public abstract class DateFormat extends Format {
 
   public static final DateFormat getDateInstance(int style, Locale aLocale) {
     checkStyle(style);
-    return new SimpleDateFormat(kDatePatterns[style], aLocale);
+    String pattern = shim.LocaleDb.formatPattern(aLocale, style, -1);
+    return new SimpleDateFormat(pattern != null ? pattern : kDatePatterns[style], aLocale);
   }
 
   public static final DateFormat getDateTimeInstance() {
@@ -184,7 +186,9 @@ public abstract class DateFormat extends Format {
   public static final DateFormat getDateTimeInstance(int dateStyle, int timeStyle, Locale aLocale) {
     checkTimeStyle(timeStyle);
     checkStyle(dateStyle);
-    return new SimpleDateFormat(kDatePatterns[dateStyle] + ", " + kTimePatterns[timeStyle], aLocale);
+    String pattern = shim.LocaleDb.formatPattern(aLocale, dateStyle, timeStyle);
+    return new SimpleDateFormat(pattern != null ? pattern : kDatePatterns[dateStyle] + ", " + kTimePatterns[timeStyle],
+        aLocale);
   }
 
   public static final DateFormat getInstance() {

@@ -229,7 +229,30 @@ public class SimpleDateFormat extends DateFormat {
     return buffer;
   }
 
-  private static void zeroPad(StringBuffer buffer, long value, int minDigits) {
+  private void zeroPad(StringBuffer buffer, long value, int minDigits) {
+    char zero = zeroDigit();
+    if (zero == '0') {
+      zeroPadAscii(buffer, value, minDigits);
+      return;
+    }
+    int start = buffer.length();
+    zeroPadAscii(buffer, value, minDigits);
+    for (int k = start; k < buffer.length(); k++) {
+      char c = buffer.charAt(k);
+      if (c >= '0' && c <= '9') {
+        buffer.setCharAt(k, (char) (zero + (c - '0')));
+      }
+    }
+  }
+
+  private char zeroDigit() {
+    if (numberFormat instanceof DecimalFormat) {
+      return ((DecimalFormat) numberFormat).getDecimalFormatSymbols().getZeroDigit();
+    }
+    return '0';
+  }
+
+  private static void zeroPadAscii(StringBuffer buffer, long value, int minDigits) {
     if (value < 0) {
       buffer.append('-');
       value = -value;
@@ -249,14 +272,14 @@ public class SimpleDateFormat extends DateFormat {
     }
     buffer.append(offset < 0 ? '-' : '+');
     offset = Math.abs(offset);
-    zeroPad(buffer, offset / 60, 2);
+    zeroPadAscii(buffer, offset / 60, 2);
     if (iso && count == 1) {
       return;
     }
     if (iso && count == 3) {
       buffer.append(':');
     }
-    zeroPad(buffer, offset % 60, 2);
+    zeroPadAscii(buffer, offset % 60, 2);
   }
 
   private void formatField(char c, int count, StringBuffer buffer) {

@@ -21,41 +21,50 @@ import java.util.Locale;
 import java.util.Map;
 
 final class DateTimeTextProvider {
-  private static final String[] kMonthsFull = {"January", "February", "March", "April", "May", "June", "July",
-      "August", "September", "October", "November", "December"};
-  private static final String[] kMonthsShort = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
-      "Nov", "Dec"};
-  private static final String[] kMonthsNarrow = {"J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"};
-  private static final String[] kDaysFull = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
-      "Sunday"};
-  private static final String[] kDaysShort = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
-  private static final String[] kDaysNarrow = {"M", "T", "W", "T", "F", "S", "S"};
-
   private static final DateTimeTextProvider INSTANCE = new DateTimeTextProvider();
 
   static DateTimeTextProvider getInstance() {
     return INSTANCE;
   }
 
-  private static String[] table(TemporalField field, TextStyle style) {
-    TextStyle normal = style.asNormal();
+  private static int styleIndex(TextStyle style) {
+    switch (style) {
+      case FULL: return 0;
+      case SHORT: return 1;
+      case NARROW: return 2;
+      case FULL_STANDALONE: return 3;
+      case SHORT_STANDALONE: return 4;
+      default: return 5;
+    }
+  }
+
+  private static String[] slice(String[] all, int from, int count) {
+    if (all == null || all.length < from + count) {
+      return null;
+    }
+    String[] part = new String[count];
+    System.arraycopy(all, from, part, 0, count);
+    return part;
+  }
+
+  private static String[] table(TemporalField field, TextStyle style, Locale locale) {
+    int index = styleIndex(style);
     if (field == ChronoField.MONTH_OF_YEAR) {
-      return normal == TextStyle.FULL ? kMonthsFull : normal == TextStyle.SHORT ? kMonthsShort : kMonthsNarrow;
+      return shim.LocaleDb.list(locale, "M" + index);
     }
     if (field == ChronoField.DAY_OF_WEEK) {
-      return normal == TextStyle.FULL ? kDaysFull : normal == TextStyle.SHORT ? kDaysShort : kDaysNarrow;
+      return shim.LocaleDb.list(locale, "D" + index);
     }
     if (field == ChronoField.AMPM_OF_DAY) {
-      return normal == TextStyle.NARROW ? new String[] {"a", "p"} : new String[] {"AM", "PM"};
+      return slice(shim.LocaleDb.list(locale, "AMP"), styleIndex(style.asNormal()) * 2, 2);
     }
     if (field == ChronoField.ERA) {
-      return normal == TextStyle.FULL ? new String[] {"Before Christ", "Anno Domini"}
-          : normal == TextStyle.SHORT ? new String[] {"BC", "AD"} : new String[] {"B", "A"};
+      int normal = styleIndex(style.asNormal());
+      return slice(shim.LocaleDb.list(locale, "E"), (normal == 0 ? 1 : normal == 1 ? 0 : 2) * 2, 2);
     }
     if (field == IsoFields.QUARTER_OF_YEAR) {
-      return normal == TextStyle.FULL
-          ? new String[] {"1st quarter", "2nd quarter", "3rd quarter", "4th quarter"}
-          : normal == TextStyle.SHORT ? new String[] {"Q1", "Q2", "Q3", "Q4"} : new String[] {"1", "2", "3", "4"};
+      int[] order = {1, 0, 2, 4, 3, 5};
+      return slice(shim.LocaleDb.list(locale, "Q"), order[index] * 4, 4);
     }
     return null;
   }
@@ -65,7 +74,7 @@ final class DateTimeTextProvider {
   }
 
   String getText(TemporalField field, long value, TextStyle style, Locale locale) {
-    String[] names = table(field, style);
+    String[] names = table(field, style, locale);
     if (names == null) {
       return null;
     }
@@ -113,7 +122,7 @@ final class DateTimeTextProvider {
         : new TextStyle[] {style};
     boolean any = false;
     for (TextStyle s : styles) {
-      String[] names = isHijrahMonth(chrono, field) ? hijrahMonths(s) : table(field, s);
+      String[] names = isHijrahMonth(chrono, field) ? hijrahMonths(s) : table(field, s, locale);
       if (field == ChronoField.ERA && chrono != null && chrono != java.time.chrono.IsoChronology.INSTANCE) {
         List<java.time.chrono.Era> eras = chrono.eras();
         names = new String[eras.size()];
