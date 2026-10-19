@@ -91,6 +91,10 @@ public final class FileNative {
 
   public static native String cwd();
 
+  public static native boolean isTerminal(int fd);
+
+  public static native boolean setEcho(boolean on);
+
   public static String message(int negativeErrno) {
     return strerror(-negativeErrno);
   }
