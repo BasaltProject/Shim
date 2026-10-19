@@ -1324,6 +1324,7 @@ Allocator* allocator(MyThread* t);
 
 unsigned addDynamic(MyThread* t, GcInvocation* invocation)
 {
+  PROTECT(t, invocation);
   ACQUIRE(t, t->m->classLock);
 
   int index = invocation->index();
