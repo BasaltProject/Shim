@@ -57,4 +57,10 @@ class KeyGeneratorCore extends KeyGeneratorSpi {
     random.nextBytes(keyBytes);
     return new SecretKeySpec(keyBytes, name);
   }
+
+  public static final class ARCFOURKeyGenerator extends KeyGeneratorCore {
+    public ARCFOURKeyGenerator() {
+      super("ARCFOUR", 128);
+    }
+  }
 }

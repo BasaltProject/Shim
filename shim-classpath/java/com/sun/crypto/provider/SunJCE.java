@@ -175,6 +175,29 @@ public final class SunJCE extends Provider {
     add("KDF", "HKDF-SHA256", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA256", new String[] {}, new String[] {});
     add("KDF", "HKDF-SHA384", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA384", new String[] {}, new String[] {});
     add("KDF", "HKDF-SHA512", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA512", new String[] {}, new String[] {});
+    add("Cipher", "PBEWithMD5AndDES", "com.sun.crypto.provider.PBES1Core$PBEWithMD5AndDES", new String[] {"OID.1.2.840.113549.1.5.3", "1.2.840.113549.1.5.3", "PBE"}, new String[] {});
+    add("SecretKeyFactory", "PBEWithMD5AndDES", "com.sun.crypto.provider.PBEKeyFactory$PBEWithMD5AndDES", new String[] {"OID.1.2.840.113549.1.5.3", "1.2.840.113549.1.5.3", "PBE"}, new String[] {});
+    add("AlgorithmParameters", "PBEWithMD5AndDES", "com.sun.crypto.provider.PBEParameters", new String[] {"OID.1.2.840.113549.1.5.3", "1.2.840.113549.1.5.3", "PBE"}, new String[] {});
+    add("Cipher", "PBEWithSHA1AndDESede", "com.sun.crypto.provider.PBES1Core$PBEWithSHA1AndDESede", new String[] {"OID.1.2.840.113549.1.12.1.3", "1.2.840.113549.1.12.1.3"}, new String[] {});
+    add("SecretKeyFactory", "PBEWithSHA1AndDESede", "com.sun.crypto.provider.PBEKeyFactory$PBEWithSHA1AndDESede", new String[] {"OID.1.2.840.113549.1.12.1.3", "1.2.840.113549.1.12.1.3"}, new String[] {});
+    add("AlgorithmParameters", "PBEWithSHA1AndDESede", "com.sun.crypto.provider.PBEParameters", new String[] {"OID.1.2.840.113549.1.12.1.3", "1.2.840.113549.1.12.1.3"}, new String[] {});
+    add("Cipher", "PBEWithSHA1AndRC2_40", "com.sun.crypto.provider.PBES1Core$PBEWithSHA1AndRC2_40", new String[] {"OID.1.2.840.113549.1.12.1.6", "1.2.840.113549.1.12.1.6"}, new String[] {});
+    add("SecretKeyFactory", "PBEWithSHA1AndRC2_40", "com.sun.crypto.provider.PBEKeyFactory$PBEWithSHA1AndRC2_40", new String[] {"OID.1.2.840.113549.1.12.1.6", "1.2.840.113549.1.12.1.6"}, new String[] {});
+    add("AlgorithmParameters", "PBEWithSHA1AndRC2_40", "com.sun.crypto.provider.PBEParameters", new String[] {"OID.1.2.840.113549.1.12.1.6", "1.2.840.113549.1.12.1.6"}, new String[] {});
+    add("Cipher", "PBEWithSHA1AndRC2_128", "com.sun.crypto.provider.PBES1Core$PBEWithSHA1AndRC2_128", new String[] {"OID.1.2.840.113549.1.12.1.5", "1.2.840.113549.1.12.1.5"}, new String[] {});
+    add("SecretKeyFactory", "PBEWithSHA1AndRC2_128", "com.sun.crypto.provider.PBEKeyFactory$PBEWithSHA1AndRC2_128", new String[] {"OID.1.2.840.113549.1.12.1.5", "1.2.840.113549.1.12.1.5"}, new String[] {});
+    add("AlgorithmParameters", "PBEWithSHA1AndRC2_128", "com.sun.crypto.provider.PBEParameters", new String[] {"OID.1.2.840.113549.1.12.1.5", "1.2.840.113549.1.12.1.5"}, new String[] {});
+    add("Cipher", "PBEWithSHA1AndRC4_128", "com.sun.crypto.provider.PBES1Core$PBEWithSHA1AndRC4_128", new String[] {"OID.1.2.840.113549.1.12.1.1", "1.2.840.113549.1.12.1.1"}, new String[] {});
+    add("SecretKeyFactory", "PBEWithSHA1AndRC4_128", "com.sun.crypto.provider.PBEKeyFactory$PBEWithSHA1AndRC4_128", new String[] {"OID.1.2.840.113549.1.12.1.1", "1.2.840.113549.1.12.1.1"}, new String[] {});
+    add("AlgorithmParameters", "PBEWithSHA1AndRC4_128", "com.sun.crypto.provider.PBEParameters", new String[] {"OID.1.2.840.113549.1.12.1.1", "1.2.840.113549.1.12.1.1"}, new String[] {});
+    add("Cipher", "PBEWithSHA1AndRC4_40", "com.sun.crypto.provider.PBES1Core$PBEWithSHA1AndRC4_40", new String[] {"OID.1.2.840.113549.1.12.1.2", "1.2.840.113549.1.12.1.2"}, new String[] {});
+    add("SecretKeyFactory", "PBEWithSHA1AndRC4_40", "com.sun.crypto.provider.PBEKeyFactory$PBEWithSHA1AndRC4_40", new String[] {"OID.1.2.840.113549.1.12.1.2", "1.2.840.113549.1.12.1.2"}, new String[] {});
+    add("AlgorithmParameters", "PBEWithSHA1AndRC4_40", "com.sun.crypto.provider.PBEParameters", new String[] {"OID.1.2.840.113549.1.12.1.2", "1.2.840.113549.1.12.1.2"}, new String[] {});
+    add("Cipher", "PBEWithMD5AndTripleDES", "com.sun.crypto.provider.PBES1Core$PBEWithMD5AndTripleDES", new String[] {}, new String[] {});
+    add("SecretKeyFactory", "PBEWithMD5AndTripleDES", "com.sun.crypto.provider.PBEKeyFactory$PBEWithMD5AndTripleDES", new String[] {}, new String[] {});
+    add("AlgorithmParameters", "PBEWithMD5AndTripleDES", "com.sun.crypto.provider.PBEParameters", new String[] {}, new String[] {});
+    add("Cipher", "ARCFOUR", "com.sun.crypto.provider.ARCFOURCipher", new String[] {"OID.1.2.840.113549.3.4", "1.2.840.113549.3.4", "RC4"}, new String[] {"SupportedModes", "ECB", "SupportedPaddings", "NOPADDING", "SupportedKeyFormats", "RAW"});
+    add("KeyGenerator", "ARCFOUR", "com.sun.crypto.provider.KeyGeneratorCore$ARCFOURKeyGenerator", new String[] {"OID.1.2.840.113549.3.4", "1.2.840.113549.3.4", "RC4"}, new String[] {});
     add("Cipher", "PBEWithHmacSHA1AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA1AndAES_128", new String[] {},
         new String[] {"SupportedModes", "CBC", "SupportedPaddings", "PKCS5Padding", "SupportedKeyFormats", "RAW"});
     add("SecretKeyFactory", "PBEWithHmacSHA1AndAES_128", "com.sun.crypto.provider.PBES2KeyFactory$HmacSHA1AndAES_128", new String[] {},
