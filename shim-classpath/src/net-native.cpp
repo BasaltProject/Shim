@@ -98,6 +98,12 @@ const int kOptReusePort = 10;
 const int kOptMulticastTtl = 11;
 const int kOptMulticastLoop = 12;
 const int kOptMulticastIf = 13;
+const int kOptTcpKeepIdle = 14;
+const int kOptTcpKeepIntvl = 15;
+const int kOptTcpKeepCnt = 16;
+const int kOptTcpQuickAck = 17;
+const int kOptIncomingNapiId = 18;
+const int kOptDontFragment = 19;
 
 const jlong kV6Flag = static_cast<jlong>(1) << 40;
 const jlong kHandleMask = (static_cast<jlong>(1) << 40) - 1;
@@ -801,6 +807,31 @@ extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_setOption(JNIEnv* e, jclas
 #endif
     }
     break;
+#ifdef TCP_KEEPIDLE
+  case kOptTcpKeepIdle: level = IPPROTO_TCP; name = TCP_KEEPIDLE; break;
+#endif
+#ifdef TCP_KEEPINTVL
+  case kOptTcpKeepIntvl: level = IPPROTO_TCP; name = TCP_KEEPINTVL; break;
+#endif
+#ifdef TCP_KEEPCNT
+  case kOptTcpKeepCnt: level = IPPROTO_TCP; name = TCP_KEEPCNT; break;
+#endif
+#ifdef TCP_QUICKACK
+  case kOptTcpQuickAck: level = IPPROTO_TCP; name = TCP_QUICKACK; break;
+#endif
+#ifdef IP_MTU_DISCOVER
+  case kOptDontFragment:
+    if (handleV6(handle)) {
+      level = IPPROTO_IPV6;
+      name = IPV6_MTU_DISCOVER;
+      v = value ? IPV6_PMTUDISC_DO : IPV6_PMTUDISC_DONT;
+    } else {
+      level = IPPROTO_IP;
+      name = IP_MTU_DISCOVER;
+      v = value ? IP_PMTUDISC_DO : IP_PMTUDISC_DONT;
+    }
+    break;
+#endif
   case kOptLinger: {
     struct linger l;
     l.l_onoff = value >= 0 ? 1 : 0;
@@ -857,6 +888,34 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NetNative_getOption(JNIEnv* e, jclas
       break;
     }
     return 0;
+#ifdef TCP_KEEPIDLE
+  case kOptTcpKeepIdle: level = IPPROTO_TCP; name = TCP_KEEPIDLE; break;
+#endif
+#ifdef TCP_KEEPINTVL
+  case kOptTcpKeepIntvl: level = IPPROTO_TCP; name = TCP_KEEPINTVL; break;
+#endif
+#ifdef TCP_KEEPCNT
+  case kOptTcpKeepCnt: level = IPPROTO_TCP; name = TCP_KEEPCNT; break;
+#endif
+#ifdef TCP_QUICKACK
+  case kOptTcpQuickAck: level = IPPROTO_TCP; name = TCP_QUICKACK; break;
+#endif
+#ifdef SO_INCOMING_NAPI_ID
+  case kOptIncomingNapiId: name = SO_INCOMING_NAPI_ID; break;
+#endif
+#ifdef IP_MTU_DISCOVER
+  case kOptDontFragment: {
+    NetOptVal mode = 0;
+    NetLen modeLen = sizeof(mode);
+    bool v6 = handleV6(handle);
+    if (getsockopt(fd, v6 ? IPPROTO_IPV6 : IPPROTO_IP, v6 ? IPV6_MTU_DISCOVER : IP_MTU_DISCOVER,
+                   reinterpret_cast<char*>(&mode), &modeLen) != 0) {
+      throwForError(e, NET_ERRNO(), "getsockopt");
+      return 0;
+    }
+    return mode == (v6 ? IPV6_PMTUDISC_DO : IP_PMTUDISC_DO) ? 1 : 0;
+  }
+#endif
   case kOptLinger: {
     struct linger l;
     NetLen ll = sizeof(l);
@@ -1603,6 +1662,30 @@ extern "C" JNIEXPORT jboolean JNICALL Java_shim_NetNative_connectNbUnix(JNIEnv* 
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL Java_shim_NetNative_sockNameUnix(JNIEnv*, jclass, jlong, jboolean)
+{
+  return 0;
+}
+#endif
+
+#ifndef PLATFORM_WINDOWS
+extern "C" JNIEXPORT jlongArray JNICALL Java_shim_NetNative_peerCredentials(JNIEnv* e, jclass, jlong handle)
+{
+#ifdef SO_PEERCRED
+  struct ucred cred;
+  socklen_t len = sizeof(cred);
+  if (getsockopt(handleFd(handle), SOL_SOCKET, SO_PEERCRED, &cred, &len) != 0 || cred.pid == 0) {
+    return 0;
+  }
+  jlong values[2] = {static_cast<jlong>(cred.uid), static_cast<jlong>(cred.gid)};
+  jlongArray result = e->NewLongArray(2);
+  e->SetLongArrayRegion(result, 0, 2, values);
+  return result;
+#else
+  return 0;
+#endif
+}
+#else
+extern "C" JNIEXPORT jlongArray JNICALL Java_shim_NetNative_peerCredentials(JNIEnv*, jclass, jlong)
 {
   return 0;
 }

@@ -59,18 +59,30 @@ final class AsynchronousSocketChannelImpl extends AsynchronousSocketChannel {
 
   @Override
   public <T> AsynchronousSocketChannel setOption(SocketOption<T> name, T value) throws IOException {
+    if (name == null) {
+      throw new NullPointerException();
+    }
+    if (!supportedOptions().contains(name)) {
+      throw new UnsupportedOperationException("'" + name + "' not supported");
+    }
     channel.setOption(name, value);
     return this;
   }
 
   @Override
   public <T> T getOption(SocketOption<T> name) throws IOException {
+    if (name == null) {
+      throw new NullPointerException();
+    }
+    if (!supportedOptions().contains(name)) {
+      throw new UnsupportedOperationException("'" + name + "' not supported");
+    }
     return channel.getOption(name);
   }
 
   @Override
   public Set<SocketOption<?>> supportedOptions() {
-    return channel.supportedOptions();
+    return shim.SocketOptionSupport.supported(shim.SocketOptionSupport.kAsyncClient);
   }
 
   @Override

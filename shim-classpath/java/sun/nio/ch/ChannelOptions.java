@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.Set;
 import shim.NetHandle;
 import shim.NetNative;
+import shim.SocketOptionSupport;
 
 final class ChannelOptions {
   static final int kStream = 0;
@@ -28,34 +29,18 @@ final class ChannelOptions {
   private ChannelOptions() { }
 
   static Set<SocketOption<?>> supported(int kind) {
-    Set<SocketOption<?>> options = new HashSet<SocketOption<?>>();
-    if (kind == kUnixStream || kind == kUnixServer) {
-      options.add(StandardSocketOptions.SO_RCVBUF);
-      if (kind == kUnixStream) {
-        options.add(StandardSocketOptions.SO_SNDBUF);
-        options.add(StandardSocketOptions.SO_LINGER);
-      }
-      return Collections.unmodifiableSet(options);
+    switch (kind) {
+    case kStream:
+      return SocketOptionSupport.supported(SocketOptionSupport.kChannelClient);
+    case kServer:
+      return SocketOptionSupport.supported(SocketOptionSupport.kChannelServer);
+    case kDatagram:
+      return SocketOptionSupport.supported(SocketOptionSupport.kUdp);
+    case kUnixStream:
+      return SocketOptionSupport.supported(SocketOptionSupport.kUnixClient);
+    default:
+      return SocketOptionSupport.supported(SocketOptionSupport.kUnixServer);
     }
-    options.add(StandardSocketOptions.SO_RCVBUF);
-    options.add(StandardSocketOptions.SO_REUSEADDR);
-    options.add(StandardSocketOptions.SO_REUSEPORT);
-    if (kind != kServer) {
-      options.add(StandardSocketOptions.SO_SNDBUF);
-      options.add(StandardSocketOptions.IP_TOS);
-    }
-    if (kind == kStream) {
-      options.add(StandardSocketOptions.SO_KEEPALIVE);
-      options.add(StandardSocketOptions.SO_LINGER);
-      options.add(StandardSocketOptions.TCP_NODELAY);
-    }
-    if (kind == kDatagram) {
-      options.add(StandardSocketOptions.SO_BROADCAST);
-      options.add(StandardSocketOptions.IP_MULTICAST_TTL);
-      options.add(StandardSocketOptions.IP_MULTICAST_LOOP);
-      options.add(StandardSocketOptions.IP_MULTICAST_IF);
-    }
-    return Collections.unmodifiableSet(options);
   }
 
   private static int code(SocketOption<?> name) {
@@ -71,6 +56,7 @@ final class ChannelOptions {
     if (name == StandardSocketOptions.IP_MULTICAST_TTL) return NetNative.OPT_MULTICAST_TTL;
     if (name == StandardSocketOptions.IP_MULTICAST_LOOP) return NetNative.OPT_MULTICAST_LOOP;
     if (name == StandardSocketOptions.IP_MULTICAST_IF) return NetNative.OPT_MULTICAST_IF;
+    if (name == SocketOptionSupport.OOBINLINE) return NetNative.OPT_OOBINLINE;
     return -1;
   }
 
@@ -80,6 +66,10 @@ final class ChannelOptions {
     }
     if (value == null || !name.type().isInstance(value)) {
       throw new IllegalArgumentException("Invalid value '" + value + "'");
+    }
+    if (SocketOptionSupport.isExtended(name)) {
+      SocketOptionSupport.setExtended(net, name, value);
+      return;
     }
     int v;
     if (value instanceof Boolean) {
@@ -112,6 +102,9 @@ final class ChannelOptions {
   static <T> T get(NetHandle net, SocketOption<T> name, int kind) throws IOException {
     if (!supported(kind).contains(name)) {
       throw new UnsupportedOperationException("'" + name + "' not supported");
+    }
+    if (SocketOptionSupport.isExtended(name)) {
+      return SocketOptionSupport.getExtended(net, name);
     }
     long h = net.begin();
     try {

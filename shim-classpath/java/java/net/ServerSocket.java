@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Set;
 import shim.NetHandle;
 import shim.NetNative;
+import shim.SocketOptionSupport;
 
 public class ServerSocket implements Closeable {
   private final NetHandle net = new NetHandle(false);
@@ -250,6 +251,15 @@ public class ServerSocket implements Closeable {
       setReuseAddress((Boolean) value);
     } else if (name == StandardSocketOptions.SO_REUSEPORT) {
       setIntOption(NetNative.OPT_REUSEPORT, ((Boolean) value) ? 1 : 0);
+    } else if (name == StandardSocketOptions.IP_TOS) {
+      int tos = (Integer) value;
+      if (tos < 0 || tos > 255) {
+        throw new IllegalArgumentException("Invalid IP_TOS value");
+      }
+      setIntOption(NetNative.OPT_TOS, tos);
+    } else if (SocketOptionSupport.supported(SocketOptionSupport.kTcpServer).contains(name)
+        && SocketOptionSupport.isExtended(name)) {
+      SocketOptionSupport.setExtended(net, name, value);
     } else {
       throw new UnsupportedOperationException("'" + name + "' not supported");
     }
@@ -271,14 +281,17 @@ public class ServerSocket implements Closeable {
     } else if (name == StandardSocketOptions.SO_REUSEPORT) {
       return (T) Boolean.valueOf(getIntOption(NetNative.OPT_REUSEPORT) != 0);
     }
+    if (name == StandardSocketOptions.IP_TOS) {
+      return (T) Integer.valueOf(getIntOption(NetNative.OPT_TOS));
+    }
+    if (SocketOptionSupport.supported(SocketOptionSupport.kTcpServer).contains(name)
+        && SocketOptionSupport.isExtended(name)) {
+      return SocketOptionSupport.getExtended(net, name);
+    }
     throw new UnsupportedOperationException("'" + name + "' not supported");
   }
 
   public Set<SocketOption<?>> supportedOptions() {
-    Set<SocketOption<?>> options = new HashSet<SocketOption<?>>();
-    options.add(StandardSocketOptions.SO_RCVBUF);
-    options.add(StandardSocketOptions.SO_REUSEADDR);
-    options.add(StandardSocketOptions.SO_REUSEPORT);
-    return Collections.unmodifiableSet(options);
+    return SocketOptionSupport.supported(SocketOptionSupport.kTcpServer);
   }
 }

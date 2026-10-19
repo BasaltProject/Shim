@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Set;
 import shim.NetHandle;
 import shim.NetNative;
+import shim.SocketOptionSupport;
 
 public class DatagramSocket implements Closeable {
   private final NetHandle net = new NetHandle(true);
@@ -429,6 +430,9 @@ public class DatagramSocket implements Closeable {
         throw new IllegalArgumentException("Invalid null network interface");
       }
       setIntOption(NetNative.OPT_MULTICAST_IF, nif.getIndex());
+    } else if (SocketOptionSupport.supported(SocketOptionSupport.kUdp).contains(name)
+        && SocketOptionSupport.isExtended(name)) {
+      SocketOptionSupport.setExtended(net, name, value);
     } else {
       throw new UnsupportedOperationException("'" + name + "' not supported");
     }
@@ -462,21 +466,15 @@ public class DatagramSocket implements Closeable {
     } else if (name == StandardSocketOptions.IP_MULTICAST_IF) {
       return (T) NetworkInterface.getByIndex(getIntOption(NetNative.OPT_MULTICAST_IF));
     }
+    if (SocketOptionSupport.supported(SocketOptionSupport.kUdp).contains(name)
+        && SocketOptionSupport.isExtended(name)) {
+      return SocketOptionSupport.getExtended(net, name);
+    }
     throw new UnsupportedOperationException("'" + name + "' not supported");
   }
 
   public Set<SocketOption<?>> supportedOptions() {
-    Set<SocketOption<?>> options = new HashSet<SocketOption<?>>();
-    options.add(StandardSocketOptions.SO_SNDBUF);
-    options.add(StandardSocketOptions.SO_RCVBUF);
-    options.add(StandardSocketOptions.SO_REUSEADDR);
-    options.add(StandardSocketOptions.SO_REUSEPORT);
-    options.add(StandardSocketOptions.SO_BROADCAST);
-    options.add(StandardSocketOptions.IP_TOS);
-    options.add(StandardSocketOptions.IP_MULTICAST_TTL);
-    options.add(StandardSocketOptions.IP_MULTICAST_LOOP);
-    options.add(StandardSocketOptions.IP_MULTICAST_IF);
-    return Collections.unmodifiableSet(options);
+    return SocketOptionSupport.supported(SocketOptionSupport.kUdp);
   }
 
   public void joinGroup(SocketAddress mcastaddr, NetworkInterface netIf) throws IOException {
