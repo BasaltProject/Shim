@@ -19,6 +19,7 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.net.SocketOption;
 import java.net.StandardSocketOptions;
+import java.net.UnixDomainSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AlreadyBoundException;
@@ -39,7 +40,10 @@ import shim.NetHandle;
 import shim.NetNative;
 
 final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasHandle {
-  private final NetHandle net = new NetHandle(false);
+  private final NetHandle net;
+  private final boolean unix;
+  private UnixDomainSocketAddress unixRemote;
+  private UnixDomainSocketAddress unixLocal;
   private final Object stateLock = new Object();
   private boolean connected;
   private boolean pending;
@@ -51,13 +55,62 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
   private Socket adaptor;
 
   SocketChannelImpl(SelectorProvider provider) throws IOException {
+    this(provider, false);
+  }
+
+  SocketChannelImpl(SelectorProvider provider, boolean unix) throws IOException {
     super(provider);
+    this.unix = unix;
+    this.net = new NetHandle(false, unix);
     net.begin();
     net.end();
   }
 
+  SocketChannelImpl(SelectorProvider provider, long handle, boolean unix) throws IOException {
+    super(provider);
+    this.unix = unix;
+    this.net = new NetHandle(false, unix);
+    net.adopt(handle);
+    connected = true;
+    bound = true;
+    unixRemote = unixName(true);
+    unixLocal = unixName(false);
+  }
+
+  private UnixDomainSocketAddress unixName(boolean peer) {
+    try {
+      long h = net.begin();
+      try {
+        byte[] raw = NetNative.sockNameUnix(h, peer);
+        String path = raw == null ? "" : new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        return UnixDomainSocketAddress.of(path);
+      } finally {
+        net.end();
+      }
+    } catch (IOException e) {
+      return UnixDomainSocketAddress.of("");
+    }
+  }
+
+  static byte[] unixPathBytes(SocketAddress sa) {
+    if (sa == null) {
+      throw new NullPointerException();
+    }
+    if (!(sa instanceof UnixDomainSocketAddress)) {
+      throw new UnsupportedAddressTypeException();
+    }
+    return ((UnixDomainSocketAddress) sa).getPath().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+  }
+
+  static String autobindPath() {
+    String tmp = System.getProperty("java.io.tmpdir", "/tmp");
+    return tmp + "/socket_" + Math.abs(new java.util.Random().nextInt());
+  }
+
   SocketChannelImpl(SelectorProvider provider, long handle, byte[] peer, int peerPort) throws IOException {
     super(provider);
+    this.unix = false;
+    this.net = new NetHandle(false);
     net.adopt(handle);
     connected = true;
     bound = true;
@@ -113,6 +166,19 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
       if (bound) {
         throw new AlreadyBoundException();
       }
+      if (unix) {
+        byte[] path = addr == null ? autobindPath().getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            : unixPathBytes(addr);
+        long h = net.begin();
+        try {
+          NetNative.bindUnix(h, path);
+        } finally {
+          net.end();
+        }
+        bound = true;
+        unixLocal = unixName(false);
+        return this;
+      }
       InetSocketAddress isa = addr == null ? new InetSocketAddress(0) : checkAddress(addr);
       long h = net.begin();
       try {
@@ -146,7 +212,7 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
       throw new NullPointerException();
     }
     ensureOpen();
-    ChannelOptions.set(net, name, value, ChannelOptions.kStream);
+    ChannelOptions.set(net, name, value, unix ? ChannelOptions.kUnixStream : ChannelOptions.kStream);
     return this;
   }
 
@@ -156,12 +222,12 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
       throw new NullPointerException();
     }
     ensureOpen();
-    return ChannelOptions.get(net, name, ChannelOptions.kStream);
+    return ChannelOptions.get(net, name, unix ? ChannelOptions.kUnixStream : ChannelOptions.kStream);
   }
 
   @Override
   public Set<SocketOption<?>> supportedOptions() {
-    return ChannelOptions.supported(ChannelOptions.kStream);
+    return ChannelOptions.supported(unix ? ChannelOptions.kUnixStream : ChannelOptions.kStream);
   }
 
   @Override
@@ -206,6 +272,9 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
 
   @Override
   public Socket socket() {
+    if (unix) {
+      throw new UnsupportedOperationException("Not supported");
+    }
     synchronized (stateLock) {
       if (adaptor == null) {
         adaptor = new SocketAdaptor(this);
@@ -230,6 +299,9 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
 
   @Override
   public boolean connect(SocketAddress sa) throws IOException {
+    if (unix) {
+      return connectUnix(sa);
+    }
     InetSocketAddress isa = checkAddress(sa);
     synchronized (stateLock) {
       ensureOpen();
@@ -273,6 +345,45 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
     }
   }
 
+  private boolean connectUnix(SocketAddress sa) throws IOException {
+    byte[] path = unixPathBytes(sa);
+    synchronized (stateLock) {
+      ensureOpen();
+      if (connected) {
+        throw new AlreadyConnectedException();
+      }
+      if (pending) {
+        throw new ConnectionPendingException();
+      }
+      long h = net.begin();
+      try {
+        boolean done;
+        if (isBlocking()) {
+          NetNative.connectUnix(h, path);
+          done = true;
+        } else {
+          done = NetNative.connectNbUnix(h, path);
+        }
+        unixRemote = (UnixDomainSocketAddress) sa;
+        bound = true;
+        if (done) {
+          connected = true;
+        } else {
+          pending = true;
+        }
+        unixLocal = unixName(false);
+        return done;
+      } catch (IOException e) {
+        try {
+          close();
+        } catch (IOException ignore) { }
+        throw e;
+      } finally {
+        net.end();
+      }
+    }
+  }
+
   @Override
   public boolean finishConnect() throws IOException {
     synchronized (stateLock) {
@@ -289,7 +400,11 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
         if (done) {
           connected = true;
           pending = false;
-          refreshLocal();
+          if (unix) {
+            unixLocal = unixName(false);
+          } else {
+            refreshLocal();
+          }
         }
         return done;
       } catch (IOException e) {
@@ -307,7 +422,7 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
   public SocketAddress getRemoteAddress() throws IOException {
     synchronized (stateLock) {
       ensureOpen();
-      return connected ? remote : null;
+      return connected ? (unix ? unixRemote : remote) : null;
     }
   }
 
@@ -315,7 +430,7 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
   public SocketAddress getLocalAddress() throws IOException {
     synchronized (stateLock) {
       ensureOpen();
-      return bound ? local : null;
+      return bound ? (unix ? unixLocal : local) : null;
     }
   }
 
@@ -467,11 +582,13 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
         } else {
           sb.append("unconnected");
         }
-        if (local != null) {
-          sb.append(" local=").append(local);
+        Object shownLocal = unix ? unixLocal : local;
+        Object shownRemote = unix ? unixRemote : remote;
+        if (shownLocal != null) {
+          sb.append(" local=").append(shownLocal);
         }
-        if (remote != null && connected) {
-          sb.append(" remote=").append(remote);
+        if (shownRemote != null && connected) {
+          sb.append(" remote=").append(shownRemote);
         }
       }
     }

@@ -83,4 +83,88 @@ public class MulticastSocket extends DatagramSocket {
       throw new SocketException(e.getMessage());
     }
   }
+
+  public void setInterface(InetAddress inf) throws SocketException {
+    if (isClosed()) {
+      throw new SocketException("Socket is closed");
+    }
+    if (inf == null) {
+      throw new SocketException("bad argument for IP_MULTICAST_IF: address null or not bound to any interface");
+    }
+    NetworkInterface ni = NetworkInterface.getByInetAddress(inf);
+    if (ni == null) {
+      throw new SocketException("bad argument for IP_MULTICAST_IF: address not bound to any interface");
+    }
+    try {
+      setOption(StandardSocketOptions.IP_MULTICAST_IF, ni);
+    } catch (SocketException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new SocketException(e.getMessage());
+    }
+  }
+
+  public InetAddress getInterface() throws SocketException {
+    if (isClosed()) {
+      throw new SocketException("Socket is closed");
+    }
+    try {
+      NetworkInterface ni = getOption(StandardSocketOptions.IP_MULTICAST_IF);
+      if (ni != null) {
+        java.util.Enumeration<InetAddress> addrs = ni.getInetAddresses();
+        if (addrs.hasMoreElements()) {
+          return addrs.nextElement();
+        }
+      }
+      return InetAddress.anyLocalAddress();
+    } catch (SocketException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new SocketException(e.getMessage());
+    }
+  }
+
+  public void setNetworkInterface(NetworkInterface netIf) throws SocketException {
+    if (isClosed()) {
+      throw new SocketException("Socket is closed");
+    }
+    try {
+      setOption(StandardSocketOptions.IP_MULTICAST_IF, netIf);
+    } catch (SocketException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new SocketException(e.getMessage());
+    }
+  }
+
+  public NetworkInterface getNetworkInterface() throws SocketException {
+    if (isClosed()) {
+      throw new SocketException("Socket is closed");
+    }
+    try {
+      NetworkInterface ni = getOption(StandardSocketOptions.IP_MULTICAST_IF);
+      if (ni == null) {
+        return NetworkInterface.anyInterface();
+      }
+      return ni;
+    } catch (SocketException e) {
+      throw e;
+    } catch (IOException e) {
+      throw new SocketException(e.getMessage());
+    }
+  }
+
+  @Deprecated
+  public void send(DatagramPacket p, byte ttl) throws IOException {
+    if (isClosed()) {
+      throw new SocketException("Socket is closed");
+    }
+    int previous = getTimeToLive();
+    try {
+      setTimeToLive(ttl & 0xff);
+      send(p);
+    } finally {
+      setTimeToLive(previous);
+    }
+  }
 }

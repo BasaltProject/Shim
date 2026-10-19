@@ -41,6 +41,16 @@ public abstract class SelectorProvider {
 
   public abstract SocketChannel openSocketChannel() throws IOException;
 
+  public SocketChannel openSocketChannel(ProtocolFamily family) throws IOException {
+    java.util.Objects.requireNonNull(family);
+    throw new UnsupportedOperationException("Protocol family not supported");
+  }
+
+  public ServerSocketChannel openServerSocketChannel(ProtocolFamily family) throws IOException {
+    java.util.Objects.requireNonNull(family);
+    throw new UnsupportedOperationException("Protocol family not supported");
+  }
+
   public java.nio.channels.Channel inheritedChannel() throws IOException {
     return null;
   }

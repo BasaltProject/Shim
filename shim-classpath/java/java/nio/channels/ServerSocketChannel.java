@@ -20,6 +20,10 @@ public abstract class ServerSocketChannel extends AbstractSelectableChannel impl
     super(provider);
   }
 
+  public static ServerSocketChannel open(java.net.ProtocolFamily family) throws IOException {
+    return SelectorProvider.provider().openServerSocketChannel(family);
+  }
+
   public static ServerSocketChannel open() throws IOException {
     return SelectorProvider.provider().openServerSocketChannel();
   }

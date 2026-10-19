@@ -26,6 +26,10 @@ public abstract class SocketChannel extends AbstractSelectableChannel implements
     return SelectorProvider.provider().openSocketChannel();
   }
 
+  public static SocketChannel open(java.net.ProtocolFamily family) throws IOException {
+    return SelectorProvider.provider().openSocketChannel(family);
+  }
+
   public static SocketChannel open(SocketAddress remote) throws IOException {
     SocketChannel sc = open();
     try {

@@ -23,4 +23,6 @@
 
 package java.net;
 
-public interface ProtocolFamily { }
+public interface ProtocolFamily {
+  String name();
+}

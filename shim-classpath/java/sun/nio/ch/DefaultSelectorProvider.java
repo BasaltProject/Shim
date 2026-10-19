@@ -56,4 +56,28 @@ public class DefaultSelectorProvider extends SelectorProvider {
   public SocketChannel openSocketChannel() throws IOException {
     return new SocketChannelImpl(this);
   }
+
+  @Override
+  public SocketChannel openSocketChannel(ProtocolFamily family) throws IOException {
+    java.util.Objects.requireNonNull(family);
+    if (family == StandardProtocolFamily.UNIX) {
+      return new SocketChannelImpl(this, true);
+    }
+    if (family != StandardProtocolFamily.INET && family != StandardProtocolFamily.INET6) {
+      throw new UnsupportedOperationException("Protocol family not supported");
+    }
+    return new SocketChannelImpl(this);
+  }
+
+  @Override
+  public ServerSocketChannel openServerSocketChannel(ProtocolFamily family) throws IOException {
+    java.util.Objects.requireNonNull(family);
+    if (family == StandardProtocolFamily.UNIX) {
+      return new ServerSocketChannelImpl(this, true);
+    }
+    if (family != StandardProtocolFamily.INET && family != StandardProtocolFamily.INET6) {
+      throw new UnsupportedOperationException("Protocol family not supported");
+    }
+    return new ServerSocketChannelImpl(this);
+  }
 }

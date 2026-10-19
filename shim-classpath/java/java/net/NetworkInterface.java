@@ -29,6 +29,13 @@ public final class NetworkInterface {
     this.hardware = hardware;
   }
 
+  static NetworkInterface anyInterface() {
+    InetAddress any = InetAddress.anyLocalAddress();
+    NetworkInterface dummy = new NetworkInterface(any.getHostName(), 0, 0, null);
+    dummy.addresses.add(new InterfaceAddress(any, null, (short) 0));
+    return dummy;
+  }
+
   private static List<NetworkInterface> snapshot() throws SocketException {
     NetNative.init();
     Object[] data = NetNative.interfaces();
