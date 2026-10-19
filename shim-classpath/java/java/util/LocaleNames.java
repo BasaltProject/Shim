@@ -11,52 +11,8 @@ package java.util;
 final class LocaleNames {
   private LocaleNames() { }
 
-  private static final Map<String, Map<String, String>> kTables = new HashMap<String, Map<String, String>>();
-
-  private static synchronized Map<String, String> load(String tag) {
-    Map<String, String> table = kTables.get(tag);
-    if (table != null) {
-      return table;
-    }
-    table = new HashMap<String, String>();
-    String[] chunks = LocaleDisplayData.lines(tag);
-    if (chunks != null) {
-      for (String chunk : chunks) {
-        int from = 0;
-        while (from < chunk.length()) {
-          int end = chunk.indexOf('\n', from);
-          if (end < 0) {
-            end = chunk.length();
-          }
-          int eq = chunk.indexOf('=', from);
-          if (eq > from && eq < end) {
-            table.put(chunk.substring(from, eq), chunk.substring(eq + 1, end));
-          }
-          from = end + 1;
-        }
-      }
-    }
-    kTables.put(tag, table);
-    return table;
-  }
-
-  private static Map<String, String> table(Locale in) {
-    String lang = in.getLanguage();
-    String tag = lang;
-    if (lang.equals("zh")) {
-      String region = in.getCountry();
-      boolean traditional = in.getScript().equals("Hant")
-          || (in.getScript().isEmpty() && (region.equals("TW") || region.equals("HK") || region.equals("MO")));
-      tag = traditional ? "zh-Hant" : "zh";
-    }
-    boolean known = false;
-    for (String t : LocaleDisplayData.kTags) {
-      if (t.equals(tag)) {
-        known = true;
-        break;
-      }
-    }
-    return load(known ? tag : "en");
+  private static String get(Locale in, String key) {
+    return shim.LocaleDb.names().get(in, key);
   }
 
   static String language(Locale l, Locale in) {
@@ -64,11 +20,10 @@ final class LocaleNames {
     if (code.isEmpty()) {
       return "";
     }
-    Map<String, String> t = table(in);
-    String name = t.get("L" + code);
+    String name = get(in, "n.L." + code);
     if (name == null && code.length() == 3) {
       String two = Locale.languageForIso3(code);
-      name = two == null ? null : t.get("L" + two);
+      name = two == null ? null : get(in, "n.L." + two);
     }
     return name != null ? name : code;
   }
@@ -78,7 +33,7 @@ final class LocaleNames {
     if (code.isEmpty()) {
       return "";
     }
-    String name = table(in).get("S" + code);
+    String name = get(in, "n.S." + code);
     return name != null ? name : code;
   }
 
@@ -87,73 +42,66 @@ final class LocaleNames {
     if (code.isEmpty()) {
       return "";
     }
-    Map<String, String> t = table(in);
-    String name = t.get("R" + code);
+    String name = get(in, "n.R." + code);
     if (name == null && code.length() == 3 && !LocaleTags.isDigits(code)) {
       String two = Locale.countryForIso3(code);
-      name = two == null ? null : t.get("R" + two);
+      name = two == null ? null : get(in, "n.R." + two);
     }
     return name != null ? name : code;
   }
 
-  private static String compose(Map<String, String> t, String a, String b) {
-    String pattern = t.get("PListCompositionPattern");
-    if (pattern == null) {
-      pattern = "{0}, {1}";
-    }
-    return pattern.replace("{0}", a).replace("{1}", b);
+  private static String[] patterns(Locale in) {
+    String[] parts = shim.LocaleDb.names().list(in, "n.P");
+    return parts != null && parts.length == 4 ? parts : new String[] {"", " (", ")", ", "};
   }
 
-  private static List<String> variantNames(Locale l, Map<String, String> t) {
+  private static String compose(Locale in, String a, String b) {
+    return a + patterns(in)[3] + b;
+  }
+
+  private static List<String> variantNames(Locale l, Locale in) {
     List<String> names = new ArrayList<String>();
     String variant = l.getVariant();
     if (!variant.isEmpty()) {
       for (String piece : variant.split("_", -1)) {
-        String name = t.get("V" + piece);
+        String name = get(in, "n.V." + piece);
         names.add(name != null ? name : piece);
       }
     }
     return names;
   }
 
-  static String currency(String code, Locale in) {
-    return table(in).get("C" + code);
-  }
-
   static String variant(Locale l, Locale in) {
-    Map<String, String> t = table(in);
     String result = null;
-    for (String name : variantNames(l, t)) {
-      result = result == null ? name : compose(t, result, name);
+    for (String name : variantNames(l, in)) {
+      result = result == null ? name : compose(in, result, name);
     }
     return result == null ? "" : result;
   }
 
-  private static String keywordName(Map<String, String> t, String key, String type, Locale in) {
-    String keyName = t.get("K" + key);
+  private static String keywordName(String key, String type, Locale in) {
     if (key.equals("cu") && !type.isEmpty()) {
-      String currency = t.get("C" + LocaleTags.upper(type));
+      String[] currency = shim.LocaleDb.currency().list(in, "c." + LocaleTags.upper(type));
       if (currency != null) {
-        return pattern(t, keyName != null ? keyName : key, currency);
+        return typed(in, key, currency[1]);
       }
     }
-    String typeName = type.isEmpty() ? null : t.get("T" + key + "." + type);
+    String typeName = type.isEmpty() ? null : get(in, "n.T." + key + "." + type);
     if (typeName != null) {
       return typeName;
     }
-    return pattern(t, keyName != null ? keyName : key, type);
+    return typed(in, key, type);
   }
 
-  private static String pattern(Map<String, String> t, String key, String type) {
-    String pattern = t.get("PListKeyTypePattern");
-    if (pattern == null) {
-      pattern = "{0}: {1}";
+  private static String typed(Locale in, String key, String type) {
+    String template = get(in, "n.K." + key);
+    if (template == null) {
+      return key + ": " + type;
     }
-    return pattern.replace("{0}", key).replace("{1}", type);
+    return template.replace("zzzz", type);
   }
 
   static String name(Locale l, Locale in) {
-    Map<String, String> t = table(in);
     if (l.getLanguage().isEmpty() && l.getScript().isEmpty() && l.getCountry().isEmpty()
         && l.getVariant().isEmpty()) {
       return "";
@@ -168,13 +116,16 @@ final class LocaleNames {
     if (!l.getCountry().isEmpty()) {
       parts.add(country(l, in));
     }
-    parts.addAll(variantNames(l, t));
+    parts.addAll(variantNames(l, in));
     LocaleExtensions ext = l.extensions();
     if (ext != null) {
       parts.addAll(ext.attributes);
       for (Map.Entry<String, String> kw : ext.keywords.entrySet()) {
-        parts.add(keywordName(t, kw.getKey(), kw.getValue(), in));
+        parts.add(keywordName(kw.getKey(), kw.getValue(), in));
       }
+    }
+    if (parts.isEmpty()) {
+      return "";
     }
     String main = parts.get(0);
     if (parts.size() == 1) {
@@ -182,18 +133,9 @@ final class LocaleNames {
     }
     String qualifiers = parts.get(1);
     for (int i = 2; i < parts.size(); i++) {
-      qualifiers = compose(t, qualifiers, parts.get(i));
+      qualifiers = compose(in, qualifiers, parts.get(i));
     }
-    String pattern = t.get("PDisplayNamePattern");
-    String template = "{1} ({2})";
-    if (pattern != null) {
-      int two = pattern.indexOf("2#");
-      if (two >= 0) {
-        template = pattern.substring(two + 2, pattern.lastIndexOf('}'));
-      } else {
-        template = pattern;
-      }
-    }
-    return template.replace("{1}", main).replace("{2}", qualifiers);
+    String[] pattern = patterns(in);
+    return pattern[0] + main + pattern[1] + qualifiers + pattern[2];
   }
 }
