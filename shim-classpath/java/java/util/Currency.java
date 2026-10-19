@@ -100,11 +100,9 @@ public final class Currency implements Serializable {
   }
 
   public String getSymbol(Locale locale) {
-    if (currencyCode.equals("USD") && !"US".equals(locale.getCountry()) && !locale.getCountry().isEmpty()
-        && !locale.getLanguage().equals("en")) {
-      return "$";
-    }
-    return symbol;
+    Objects.requireNonNull(locale, "locale");
+    String[] entry = shim.LocaleDb.currency().list(locale, "c." + currencyCode);
+    return entry != null ? entry[0] : currencyCode;
   }
 
   public int getDefaultFractionDigits() {
@@ -132,8 +130,9 @@ public final class Currency implements Serializable {
   }
 
   public String getDisplayName(Locale locale) {
-    String name = LocaleNames.currency(currencyCode, Objects.requireNonNull(locale));
-    return name != null ? name : displayName;
+    Objects.requireNonNull(locale, "locale");
+    String[] entry = shim.LocaleDb.currency().list(locale, "c." + currencyCode);
+    return entry != null ? entry[1] : currencyCode;
   }
 
   @Override

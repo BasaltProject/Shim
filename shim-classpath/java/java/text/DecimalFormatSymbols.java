@@ -98,6 +98,9 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
       found = null;
     }
     setCurrency(found != null ? found : Currency.getInstance("XXX"));
+    if (found == null) {
+      this.currencySymbol = "\u00a4";
+    }
   }
 
   private char monetaryGroupingSeparator;
