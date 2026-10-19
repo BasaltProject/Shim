@@ -142,6 +142,7 @@ void usageAndExit(const char* name)
       "\t[-Xbootclasspath/p:<classpath to prepend to bootstrap classpath>]\n"
       "\t[-Xbootclasspath:<bootstrap classpath>]\n"
       "\t[-Xbootclasspath/a:<classpath to append to bootstrap classpath>]\n"
+      "\t[--enable-preview]\n"
       "\t[-D<property name>=<property value> ...]\n"
       "\t{<class name>|-jar <app jar>} [<argument> ...]\n",
       name);
@@ -173,6 +174,8 @@ int main(int ac, const char** av)
         usageAndExit(av[0]);
       jar = av[++i];
     } else if (strncmp(av[i], "-X", 2) == 0 or strncmp(av[i], "-D", 2) == 0) {
+      ++vmArgs.nOptions;
+    } else if (strcmp(av[i], "--enable-preview") == 0) {
       ++vmArgs.nOptions;
     } else if (strcmp(av[i], "-client") == 0 or strcmp(av[i], "-server") == 0) {
       // ignore
@@ -258,6 +261,8 @@ int main(int ac, const char** av)
   for (int i = 1; i < ac; ++i) {
     if (strncmp(av[i], "-X", 2) == 0 or strncmp(av[i], "-D", 2) == 0) {
       vmArgs.options[optionIndex++].optionString = const_cast<char*>(av[i]);
+    } else if (strcmp(av[i], "--enable-preview") == 0) {
+      vmArgs.options[optionIndex++].optionString = const_cast<char*>("-Xenable-preview");
     }
   }
 

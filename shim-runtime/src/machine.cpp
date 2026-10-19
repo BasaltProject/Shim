@@ -4098,6 +4098,8 @@ void updatePackageMap(Thread* t, GcClass* class_)
 
 namespace vm {
 
+bool previewEnabled = false;
+
 Machine::Machine(System* system,
                  Heap* heap,
                  Finder* bootFinder,
@@ -5286,7 +5288,7 @@ GcClass* parseClass(Thread* t,
     throwNew(t, GcUnsupportedClassVersionError::Type,
              "Unsupported class file version %u.%u (maximum 69.0)", majorVer, minorVer);
   }
-  if (majorVer >= 56 and minorVer != 0) {
+  if (majorVer >= 56 and minorVer != 0 and not(previewEnabled and minorVer == 65535 and majorVer == 69)) {
     throwNew(t, GcUnsupportedClassVersionError::Type,
              minorVer == 65535 ? "Preview class files are not enabled (%u.%u)"
                               : "Unsupported class file minor version %u.%u",
