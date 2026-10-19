@@ -136,23 +136,26 @@ jint JNICALL DestroyJavaVM(Machine* m)
 
 jint JNICALL GetEnv(Machine* m, Thread** t, jint version)
 {
-  *t = static_cast<Thread*>(m->localThread->get());
-  if (*t) {
-    if (version <= JNI_VERSION_1_6) {
-      return SHIM_JNI_OK;
-    } else {
-      return SHIM_JNI_EVERSION;
-    }
-  } else {
-    return SHIM_JNI_EDETACHED;
+  *t = 0;
+  switch (version) {
+  case 0x00010001:
+  case 0x00010002:
+  case 0x00010004:
+  case JNI_VERSION_1_6:
+  case JNI_VERSION_1_8:
+    break;
+  default:
+    return SHIM_JNI_EVERSION;
   }
+  *t = static_cast<Thread*>(m->localThread->get());
+  return *t ? SHIM_JNI_OK : SHIM_JNI_EDETACHED;
 }
 
 jint JNICALL GetVersion(Thread* t)
 {
   ENTER(t, Thread::ActiveState);
 
-  return JNI_VERSION_1_6;
+  return JNI_VERSION_1_8;
 }
 
 jsize JNICALL GetStringLength(Thread* t, jstring s)

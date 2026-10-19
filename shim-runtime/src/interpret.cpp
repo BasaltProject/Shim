@@ -635,10 +635,13 @@ unsigned invokeNative(Thread* t, GcMethod* method)
   resolveNative(t, method);
 
   GcNative* native = getMethodRuntimeData(t, method)->native();
+  PROTECT(t, native);
   if (native->fast()) {
     pushFrame(t, method);
 
     uint64_t result;
+    object referenceResult = 0;
+    PROTECT(t, referenceResult);
     {
       THREAD_RESOURCE0(t, popFrame(static_cast<Thread*>(t)));
 
@@ -663,8 +666,14 @@ unsigned invokeNative(Thread* t, GcMethod* method)
         reinterpret_cast<FastVoidNativeFunction>(native->function())(
           t, method, RUNTIME_ARRAY_BODY(args));
       }
+      if (method->returnCode() == ObjectField) {
+        referenceResult = reinterpret_cast<object>(result);
+      }
     }
 
+    if (method->returnCode() == ObjectField) {
+      result = reinterpret_cast<uintptr_t>(referenceResult);
+    }
     pushResult(t, method->returnCode(), result, false);
 
     return method->returnCode();
@@ -926,6 +935,9 @@ loop:
 
   case areturn: {
     object result = popObject(t);
+    // Releasing a synchronized frame can wait for another thread and run GC.
+    // The return operand has already left the Java stack at that point.
+    PROTECT(t, result);
     if (frame > base) {
       popFrame(t);
       pushObject(t, result);
@@ -3220,6 +3232,7 @@ object invoke(Thread* t, GcMethod* method, bool nonVirtual = false)
   }
 
   object result = 0;
+  PROTECT(t, result);
 
   if (method->flags() & ACC_NATIVE) {
     unsigned returnCode = invokeNative(t, method);
