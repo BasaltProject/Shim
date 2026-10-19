@@ -208,7 +208,7 @@ public final class Pattern implements Serializable {
     return Arrays.stream(split(input));
   }
 
-  public Stream<String> splitWithDelimitersAsStream(final CharSequence input) {
+  private Stream<String> splitWithDelimitersAsStream(final CharSequence input) {
     return Arrays.stream(splitWithDelimiters(input, 0));
   }
 
@@ -1284,7 +1284,7 @@ public final class Pattern implements Serializable {
     return RegexProperties.single(first);
   }
 
-  public int groupCountInternal() {
+  int groupCountInternal() {
     return capturingGroupCount - 1;
   }
 

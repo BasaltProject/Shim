@@ -86,10 +86,6 @@ public class Deflater implements AutoCloseable {
     return finished;
   }
 
-  public boolean needsDictionary() {
-    return false;
-  }
-
   public synchronized boolean needsInput() {
     return length == 0;
   }
@@ -267,10 +263,6 @@ public class Deflater implements AutoCloseable {
   }
 
   public void close() {
-    end();
-  }
-
-  public void dispose() {
     end();
   }
 

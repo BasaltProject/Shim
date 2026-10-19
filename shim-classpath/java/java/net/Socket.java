@@ -34,7 +34,7 @@ public class Socket implements Closeable {
   private OutputStream out;
   private boolean oldImpl;
 
-  public static void init() throws IOException {
+  static void init() throws IOException {
     NetNative.init();
   }
 

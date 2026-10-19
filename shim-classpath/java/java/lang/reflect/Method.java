@@ -42,6 +42,10 @@ public class Method extends Executable {
     return o instanceof Method && ((Method) o).vmMethod == vmMethod;
   }
 
+  public int hashCode() {
+    return getDeclaringClass().getName().hashCode() ^ getName().hashCode();
+  }
+
   public boolean isAccessible() {
     return accessible;
   }
@@ -89,7 +93,7 @@ public class Method extends Executable {
       if (instance == null) {
         throw new NullPointerException("Cannot invoke \"Object.getClass()\" because \"obj\" is null");
       }
-      if (!Class.isInstance(vmMethod.class_, instance)) {
+      if (!Classes.isInstance(vmMethod.class_, instance)) {
         throw new IllegalArgumentException("object of type " + instance.getClass().getName()
                                            + " is not an instance of " + getDeclaringClass().getName());
       }
@@ -187,7 +191,7 @@ public class Method extends Executable {
     if (instance == null) {
       throw new NullPointerException();
     }
-    if (!Class.isInstance(vmMethod.class_, instance)) {
+    if (!Classes.isInstance(vmMethod.class_, instance)) {
       throw new IllegalArgumentException();
     }
     if (arguments == null) {
@@ -308,13 +312,13 @@ public class Method extends Executable {
     if (mod != 0) {
       sb.append(Modifier.toString(mod)).append(' ');
     }
-    sb.append(getReturnType().getName()).append(' ');
-    sb.append(getDeclaringClass().getName()).append('.');
+    sb.append(getReturnType().getTypeName()).append(' ');
+    sb.append(getDeclaringClass().getTypeName()).append('.');
     sb.append(getName()).append('(');
     Class<?>[] params = getParameterTypes();
     for (int i = 0; i < params.length; i++) {
       if (i > 0) sb.append(',');
-      sb.append(params[i].getName());
+      sb.append(params[i].getTypeName());
     }
     sb.append(')');
     Class<?>[] exceptions = getExceptionTypes();
@@ -322,7 +326,7 @@ public class Method extends Executable {
       sb.append(" throws ");
       for (int i = 0; i < exceptions.length; i++) {
         if (i > 0) sb.append(',');
-        sb.append(exceptions[i].getName());
+        sb.append(exceptions[i].getTypeName());
       }
     }
     return sb.toString();
@@ -366,7 +370,7 @@ public class Method extends Executable {
       String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
       try {
         SignatureParser.MethodSignature ms =
-            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass(), this);
         return ms.returnType;
       } catch (Exception ignored) {
       }
@@ -380,7 +384,7 @@ public class Method extends Executable {
       String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
       try {
         SignatureParser.MethodSignature ms =
-            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass(), this);
         return ms.parameterTypes;
       } catch (Exception ignored) {
       }
@@ -394,7 +398,7 @@ public class Method extends Executable {
       String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
       try {
         SignatureParser.MethodSignature ms =
-            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass(), this);
         return ms.exceptionTypes;
       } catch (Exception ignored) {
       }
@@ -408,7 +412,7 @@ public class Method extends Executable {
       String sig = Classes.toString((byte[]) vmMethod.addendum.signature);
       try {
         SignatureParser.MethodSignature ms =
-            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass());
+            SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass(), this);
         return ms.typeParameters;
       } catch (Exception ignored) {
       }

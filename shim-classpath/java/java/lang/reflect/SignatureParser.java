@@ -59,11 +59,25 @@ public class SignatureParser {
     }
   }
 
+  public static TypeVariable<?>[] classTypeParameters(Class declaringClass) {
+    for (TypeVariable tv : collectTypeVariables(declaringClass).values()) {
+      if (tv instanceof TypeVariableImpl && ((TypeVariableImpl) tv).owner == declaringClass) {
+        return ((TypeVariableImpl) tv).vars.clone();
+      }
+    }
+    return new TypeVariable<?>[0];
+  }
+
   public static Type parse(ClassLoader loader, String signature, Class declaringClass) {
     return new SignatureParser(loader, signature, collectTypeVariables(declaringClass)).type;
   }
 
   public static MethodSignature parseMethod(ClassLoader loader, String signature, Class declaringClass) {
+    return parseMethod(loader, signature, declaringClass, null);
+  }
+
+  public static MethodSignature parseMethod(ClassLoader loader, String signature, Class declaringClass,
+      GenericDeclaration owner) {
     Map<String, TypeVariable> varsMap = new HashMap<>(collectTypeVariables(declaringClass));
     List<TypeVariableImpl> methodVarsList = new ArrayList<>();
     char[] signChars = signature.toCharArray();
@@ -95,9 +109,20 @@ public class SignatureParser {
         } catch (Exception ignored) {
         }
         TypeVariableImpl tv = new TypeVariableImpl(typeVarName, baseType);
+        tv.setOwner(owner);
         methodVarsList.add(tv);
         varsMap.put(typeVarName, tv);
         i++;
+        while (i < signChars.length && signChars[i] == ':') {
+          i++;
+          int extraAngles = 0;
+          while (i < signChars.length && (extraAngles > 0 || signChars[i] != ';')) {
+            if (signChars[i] == '<') extraAngles++;
+            else if (signChars[i] == '>') extraAngles--;
+            i++;
+          }
+          i++;
+        }
       }
       if (i < signChars.length && signChars[i] == '>') {
         i++;
@@ -434,7 +459,10 @@ public class SignatureParser {
               }
               String typeVarName = new String(signChars, i, colon - i);
               i = colon + 1;
-              
+              if (signChars[i] == ':') {
+                i++;
+              }
+
               int start = i;
               int angles = 0;
               while (angles > 0 || signChars[i] != ';') {
@@ -444,11 +472,22 @@ public class SignatureParser {
               }
               String typeName = new String(signChars, start, i - start + 1);
               final Type baseType = SignatureParser.parse(cur.vmClass.loader, typeName, varsMap);
-  
+
               TypeVariableImpl tv = new TypeVariableImpl(typeVarName, baseType);
+              tv.setOwner(cur);
               varsList.add(tv);
 
               i++;
+              while (signChars[i] == ':') {
+                i++;
+                angles = 0;
+                while (angles > 0 || signChars[i] != ';') {
+                  if (signChars[i] == '<') angles ++;
+                  else if (signChars[i] == '>') angles --;
+                  i++;
+                }
+                i++;
+              }
             } while (signChars[i] != '>');
           
           }
@@ -469,12 +508,20 @@ public class SignatureParser {
     private String name;
     private Type baseType;
     private TypeVariableImpl[] vars;
+    private GenericDeclaration owner;
 
     public Type[] getBounds() {
       return new Type[] { baseType };
     }
-    
+
+    void setOwner(GenericDeclaration owner) {
+      this.owner = owner;
+    }
+
     public GenericDeclaration getGenericDeclaration() {
+      if (owner != null) {
+        return owner;
+      }
       return new GenericDeclaration() {
         public TypeVariable<?>[] getTypeParameters() {
           return vars;
@@ -537,7 +584,8 @@ public class SignatureParser {
     public boolean equals(Object o) {
       if (o instanceof TypeVariable) {
         TypeVariable<?> that = (TypeVariable<?>) o;
-        return Objects.equals(name, that.getName());
+        return Objects.equals(name, that.getName())
+            && (owner == null || that.getGenericDeclaration() == null || owner.equals(that.getGenericDeclaration()));
       }
       return false;
     }

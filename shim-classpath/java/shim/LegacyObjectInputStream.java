@@ -235,7 +235,7 @@ public class LegacyObjectInputStream extends InputStream {
 
     map.put(id, o);
 
-    for (Field<?> f: c.getAllFields()) {
+    for (Field<?> f: Classes.allFields(c)) {
       int modifiers = f.getModifiers();
       if ((modifiers & (Modifier.TRANSIENT | Modifier.STATIC)) == 0) {
         try {

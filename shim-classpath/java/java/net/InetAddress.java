@@ -132,7 +132,7 @@ public class InetAddress implements Serializable {
     return false;
   }
 
-  public int getRawAddress() {
+  int getRawAddress() {
     byte[] a = holderAddress;
     if (a.length == 4) {
       return ((a[0] & 0xff) << 24) | ((a[1] & 0xff) << 16) | ((a[2] & 0xff) << 8) | (a[3] & 0xff);
