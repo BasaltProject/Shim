@@ -23,46 +23,110 @@
 
 package java.lang.invoke;
 
-public class SerializedLambda implements java.io.Serializable {
+import java.io.InvalidObjectException;
+import java.io.ObjectStreamException;
+import java.lang.reflect.Method;
+import java.util.Objects;
+
+public final class SerializedLambda implements java.io.Serializable {
   private static final long serialVersionUID = 8025925345765570181L;
 
-  public Object getCapturedArg(int i) {
-    // todo
-    return null;
+  private final Class<?> capturingClass;
+  private final String functionalInterfaceClass;
+  private final String functionalInterfaceMethodName;
+  private final String functionalInterfaceMethodSignature;
+  private final String implClass;
+  private final String implMethodName;
+  private final String implMethodSignature;
+  private final int implMethodKind;
+  private final String instantiatedMethodType;
+  private final Object[] capturedArgs;
+
+  public SerializedLambda(Class<?> capturingClass,
+                          String functionalInterfaceClass,
+                          String functionalInterfaceMethodName,
+                          String functionalInterfaceMethodSignature,
+                          int implMethodKind,
+                          String implClass,
+                          String implMethodName,
+                          String implMethodSignature,
+                          String instantiatedMethodType,
+                          Object[] capturedArgs) {
+    this.capturingClass = capturingClass;
+    this.functionalInterfaceClass = functionalInterfaceClass;
+    this.functionalInterfaceMethodName = functionalInterfaceMethodName;
+    this.functionalInterfaceMethodSignature = functionalInterfaceMethodSignature;
+    this.implMethodKind = implMethodKind;
+    this.implClass = implClass;
+    this.implMethodName = implMethodName;
+    this.implMethodSignature = implMethodSignature;
+    this.instantiatedMethodType = instantiatedMethodType;
+    this.capturedArgs = Objects.requireNonNull(capturedArgs).clone();
   }
 
-  public int getImplMethodKind() {
-    // todo
-    return 0;
-  }
-
-  public String getImplClass() {
-    // todo
-    return null;
-  }
-
-  public String getImplMethodName() {
-    // todo
-    return null;
-  }
-
-  public String getImplMethodSignature() {
-    // todo
-    return null;
+  public String getCapturingClass() {
+    return capturingClass.getName().replace('.', '/');
   }
 
   public String getFunctionalInterfaceClass() {
-    // todo
-    return null;
+    return functionalInterfaceClass;
   }
 
   public String getFunctionalInterfaceMethodName() {
-    // todo
-    return null;
+    return functionalInterfaceMethodName;
   }
 
   public String getFunctionalInterfaceMethodSignature() {
-    // todo
-    return null;
+    return functionalInterfaceMethodSignature;
+  }
+
+  public String getImplClass() {
+    return implClass;
+  }
+
+  public String getImplMethodName() {
+    return implMethodName;
+  }
+
+  public String getImplMethodSignature() {
+    return implMethodSignature;
+  }
+
+  public int getImplMethodKind() {
+    return implMethodKind;
+  }
+
+  public final String getInstantiatedMethodType() {
+    return instantiatedMethodType;
+  }
+
+  public int getCapturedArgCount() {
+    return capturedArgs.length;
+  }
+
+  public Object getCapturedArg(int i) {
+    return capturedArgs[i];
+  }
+
+  private Object readResolve() throws ObjectStreamException {
+    try {
+      Method deserialize = capturingClass.getDeclaredMethod("$deserializeLambda$", SerializedLambda.class);
+      deserialize.setAccessible(true);
+      return deserialize.invoke(null, this);
+    } catch (ReflectiveOperationException e) {
+      InvalidObjectException ex = new InvalidObjectException("ReflectiveOperationException during deserialization");
+      ex.initCause(e);
+      throw ex;
+    }
+  }
+
+  @Override
+  public String toString() {
+    String implKind = MethodHandleInfo.referenceKindToString(implMethodKind);
+    return String.format("SerializedLambda[%s=%s, %s=%s.%s:%s, %s=%s %s.%s:%s, %s=%s, %s=%d]",
+        "capturingClass", capturingClass, "functionalInterfaceMethod", functionalInterfaceClass,
+        functionalInterfaceMethodName, functionalInterfaceMethodSignature, "implementation", implKind, implClass,
+        implMethodName, implMethodSignature, "instantiatedMethodType", instantiatedMethodType, "numCaptured",
+        capturedArgs.length);
   }
 }
