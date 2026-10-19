@@ -40,6 +40,42 @@ public class PublicMethodReflection {
   }
   public static class ClassWins extends Parent implements Root { }
   public interface Empty { }
+  public static class MissingOptionalType { }
+  public static class OptionalApi {
+    private MissingOptionalType implementation() { return null; }
+    public static String available() { return "available"; }
+  }
+
+  private static void optionalPrivateSignature() throws Exception {
+    String apiName = OptionalApi.class.getName();
+    String missingName = MissingOptionalType.class.getName();
+    byte[] bytes;
+    try (java.io.InputStream in = PublicMethodReflection.class.getResourceAsStream(
+        "/" + apiName.replace('.', '/') + ".class")) {
+      bytes = in.readAllBytes();
+    }
+    ClassLoader loader = new ClassLoader(PublicMethodReflection.class.getClassLoader()) {
+      protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+        if (name.equals(missingName)) throw new ClassNotFoundException(name);
+        if (!name.equals(apiName)) return super.loadClass(name, resolve);
+        Class<?> type = findLoadedClass(name);
+        if (type == null) type = defineClass(name, bytes, 0, bytes.length);
+        if (resolve) resolveClass(type);
+        return type;
+      }
+    };
+    Class<?> api = Class.forName(apiName, false, loader);
+    System.out.println("optional public method: " + api.getMethod("available").invoke(null));
+    for (Method method : api.getMethods()) {
+      if (!Modifier.isPublic(method.getModifiers())) throw new AssertionError(method);
+    }
+    try {
+      api.getDeclaredMethods();
+      throw new AssertionError("Declared reflection must still resolve private signatures");
+    } catch (NoClassDefFoundError expected) {
+      System.out.println("optional private signature remains unresolved");
+    }
+  }
 
   private static String identity(Method method) {
     return method.getDeclaringClass().getName() + ":" + method.getName()
@@ -73,6 +109,7 @@ public class PublicMethodReflection {
   }
 
   public static void main(String[] args) throws Exception {
+    optionalPrivateSignature();
     Class<?>[] types = {Root.class, Left.class, Diamond.class, Narrow.class, Repeated.class,
       Abstract.class, Parent.class, Child.class, ClassWins.class, Empty.class,
       int.class, void.class, String[].class, int[][].class};
