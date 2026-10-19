@@ -249,8 +249,13 @@ void enumerateThreads(Thread* t,
                       unsigned limit)
 {
   if (*index < limit) {
-    array->setBodyElement(t, *index, x->javaThread);
-    ++(*index);
+    // Terminated native records remain in the tree until zombie collection.
+    // They must not consume slots reserved for the live-thread snapshot.
+    if (x->javaThread && x->state != Thread::NoState
+        && x->state != Thread::ZombieState && x->state != Thread::JoinedState) {
+      array->setBodyElement(t, *index, x->javaThread);
+      ++(*index);
+    }
 
     if (x->peer)
       enumerateThreads(t, x->peer, array, index, limit);
@@ -671,7 +676,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
                        objectArrayLength(t, reinterpret_cast<object>(array)));
   unsigned index = 0;
   local::enumerateThreads(t, t->m->rootThread, array, &index, count);
-  return count;
+  return index;
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
