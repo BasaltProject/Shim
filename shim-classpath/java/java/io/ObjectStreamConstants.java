@@ -36,6 +36,7 @@ public interface ObjectStreamConstants {
   byte SC_ENUM = 0x10;
   SerializablePermission SUBSTITUTION_PERMISSION = new SerializablePermission("enableSubstitution");
   SerializablePermission SUBCLASS_IMPLEMENTATION_PERMISSION = new SerializablePermission("enableSubclassImplementation");
+  SerializablePermission SERIAL_FILTER_PERMISSION = new SerializablePermission("serialFilter");
   int PROTOCOL_VERSION_1 = 1;
   int PROTOCOL_VERSION_2 = 2;
 }

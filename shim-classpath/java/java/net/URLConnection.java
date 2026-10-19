@@ -258,6 +258,14 @@ public abstract class URLConnection {
     return defaultUseCaches;
   }
 
+  @Deprecated
+  public static void setDefaultRequestProperty(String key, String value) { }
+
+  @Deprecated
+  public static String getDefaultRequestProperty(String key) {
+    return null;
+  }
+
   public void setRequestProperty(String key, String value) {
     checkConnected();
     if (key == null) {

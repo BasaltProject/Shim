@@ -35,6 +35,88 @@ public class Channels {
     return new MyOutputStream(channel);
   }
 
+  public static InputStream newInputStream(AsynchronousByteChannel channel) {
+    Objects.requireNonNull(channel, "ch");
+    return new AsyncInputStream(channel);
+  }
+
+  public static OutputStream newOutputStream(AsynchronousByteChannel channel) {
+    Objects.requireNonNull(channel, "ch");
+    return new AsyncOutputStream(channel);
+  }
+
+  private static final class AsyncInputStream extends InputStream {
+    private final AsynchronousByteChannel channel;
+
+    AsyncInputStream(AsynchronousByteChannel channel) {
+      this.channel = channel;
+    }
+
+    @Override
+    public int read() throws IOException {
+      byte[] one = new byte[1];
+      int n = read(one, 0, 1);
+      return n <= 0 ? -1 : one[0] & 0xFF;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+      Objects.checkFromIndexSize(off, len, b.length);
+      if (len == 0) {
+        return 0;
+      }
+      try {
+        return channel.read(ByteBuffer.wrap(b, off, len)).get();
+      } catch (java.util.concurrent.ExecutionException e) {
+        Throwable c = e.getCause();
+        throw c instanceof IOException ? (IOException) c : new IOException(c);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void close() throws IOException {
+      channel.close();
+    }
+  }
+
+  private static final class AsyncOutputStream extends OutputStream {
+    private final AsynchronousByteChannel channel;
+
+    AsyncOutputStream(AsynchronousByteChannel channel) {
+      this.channel = channel;
+    }
+
+    @Override
+    public void write(int b) throws IOException {
+      write(new byte[] {(byte) b}, 0, 1);
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+      Objects.checkFromIndexSize(off, len, b.length);
+      ByteBuffer bb = ByteBuffer.wrap(b, off, len);
+      try {
+        while (bb.hasRemaining()) {
+          channel.write(bb).get();
+        }
+      } catch (java.util.concurrent.ExecutionException e) {
+        Throwable c = e.getCause();
+        throw c instanceof IOException ? (IOException) c : new IOException(c);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void close() throws IOException {
+      channel.close();
+    }
+  }
+
   public static ReadableByteChannel newChannel(InputStream stream) {
     return new InputStreamChannel(stream);
   }

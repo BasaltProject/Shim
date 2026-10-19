@@ -116,6 +116,10 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
     Configuration withTimeout(Duration timeout);
   }
 
+  final class TimeoutException extends RuntimeException {
+    TimeoutException() { }
+  }
+
   final class FailedException extends RuntimeException {
     public FailedException(Throwable cause) {
       super(cause);
@@ -344,7 +348,7 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
           boolean ok = latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
           if (!ok) {
             cancelled.set(true);
-            throw new RuntimeException("Scope timeout");
+            throw new TimeoutException();
           }
         } else {
           latch.await();

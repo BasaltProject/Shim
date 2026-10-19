@@ -89,7 +89,7 @@ public class MulticastSocket extends DatagramSocket {
       throw new SocketException("Socket is closed");
     }
     if (inf == null) {
-      throw new SocketException("bad argument for IP_MULTICAST_IF: address null or not bound to any interface");
+      throw new SocketException("Invalid value 'null'");
     }
     NetworkInterface ni = NetworkInterface.getByInetAddress(inf);
     if (ni == null) {
