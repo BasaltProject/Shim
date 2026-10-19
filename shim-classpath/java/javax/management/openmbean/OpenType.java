@@ -20,7 +20,7 @@ public abstract class OpenType<T> implements Serializable {
       "java.lang.Void", "java.lang.Boolean", "java.lang.Character", "java.lang.Byte", "java.lang.Short",
       "java.lang.Integer", "java.lang.Long", "java.lang.Float", "java.lang.Double", "java.lang.String",
       "java.math.BigDecimal", "java.math.BigInteger", "java.util.Date", "javax.management.ObjectName",
-      CompositeData.class.getName()));
+      CompositeData.class.getName(), TabularData.class.getName()));
 
   @Deprecated
   public static final String[] ALLOWED_CLASSNAMES = ALLOWED_CLASSNAMES_LIST.toArray(new String[0]);

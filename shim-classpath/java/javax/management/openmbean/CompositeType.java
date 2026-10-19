@@ -174,7 +174,7 @@ public class CompositeType extends OpenType<CompositeData> {
         result.append(nameToType.get(key).toString());
         i++;
       }
-      result.append("))");
+      result.append(")))");
       myToString = result.toString();
     }
     return myToString;
