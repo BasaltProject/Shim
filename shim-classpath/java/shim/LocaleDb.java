@@ -13,28 +13,36 @@ public final class LocaleDb {
   private static LocaleTable main;
   private static LocaleTable currency;
   private static LocaleTable names;
+  private static LocaleTable zones;
 
   private LocaleDb() { }
 
   private static synchronized LocaleTable main() {
     if (main == null) {
-      main = new LocaleTable(LocaleDbDataMain.kChunks);
+      main = new LocaleTable(LocaleDbDataMain.kLanguages, LocaleDbDataMain.kParts);
     }
     return main;
   }
 
   public static synchronized LocaleTable currency() {
     if (currency == null) {
-      currency = new LocaleTable(LocaleDbDataCurrency.kChunks);
+      currency = new LocaleTable(LocaleDbDataCurrency.kLanguages, LocaleDbDataCurrency.kParts);
     }
     return currency;
   }
 
   public static synchronized LocaleTable names() {
     if (names == null) {
-      names = new LocaleTable(LocaleDbDataNames.kChunks);
+      names = new LocaleTable(LocaleDbDataNames.kLanguages, LocaleDbDataNames.kParts);
     }
     return names;
+  }
+
+  public static synchronized LocaleTable zones() {
+    if (zones == null) {
+      zones = new LocaleTable(LocaleDbDataZones.kLanguages, LocaleDbDataZones.kParts);
+    }
+    return zones;
   }
 
   public static String get(Locale locale, String key) {

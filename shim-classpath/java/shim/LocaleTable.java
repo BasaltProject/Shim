@@ -25,21 +25,20 @@ public final class LocaleTable {
   private final Map<String, Map<String, String[]>> kResolved = new HashMap<String, Map<String, String[]>>();
   private final Map<String, Map<String, String>> kParsed = new HashMap<String, Map<String, String>>();
 
-  private final String[] chunks;
+  private final String[] languages;
+  private final String[][] parts;
+  private final Map<String, Boolean> loadedParts = new HashMap<String, Boolean>();
 
-  LocaleTable(String[] chunks) {
-    this.chunks = chunks;
+  LocaleTable(String[] languages, String[][] parts) {
+    this.languages = languages;
+    this.parts = parts;
   }
 
-  private synchronized void load() {
-    if (blocks != null) {
-      return;
-    }
+  private static String decode(String[] chunkList) {
     StringBuilder encoded = new StringBuilder();
-    for (String chunk : chunks) {
+    for (String chunk : chunkList) {
       encoded.append(chunk);
     }
-    String text;
     try {
       byte[] gz = Base64.getDecoder().decode(encoded.toString());
       InputStream in = new GZIPInputStream(new ByteArrayInputStream(gz));
@@ -49,11 +48,13 @@ public final class LocaleTable {
       while ((n = in.read(buffer)) > 0) {
         out.write(buffer, 0, n);
       }
-      text = new String(out.toByteArray(), StandardCharsets.UTF_8);
+      return new String(out.toByteArray(), StandardCharsets.UTF_8);
     } catch (IOException e) {
       throw new IllegalStateException(e);
     }
-    Map<String, String> map = new HashMap<String, String>();
+  }
+
+  private void addBlocks(String text) {
     int pos = 0;
     int length = text.length();
     while (pos < length) {
@@ -61,10 +62,34 @@ public final class LocaleTable {
       String tag = text.substring(pos + 1, lineEnd);
       int next = text.indexOf("\n@", lineEnd);
       int end = next < 0 ? length : next + 1;
-      map.put(tag, text.substring(lineEnd + 1, end));
+      blocks.put(tag, text.substring(lineEnd + 1, end));
       pos = end;
     }
-    blocks = map;
+  }
+
+  private synchronized void load(String tag) {
+    if (blocks == null) {
+      blocks = new HashMap<String, String>();
+    }
+    int cut = tag.indexOf('-');
+    String language = cut < 0 ? tag : tag.substring(0, cut);
+    if (loadedParts.get(language) == null) {
+      loadedParts.put(language, Boolean.TRUE);
+      int low = 0;
+      int high = languages.length - 1;
+      while (low <= high) {
+        int mid = (low + high) >>> 1;
+        int order = languages[mid].compareTo(language);
+        if (order < 0) {
+          low = mid + 1;
+        } else if (order > 0) {
+          high = mid - 1;
+        } else {
+          addBlocks(decode(parts[mid]));
+          break;
+        }
+      }
+    }
   }
 
   private static String unescape(String value) {
@@ -87,7 +112,7 @@ public final class LocaleTable {
   private synchronized Map<String, String> block(String tag) {
     Map<String, String> parsed = kParsed.get(tag);
     if (parsed == null) {
-      load();
+      load(tag);
       parsed = new HashMap<String, String>();
       String text = blocks.get(tag);
       if (text != null) {
