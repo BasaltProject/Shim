@@ -38,6 +38,11 @@ public final class ZoneNames {
     return values != null ? values : tuple(Locale.ENGLISH, zoneId, 0);
   }
 
+  public static String[] names(Locale locale, String zoneId) {
+    String[] values = tupleOrEnglish(locale, zoneId);
+    return values == null ? null : values.clone();
+  }
+
   public static String timeZoneName(Locale locale, String zoneId, boolean daylight, boolean shortName) {
     String[] values = tupleOrEnglish(locale, zoneId);
     if (values == null) {

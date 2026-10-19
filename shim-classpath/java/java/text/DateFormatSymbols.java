@@ -47,9 +47,8 @@ public class DateFormatSymbols implements Serializable, Cloneable {
     "", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
   };
   private String[] ampm = new String[] {"AM", "PM"};
-  private String[][] zoneStrings = new String[][] {
-    {"GMT", "Greenwich Mean Time", "GMT", "Greenwich Mean Time", "GMT"}
-  };
+  private String[][] zoneStrings;
+  private Locale zoneLocale = Locale.ROOT;
   private String localPatternChars = "GyMdkHmsSEDFwWahKzZ";
 
   public DateFormatSymbols() {
@@ -58,6 +57,7 @@ public class DateFormatSymbols implements Serializable, Cloneable {
 
   public DateFormatSymbols(Locale locale) {
     Objects.requireNonNull(locale, "locale");
+    zoneLocale = locale;
     String[] monthNames = shim.LocaleDb.list(locale, "M0");
     if (monthNames != null) {
       months = withTrailingEmpty(monthNames);
@@ -141,7 +141,23 @@ public class DateFormatSymbols implements Serializable, Cloneable {
     ampm = v.clone();
   }
 
+  private String[][] zoneStringsOrDefault() {
+    if (zoneStrings == null) {
+      String[] ids = java.util.TimeZone.getAvailableIDs();
+      java.util.List<String[]> rows = new java.util.ArrayList<String[]>();
+      for (String id : ids) {
+        String[] t = sun.util.locale.provider.ZoneNames.names(zoneLocale, id);
+        if (t != null) {
+          rows.add(new String[] {id, t[1], t[0], t[3], t[2], t[4], t[6]});
+        }
+      }
+      zoneStrings = rows.toArray(new String[0][]);
+    }
+    return zoneStrings;
+  }
+
   public String[][] getZoneStrings() {
+    String[][] zoneStrings = zoneStringsOrDefault();
     String[][] copy = new String[zoneStrings.length][];
     for (int i = 0; i < zoneStrings.length; i++) {
       copy[i] = zoneStrings[i].clone();
@@ -175,7 +191,9 @@ public class DateFormatSymbols implements Serializable, Cloneable {
       copy.weekdays = weekdays.clone();
       copy.shortWeekdays = shortWeekdays.clone();
       copy.ampm = ampm.clone();
-      copy.zoneStrings = getZoneStrings();
+      if (zoneStrings != null) {
+        copy.zoneStrings = getZoneStrings();
+      }
       return copy;
     } catch (CloneNotSupportedException e) {
       throw new InternalError(e);
