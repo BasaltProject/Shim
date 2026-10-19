@@ -276,6 +276,30 @@ final class ConstantDescsImpl {
     }
 
     @Override
+    public String lookupDescriptor() {
+      switch (kind) {
+        case VIRTUAL:
+        case SPECIAL:
+        case INTERFACE_VIRTUAL:
+        case INTERFACE_SPECIAL:
+        case STATIC:
+        case INTERFACE_STATIC:
+          return type.descriptorString();
+        case STATIC_GETTER:
+        case GETTER:
+          return type.returnType().descriptorString();
+        case STATIC_SETTER:
+          return type.parameterType(0).descriptorString();
+        case SETTER:
+          return type.parameterType(1).descriptorString();
+        case CONSTRUCTOR:
+          return type.changeReturnType(ConstantDescs.CD_void).descriptorString();
+        default:
+          throw new IllegalStateException(kind.toString());
+      }
+    }
+
+    @Override
     public MethodTypeDesc invocationType() {
       switch (kind) {
         case VIRTUAL:

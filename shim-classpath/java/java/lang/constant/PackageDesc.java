@@ -11,6 +11,10 @@ package java.lang.constant;
 import java.util.Objects;
 
 public interface PackageDesc {
+  boolean equals(Object o);
+
+  int hashCode();
+
   static PackageDesc of(String name) {
     Objects.requireNonNull(name, "name");
     if (!PackageDescImpl.valid(name, '.', '/')) {

@@ -26,6 +26,10 @@ package java.util;
 import java.util.function.UnaryOperator;
 
 public interface List<T> extends Collection<T>, SequencedCollection<T> {
+  boolean equals(Object o);
+
+  int hashCode();
+
   public T get(int index);
 
   public T set(int index, T value);
