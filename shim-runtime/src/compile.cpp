@@ -2941,6 +2941,7 @@ void NO_RETURN throwArrayIndexOutOfBounds(MyThread* t, int32_t first, int32_t se
 
 void NO_RETURN throwStackOverflow(MyThread* t)
 {
+  if (getenv("SHIM_TRACE_COMPILE")) fprintf(stderr, "SHIMDBG StackOverflowError\n");
   throwNew(t, GcStackOverflowError::Type);
 }
 
