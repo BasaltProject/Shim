@@ -167,7 +167,10 @@ public class Classes {
     }
 
     case '@':
-      return getAnnotation(loader, parseAnnotation(loader, pool, in));
+      {
+        Object[] nested = parseAnnotation(loader, pool, in);
+        return nested == null ? null : getAnnotation(loader, nested);
+      }
 
     case '[': {
       Object[] array = new Object[read2(in)];
@@ -181,15 +184,61 @@ public class Classes {
     }
   }
 
+  private static void skipAnnotationValue(InputStream in) throws IOException {
+    switch (read1(in)) {
+    case 'Z': case 'B': case 'C': case 'S': case 'I': case 'F': case 'J': case 'D':
+    case 's': case 'c':
+      read2(in);
+      break;
+
+    case 'e':
+      read2(in);
+      read2(in);
+      break;
+
+    case '@':
+      skipAnnotation(in);
+      break;
+
+    case '[': {
+      int n = read2(in);
+      for (int i = 0; i < n; ++i) {
+        skipAnnotationValue(in);
+      }
+      break;
+    }
+
+    default: throw new AssertionError();
+    }
+  }
+
+  private static void skipAnnotation(InputStream in) throws IOException {
+    read2(in);
+    int n = read2(in);
+    for (int i = 0; i < n; ++i) {
+      read2(in);
+      skipAnnotationValue(in);
+    }
+  }
+
   private static Object[] parseAnnotation(ClassLoader loader,
                                           Object pool,
                                           InputStream in)
     throws IOException
   {
     byte[] typeName = (byte[]) Singleton.getObject(pool, read2(in) - 1);
-    Object[] annotation = new Object[(read2(in) + 1) * 2];
-    annotation[1] = SystemClassLoader.getClass
-      (loadVMClass(loader, typeName, 1, typeName.length - 3));
+    int count = read2(in);
+    Object[] annotation = new Object[(count + 1) * 2];
+    try {
+      annotation[1] = SystemClassLoader.getClass
+        (loadVMClass(loader, typeName, 1, typeName.length - 3));
+    } catch (NoClassDefFoundError e) {
+      for (int i = 0; i < count; ++i) {
+        read2(in);
+        skipAnnotationValue(in);
+      }
+      return null;
+    }
 
     for (int i = 2; i < annotation.length; i += 2) {
       byte[] name = (byte[]) Singleton.getObject(pool, read2(in) - 1);
@@ -206,8 +255,17 @@ public class Classes {
     throws IOException
   {
     Object[] table = new Object[read2(in)];
+    int n = 0;
     for (int i = 0; i < table.length; ++i) {
-      table[i] = parseAnnotation(loader, pool, in);
+      Object[] a = parseAnnotation(loader, pool, in);
+      if (a != null) {
+        table[n++] = a;
+      }
+    }
+    if (n < table.length) {
+      Object[] trimmed = new Object[n];
+      System.arraycopy(table, 0, trimmed, 0, n);
+      return trimmed;
     }
     return table;
   }
