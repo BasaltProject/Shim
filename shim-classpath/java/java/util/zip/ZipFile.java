@@ -372,7 +372,7 @@ public class ZipFile implements Closeable {
     private boolean closedStream;
 
     InflaterStream(InputStream in, long size) {
-      super(in, new Inflater(true), 512);
+      super(in, new Inflater(true), 8192);
       this.remaining = size;
     }
 

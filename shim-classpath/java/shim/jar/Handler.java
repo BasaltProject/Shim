@@ -173,12 +173,14 @@ public class Handler extends URLStreamHandler {
       if (!"file".equals(jarUrl.getProtocol())) {
         throw new IOException("Unsupported jar file url protocol: " + jarUrl.getProtocol());
       }
-      file = new JarFile(path);
+      file = getUseCaches() ? shim.JarCache.open(new java.io.File(path)) : new JarFile(path);
       String name = getEntryName();
       if (name != null) {
         entry = file.getJarEntry(name);
         if (entry == null) {
-          file.close();
+          if (!getUseCaches()) {
+            file.close();
+          }
           file = null;
           throw new FileNotFoundException("JAR entry not found in jar file");
         }
