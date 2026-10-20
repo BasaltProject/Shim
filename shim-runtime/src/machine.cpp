@@ -5582,6 +5582,25 @@ GcClass* resolveSystemClass(Thread* t,
                             bool throw_,
                             Gc::Type throwType)
 {
+  if (spec->length() == 3 and spec->body()[0] == '[') {
+    GcClass* primitiveArray = 0;
+    switch (spec->body()[1]) {
+    case 'Z': primitiveArray = type(t, GcBooleanArray::Type); break;
+    case 'B': primitiveArray = type(t, GcByteArray::Type); break;
+    case 'S': primitiveArray = type(t, GcShortArray::Type); break;
+    case 'C': primitiveArray = type(t, GcCharArray::Type); break;
+    case 'I': primitiveArray = type(t, GcIntArray::Type); break;
+    case 'J': primitiveArray = type(t, GcLongArray::Type); break;
+    case 'F': primitiveArray = type(t, GcFloatArray::Type); break;
+    case 'D': primitiveArray = type(t, GcDoubleArray::Type); break;
+    default: break;
+    }
+    if (primitiveArray) {
+      primitiveArray->setVirtualTable(t, type(t, GcJobject::Type)->virtualTable());
+      return primitiveArray;
+    }
+  }
+
   PROTECT(t, loader);
   PROTECT(t, spec);
 
