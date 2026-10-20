@@ -211,24 +211,38 @@ public abstract class ClassLoader {
   protected Class loadClass(String name, boolean resolve)
     throws ClassNotFoundException
   {
-    Class c = findLoadedClass(name);
-    if (c == null) {
-      if (parent != null) {
-        try {
-          c = parent.loadClass(name);
-        } catch (ClassNotFoundException ok) { }
-      }
-
+    synchronized (getClassLoadingLock(name)) {
+      Class c = findLoadedClass(name);
       if (c == null) {
-        c = findClass(name);
+        if (parent != null) {
+          try {
+            c = parent.loadClass(name);
+          } catch (ClassNotFoundException ok) { }
+        }
+
+        if (c == null) {
+          c = findClass(name);
+        }
       }
-    }
 
-    if (resolve) {
-      resolveClass(c);
-    }
+      if (resolve) {
+        resolveClass(c);
+      }
 
-    return c;
+      return c;
+    }
+  }
+
+  private final java.util.concurrent.ConcurrentHashMap<String, Object> parallelLockMap =
+      new java.util.concurrent.ConcurrentHashMap<String, Object>();
+
+  protected Object getClassLoadingLock(String className) {
+    if (className == null) {
+      throw new NullPointerException();
+    }
+    Object newLock = new Object();
+    Object lock = parallelLockMap.putIfAbsent(className, newLock);
+    return lock == null ? newLock : lock;
   }
 
   protected void resolveClass(Class c) {
