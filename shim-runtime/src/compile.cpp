@@ -2435,20 +2435,20 @@ GcMethod* resolveMethod(Thread* t, GcPair* pair)
 
   GcClass* class_ = resolveClassInObject(
       t,
-      cast<GcMethod>(t, pair->first())->class_()->loader(),
+      codeOwner(t, cast<GcMethod>(t, pair->first()))->loader(),
       reference,
       ReferenceClass);
 
   return cast<GcMethod>(t,
                         resolveMember(t,
-                                        cast<GcMethod>(t, pair->first())->class_()->loader(),
+                                        codeOwner(t, cast<GcMethod>(t, pair->first()))->loader(),
                                         class_,
                                         reference->name(),
                                         reference->spec(),
                                         findMethodInClass,
                                         GcNoSuchMethodError::Type,
                                         true,
-                                        cast<GcMethod>(t, pair->first())->class_()));
+                                        codeOwner(t, cast<GcMethod>(t, pair->first()))));
 }
 
 bool methodAbstract(Thread* t UNUSED, GcMethod* method)
@@ -2570,7 +2570,7 @@ int64_t getMethodAddress(MyThread* t, GcMethod* target)
 
 GcClass* resolveReferencedClass(Thread* t, GcPair* pair)
 {
-  GcClass* accessor = cast<GcMethod>(t, pair->first())->class_();
+  GcClass* accessor = codeOwner(t, cast<GcMethod>(t, pair->first()));
   PROTECT(t, accessor);
   GcClass* c = resolveClass(t, accessor->loader(), cast<GcReference>(t, pair->second())->name());
   PROTECT(t, c);
@@ -2953,7 +2953,7 @@ GcClass* loadedClassInPool(Thread* t, GcMethod* method, unsigned index)
   object entry = singletonObject(t, method->code()->pool(), index);
   if (objectClass(t, entry) == type(t, GcReference::Type)) {
     GcClass* c = findLoadedClass(t, method->class_()->loader(), cast<GcReference>(t, entry)->name());
-    return c and classAccessible(t, method->class_(), c) ? c : 0;
+    return c and classAccessible(t, codeOwner(t, method), c) ? c : 0;
   }
   return cast<GcClass>(t, entry);
 }
@@ -2987,20 +2987,20 @@ GcField* resolveField(Thread* t, GcPair* pair)
 
   GcClass* class_ = resolveClassInObject(
       t,
-      cast<GcMethod>(t, pair->first())->class_()->loader(),
+      codeOwner(t, cast<GcMethod>(t, pair->first()))->loader(),
       reference,
       ReferenceClass);
 
   return cast<GcField>(t,
                        resolveMember(t,
-                                       cast<GcMethod>(t, pair->first())->class_()->loader(),
+                                       codeOwner(t, cast<GcMethod>(t, pair->first()))->loader(),
                                        class_,
                                        reference->name(),
                                        reference->spec(),
                                        findFieldInClass,
                                        GcNoSuchFieldError::Type,
                                        true,
-                                       cast<GcMethod>(t, pair->first())->class_()));
+                                       codeOwner(t, cast<GcMethod>(t, pair->first()))));
 }
 
 uint64_t getFieldValue(Thread* t, object target, GcField* field)
@@ -5858,7 +5858,7 @@ loop:
                 and cast<GcReference>(t, v)->kind() != 0)) {
           GcInt* poolIndex = makeInt(t, index - 1);
           PROTECT(t, poolIndex);
-          GcPair* location = makePair(t, context->method->class_()->loader(), poolIndex);
+          GcPair* location = makePair(t, codeOwner(t, context->method)->loader(), poolIndex);
           PROTECT(t, location);
           frame->push(ir::Type::object(), c->nativeCall(
               c->constant(getThunk(t, getLoadableConstantThunk), ir::Type::iptr()),

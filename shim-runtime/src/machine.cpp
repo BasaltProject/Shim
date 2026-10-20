@@ -5833,6 +5833,25 @@ static bool memberAccessible(Thread* t, GcClass* accessor, GcClass* declaring, u
   return (flags & ACC_PROTECTED) && isAssignableFrom(t, declaring, accessor);
 }
 
+GcClass* codeOwner(Thread* t, GcMethod* method)
+{
+  GcClass* c = method->class_();
+  if (not (method->vmFlags() & InterfaceMethodFlag) or method->code() == 0) return c;
+  GcArray* itable = cast<GcArray>(t, c->interfaceTable());
+  if (itable == 0) return c;
+  unsigned stride = (c->flags() & ACC_INTERFACE) ? 1 : 2;
+  for (unsigned i = 0; i < itable->length(); i += stride) {
+    GcClass* provider = cast<GcClass>(t, itable->body()[i]);
+    GcArray* table = cast<GcArray>(t, provider->virtualTable());
+    if (table == 0) continue;
+    for (unsigned j = 0; j < table->length(); ++j) {
+      GcMethod* m = cast<GcMethod>(t, table->body()[j]);
+      if (m->code() == method->code() and m->class_() == provider) return provider;
+    }
+  }
+  return c;
+}
+
 bool classAccessible(Thread* t, GcClass* accessor, GcClass* c)
 {
   if (accessor == 0 || accessor->loader() == roots(t)->bootLoader()) return true;
