@@ -2522,7 +2522,8 @@ GcList* addInterfaceMethods(Thread* t,
                             GcClass* class_,
                             GcHashMap* virtualMap,
                             unsigned* virtualCount,
-                            bool makeList)
+                            bool makeList,
+                            GcList** replaced)
 {
   GcArray* itable = cast<GcArray>(t, class_->interfaceTable());
   if (itable) {
@@ -2574,13 +2575,43 @@ GcList* addInterfaceMethods(Thread* t,
             }
           } else if (method->code() != 0) {
             GcMethod* existing = cast<GcMethod>(t, n->second());
+            bool useDefault = false;
             if (existing->code() == 0 and (existing->vmFlags() & InterfaceMethodFlag)) {
-              existing->setCode(t, method->code());
-              existing->flags() = method->flags();
+              useDefault = true;
             } else if ((existing->vmFlags() & InterfaceMethodFlag) and existing->code() != method->code()
                        and moreSpecificDefault(t, itable, stride, i, existing, method)) {
-              existing->setCode(t, method->code());
-              existing->flags() = method->flags();
+              useDefault = true;
+            }
+            if (useDefault) {
+              if (existing->class_() == class_) {
+                existing->setCode(t, method->code());
+                existing->flags() = method->flags();
+              } else {
+                PROTECT(t, n);
+                GcMethod* inherited = existing;
+                PROTECT(t, inherited);
+                GcMethod* copy = makeMethod(t,
+                                            inherited->vmFlags(),
+                                            inherited->returnCode(),
+                                            inherited->parameterCount(),
+                                            inherited->parameterFootprint(),
+                                            method->flags(),
+                                            inherited->offset(),
+                                            0,
+                                            0,
+                                            inherited->name(),
+                                            inherited->spec(),
+                                            0,
+                                            class_,
+                                            method->code());
+                PROTECT(t, copy);
+                n->setFirst(t, copy);
+                n->setSecond(t, copy);
+                if (*replaced == 0) {
+                  *replaced = vm::makeList(t, 0, 0, 0);
+                }
+                listAppend(t, *replaced, copy);
+              }
             }
           }
         }
@@ -2832,14 +2863,17 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
     class_->setMethodTable(t, methodTable);
   }
 
+  GcList* replacedList = 0;
+  PROTECT(t, replacedList);
   GcList* abstractVirtuals
-      = addInterfaceMethods(t, class_, virtualMap, &virtualCount, true);
+      = addInterfaceMethods(t, class_, virtualMap, &virtualCount, true, &replacedList);
+  bool replacedInherited = replacedList != 0;
 
   PROTECT(t, abstractVirtuals);
 
   bool populateInterfaceVtables = false;
 
-  if (declaredVirtualCount == 0 and abstractVirtuals == 0
+  if (declaredVirtualCount == 0 and abstractVirtuals == 0 and not replacedInherited
       and (class_->flags() & ACC_INTERFACE) == 0) {
     if (class_->super()) {
       // inherit virtual table from superclass
@@ -2894,7 +2928,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
       }
     }
 
-    if (abstractVirtuals) {
+    if (abstractVirtuals or replacedList) {
       PROTECT(t, vtable);
 
       object originalMethodTable = class_->methodTable();
@@ -2908,8 +2942,8 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
       GcClassAddendum* addendum = getClassAddendum(t, class_, pool);
       addendum->declaredMethodCount() = oldLength;
 
-      GcArray* newMethodTable
-          = makeArray(t, oldLength + abstractVirtuals->size());
+      GcArray* newMethodTable = makeArray(
+          t, oldLength + (abstractVirtuals ? abstractVirtuals->size() : 0) + (replacedList ? replacedList->size() : 0));
 
       if (oldLength) {
         GcArray* mtable = cast<GcArray>(t, class_->methodTable());
@@ -2921,13 +2955,17 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
       mark(t, newMethodTable, ArrayBody, oldLength);
 
       unsigned mti = oldLength;
-      for (GcPair* p = cast<GcPair>(t, abstractVirtuals->front()); p;
+      for (GcPair* p = abstractVirtuals ? cast<GcPair>(t, abstractVirtuals->front()) : 0; p;
            p = cast<GcPair>(t, p->second())) {
         newMethodTable->setBodyElement(t, mti++, p->first());
 
         if ((class_->flags() & ACC_INTERFACE) == 0) {
           vtable->setBodyElement(t, i++, p->first());
         }
+      }
+      for (GcPair* p = replacedList ? cast<GcPair>(t, replacedList->front()) : 0; p;
+           p = cast<GcPair>(t, p->second())) {
+        newMethodTable->setBodyElement(t, mti++, p->first());
       }
 
       assertT(t, newMethodTable->length() == mti);
@@ -5846,7 +5884,9 @@ GcClass* codeOwner(Thread* t, GcMethod* method)
     if (table == 0) continue;
     for (unsigned j = 0; j < table->length(); ++j) {
       GcMethod* m = cast<GcMethod>(t, table->body()[j]);
-      if (m->code() == method->code() and m->class_() == provider) return provider;
+      if (m->code() == method->code() and m->class_() == provider and not (m->vmFlags() & InterfaceMethodFlag)) {
+        return provider;
+      }
     }
   }
   return c;
