@@ -79,6 +79,15 @@ public abstract class FileSystemProvider {
           } finally {
             loadingProviders = false;
           }
+          boolean hasJar = false;
+          for (FileSystemProvider p : list) {
+            if (p.getScheme().equalsIgnoreCase("jar")) {
+              hasJar = true;
+            }
+          }
+          if (!hasJar) {
+            list.add(new jdk.nio.zipfs.ZipFileSystemProvider());
+          }
           list.add(0, defaultProvider);
           installedProviders = Collections.unmodifiableList(list);
         }

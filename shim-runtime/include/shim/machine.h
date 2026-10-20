@@ -2758,12 +2758,16 @@ inline GcMethod* findInterfaceMethod(Thread* t,
     return findVirtualMethod(t, method, class_);
   }
 
+  if (method->flags() & ACC_PRIVATE) {
+    return method;
+  }
+
   GcClass* interface = method->class_();
   GcArray* itable = cast<GcArray>(t, class_->interfaceTable());
   for (unsigned i = 0; i < itable->length(); i += 2) {
     if (itable->body()[i] == interface) {
-      return cast<GcMethod>(
-          t, cast<GcArray>(t, itable->body()[i + 1])->body()[method->offset()]);
+      GcArray* row = cast<GcArray>(t, itable->body()[i + 1]);
+      return cast<GcMethod>(t, row->body()[method->offset()]);
     }
   }
   abort(t);
