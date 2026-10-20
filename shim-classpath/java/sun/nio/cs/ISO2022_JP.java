@@ -17,20 +17,27 @@ import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 
 public final class ISO2022_JP extends Charset implements HistoricallyNamedCharset {
-  public static final ISO2022_JP INSTANCE = new ISO2022_JP();
+  public static final ISO2022_JP INSTANCE = new ISO2022_JP("ISO-2022-JP",
+      new String[] {"iso2022jp", "jis", "csISO2022JP", "jis_encoding", "csjisencoding"}, false);
+  public static final ISO2022_JP INSTANCE2 = new ISO2022_JP("ISO-2022-JP-2",
+      new String[] {"csISO2022JP2", "iso2022jp2"}, true);
 
   private static final int kAscii = 0;
   private static final int kRoman = 1;
   private static final int kKana = 2;
   private static final int kJis = 3;
+  private static final int kJis0212 = 4;
 
-  private ISO2022_JP() {
-    super("ISO-2022-JP", new String[] {"iso2022jp", "jis", "csISO2022JP", "jis_encoding", "csjisencoding"});
+  private final boolean jp2;
+
+  private ISO2022_JP(String name, String[] aliases, boolean jp2) {
+    super(name, aliases);
+    this.jp2 = jp2;
   }
 
   @Override
   public String historicalName() {
-    return "ISO2022JP";
+    return jp2 ? "ISO2022JP2" : "ISO2022JP";
   }
 
   @Override
@@ -41,6 +48,7 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
   @Override
   public CharsetDecoder newDecoder() {
     final CharsetDecoder jis = Charset.forName("x-JIS0208").newDecoder();
+    final CharsetDecoder euc = jp2 ? Charset.forName("EUC-JP").newDecoder() : null;
     return new CharsetDecoder(this, 0.5f, 1.0f) {
       private int mode = kAscii;
       private boolean shifted;
@@ -59,11 +67,25 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
             int b1 = src.get() & 0xff;
             if (b1 == 0x1b) {
               if (src.remaining() < 2) {
+                src.position(mark);
                 return CoderResult.UNDERFLOW;
               }
               int b2 = src.get() & 0xff;
               int b3 = src.get() & 0xff;
               int next = -1;
+              if (jp2 && b2 == '$' && b3 == '(') {
+                if (!src.hasRemaining()) {
+                  src.position(mark);
+                  return CoderResult.UNDERFLOW;
+                }
+                if ((src.get() & 0xff) == 'D') {
+                  mode = kJis0212;
+                  mark = src.position();
+                  continue;
+                }
+                src.position(mark);
+                return CoderResult.malformedForLength(4);
+              }
               if (b2 == '(' && b3 == 'B') {
                 next = kAscii;
               } else if (b2 == '(' && b3 == 'J') {
@@ -75,7 +97,7 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
               }
               if (next < 0) {
                 src.position(mark);
-                return CoderResult.malformedForLength(b2 == '(' || b2 == '$' ? 3 : 1);
+                return CoderResult.malformedForLength(b2 == '(' || b2 == '$' ? 3 : (jp2 && (b2 == '.' || b2 == 'N') ? 2 : 1));
               }
               mode = next;
               mark = src.position();
@@ -95,7 +117,7 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
               src.position(mark);
               return CoderResult.malformedForLength(1);
             }
-            if (b1 == '\n' || b1 == '\r') {
+            if ((b1 == '\n' || b1 == '\r') && !(jp2 && (mode == kJis || mode == kJis0212))) {
               if (!dst.hasRemaining()) {
                 src.position(mark);
                 return CoderResult.OVERFLOW;
@@ -106,8 +128,8 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
               continue;
             }
             char out;
-            if (mode == kJis) {
-              if (b1 < 0x21 || b1 > 0x7e) {
+            if (mode == kJis || mode == kJis0212) {
+              if (!jp2 && (b1 < 0x21 || b1 > 0x7e)) {
                 src.position(mark);
                 return CoderResult.malformedForLength(1);
               }
@@ -116,13 +138,20 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
                 return CoderResult.UNDERFLOW;
               }
               int b2 = src.get() & 0xff;
-              if (b2 < 0x21 || b2 > 0x7e) {
+              boolean badFirst = b1 < 0x21 || b1 > 0x7e;
+              if (badFirst && jp2 || b2 < 0x21 || b2 > 0x7e) {
                 src.position(mark);
-                return CoderResult.malformedForLength(1);
+                return CoderResult.malformedForLength(jp2 ? 2 : 1);
               }
-              jis.reset();
               CharBuffer one = CharBuffer.allocate(2);
-              CoderResult r = jis.decode(ByteBuffer.wrap(new byte[] {(byte) b1, (byte) b2}), one, true);
+              CoderResult r;
+              if (mode == kJis0212) {
+                euc.reset();
+                r = euc.decode(ByteBuffer.wrap(new byte[] {(byte) 0x8f, (byte) (b1 | 0x80), (byte) (b2 | 0x80)}), one, true);
+              } else {
+                jis.reset();
+                r = jis.decode(ByteBuffer.wrap(new byte[] {(byte) b1, (byte) b2}), one, true);
+              }
               if (r.isError() || one.position() == 0) {
                 src.position(mark);
                 return CoderResult.unmappableForLength(2);
@@ -173,7 +202,8 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
   @Override
   public CharsetEncoder newEncoder() {
     final CharsetEncoder jis = Charset.forName("x-JIS0208").newEncoder();
-    return new CharsetEncoder(this, 4.0f, 8.0f, new byte[] {0x21, 0x29}) {
+    final CharsetEncoder euc = jp2 ? Charset.forName("EUC-JP").newEncoder() : null;
+    return new CharsetEncoder(this, 4.0f, jp2 ? 9.0f : 8.0f, new byte[] {0x21, 0x29}) {
       private int mode = kAscii;
 
       @Override
@@ -202,11 +232,13 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
         if (mode == target) {
           return true;
         }
-        if (dst.remaining() < 3) {
+        if (dst.remaining() < (target == kJis0212 ? 4 : 3)) {
           return false;
         }
         dst.put((byte) 0x1b);
-        if (target == kJis) {
+        if (target == kJis0212) {
+          dst.put((byte) '$').put((byte) '(').put((byte) 'D');
+        } else if (target == kJis) {
           dst.put((byte) '$').put((byte) 'B');
         } else {
           dst.put((byte) '(').put((byte) (target == kAscii ? 'B' : (target == kRoman ? 'J' : 'I')));
@@ -220,7 +252,17 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
         if (c < 0x80 || c == '¥' || c == '‾' || (c >= 0xff61 && c <= 0xff9f)) {
           return true;
         }
-        return jis.canEncode(c);
+        return jis.canEncode(c) || euc != null && !Character.isSurrogate(c) && jis0212(c) != null;
+      }
+
+      private byte[] jis0212(char c) {
+        ByteBuffer three = ByteBuffer.allocate(4);
+        euc.reset();
+        CoderResult r = euc.encode(CharBuffer.wrap(new char[] {c}), three, true);
+        if (!r.isError() && three.position() == 3 && three.get(0) == (byte) 0x8f) {
+          return new byte[] {(byte) (three.get(1) & 0x7f), (byte) (three.get(2) & 0x7f)};
+        }
+        return null;
       }
 
       @Override
@@ -252,12 +294,16 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
             dst.put((byte) (c - 0xff61 + 0x21));
           } else {
             byte[] pair = null;
+            int pairMode = kJis;
             if (!Character.isSurrogate(c)) {
               ByteBuffer two = ByteBuffer.allocate(4);
               jis.reset();
               CoderResult r = jis.encode(CharBuffer.wrap(new char[] {c}), two, true);
               if (!r.isError() && two.position() == 2) {
                 pair = new byte[] {two.get(0), two.get(1)};
+              } else if (euc != null) {
+                pair = jis0212(c);
+                pairMode = kJis0212;
               }
             }
             if (pair == null) {
@@ -291,7 +337,7 @@ public final class ISO2022_JP extends Charset implements HistoricallyNamedCharse
               src.position(mark);
               return err;
             }
-            if (dst.remaining() < 5 || !switchTo(dst, kJis)) {
+            if (dst.remaining() < (pairMode == kJis0212 ? 6 : 5) || !switchTo(dst, pairMode)) {
               src.position(mark);
               return CoderResult.OVERFLOW;
             }
