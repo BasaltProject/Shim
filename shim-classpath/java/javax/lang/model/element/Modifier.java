@@ -1,0 +1,24 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package javax.lang.model.element;
+
+public enum Modifier {
+  PUBLIC, PROTECTED, PRIVATE, ABSTRACT, DEFAULT, STATIC, SEALED, NON_SEALED {
+    @Override
+    public String toString() {
+      return "non-sealed";
+    }
+  },
+  FINAL, TRANSIENT, VOLATILE, SYNCHRONIZED, NATIVE, STRICTFP;
+
+  @Override
+  public String toString() {
+    return name().toLowerCase(java.util.Locale.US);
+  }
+}
