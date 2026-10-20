@@ -11,7 +11,12 @@ package sun.management;
 import java.lang.management.GarbageCollectorMXBean;
 import javax.management.ObjectName;
 
-public class GarbageCollectorImpl implements GarbageCollectorMXBean {
+public class GarbageCollectorImpl implements com.sun.management.GarbageCollectorMXBean {
+  @Override
+  public com.sun.management.GcInfo getLastGcInfo() {
+    return null;
+  }
+
   @Override
   public long getCollectionCount() {
     return -1;

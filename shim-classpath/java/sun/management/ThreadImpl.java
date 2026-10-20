@@ -15,7 +15,41 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.management.ObjectName;
 
-public class ThreadImpl implements ThreadMXBean {
+public class ThreadImpl implements com.sun.management.ThreadMXBean {
+  private boolean allocatedEnabled = true;
+
+  @Override
+  public long getThreadAllocatedBytes(long id) {
+    if (id <= 0) {
+      throw new IllegalArgumentException("Invalid thread ID parameter: " + id);
+    }
+    return allocatedEnabled && Thread.currentThread().threadId() == id ? 0 : -1;
+  }
+
+  @Override
+  public long[] getThreadAllocatedBytes(long[] ids) {
+    long[] out = new long[ids.length];
+    for (int i = 0; i < ids.length; i++) {
+      out[i] = getThreadAllocatedBytes(ids[i]);
+    }
+    return out;
+  }
+
+  @Override
+  public boolean isThreadAllocatedMemorySupported() {
+    return true;
+  }
+
+  @Override
+  public boolean isThreadAllocatedMemoryEnabled() {
+    return allocatedEnabled;
+  }
+
+  @Override
+  public void setThreadAllocatedMemoryEnabled(boolean enable) {
+    allocatedEnabled = enable;
+  }
+
   private volatile boolean contentionMonitoring;
   private volatile boolean cpuTime = true;
   private volatile int peak;
