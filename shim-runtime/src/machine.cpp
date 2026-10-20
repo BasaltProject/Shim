@@ -2496,26 +2496,34 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
 }
 
 static bool moreSpecificDefault(Thread* t,
-                                GcArray* itable,
+                                GcArray* classItable,
                                 unsigned stride,
                                 unsigned current,
                                 GcMethod* existing,
                                 GcMethod* candidate)
 {
-  GcClass* challenger = cast<GcClass>(t, itable->body()[current]);
-  for (unsigned k = 0; k < itable->length(); k += stride) {
-    GcClass* provider = cast<GcClass>(t, itable->body()[k]);
+  // The inherited method may already be compiled, so its code object cannot identify the interface that provided it;
+  // the providers are the interfaces of its class that declare the same name and spec.
+  GcClass* challenger = cast<GcClass>(t, classItable->body()[current]);
+  if (candidate->vmFlags() & InterfaceMethodFlag or candidate->class_() != challenger) return false;
+  GcArray* holderTable = cast<GcArray>(t, existing->class_()->interfaceTable());
+  if (holderTable == 0) return false;
+  unsigned holderStride = (existing->class_()->flags() & ACC_INTERFACE) ? 1 : 2;
+  bool found = false;
+  for (unsigned k = 0; k < holderTable->length(); k += holderStride) {
+    GcClass* provider = cast<GcClass>(t, holderTable->body()[k]);
     GcArray* table = cast<GcArray>(t, provider->virtualTable());
-    if (table == 0 or provider == challenger) continue;
+    if (table == 0) continue;
     for (unsigned j = 0; j < table->length(); ++j) {
       GcMethod* m = cast<GcMethod>(t, table->body()[j]);
-      if (m->code() == existing->code() and byteArrayEqual(t, m->name(), candidate->name())
-          and byteArrayEqual(t, m->spec(), candidate->spec())) {
-        return isAssignableFrom(t, provider, challenger);
+      if (m->class_() == provider and not (m->vmFlags() & InterfaceMethodFlag) and m->code() != 0
+          and byteArrayEqual(t, m->name(), candidate->name()) and byteArrayEqual(t, m->spec(), candidate->spec())) {
+        if (provider == challenger or not isAssignableFrom(t, provider, challenger)) return false;
+        found = true;
       }
     }
   }
-  return false;
+  return found;
 }
 
 GcList* addInterfaceMethods(Thread* t,
@@ -2578,7 +2586,7 @@ GcList* addInterfaceMethods(Thread* t,
             bool useDefault = false;
             if (existing->code() == 0 and (existing->vmFlags() & InterfaceMethodFlag)) {
               useDefault = true;
-            } else if ((existing->vmFlags() & InterfaceMethodFlag) and existing->code() != method->code()
+            } else if ((existing->vmFlags() & InterfaceMethodFlag)
                        and moreSpecificDefault(t, itable, stride, i, existing, method)) {
               useDefault = true;
             }
@@ -5889,7 +5897,21 @@ GcClass* codeOwner(Thread* t, GcMethod* method)
       }
     }
   }
-  return c;
+  // The code object is replaced when a method is compiled, so fall back to the most specific declaring interface.
+  GcClass* best = 0;
+  for (unsigned i = 0; i < itable->length(); i += stride) {
+    GcClass* provider = cast<GcClass>(t, itable->body()[i]);
+    GcArray* table = cast<GcArray>(t, provider->virtualTable());
+    if (table == 0) continue;
+    for (unsigned j = 0; j < table->length(); ++j) {
+      GcMethod* m = cast<GcMethod>(t, table->body()[j]);
+      if (m->class_() == provider and not (m->vmFlags() & InterfaceMethodFlag) and m->code() != 0
+          and byteArrayEqual(t, m->name(), method->name()) and byteArrayEqual(t, m->spec(), method->spec())) {
+        if (best == 0 or isAssignableFrom(t, best, provider)) best = provider;
+      }
+    }
+  }
+  return best ? best : c;
 }
 
 bool classAccessible(Thread* t, GcClass* accessor, GcClass* c)
