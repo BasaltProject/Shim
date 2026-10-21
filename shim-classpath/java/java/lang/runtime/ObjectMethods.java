@@ -94,7 +94,8 @@ public final class ObjectMethods {
     }
 
     int metaId = register(recordClass, nameList, getters);
-    MethodHandle targetHandle = generateTarget(lookup, methodName, methodType, recordClass, metaId);
+    Component[] components = components(recordClass, nameList, getters);
+    MethodHandle targetHandle = generateTarget(lookup, methodName, methodType, recordClass, metaId, components);
 
     if (type instanceof MethodType) {
       return new ConstantCallSite(targetHandle);
@@ -103,17 +104,52 @@ public final class ObjectMethods {
     }
   }
 
+  private static final class Component {
+    final String name;
+    final String descriptor;
+
+    Component(String name, String descriptor) {
+      this.name = name;
+      this.descriptor = descriptor;
+    }
+
+    char kind() {
+      char c = descriptor.charAt(0);
+      return c == '[' ? 'L' : c;
+    }
+  }
+
+  private static Component[] components(Class<?> recordClass, String[] names, MethodHandle[] getters) {
+    Component[] result = new Component[names.length];
+    for (int i = 0; i < names.length; ++i) {
+      try {
+        Method accessor = recordClass.getDeclaredMethod(names[i]);
+        if (!java.lang.reflect.Modifier.isPublic(accessor.getModifiers())
+            || java.lang.reflect.Modifier.isStatic(accessor.getModifiers())) {
+          return null;
+        }
+        String desc = MethodType.methodType(accessor.getReturnType()).toMethodDescriptorString();
+        result[i] = new Component(names[i], desc.substring(desc.indexOf(')') + 1));
+      } catch (NoSuchMethodException e) {
+        return null;
+      }
+    }
+    return result;
+  }
+
   private static MethodHandle generateTarget(
       MethodHandles.Lookup lookup,
       String methodName,
       MethodType methodType,
       Class<?> recordClass,
-      int metaId) throws Throwable {
+      int metaId,
+      Component[] components) throws Throwable {
 
     String generatedClassName;
     synchronized (ObjectMethods.class) {
-      generatedClassName = "shim/record/RecordHelper$" + (nextClassId++);
+      generatedClassName = recordClass.getName().replace('.', '/') + "$$RecordHelper" + (nextClassId++);
     }
+    String recordName = recordClass.getName().replace('.', '/');
 
     List<PoolEntry> pool = new ArrayList<PoolEntry>();
     byte[] code;
@@ -123,10 +159,10 @@ public final class ObjectMethods {
         code = assembleToString(pool, metaId);
         break;
       case "hashCode":
-        code = assembleHashCode(pool, metaId);
+        code = components != null ? assembleDirectHashCode(pool, recordName, components) : assembleHashCode(pool, metaId);
         break;
       case "equals":
-        code = assembleEquals(pool, metaId);
+        code = components != null ? assembleDirectEquals(pool, recordName, components) : assembleEquals(pool, metaId);
         break;
       default:
         throw new IllegalArgumentException("Unknown method name: " + methodName);
@@ -151,6 +187,150 @@ public final class ObjectMethods {
         Classes.defineVMClass(cl, data, 0, data.length));
     Method m = generated.getMethod("make", methodType.parameterArray());
     return new MethodHandle(MethodHandle.REF_invokeStatic, cl, Classes.toVMMethod(m));
+  }
+
+  private static void op(ByteArrayOutputStream code, int opcode) throws IOException {
+    Stream.write1(code, opcode);
+  }
+
+  private static void opIndex(ByteArrayOutputStream code, int opcode, int poolIndex) throws IOException {
+    Stream.write1(code, opcode);
+    Stream.write2(code, poolIndex + 1);
+  }
+
+  private static byte[] finishCode(ByteArrayOutputStream code) throws IOException {
+    Stream.write2(code, 0);
+    Stream.write2(code, 0);
+    byte[] result = code.toByteArray();
+    Stream.set4(result, 4, result.length - 12);
+    return result;
+  }
+
+  private static byte[] assembleDirectEquals(List<PoolEntry> pool, String recordName, Component[] components)
+      throws IOException {
+    ByteArrayOutputStream code = new ByteArrayOutputStream();
+    Stream.write2(code, 6);
+    Stream.write2(code, 3);
+    Stream.write4(code, 0);
+    int base = code.size();
+
+    int recordClass = ConstantPool.addClass(pool, recordName);
+    op(code, Assembler.aload_0);
+    op(code, Assembler.aload_1);
+    int branch = code.size();
+    op(code, 0xa6);
+    Stream.write2(code, 5);
+    op(code, 0x04);
+    op(code, Assembler.ireturn);
+    op(code, Assembler.aload_1);
+    opIndex(code, 0xc1, recordClass);
+    int instanceBranch = code.size();
+    op(code, 0x9a);
+    Stream.write2(code, 5);
+    op(code, 0x03);
+    op(code, Assembler.ireturn);
+    op(code, Assembler.aload_1);
+    opIndex(code, 0xc0, recordClass);
+    op(code, 0x4d);
+
+    List<Integer> falseBranches = new ArrayList<Integer>();
+    for (Component c : components) {
+      int accessor = ConstantPool.addMethodRef(pool, recordName, c.name, "()" + c.descriptor);
+      op(code, Assembler.aload_0);
+      opIndex(code, Assembler.invokevirtual, accessor);
+      op(code, 0x2c);
+      opIndex(code, Assembler.invokevirtual, accessor);
+      switch (c.kind()) {
+      case 'J':
+        op(code, 0x94);
+        falseBranches.add(code.size());
+        op(code, 0x9a);
+        Stream.write2(code, 0);
+        break;
+      case 'F':
+        opIndex(code, Assembler.invokestatic, ConstantPool.addMethodRef(pool, "java/lang/Float", "compare", "(FF)I"));
+        falseBranches.add(code.size());
+        op(code, 0x9a);
+        Stream.write2(code, 0);
+        break;
+      case 'D':
+        opIndex(code, Assembler.invokestatic, ConstantPool.addMethodRef(pool, "java/lang/Double", "compare", "(DD)I"));
+        falseBranches.add(code.size());
+        op(code, 0x9a);
+        Stream.write2(code, 0);
+        break;
+      case 'L':
+        opIndex(code, Assembler.invokestatic,
+            ConstantPool.addMethodRef(pool, "java/util/Objects", "equals", "(Ljava/lang/Object;Ljava/lang/Object;)Z"));
+        falseBranches.add(code.size());
+        op(code, 0x99);
+        Stream.write2(code, 0);
+        break;
+      default:
+        falseBranches.add(code.size());
+        op(code, 0xa0);
+        Stream.write2(code, 0);
+        break;
+      }
+    }
+    op(code, 0x04);
+    op(code, Assembler.ireturn);
+    int falseTarget = code.size();
+    op(code, 0x03);
+    op(code, Assembler.ireturn);
+
+    byte[] result = finishCode(code);
+    for (int at : falseBranches) {
+      int offset = falseTarget - at;
+      result[at + 1] = (byte) (offset >> 8);
+      result[at + 2] = (byte) offset;
+    }
+    return result;
+  }
+
+  private static byte[] assembleDirectHashCode(List<PoolEntry> pool, String recordName, Component[] components)
+      throws IOException {
+    ByteArrayOutputStream code = new ByteArrayOutputStream();
+    Stream.write2(code, 8);
+    Stream.write2(code, 2);
+    Stream.write4(code, 0);
+
+    op(code, 0x03);
+    op(code, 0x3c);
+    for (Component c : components) {
+      int accessor = ConstantPool.addMethodRef(pool, recordName, c.name, "()" + c.descriptor);
+      op(code, 0x1b);
+      op(code, 0x10);
+      op(code, 31);
+      op(code, 0x68);
+      op(code, Assembler.aload_0);
+      opIndex(code, Assembler.invokevirtual, accessor);
+      switch (c.kind()) {
+      case 'Z':
+        opIndex(code, Assembler.invokestatic, ConstantPool.addMethodRef(pool, "java/lang/Boolean", "hashCode", "(Z)I"));
+        break;
+      case 'J':
+        opIndex(code, Assembler.invokestatic, ConstantPool.addMethodRef(pool, "java/lang/Long", "hashCode", "(J)I"));
+        break;
+      case 'F':
+        opIndex(code, Assembler.invokestatic, ConstantPool.addMethodRef(pool, "java/lang/Float", "hashCode", "(F)I"));
+        break;
+      case 'D':
+        opIndex(code, Assembler.invokestatic, ConstantPool.addMethodRef(pool, "java/lang/Double", "hashCode", "(D)I"));
+        break;
+      case 'L':
+        opIndex(code, Assembler.invokestatic,
+            ConstantPool.addMethodRef(pool, "java/util/Objects", "hashCode", "(Ljava/lang/Object;)I"));
+        break;
+      default:
+        break;
+      }
+      op(code, 0x60);
+      op(code, 0x3c);
+    }
+    op(code, 0x1b);
+    op(code, Assembler.ireturn);
+    return finishCode(code);
   }
 
   private static byte[] assembleToString(List<PoolEntry> pool, int metaId) throws IOException {

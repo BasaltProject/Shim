@@ -511,10 +511,26 @@ public final class Class <T>
 
   public native Constructor getEnclosingConstructor();
 
+  private static final class EnumConstantsCache {
+    static final java.util.concurrent.ConcurrentHashMap<Class<?>, Object[]> map
+        = new java.util.concurrent.ConcurrentHashMap<Class<?>, Object[]>();
+  }
+
   public T[] getEnumConstants() {
+    T[] shared = getEnumConstantsShared();
+    return shared == null ? null : shared.clone();
+  }
+
+  T[] getEnumConstantsShared() {
+    Object[] cached = EnumConstantsCache.map.get(this);
+    if (cached != null) {
+      return (T[]) cached;
+    }
     if (Enum.class.isAssignableFrom(this)) {
       try {
-        return (T[]) getMethod("values").invoke(null);
+        T[] values = (T[]) getMethod("values").invoke(null);
+        EnumConstantsCache.map.put(this, values);
+        return values;
       } catch (Exception e) {
         throw new Error();
       }
