@@ -1082,6 +1082,7 @@ class Machine {
   unsigned long long hiddenClassSequence;
   uint64_t threadIdSequence;
   System::Monitor* referenceLock;
+  System::Monitor* monitorMapLock;
   System::Monitor* shutdownLock;
   System::Library* libraries;
   FILE* errorLog;
@@ -2906,7 +2907,7 @@ inline Thread* monitorAtomicPollAcquire(Thread* t,
 inline bool monitorTryAcquire(Thread* t, GcMonitor* monitor)
 {
   if (monitor->owner() == t
-      or (monitorAtomicPollAcquire(t, monitor, false) == 0
+      or (monitor->owner() == 0
           and atomicCompareAndSwap(
                   reinterpret_cast<uintptr_t*>(&monitor->owner()),
                   0,
@@ -2918,11 +2919,37 @@ inline bool monitorTryAcquire(Thread* t, GcMonitor* monitor)
   }
 }
 
+inline void monitorSpinPause()
+{
+#if defined(__x86_64__) || defined(__i386__)
+  __builtin_ia32_pause();
+#elif defined(__aarch64__)
+  asm volatile("yield");
+#endif
+}
+
+inline bool monitorSpinAcquire(Thread* t, GcMonitor* monitor)
+{
+  static const unsigned kSpins = 200;
+  for (unsigned i = 0; i < kSpins; ++i) {
+    Thread* owner = static_cast<Thread*>(monitor->owner());
+    if (owner == 0) {
+      if (monitorTryAcquire(t, monitor)) {
+        return true;
+      }
+    } else if (owner->state != Thread::ActiveState) {
+      return false;
+    }
+    monitorSpinPause();
+  }
+  return false;
+}
+
 inline void monitorAcquire(Thread* t,
                            GcMonitor* monitor,
                            GcMonitorNode* node = 0)
 {
-  if (not monitorTryAcquire(t, monitor)) {
+  if (not monitorTryAcquire(t, monitor) and not monitorSpinAcquire(t, monitor)) {
     PROTECT(t, monitor);
     PROTECT(t, node);
 
