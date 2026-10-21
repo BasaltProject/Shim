@@ -21,10 +21,19 @@ final class StylesheetCompiler {
   }
 
   Transformer compile(Source source) throws TransformerConfigurationException {
-    throw new TransformerConfigurationException("XSLT stylesheets are not supported.");
+    return new XsltTransformer(factory, new XsltStylesheet(factory, source));
   }
 
-  Templates compileTemplates(Source source) throws TransformerConfigurationException {
-    throw new TransformerConfigurationException("XSLT stylesheets are not supported.");
+  Templates compileTemplates(final Source source) throws TransformerConfigurationException {
+    final XsltStylesheet sheet = new XsltStylesheet(factory, source);
+    return new Templates() {
+      public Transformer newTransformer() throws TransformerConfigurationException {
+        return new XsltTransformer(factory, sheet);
+      }
+
+      public java.util.Properties getOutputProperties() {
+        return new XsltTransformer(factory, sheet).getOutputProperties();
+      }
+    };
   }
 }

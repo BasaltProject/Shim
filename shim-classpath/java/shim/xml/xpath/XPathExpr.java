@@ -248,6 +248,8 @@ abstract class XPathExpr {
     final String local;
     final List<XPathExpr> args;
 
+    boolean external;
+
     Call(String prefix, String local, List<XPathExpr> args) {
       this.prefix = prefix;
       this.local = local;
@@ -255,7 +257,7 @@ abstract class XPathExpr {
     }
 
     Object eval(XPathContext c) {
-      if (prefix != null) {
+      if (prefix != null || external) {
         return XPathFunctions.extension(this, c);
       }
       return XPathFunctions.call(local, args, c);

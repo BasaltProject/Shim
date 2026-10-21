@@ -189,7 +189,7 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
       writeDeclaration();
     }
     try {
-      if (indent && method.equals("xml")) {
+      if (indent && (method.equals("xml") || isHtml())) {
         writer.write("\n");
       }
       writer.flush();
@@ -200,6 +200,23 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
 
   private boolean isXml() {
     return method.equals("xml");
+  }
+
+  private boolean isHtml() {
+    return method.equals("html");
+  }
+
+  private static final java.util.Set<String> kVoid = new HashSet<String>(java.util.Arrays.asList("area", "base",
+      "basefont", "br", "col", "frame", "hr", "img", "input", "isindex", "link", "meta", "param", "embed", "source",
+      "track", "wbr"));
+
+  private static boolean isVoid(String name) {
+    return kVoid.contains(name.toLowerCase(java.util.Locale.ROOT));
+  }
+
+  private String htmlMeta() {
+    return "<META http-equiv=\"Content-Type\" content=\"" + (mediaType != null ? mediaType : "text/html")
+        + "; charset=" + encoding + "\">";
   }
 
   public void startPrefixMapping(String prefix, String uri) throws SAXException {
@@ -292,6 +309,12 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
         stack.get(stack.size() - 1).children.add(n);
       }
       stack.add(n);
+      if (isHtml() && qName.equalsIgnoreCase("head")) {
+        Node meta = new Node();
+        meta.kind = Node.kRaw;
+        meta.data = htmlMeta();
+        n.children.add(meta);
+      }
       return;
     }
     closeOpenTag();
@@ -307,6 +330,7 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
     }
     writeStartTag(qName, attrs);
     startTagOpen = true;
+    openTag = qName;
     directStack.add(qName);
   }
 
@@ -314,6 +338,9 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
     if (startTagOpen) {
       raw(">");
       startTagOpen = false;
+      if (isHtml() && openTag != null && openTag.equalsIgnoreCase("head")) {
+        raw(htmlMeta());
+      }
     }
   }
 
@@ -337,6 +364,15 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
       return;
     }
     directKeys.remove(directKeys.size() - 1);
+    if (isHtml()) {
+      if (startTagOpen) {
+        closeOpenTag();
+      }
+      if (!isVoid(qName)) {
+        raw("</" + qName + ">");
+      }
+      return;
+    }
     if (startTagOpen) {
       raw("/>");
       startTagOpen = false;
@@ -572,7 +608,12 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
         escape(sb, a[1], true);
         sb.append('"');
       }
-      if (n.children.isEmpty()) {
+      if (isHtml() && n.children.isEmpty()) {
+        sb.append('>');
+        if (!isVoid(n.name)) {
+          sb.append("</").append(n.name).append('>');
+        }
+      } else if (n.children.isEmpty()) {
         sb.append("/>");
       } else if (inlineText(n)) {
         sb.append('>');

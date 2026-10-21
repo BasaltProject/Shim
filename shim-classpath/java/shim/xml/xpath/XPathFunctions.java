@@ -347,7 +347,7 @@ final class XPathFunctions {
           + "], but an extension provider is not set.");
     }
     String uri = "";
-    if (c.shared.namespaces != null) {
+    if (c.shared.namespaces != null && call.prefix != null) {
       String u = c.shared.namespaces.getNamespaceURI(call.prefix);
       uri = u == null ? "" : u;
     }
