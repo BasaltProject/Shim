@@ -97,7 +97,7 @@ public abstract class HttpClient implements AutoCloseable {
   }
 
   public WebSocket.Builder newWebSocketBuilder() {
-    throw new UnsupportedOperationException("WebSocket builder not supported");
+    return new WebSocketClient.BuilderImpl(this, executor().orElse(null));
   }
 
   @Override
