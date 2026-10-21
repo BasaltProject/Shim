@@ -359,8 +359,10 @@ public class Classes {
   public static void link(VMClass c, ClassLoader loader) {
     // Symbolic signatures belong to the defining class, including delegated loads.
     loader = c.loader;
-    acquireClassLock();
-    try {
+    if ((c.vmFlags & LinkFlag) != 0) {
+      return;
+    }
+    synchronized (c) {
       if ((c.vmFlags & LinkFlag) == 0) {
         if (c.super_ != null) {
           link(c.super_, loader);
@@ -392,10 +394,13 @@ public class Classes {
           }
         }
 
-        c.vmFlags |= LinkFlag;
+        acquireClassLock();
+        try {
+          c.vmFlags |= LinkFlag;
+        } finally {
+          releaseClassLock();
+        }
       }
-    } finally {
-      releaseClassLock();
     }
   }
 
@@ -405,19 +410,14 @@ public class Classes {
 
   private static void linkDeclaredMethods(VMClass c, boolean constructors, boolean publicOnly) {
     link(c);
-    acquireClassLock();
-    try {
-      if (c.methodTable == null) return;
-      for (int i = 0, count = declaredMethodCount(c); i < count; ++i) {
-        VMMethod method = c.methodTable[i];
-        String name = toString(method.name);
-        boolean constructor = name.equals("<init>");
-        if ((constructors ? !constructor : name.startsWith("<"))
-            || (publicOnly && (method.flags & Modifier.PUBLIC) == 0)) continue;
-        for (int j = 1; j < method.spec.length;) j = resolveSpec(c.loader, method.spec, j);
-      }
-    } finally {
-      releaseClassLock();
+    if (c.methodTable == null) return;
+    for (int i = 0, count = declaredMethodCount(c); i < count; ++i) {
+      VMMethod method = c.methodTable[i];
+      String name = toString(method.name);
+      boolean constructor = name.equals("<init>");
+      if ((constructors ? !constructor : name.startsWith("<"))
+          || (publicOnly && (method.flags & Modifier.PUBLIC) == 0)) continue;
+      for (int j = 1; j < method.spec.length;) j = resolveSpec(c.loader, method.spec, j);
     }
   }
 
@@ -427,13 +427,8 @@ public class Classes {
 
   public static void linkFields(VMClass c) {
     link(c);
-    acquireClassLock();
-    try {
-      if (c.fieldTable != null) {
-        for (VMField field : c.fieldTable) resolveSpec(c.loader, field.spec, 0);
-      }
-    } finally {
-      releaseClassLock();
+    if (c.fieldTable != null) {
+      for (VMField field : c.fieldTable) resolveSpec(c.loader, field.spec, 0);
     }
   }
 
