@@ -157,6 +157,15 @@ public final class DomBuilder extends DefaultHandler2 implements DeclHandler {
     }
     add(el);
     current = el;
+    if (recordPositions && locator != null) {
+      el.setUserData("shim.position", new int[] {locator.getLineNumber(), locator.getColumnNumber()}, null);
+    }
+  }
+
+  private boolean recordPositions;
+
+  public void recordPositions() {
+    recordPositions = true;
   }
 
   public void endElement(String uri, String localName, String qName) throws SAXException {
