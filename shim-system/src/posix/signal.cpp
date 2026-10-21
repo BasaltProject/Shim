@@ -21,6 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
+#include <stdio.h>
 #include "signal.h"
 #include "sys/types.h"
 #ifdef __APPLE__
@@ -99,7 +100,7 @@ namespace posix {
 
 using namespace vm;
 
-void handleSignal(int signal, siginfo_t*, void* context)
+void handleSignal(int signal, siginfo_t* info, void* context)
 {
   ucontext_t* c = static_cast<ucontext_t*>(context);
 
@@ -151,6 +152,7 @@ void handleSignal(int signal, siginfo_t*, void* context)
 
       vmJump(ip, frame, stack, thread, 0, 0);
     } else {
+      fprintf(stderr, "fatal signal %d at address %p\n", signal, info ? info->si_addr : 0);
       crash();
     }
   } break;
