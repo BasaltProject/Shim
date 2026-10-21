@@ -306,6 +306,16 @@ public abstract class HttpClient implements AutoCloseable {
         }
       }
 
+      Version used = Version.HTTP_1_1;
+      Http2Exchange.Result h2 = null;
+      if (request.version().orElse(version) == Version.HTTP_2 && "https".equalsIgnoreCase(uri.getScheme())
+          && (p == null || p == Proxy.NO_PROXY)) {
+        h2 = sendHttp2(request, uri);
+      }
+      if (h2 != null) {
+        return deliverHttp2(request, uri, h2, responseBodyHandler);
+      }
+
       URLConnection connection = (p != null && p != Proxy.NO_PROXY) ? url.openConnection(p) : url.openConnection();
       if (connectTimeout.isPresent()) {
         connection.setConnectTimeout((int) connectTimeout.get().toMillis());
@@ -411,7 +421,7 @@ public abstract class HttpClient implements AutoCloseable {
 
         @Override
         public Version version() {
-          return HttpClientImpl.this.version;
+          return used;
         }
       };
 
@@ -455,7 +465,126 @@ public abstract class HttpClient implements AutoCloseable {
       try {
         finalUri = connection.getURL().toURI();
       } catch (java.net.URISyntaxException ignore) { }
-      return new HttpResponseImpl<T>(code, request, respHeaders, body, finalUri, this.version);
+      return new HttpResponseImpl<T>(code, request, respHeaders, body, finalUri, used);
+    }
+
+    private Http2Exchange.Result sendHttp2(HttpRequest request, URI uri) throws IOException {
+      java.io.ByteArrayOutputStream bodyBytes = new java.io.ByteArrayOutputStream();
+      Optional<HttpRequest.BodyPublisher> pub = request.bodyPublisher();
+      if (pub.isPresent() && !request.method().equals("GET") && !request.method().equals("HEAD")) {
+        pub.get().subscribe(new Flow.Subscriber<ByteBuffer>() {
+          @Override
+          public void onSubscribe(Flow.Subscription subscription) {
+            subscription.request(Long.MAX_VALUE);
+          }
+
+          @Override
+          public void onNext(ByteBuffer item) {
+            byte[] b = new byte[item.remaining()];
+            item.get(b);
+            bodyBytes.write(b, 0, b.length);
+          }
+
+          @Override
+          public void onError(Throwable throwable) { }
+
+          @Override
+          public void onComplete() { }
+        });
+      }
+      List<String[]> headers = new java.util.ArrayList<String[]>();
+      boolean agent = false;
+      for (Map.Entry<String, List<String>> e : request.headers().map().entrySet()) {
+        String name = e.getKey().toLowerCase(java.util.Locale.ROOT);
+        agent |= name.equals("user-agent");
+        for (String v : e.getValue()) {
+          headers.add(new String[] {name, v});
+        }
+      }
+      if (!agent) {
+        headers.add(new String[] {"user-agent", "Java-http-client/" + System.getProperty("java.version")});
+      }
+      if (cookieHandler.isPresent()) {
+        Map<String, List<String>> cookies = cookieHandler.get().get(uri, request.headers().map());
+        if (cookies != null) {
+          for (Map.Entry<String, List<String>> e : cookies.entrySet()) {
+            for (String v : e.getValue()) {
+              headers.add(new String[] {e.getKey().toLowerCase(java.util.Locale.ROOT), v});
+            }
+          }
+        }
+      }
+      byte[] body = bodyBytes.toByteArray();
+      if (body.length > 0) {
+        headers.add(new String[] {"content-length", Integer.toString(body.length)});
+      }
+      int connect = connectTimeout.isPresent() ? (int) connectTimeout.get().toMillis() : 0;
+      int read = request.timeout().isPresent() ? (int) request.timeout().get().toMillis() : 0;
+      return Http2Exchange.run(sslContext.getSocketFactory(), sslParameters, uri, request.method(), headers, body,
+          connect, read);
+    }
+
+    private <T> HttpResponse<T> deliverHttp2(HttpRequest request, URI uri, Http2Exchange.Result r,
+                                             HttpResponse.BodyHandler<T> handler)
+        throws IOException, InterruptedException
+    {
+      HttpHeaders respHeaders = HttpHeaders.of(r.headers, (k, v) -> true);
+      if (cookieHandler.isPresent()) {
+        cookieHandler.get().put(uri, respHeaders.map());
+      }
+      String location = respHeaders.firstValue("location").orElse(null);
+      boolean redirect = r.status >= 301 && r.status <= 308 && r.status != 304 && r.status != 306 && location != null;
+      if (redirect && followRedirects != Redirect.NEVER) {
+        URI target = uri.resolve(location);
+        boolean secure = "https".equalsIgnoreCase(target.getScheme());
+        if (followRedirects == Redirect.ALWAYS || secure) {
+          HttpRequest.Builder b = HttpRequest.newBuilder(target);
+          boolean toGet = r.status == 303 || ((r.status == 301 || r.status == 302) && request.method().equals("POST"));
+          if (toGet) {
+            b.GET();
+          } else {
+            b.method(request.method(), request.bodyPublisher().orElse(HttpRequest.BodyPublishers.noBody()));
+          }
+          request.headers().map().forEach((k, vs) -> vs.forEach(v -> {
+            if (!k.equalsIgnoreCase("content-length")) {
+              b.header(k, v);
+            }
+          }));
+          return send(b.build(), handler);
+        }
+      }
+      final int code = r.status;
+      HttpResponse.ResponseInfo info = new HttpResponse.ResponseInfo() {
+        @Override
+        public int statusCode() {
+          return code;
+        }
+
+        @Override
+        public HttpHeaders headers() {
+          return respHeaders;
+        }
+
+        @Override
+        public Version version() {
+          return Version.HTTP_2;
+        }
+      };
+      HttpResponse.BodySubscriber<T> subscriber = handler.apply(info);
+      subscriber.onSubscribe(null);
+      if (r.body.length > 0) {
+        subscriber.onNext(Collections.singletonList(ByteBuffer.wrap(r.body)));
+      }
+      subscriber.onComplete();
+      T body;
+      try {
+        body = subscriber.getBody().toCompletableFuture().get();
+      } catch (Exception e) {
+        Throwable cause = e.getCause() != null ? e.getCause() : e;
+        if (cause instanceof IOException) throw (IOException) cause;
+        throw new IOException(cause);
+      }
+      return new HttpResponseImpl<T>(code, request, respHeaders, body, uri, Version.HTTP_2);
     }
 
     @Override
