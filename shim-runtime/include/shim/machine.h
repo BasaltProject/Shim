@@ -1140,6 +1140,8 @@ class GcThread;
 class GcThrowable;
 class GcString;
 
+class GcMonitorNode;
+
 class Thread {
  public:
   enum State {
@@ -1380,6 +1382,9 @@ class Thread {
   uintptr_t* heap;
   uintptr_t backupHeap[ThreadBackupHeapSizeInWords];
   unsigned backupHeapIndex;
+  GcMonitorNode** waitNodeRef;
+  uint16_t waitState;
+  uint16_t wakePending;
 
  private:
   unsigned flags;
@@ -2945,6 +2950,32 @@ inline bool monitorSpinAcquire(Thread* t, GcMonitor* monitor)
   return false;
 }
 
+// the caller holds t->lock and has queued its node on the monitor
+inline void monitorAwaitQueued(Thread* t, GcMonitor* monitor)
+{
+  PROTECT(t, monitor);
+
+  while (not(t == monitorAtomicPollAcquire(t, monitor, false)
+             and atomicCompareAndSwap(reinterpret_cast<uintptr_t*>(&monitor->owner()),
+                                      0,
+                                      reinterpret_cast<uintptr_t>(t)))) {
+    {
+      ENTER(t, Thread::IdleState);
+
+      t->lock->wait(t->systemThread, 0);
+    }
+
+    t->wakePending = 0;
+    storeLoadMemoryBarrier();
+  }
+
+  expect(t, t == monitorAtomicPollAcquire(t, monitor, true));
+
+  t->wakePending = 0;
+
+  ++monitor->depth();
+}
+
 inline void monitorAcquire(Thread* t,
                            GcMonitor* monitor,
                            GcMonitorNode* node = 0)
@@ -2955,25 +2986,15 @@ inline void monitorAcquire(Thread* t,
 
     ACQUIRE(t, t->lock);
 
+    t->wakePending = 0;
+
     monitorAtomicAppendAcquire(t, monitor, node);
 
     // note that we don't try to acquire the lock until we're first in
     // line, both because it's fair and because we don't support
     // removing elements from arbitrary positions in the queue
 
-    while (not(t == monitorAtomicPollAcquire(t, monitor, false)
-               and atomicCompareAndSwap(
-                       reinterpret_cast<uintptr_t*>(&monitor->owner()),
-                       0,
-                       reinterpret_cast<uintptr_t>(t)))) {
-      ENTER(t, Thread::IdleState);
-
-      t->lock->wait(t->systemThread, 0);
-    }
-
-    expect(t, t == monitorAtomicPollAcquire(t, monitor, true));
-
-    ++monitor->depth();
+    monitorAwaitQueued(t, monitor);
   }
 
   assertT(t, monitor->owner() == t);
@@ -2990,10 +3011,19 @@ inline void monitorRelease(Thread* t, GcMonitor* monitor)
 
     Thread* next = monitorAtomicPollAcquire(t, monitor, false);
 
-    if (next and acquireSystem(t, next)) {
-      ACQUIRE(t, next->lock);
+    // a head that was already signalled and has not run yet needs no second wake up
+    if (next and not next->wakePending and acquireSystem(t, next)) {
+      PROTECT(t, monitor);
 
-      next->lock->notify(t->systemThread);
+      {
+        ACQUIRE(t, next->lock);
+
+        if (next->wakePending == 0 and next == monitorAtomicPollAcquire(t, monitor, false)) {
+          next->wakePending = 1;
+
+          next->lock->notify(t->systemThread);
+        }
+      }
 
       releaseSystem(t, next);
     }
@@ -3068,6 +3098,7 @@ inline bool monitorWait(Thread* t, GcMonitor* monitor, int64_t time)
   expect(t, monitor->owner() == t);
 
   bool interrupted;
+  bool acquired = false;
   unsigned depth;
 
   PROTECT(t, monitor);
@@ -3082,17 +3113,36 @@ inline bool monitorWait(Thread* t, GcMonitor* monitor, int64_t time)
 
     monitorAppendWait(t, monitor);
 
+    t->waitNodeRef = &monitorNode;
+    t->waitState = 0;
+    t->wakePending = 0;
+
     depth = monitor->depth();
     monitor->depth() = 1;
 
     monitorRelease(t, monitor);
 
-    ENTER(t, Thread::IdleState);
+    {
+      ENTER(t, Thread::IdleState);
 
-    interrupted = t->lock->waitAndClearInterrupted(t->systemThread, time);
+      interrupted = t->lock->waitAndClearInterrupted(t->systemThread, time);
+    }
+
+    if (t->waitState == 1) {
+      // a notify moved this thread to the monitor's acquire queue without waking it
+      t->wakePending = 0;
+      storeLoadMemoryBarrier();
+      monitorAwaitQueued(t, monitor);
+      acquired = true;
+    }
+
+    t->waitState = 2;
+    t->waitNodeRef = 0;
   }
 
-  monitorAcquire(t, monitor, monitorNode);
+  if (not acquired) {
+    monitorAcquire(t, monitor, monitorNode);
+  }
 
   monitor->depth() = depth;
 
@@ -3134,9 +3184,17 @@ inline bool monitorNotify(Thread* t, GcMonitor* monitor)
   Thread* next = monitorPollWait(t, monitor);
 
   if (next) {
+    PROTECT(t, monitor);
+
     ACQUIRE(t, next->lock);
 
-    next->lock->notify(t->systemThread);
+    if (next->waitState == 0 and next->waitNodeRef) {
+      next->waitState = 1;
+
+      monitorAtomicAppendAcquire(t, monitor, *next->waitNodeRef);
+    } else {
+      next->lock->notify(t->systemThread);
+    }
 
     return true;
   } else {
