@@ -137,6 +137,12 @@ public class Throwable implements Serializable {
 
   static native StackTraceElement[] resolveTrace(Object trace);
 
+  static native Class<?>[] classTrace(Object trace);
+
+  Class<?>[] stackClasses() {
+    return trace instanceof StackTraceElement[] ? null : classTrace(trace);
+  }
+
   private StackTraceElement[] resolveTrace() {
     if (! (trace instanceof StackTraceElement[])) {
       trace = resolveTrace(trace);

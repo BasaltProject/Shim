@@ -33,7 +33,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 
-public class URLClassLoader extends ClassLoader implements Closeable {
+public class URLClassLoader extends java.security.SecureClassLoader implements Closeable {
 
   private final List<URL> urls = new ArrayList<URL>();
   private final List<File> roots = new ArrayList<File>();
@@ -92,13 +92,21 @@ public class URLClassLoader extends ClassLoader implements Closeable {
       for (File root : roots) {
         byte[] data = readBytes(root, path);
         if (data != null) {
-          return defineClass(name, data, 0, data.length);
+          return defineClass(name, data, 0, data.length, codeSource(root));
         }
       }
     } catch (IOException e) {
       throw new ClassNotFoundException("couldn't find class " + name, e);
     }
     throw new ClassNotFoundException("couldn't find class " + name);
+  }
+
+  private static java.security.CodeSource codeSource(File root) {
+    try {
+      return new java.security.CodeSource(root.toURI().toURL(), (java.security.cert.Certificate[]) null);
+    } catch (MalformedURLException e) {
+      return null;
+    }
   }
 
   private static byte[] readBytes(File root, String path) throws IOException {

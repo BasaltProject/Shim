@@ -587,6 +587,26 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Throwable_classTrace(Thread* t, object, uintptr_t* arguments)
+{
+  object trace = reinterpret_cast<object>(*arguments);
+  PROTECT(t, trace);
+
+  unsigned length = objectArrayLength(t, trace);
+  object array = makeObjectArray(t, type(t, GcJclass::Type), length);
+  PROTECT(t, array);
+
+  for (unsigned i = 0; i < length; ++i) {
+    GcTraceElement* element = cast<GcTraceElement>(t, objectArrayBody(t, trace, i));
+    GcMethod* method = cast<GcMethod>(t, element->method());
+    GcJclass* jclass = getJClass(t, method->class_());
+    reinterpret_cast<GcArray*>(array)->setBodyElement(t, i, jclass);
+  }
+
+  return reinterpret_cast<int64_t>(array);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_Thread_currentThread(Thread* t, object, uintptr_t*)
 {
   return reinterpret_cast<int64_t>(t->javaThread);

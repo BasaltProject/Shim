@@ -24,13 +24,17 @@ public class SecureClassLoader extends ClassLoader {
   }
 
   protected final Class<?> defineClass(String name, byte[] b, int off, int len, CodeSource cs) {
-    return defineClass(name, b, off, len, (ProtectionDomain) null);
+    return defineClass(name, b, off, len, domain(cs));
+  }
+
+  private ProtectionDomain domain(CodeSource cs) {
+    return cs == null ? null : new ProtectionDomain(cs, null, this, null);
   }
 
   protected final Class<?> defineClass(String name, ByteBuffer b, CodeSource cs) {
     byte[] bytes = new byte[b.remaining()];
     b.get(bytes);
-    return defineClass(name, bytes, 0, bytes.length, (ProtectionDomain) null);
+    return defineClass(name, bytes, 0, bytes.length, domain(cs));
   }
 
   protected PermissionCollection getPermissions(CodeSource codesource) {

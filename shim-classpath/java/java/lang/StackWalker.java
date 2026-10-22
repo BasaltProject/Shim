@@ -69,14 +69,17 @@ public final class StackWalker {
   }
 
   private List<StackFrame> captureFrames() {
-    StackTraceElement[] elements = new Throwable().getStackTrace();
+    Throwable capture = new Throwable();
+    Class<?>[] classes = capture.stackClasses();
+    StackTraceElement[] elements = capture.getStackTrace();
     List<StackFrame> frames = new ArrayList<StackFrame>();
     boolean retainClass = options.contains(Option.RETAIN_CLASS_REFERENCE);
     boolean showReflect = options.contains(Option.SHOW_REFLECT_FRAMES);
     boolean showHidden = options.contains(Option.SHOW_HIDDEN_FRAMES);
 
     boolean passedSelf = false;
-    for (StackTraceElement ste : elements) {
+    for (int i = 0; i < elements.length; i++) {
+      StackTraceElement ste = elements[i];
       String cname = ste.getClassName();
       if (!passedSelf) {
         if (cname.equals("java.lang.StackWalker") || cname.equals("java.lang.Throwable")) {
@@ -94,7 +97,7 @@ public final class StackWalker {
           continue;
         }
       }
-      frames.add(new StackFrameImpl(ste, retainClass));
+      frames.add(new StackFrameImpl(ste, retainClass, classes != null && i < classes.length ? classes[i] : null));
     }
     return frames;
   }
@@ -117,7 +120,9 @@ public final class StackWalker {
     if (!options.contains(Option.RETAIN_CLASS_REFERENCE)) {
       throw new UnsupportedOperationException("RETAIN_CLASS_REFERENCE option not set");
     }
-    StackTraceElement[] elements = new Throwable().getStackTrace();
+    Throwable capture = new Throwable();
+    Class<?>[] classes = capture.stackClasses();
+    StackTraceElement[] elements = capture.getStackTrace();
     int idx = 0;
     while (idx < elements.length &&
            (elements[idx].getClassName().equals("java.lang.Throwable") ||
@@ -127,6 +132,9 @@ public final class StackWalker {
     int callerIdx = idx + 1;
     if (callerIdx >= elements.length) {
       throw new IllegalCallerException("no caller frame");
+    }
+    if (classes != null && callerIdx < classes.length) {
+      return classes[callerIdx];
     }
     try {
       ClassLoader cl = Thread.currentThread().getContextClassLoader();
@@ -144,9 +152,10 @@ public final class StackWalker {
     private final boolean retainClass;
     private Class<?> declaringClass;
 
-    StackFrameImpl(StackTraceElement ste, boolean retainClass) {
+    StackFrameImpl(StackTraceElement ste, boolean retainClass, Class<?> declaringClass) {
       this.ste = ste;
       this.retainClass = retainClass;
+      this.declaringClass = declaringClass;
     }
 
     @Override

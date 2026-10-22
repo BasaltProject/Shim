@@ -33,6 +33,19 @@ public class SecurityManager {
   public SecurityManager() {
   }
 
+  protected Class<?>[] getClassContext() {
+    Class<?>[] classes = new Throwable().stackClasses();
+    if (classes == null) return new Class<?>[0];
+    int skip = 0;
+    while (skip < classes.length
+           && (classes[skip] == Throwable.class || classes[skip] == SecurityManager.class)) {
+      skip++;
+    }
+    Class<?>[] context = new Class<?>[classes.length - skip];
+    System.arraycopy(classes, skip, context, 0, context.length);
+    return context;
+  }
+
   public Object getSecurityContext() {
     return AccessController.getContext();
   }

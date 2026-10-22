@@ -743,7 +743,16 @@ public class Classes {
     return makeMethod(SystemClassLoader.getClass(m.class_), index(m));
   }
 
+  private static final java.util.Map<Class<?>, ProtectionDomain> domains
+      = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<Class<?>, ProtectionDomain>());
+
+  public static void setProtectionDomain(Class<?> c, ProtectionDomain domain) {
+    domains.put(c, domain);
+  }
+
   public static ProtectionDomain getProtectionDomain(VMClass c) {
+    ProtectionDomain assigned = domains.get(SystemClassLoader.getClass(c));
+    if (assigned != null) return assigned;
     CodeSource source = null;
     if (c.source != null) {
       try {
