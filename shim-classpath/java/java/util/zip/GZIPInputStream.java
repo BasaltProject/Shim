@@ -124,6 +124,10 @@ public class GZIPInputStream extends InflaterInputStream {
       return -1;
     }
 
+    if (len == 0) {
+      return 0;
+    }
+
     int n = super.read(buf, off, len);
     if (n > 0) {
       crc.update(buf, off, n);
