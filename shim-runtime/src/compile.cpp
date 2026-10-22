@@ -21,6 +21,12 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
+#if defined(__linux__) && __has_include(<execinfo.h>)
+#define SHIM_NATIVE_BACKTRACE 1
+#include <execinfo.h>
+#include <dlfcn.h>
+#endif
+
 #include "shim/machine.h"
 #include "shim/util.h"
 #include "shim/alloc-vector.h"
@@ -8883,6 +8889,18 @@ class SignalHandler : public SignalRegistrar::Handler {
         }
       }
       GcMethod* owner = methodForIp(t, *ip);
+#ifdef SHIM_NATIVE_BACKTRACE
+      void* native[48];
+      int nativeCount = backtrace(native, 48);
+      for (int i = 0; i < nativeCount; ++i) {
+        Dl_info info;
+        if (dladdr(native[i], &info) && info.dli_fname) {
+          fprintf(stderr, "fatal signal: native %s+0x%lx %s\n", info.dli_fname,
+                  static_cast<unsigned long>(static_cast<char*>(native[i]) - static_cast<char*>(info.dli_fbase)),
+                  info.dli_sname ? info.dli_sname : "?");
+        }
+      }
+#endif
       fprintf(stderr, "fatal signal: ip=%p state=%d method=%s.%s%s\n", *ip, static_cast<int>(t->state),
               owner ? reinterpret_cast<const char*>(owner->class_()->name()->body().begin()) : "?",
               owner ? reinterpret_cast<const char*>(owner->name()->body().begin()) : "?",
