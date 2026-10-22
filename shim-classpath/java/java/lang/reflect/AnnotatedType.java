@@ -17,6 +17,6 @@ public interface AnnotatedType extends AnnotatedElement {
   }
 
   static AnnotatedType of(Type type) {
-    return new AnnotatedTypeImpl(type);
+    return AnnotatedTypeImpl.create(type);
   }
 }

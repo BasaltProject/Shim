@@ -100,7 +100,7 @@ public class Field<T> extends AccessibleObject implements Member {
   }
 
   public AnnotatedType getAnnotatedType() {
-    return new AnnotatedTypeImpl(getGenericType());
+    return AnnotatedTypeImpl.create(getGenericType());
   }
 
   private String describe() {

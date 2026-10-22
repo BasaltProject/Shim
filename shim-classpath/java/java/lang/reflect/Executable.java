@@ -71,14 +71,14 @@ public abstract class Executable extends AccessibleObject implements Member, Gen
   }
 
   public AnnotatedType getAnnotatedReturnType() {
-    return new AnnotatedTypeImpl(Void.TYPE);
+    return AnnotatedTypeImpl.create(Void.TYPE);
   }
 
   public AnnotatedType[] getAnnotatedParameterTypes() {
     Type[] types = getGenericParameterTypes();
     AnnotatedType[] res = new AnnotatedType[types.length];
     for (int i = 0; i < types.length; i++) {
-      res[i] = new AnnotatedTypeImpl(types[i]);
+      res[i] = AnnotatedTypeImpl.create(types[i]);
     }
     return res;
   }
@@ -87,7 +87,7 @@ public abstract class Executable extends AccessibleObject implements Member, Gen
     Type[] types = getGenericExceptionTypes();
     AnnotatedType[] res = new AnnotatedType[types.length];
     for (int i = 0; i < types.length; i++) {
-      res[i] = new AnnotatedTypeImpl(types[i]);
+      res[i] = AnnotatedTypeImpl.create(types[i]);
     }
     return res;
   }

@@ -505,7 +505,12 @@ public final class Class <T>
     return new Class[0];
   }
 
-  public native Class getEnclosingClass();
+  private native Class getEnclosingClass0();
+
+  public Class getEnclosingClass() {
+    Class enclosing = getEnclosingClass0();
+    return enclosing != null ? enclosing : getDeclaringClass();
+  }
 
   public native Method getEnclosingMethod();
 
@@ -1078,7 +1083,7 @@ public final class Class <T>
   }
 
   public java.lang.reflect.AnnotatedType[] getAnnotatedInterfaces() {
-    Class<?>[] ifaces = getInterfaces();
+    Type[] ifaces = getGenericInterfaces();
     java.lang.reflect.AnnotatedType[] res = new java.lang.reflect.AnnotatedType[ifaces.length];
     for (int i = 0; i < ifaces.length; i++) {
       res[i] = java.lang.reflect.AnnotatedType.of(ifaces[i]);
@@ -1087,7 +1092,7 @@ public final class Class <T>
   }
 
   public java.lang.reflect.AnnotatedType getAnnotatedSuperclass() {
-    Class<?> sup = getSuperclass();
+    Type sup = getGenericSuperclass();
     return sup == null ? null : java.lang.reflect.AnnotatedType.of(sup);
   }
 
