@@ -5853,15 +5853,33 @@ GcClass* resolveClass(Thread* t,
   }
 }
 
+static const int8_t* packageEnd(GcByteArray* name)
+{
+  const int8_t* begin = name->body().begin();
+  const int8_t* end = begin + name->length() - 1;
+  const int8_t* slash = end;
+  while (slash > begin && *slash != '/') --slash;
+  if (slash > begin && end - slash > 3 && slash[1] == '0' && slash[2] == 'x') {
+    bool hex = true;
+    for (const int8_t* c = slash + 3; c < end; ++c) {
+      hex = hex && ((*c >= '0' && *c <= '9') || (*c >= 'a' && *c <= 'f'));
+    }
+    if (hex) {
+      const int8_t* inner = slash - 1;
+      while (inner > begin && *inner != '/') --inner;
+      slash = *inner == '/' ? inner : begin;
+    }
+  }
+  return slash;
+}
+
 static bool samePackage(GcClass* a, GcClass* b)
 {
   if (a->loader() != b->loader()) return false;
   const int8_t* x = a->name()->body().begin();
   const int8_t* y = b->name()->body().begin();
-  const int8_t* xs = x + a->name()->length() - 1;
-  const int8_t* ys = y + b->name()->length() - 1;
-  while (xs > x && *xs != '/') --xs;
-  while (ys > y && *ys != '/') --ys;
+  const int8_t* xs = packageEnd(a->name());
+  const int8_t* ys = packageEnd(b->name());
   return (xs - x) == (ys - y) && memcmp(x, y, xs - x) == 0;
 }
 
