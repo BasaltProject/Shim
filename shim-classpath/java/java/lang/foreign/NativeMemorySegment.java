@@ -297,7 +297,7 @@ final class NativeMemorySegment extends AbstractMemorySegment {
   @Override
   public float get(ValueLayout.OfFloat layout, long offset) {
     Objects.requireNonNull(layout, "layout");
-    int bits = get(ValueLayout.JAVA_INT.withOrder(layout.order()), offset);
+    int bits = get(ValueLayout.JAVA_INT.withByteAlignment(layout.byteAlignment()).withOrder(layout.order()), offset);
     return Float.intBitsToFloat(bits);
   }
 
@@ -305,7 +305,7 @@ final class NativeMemorySegment extends AbstractMemorySegment {
   public void set(ValueLayout.OfFloat layout, long offset, float value) {
     Objects.requireNonNull(layout, "layout");
     int bits = Float.floatToRawIntBits(value);
-    set(ValueLayout.JAVA_INT.withOrder(layout.order()), offset, bits);
+    set(ValueLayout.JAVA_INT.withByteAlignment(layout.byteAlignment()).withOrder(layout.order()), offset, bits);
   }
 
   @Override
@@ -334,7 +334,7 @@ final class NativeMemorySegment extends AbstractMemorySegment {
   @Override
   public double get(ValueLayout.OfDouble layout, long offset) {
     Objects.requireNonNull(layout, "layout");
-    long bits = get(ValueLayout.JAVA_LONG.withOrder(layout.order()), offset);
+    long bits = get(ValueLayout.JAVA_LONG.withByteAlignment(layout.byteAlignment()).withOrder(layout.order()), offset);
     return Double.longBitsToDouble(bits);
   }
 
@@ -342,13 +342,13 @@ final class NativeMemorySegment extends AbstractMemorySegment {
   public void set(ValueLayout.OfDouble layout, long offset, double value) {
     Objects.requireNonNull(layout, "layout");
     long bits = Double.doubleToRawLongBits(value);
-    set(ValueLayout.JAVA_LONG.withOrder(layout.order()), offset, bits);
+    set(ValueLayout.JAVA_LONG.withByteAlignment(layout.byteAlignment()).withOrder(layout.order()), offset, bits);
   }
 
   @Override
   public MemorySegment get(AddressLayout layout, long offset) {
     Objects.requireNonNull(layout, "layout");
-    long addr = get(ValueLayout.JAVA_LONG.withOrder(layout.order()), offset);
+    long addr = get(ValueLayout.JAVA_LONG.withByteAlignment(layout.byteAlignment()).withOrder(layout.order()), offset);
     MemorySegment seg = MemorySegment.ofAddress(addr);
     if (layout.targetLayout().isPresent()) {
       seg = seg.reinterpret(layout.targetLayout().get().byteSize());
@@ -360,7 +360,7 @@ final class NativeMemorySegment extends AbstractMemorySegment {
   public void set(AddressLayout layout, long offset, MemorySegment value) {
     Objects.requireNonNull(layout, "layout");
     Objects.requireNonNull(value, "value");
-    set(ValueLayout.JAVA_LONG.withOrder(layout.order()), offset, value.address());
+    set(ValueLayout.JAVA_LONG.withByteAlignment(layout.byteAlignment()).withOrder(layout.order()), offset, value.address());
   }
 
   @Override
