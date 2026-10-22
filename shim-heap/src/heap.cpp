@@ -28,6 +28,10 @@
 
 #include <shim/util/math.h>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 using namespace vm;
 using namespace shim::util;
 
@@ -38,6 +42,7 @@ namespace local {
 const unsigned Top = ~static_cast<unsigned>(0);
 
 const unsigned InitialGen2CapacityInBytes = 4 * 1024 * 1024;
+const unsigned MinimumGen2HeadroomInBytes = 8 * 1024 * 1024;
 const unsigned InitialTenuredFixieCeilingInBytes = 4 * 1024 * 1024;
 
 const bool Verbose = false;
@@ -907,7 +912,7 @@ inline void initNextGen2(Context* c)
   unsigned desired = minimum;
 
   if (not oversizedGen2(c)) {
-    desired *= 2;
+    desired += max(minimum / 4, MinimumGen2HeadroomInBytes / BytesPerWord);
   }
 
   if (desired < InitialGen2CapacityInBytes / BytesPerWord) {
@@ -1837,6 +1842,12 @@ void collect(Context* c)
   }
 
   sweepFixies(c);
+
+#ifdef __GLIBC__
+  if (c->mode == Heap::MajorCollection) {
+    malloc_trim(0);
+  }
+#endif
 
   if (Verbose) {
     int64_t now = c->system->now();
