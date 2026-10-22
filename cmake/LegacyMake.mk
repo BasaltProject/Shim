@@ -27,6 +27,7 @@ build-arch := $(shell uname -m \
 	| sed 's/^i.86$$/i386/' \
 	| sed 's/^x86pc$$/i386/' \
 	| sed 's/amd64/x86_64/' \
+	| sed 's/^arm64$$/aarch64/' \
 	| sed 's/^arm.*$$/arm/' \
 	| sed 's/aarch64/arm64/')
 
@@ -103,7 +104,7 @@ ifeq ($(filter linux windows macosx ios freebsd,$(platform)),)
 endif
 
 ifeq ($(platform),macosx)
-	ifneq ($(filter arm arm64,$(arch)),)
+	ifeq ($(arch),arm)
 		x := $(error "please use ('arch=arm' or 'arch=arm64') 'platform=ios' to build for ios-arm")
 	endif
 endif
