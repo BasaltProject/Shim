@@ -2518,7 +2518,8 @@ static bool moreSpecificDefault(Thread* t,
       GcMethod* m = cast<GcMethod>(t, table->body()[j]);
       if (m->class_() == provider and not (m->vmFlags() & InterfaceMethodFlag) and m->code() != 0
           and byteArrayEqual(t, m->name(), candidate->name()) and byteArrayEqual(t, m->spec(), candidate->spec())) {
-        if (provider == challenger or not isAssignableFrom(t, provider, challenger)) return false;
+        if (provider == challenger) continue;
+        if (not isAssignableFrom(t, provider, challenger)) return false;
         found = true;
       }
     }
