@@ -2576,11 +2576,15 @@ int64_t getMethodAddress(MyThread* t, GcMethod* target)
 
 GcClass* resolveReferencedClass(Thread* t, GcPair* pair)
 {
+  object cached = pair->second();
+  if (objectClass(t, cached) == type(t, GcClass::Type)) return cast<GcClass>(t, cached);
+  PROTECT(t, pair);
   GcClass* accessor = codeOwner(t, cast<GcMethod>(t, pair->first()));
   PROTECT(t, accessor);
   GcClass* c = resolveClass(t, accessor->loader(), cast<GcReference>(t, pair->second())->name());
   PROTECT(t, c);
   checkClassAccess(t, accessor, c);
+  pair->setSecond(t, c);
   return c;
 }
 

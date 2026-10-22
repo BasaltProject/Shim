@@ -604,10 +604,18 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
   private static class InstanceFieldVarHandle extends VarHandle {
     private final Field field;
+    private final char fast;
+    private final long offset;
 
     InstanceFieldVarHandle(Field field) {
       super(field.getType(), Collections.<Class<?>>singletonList(field.getDeclaringClass()));
       this.field = field;
+      this.fast = FastVar.kind(field.getType());
+      this.offset = fast != 0 ? FastVar.U.objectFieldOffset(field) : 0;
+    }
+
+    private Object receiver(Object[] args) {
+      return Objects.requireNonNull(args[0]);
     }
 
     @Override
@@ -687,6 +695,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public Object get(Object... args) {
+      if (fast != 0) return FastVar.get(fast, receiver(args), offset);
       synchronized (lockFor(args)) {
         return get0(args);
       }
@@ -694,6 +703,10 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public void set(Object... args) {
+      if (fast != 0) {
+        FastVar.set(fast, receiver(args), offset, args[1]);
+        return;
+      }
       synchronized (lockFor(args)) {
         set0(args);
       }
@@ -701,6 +714,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public boolean compareAndSet(Object... args) {
+      if (fast != 0) return FastVar.compareAndSet(fast, receiver(args), offset, args[1], args[2]);
       synchronized (lockFor(args)) {
         return compareAndSet0(args);
       }
@@ -708,6 +722,7 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public Object getAndSet(Object... args) {
+      if (fast != 0) return FastVar.getAndSet(fast, receiver(args), offset, args[1]);
       synchronized (lockFor(args)) {
         return getAndSet0(args);
       }
@@ -715,10 +730,17 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public Object getAndAdd(Object... args) {
+      if (fast != 0) return FastVar.getAndAdd(fast, receiver(args), offset, args[1]);
       synchronized (lockFor(args)) {
         return getAndAdd0(args);
       }
     }
+    @Override
+    public Object compareAndExchange(Object... args) {
+      if (fast != 0) return FastVar.compareAndExchange(fast, receiver(args), offset, args[1], args[2]);
+      return super.compareAndExchange(args);
+    }
+
     @Override
     Object lockFor(Object[] args) {
       return stripe(args[0], field.hashCode());
@@ -856,8 +878,37 @@ public abstract class VarHandle implements java.lang.constant.Constable {
   }
 
   private static class ArrayVarHandle extends VarHandle {
+    private final Class<?> arrayClass;
+    private final char fast;
+    private final long base;
+    private final int shift;
+    private final boolean checked;
+
     ArrayVarHandle(Class<?> arrayClass) {
       super(arrayClass.getComponentType(), Arrays.<Class<?>>asList(arrayClass, int.class));
+      this.arrayClass = arrayClass;
+      this.fast = FastVar.kind(arrayClass.getComponentType());
+      this.base = fast != 0 ? FastVar.U.arrayBaseOffset(arrayClass) : 0;
+      int scale = fast != 0 ? FastVar.U.arrayIndexScale(arrayClass) : 1;
+      this.shift = Integer.numberOfTrailingZeros(scale);
+      this.checked = fast == 'L' && arrayClass.getComponentType() != Object.class;
+    }
+
+    private Object arrayOf(Object[] args) {
+      return Objects.requireNonNull(args[0]);
+    }
+
+    private long offsetOf(Object array, Object[] args) {
+      int index = ((Number) args[1]).intValue();
+      int length = fast == 'I' ? ((int[]) array).length : fast == 'J' ? ((long[]) array).length
+          : ((Object[]) array).length;
+      if (index < 0 || index >= length) {
+        throw new ArrayIndexOutOfBoundsException("Index " + index + " out of bounds for length " + length);
+      }
+      return base + ((long) index << shift);
+    }
+
+    private void check(Object value) {
     }
 
     @Override
@@ -923,6 +974,10 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public Object get(Object... args) {
+      if (fast != 0) {
+        Object array = arrayOf(args);
+        return FastVar.get(fast, array, offsetOf(array, args));
+      }
       synchronized (lockFor(args)) {
         return get0(args);
       }
@@ -930,6 +985,13 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public void set(Object... args) {
+      if (fast != 0) {
+        Object array = arrayOf(args);
+        long offset = offsetOf(array, args);
+        check(args[2]);
+        FastVar.set(fast, array, offset, args[2]);
+        return;
+      }
       synchronized (lockFor(args)) {
         set0(args);
       }
@@ -937,6 +999,12 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public boolean compareAndSet(Object... args) {
+      if (fast != 0) {
+        Object array = arrayOf(args);
+        long offset = offsetOf(array, args);
+        check(args[3]);
+        return FastVar.compareAndSet(fast, array, offset, args[2], args[3]);
+      }
       synchronized (lockFor(args)) {
         return compareAndSet0(args);
       }
@@ -944,6 +1012,12 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public Object getAndSet(Object... args) {
+      if (fast != 0) {
+        Object array = arrayOf(args);
+        long offset = offsetOf(array, args);
+        check(args[2]);
+        return FastVar.getAndSet(fast, array, offset, args[2]);
+      }
       synchronized (lockFor(args)) {
         return getAndSet0(args);
       }
@@ -951,10 +1025,25 @@ public abstract class VarHandle implements java.lang.constant.Constable {
 
     @Override
     public Object getAndAdd(Object... args) {
+      if (fast != 0) {
+        Object array = arrayOf(args);
+        return FastVar.getAndAdd(fast, array, offsetOf(array, args), args[2]);
+      }
       synchronized (lockFor(args)) {
         return getAndAdd0(args);
       }
     }
+    @Override
+    public Object compareAndExchange(Object... args) {
+      if (fast != 0) {
+        Object array = arrayOf(args);
+        long offset = offsetOf(array, args);
+        check(args[3]);
+        return FastVar.compareAndExchange(fast, array, offset, args[2], args[3]);
+      }
+      return super.compareAndExchange(args);
+    }
+
     @Override
     Object lockFor(Object[] args) {
       return stripe(args[0], ((Number) args[1]).intValue());
