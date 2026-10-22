@@ -708,6 +708,17 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_sun_misc_Unsafe_allocateInstance0(Thread* t, object, uintptr_t* arguments)
+{
+  GcClass* c = cast<GcJclass>(t, reinterpret_cast<object>(arguments[1]))->vmClass();
+  PROTECT(t, c);
+
+  initClass(t, c);
+
+  return reinterpret_cast<int64_t>(make(t, c));
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_shim_Atomic_compareAndSwapObject(Thread* t,
                                             object,
                                             uintptr_t* arguments)

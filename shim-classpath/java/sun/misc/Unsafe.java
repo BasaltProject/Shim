@@ -41,6 +41,18 @@ public final class Unsafe {
 
   public native void freeMemory(long address);
 
+  public Object allocateInstance(Class c) throws InstantiationException {
+    if (c.isPrimitive()) {
+      throw new InstantiationException();
+    }
+    if (c.isInterface() || c.isArray() || java.lang.reflect.Modifier.isAbstract(c.getModifiers())) {
+      throw new InstantiationException(c.getName());
+    }
+    return allocateInstance0(c);
+  }
+
+  private native Object allocateInstance0(Class c);
+
   public void invokeCleaner(java.nio.ByteBuffer directBuffer) {
     if (!directBuffer.isDirect()) {
       throw new IllegalArgumentException("Not a direct buffer");
