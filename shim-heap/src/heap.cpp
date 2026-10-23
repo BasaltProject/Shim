@@ -801,6 +801,7 @@ class Context {
         freshCopyCount(0),
         freshCopyCapacity(0),
         gen2Threshold(InitialGen2CapacityInBytes / BytesPerWord),
+        logMajor(getenv("SHIM_GC_STATS") != 0),
         compactNext(false),
         retiredMemory(0),
         retiredBytes(0)
@@ -903,6 +904,7 @@ class Context {
   unsigned freshCopyCount;
   unsigned freshCopyCapacity;
   unsigned gen2Threshold;
+  bool logMajor;
   bool compactNext;
   void* retiredMemory;
   size_t retiredBytes;
@@ -1064,6 +1066,12 @@ bool reserveGen2(Context* c)
       continue;
     }
 
+#ifdef MADV_NOHUGEPAGE
+    if (getenv("SHIM_GC_NOHUGEPAGE")) {
+      madvise(memory, total, MADV_NOHUGEPAGE);
+      madvise(bits, markBytes * 2, MADV_NOHUGEPAGE);
+    }
+#endif
     c->reservation = memory;
     c->reservationBytes = total;
     c->markBits = static_cast<uintptr_t*>(bits);
@@ -1342,6 +1350,19 @@ void sweepGen2(Context* c)
                           MinimumGen2HeadroomInBytes / BytesPerWord);
   c->gen2Threshold = accountedAfter + headroom;
   c->compactNext = c->gen2.position() > c->gen2.capacity() / 2;
+
+  if (c->logMajor) {
+    fprintf(stderr,
+            "gc major: gen2 position %u KB, live %u KB, free spans %u KB (%u spans), gen1 %u KB, "
+            "fixies %u KB, count %u KB\n",
+            c->gen2.position() * BytesPerWord / 1024,
+            accountedAfter * BytesPerWord / 1024,
+            c->freeWords * BytesPerWord / 1024,
+            c->spanCount,
+            c->nextGen1.position() * BytesPerWord / 1024,
+            (c->untenuredFixieFootprint + c->tenuredFixieFootprint) / 1024,
+            c->count / 1024);
+  }
 }
 
 void degradeToCopying(Context* c)
