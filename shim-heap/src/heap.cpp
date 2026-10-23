@@ -1949,6 +1949,22 @@ visit : {
     fprintf(stderr, "walk %p (%s)\n", copy, segment(c, copy));
   }
 
+  class Prefetcher : public Heap::Walker {
+   public:
+    Prefetcher(void* copy) : copy(copy)
+    {
+    }
+
+    virtual bool visit(unsigned offset)
+    {
+      __builtin_prefetch(maskAlignedPointer(get(copy, offset)));
+      return true;
+    }
+
+    void* copy;
+  } prefetcher(copy);
+
+  c->client->walk(copy, &prefetcher);
   c->client->walk(copy, &walker);
 
   if (walker.visits) {
