@@ -31,6 +31,10 @@
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <unistd.h>
+
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 #endif
 
 using namespace vm;
@@ -3622,6 +3626,12 @@ extern "C" SHIM_EXPORT jint JNICALL
     JNI_CreateJavaVM(Machine** m, Thread** t, void* args)
 {
   local::JavaVMInitArgs* a = static_cast<local::JavaVMInitArgs*>(args);
+
+#ifdef __GLIBC__
+  if (not getenv("MALLOC_TRIM_THRESHOLD_")) mallopt(M_TRIM_THRESHOLD, 128 * 1024);
+  if (not getenv("MALLOC_TOP_PAD_")) mallopt(M_TOP_PAD, 0);
+  if (not getenv("MALLOC_ARENA_MAX")) mallopt(M_ARENA_MAX, 1);
+#endif
 
   unsigned heapLimit = 0;
   unsigned stackLimit = 0;
