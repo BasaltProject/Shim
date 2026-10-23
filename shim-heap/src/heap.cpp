@@ -32,6 +32,16 @@
 #include <malloc.h>
 #endif
 
+#include <stdlib.h>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/mman.h>
+#define SHIM_HEAP_RESERVE 1
+#ifndef MAP_NORESERVE
+#define MAP_NORESERVE 0
+#endif
+#endif
+
 using namespace vm;
 using namespace shim::util;
 
@@ -43,6 +53,9 @@ const unsigned Top = ~static_cast<unsigned>(0);
 
 const unsigned InitialGen2CapacityInBytes = 4 * 1024 * 1024;
 const unsigned MinimumGen2HeadroomInBytes = 8 * 1024 * 1024;
+const unsigned MinimumSpanInWords = 4;
+const unsigned ReleaseSpanInBytes = 128 * 1024;
+const unsigned MaxSpansScanned = 32;
 const unsigned InitialTenuredFixieCeilingInBytes = 4 * 1024 * 1024;
 
 const bool Verbose = false;
@@ -711,6 +724,14 @@ Fixie* fixie(void* body)
 
 void free(Context* c, Fixie** fixies, bool resetImmortal = false);
 
+bool reserveGen2(Context* c);
+void releaseGen2(Context* c);
+
+struct Span {
+  unsigned start;
+  unsigned length;
+};
+
 class Context {
  public:
   Context(System* system, unsigned limit)
@@ -761,15 +782,40 @@ class Context {
         lastCollectionTime(system->now()),
         totalCollectionTime(0),
         totalTime(0),
-        limitWasExceeded(false)
+        limitWasExceeded(false),
+        inPlace(false),
+        reservation(0),
+        reservationBytes(0),
+        markBits(0),
+        freshBits(0),
+        markBitsBytes(0),
+        spans(0),
+        spanCount(0),
+        spanCapacity(0),
+        spanCursor(0),
+        freeWords(0),
+        markStack(0),
+        markStackCount(0),
+        markStackCapacity(0),
+        freshCopies(0),
+        freshCopyCount(0),
+        freshCopyCapacity(0),
+        gen2Threshold(InitialGen2CapacityInBytes / BytesPerWord),
+        compactNext(false),
+        retiredMemory(0),
+        retiredBytes(0)
   {
     if (not system->success(system->make(&lock))) {
       system->abort();
+    }
+    if (not getenv("SHIM_GC_COPYING")) {
+      inPlace = reserveGen2(this);
     }
   }
 
   void dispose()
   {
+    releaseGen2(this);
     gen1.dispose();
     nextGen1.dispose();
     gen2.dispose();
@@ -838,6 +884,28 @@ class Context {
   int64_t totalTime;
 
   bool limitWasExceeded;
+
+  bool inPlace;
+  void* reservation;
+  size_t reservationBytes;
+  uintptr_t* markBits;
+  uintptr_t* freshBits;
+  size_t markBitsBytes;
+  Span* spans;
+  unsigned spanCount;
+  unsigned spanCapacity;
+  unsigned spanCursor;
+  unsigned freeWords;
+  void** markStack;
+  unsigned markStackCount;
+  unsigned markStackCapacity;
+  unsigned* freshCopies;
+  unsigned freshCopyCount;
+  unsigned freshCopyCapacity;
+  unsigned gen2Threshold;
+  bool compactNext;
+  void* retiredMemory;
+  size_t retiredBytes;
 };
 
 const char* segment(Context* c, void* p)
@@ -936,15 +1004,387 @@ inline void initNextGen2(Context* c)
   }
 }
 
+
+#ifdef SHIM_HEAP_RESERVE
+void* mapZeroed(size_t bytes)
+{
+  void* p = mmap(0,
+                 bytes,
+                 PROT_READ | PROT_WRITE,
+                 MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
+                 -1,
+                 0);
+  return p == MAP_FAILED ? 0 : p;
+}
+
+void releaseMemory(void* p, size_t bytes)
+{
+#ifdef __linux__
+  madvise(p, bytes, MADV_DONTNEED);
+#else
+  madvise(p, bytes, MADV_FREE);
+#endif
+}
+#endif
+
+bool reserveGen2(Context* c)
+{
+#ifdef SHIM_HEAP_RESERVE
+  if (sizeof(void*) < 8) {
+    return false;
+  }
+
+  const uint64_t minimum = static_cast<uint64_t>(1) << 30;
+  const uint64_t maximum = static_cast<uint64_t>(16) << 30;
+
+  for (unsigned factor = 8; factor >= 2; factor /= 2) {
+    uint64_t bytes = static_cast<uint64_t>(c->limit) * factor;
+    if (bytes < minimum) {
+      bytes = minimum;
+    }
+    if (bytes > maximum) {
+      bytes = maximum;
+    }
+    if (const char* megabytes = getenv("SHIM_GC_RESERVE_MB")) {
+      bytes = static_cast<uint64_t>(atoi(megabytes)) << 20;
+    }
+
+    uint64_t words = bytes / BytesPerWord;
+    unsigned capacity = static_cast<unsigned>(words);
+    size_t total = c->gen2.footprint(capacity) * static_cast<size_t>(BytesPerWord);
+    size_t markBytes = ceilingDivide(capacity, BitsPerWord) * static_cast<size_t>(BytesPerWord);
+
+    void* memory = mapZeroed(total);
+    if (memory == 0) {
+      continue;
+    }
+    void* bits = mapZeroed(markBytes * 2);
+    if (bits == 0) {
+      munmap(memory, total);
+      continue;
+    }
+
+    c->reservation = memory;
+    c->reservationBytes = total;
+    c->markBits = static_cast<uintptr_t*>(bits);
+    c->freshBits = c->markBits + markBytes / BytesPerWord;
+    c->markBitsBytes = markBytes * 2;
+
+    c->gen2.data = static_cast<uintptr_t*>(memory);
+    c->gen2.capacity_ = capacity;
+    c->gen2.position_ = 0;
+
+    c->heapMap.clearNewData = false;
+    c->pageMap.clearNewData = false;
+    c->pointerMap.clearNewData = false;
+    c->heapMap.init();
+    return true;
+  }
+#else
+  (void)c;
+#endif
+  return false;
+}
+
+void releaseGen2(Context* c)
+{
+#ifdef SHIM_HEAP_RESERVE
+  if (c->reservation) {
+    munmap(c->reservation, c->reservationBytes);
+    munmap(c->markBits, c->markBitsBytes);
+    c->reservation = 0;
+    c->markBits = 0;
+    c->freshBits = 0;
+    c->gen2.data = 0;
+    c->gen2.capacity_ = 0;
+    c->gen2.position_ = 0;
+    c->gen2.map = 0;
+  }
+#endif
+  if (c->spans) {
+    c->system->free(c->spans);
+    c->spans = 0;
+  }
+  if (c->markStack) {
+    c->system->free(c->markStack);
+    c->markStack = 0;
+  }
+  if (c->freshCopies) {
+    c->system->free(c->freshCopies);
+    c->freshCopies = 0;
+  }
+}
+
+template <class T>
+void grow(Context* c, T** array, unsigned* capacity, unsigned needed)
+{
+  if (needed <= *capacity) {
+    return;
+  }
+  unsigned n = *capacity ? *capacity * 2 : 1024;
+  while (n < needed) {
+    n *= 2;
+  }
+  T* a = static_cast<T*>(c->system->tryAllocate(n * sizeof(T)));
+  if (a == 0) {
+    abort(c);
+  }
+  if (*array) {
+    memcpy(a, *array, *capacity * sizeof(T));
+    c->system->free(*array);
+  }
+  *array = a;
+  *capacity = n;
+}
+
+inline unsigned gen2Index(Context* c, void* o)
+{
+  return static_cast<uintptr_t*>(o) - c->gen2.data;
+}
+
+inline bool gen2Marked(Context* c, void* o)
+{
+  unsigned i = gen2Index(c, o);
+  return (c->markBits[wordOf(i)] >> bitOf(i)) & 1;
+}
+
+inline void setGen2Mark(Context* c, void* o)
+{
+  unsigned i = gen2Index(c, o);
+  c->markBits[wordOf(i)] |= static_cast<uintptr_t>(1) << bitOf(i);
+}
+
+inline bool gen2Fresh(Context* c, void* o)
+{
+  unsigned i = gen2Index(c, o);
+  return (c->freshBits[wordOf(i)] >> bitOf(i)) & 1;
+}
+
+void* allocateGen2(Context* c, unsigned size, bool* fromSpan)
+{
+  *fromSpan = false;
+
+  if (c->spanCount) {
+    unsigned scanned = 0;
+    while (scanned < MaxSpansScanned and scanned < c->spanCount) {
+      if (c->spanCursor >= c->spanCount) {
+        c->spanCursor = 0;
+      }
+      Span* s = c->spans + c->spanCursor;
+      if (s->length >= size) {
+        void* p = c->gen2.data + s->start;
+        unsigned leftover = s->length - size;
+        if (leftover < MinimumSpanInWords) {
+          s->start += s->length;
+          s->length = 0;
+          c->freeWords -= size + leftover;
+          c->count += (size + leftover) * BytesPerWord;
+        } else {
+          s->start += size;
+          s->length = leftover;
+          c->freeWords -= size;
+          c->count += size * BytesPerWord;
+        }
+        *fromSpan = true;
+        return p;
+      }
+      ++c->spanCursor;
+      ++scanned;
+    }
+  }
+
+  void* p = c->gen2.allocate(size);
+  c->count += size * BytesPerWord;
+  return p;
+}
+
+void* copyToGen2(Context* c, void* o, unsigned size)
+{
+  unsigned before = c->gen2.position();
+  bool fromSpan;
+  void* dst = allocateGen2(c, size, &fromSpan);
+  if (not fromSpan and c->gen2Base == Top) {
+    c->gen2Base = before;
+  }
+  c->client->copy(o, dst);
+
+  if (c->mode == Heap::MajorCollection) {
+    setGen2Mark(c, dst);
+  }
+  if (fromSpan) {
+    unsigned i = gen2Index(c, dst);
+    c->freshBits[wordOf(i)] |= static_cast<uintptr_t>(1) << bitOf(i);
+    grow(c, &c->freshCopies, &c->freshCopyCapacity, c->freshCopyCount + 1);
+    c->freshCopies[c->freshCopyCount++] = i;
+  }
+  return dst;
+}
+
+void clearFreshCopies(Context* c)
+{
+  for (unsigned i = 0; i < c->freshCopyCount; ++i) {
+    unsigned j = c->freshCopies[i];
+    c->freshBits[wordOf(j)] &= ~(static_cast<uintptr_t>(1) << bitOf(j));
+  }
+  c->freshCopyCount = 0;
+}
+
+void markInPlace(Context* c, void* o)
+{
+  setGen2Mark(c, o);
+  grow(c, &c->markStack, &c->markStackCapacity, c->markStackCount + 1);
+  c->markStack[c->markStackCount++] = o;
+}
+
+void collect(Context* c, void* target, unsigned offset);
+
+void drainMarkStack(Context* c)
+{
+  class Walker : public Heap::Walker {
+   public:
+    Walker(Context* c, void* object) : c(c), object(object)
+    {
+    }
+
+    virtual bool visit(unsigned offset)
+    {
+      local::collect(c, object, offset);
+      return true;
+    }
+
+    Context* c;
+    void* object;
+  };
+
+  while (c->markStackCount) {
+    void* o = c->markStack[--c->markStackCount];
+    Walker w(c, o);
+    c->client->walk(o, &w);
+  }
+}
+
+void clearMapPrefix(Segment::Map* map, unsigned words)
+{
+  if (words) {
+    unsigned bits = map->indexOf(words - 1) + map->bitsPerRecord;
+    memset(map->data, 0, ceilingDivide(bits, BitsPerWord) * BytesPerWord);
+  }
+  if (map->child) {
+    clearMapPrefix(map->child, words);
+  }
+}
+
+void sweepGen2(Context* c)
+{
+  unsigned oldPosition = c->gen2.position();
+  unsigned accountedBefore = oldPosition - c->freeWords;
+
+  c->spanCount = 0;
+  c->spanCursor = 0;
+  c->freeWords = 0;
+
+  unsigned previousEnd = 0;
+  unsigned markWords = ceilingDivide(oldPosition, BitsPerWord);
+
+  for (unsigned w = 0; w < markWords; ++w) {
+    uintptr_t bits = c->markBits[w];
+    while (bits) {
+      unsigned bit = __builtin_ctzl(bits);
+      bits &= bits - 1;
+      unsigned start = indexOf(w, bit);
+      if (start > previousEnd and start - previousEnd >= MinimumSpanInWords) {
+        grow(c, &c->spans, &c->spanCapacity, c->spanCount + 1);
+        c->spans[c->spanCount].start = previousEnd;
+        c->spans[c->spanCount].length = start - previousEnd;
+        ++c->spanCount;
+        c->freeWords += start - previousEnd;
+      }
+      unsigned size = c->client->sizeInWords(c->gen2.data + start);
+      previousEnd = start + size;
+    }
+  }
+
+  memset(c->markBits, 0, markWords * BytesPerWord);
+
+#ifdef SHIM_HEAP_RESERVE
+  const uintptr_t page = LikelyPageSizeInBytes;
+  const unsigned minimumWords = ReleaseSpanInBytes / BytesPerWord;
+
+  for (unsigned i = 0; i < c->spanCount; ++i) {
+    if (c->spans[i].length >= minimumWords) {
+      uintptr_t from = reinterpret_cast<uintptr_t>(c->gen2.data + c->spans[i].start);
+      uintptr_t to = from + c->spans[i].length * BytesPerWord;
+      from = (from + page - 1) & ~(page - 1);
+      to &= ~(page - 1);
+      if (to > from) {
+        releaseMemory(reinterpret_cast<void*>(from), to - from);
+      }
+    }
+  }
+
+  if (oldPosition > previousEnd) {
+    uintptr_t from = reinterpret_cast<uintptr_t>(c->gen2.data + previousEnd);
+    uintptr_t to = reinterpret_cast<uintptr_t>(c->gen2.data + oldPosition);
+    from = (from + page - 1) & ~(page - 1);
+    to = (to + page - 1) & ~(page - 1);
+    if (to > from) {
+      releaseMemory(reinterpret_cast<void*>(from), to - from);
+    }
+  }
+#endif
+
+  c->gen2.position_ = previousEnd;
+
+  unsigned accountedAfter = previousEnd - c->freeWords;
+  c->count -= (accountedBefore - accountedAfter) * BytesPerWord;
+
+  unsigned headroom = max(accountedAfter / 4,
+                          MinimumGen2HeadroomInBytes / BytesPerWord);
+  c->gen2Threshold = accountedAfter + headroom;
+  c->compactNext = c->gen2.position() > c->gen2.capacity() / 2;
+}
+
+void degradeToCopying(Context* c)
+{
+  c->count -= (c->gen2.position() - c->freeWords) * BytesPerWord;
+  c->retiredMemory = c->reservation;
+  c->retiredBytes = c->reservationBytes;
+  c->reservation = 0;
+  c->inPlace = false;
+  c->spanCount = 0;
+  c->freeWords = 0;
+  c->freshCopyCount = 0;
+  c->compactNext = false;
+  c->heapMap.clearNewData = true;
+  c->pageMap.clearNewData = true;
+  c->pointerMap.clearNewData = true;
+}
+
+void releaseRetired(Context* c)
+{
+#ifdef SHIM_HEAP_RESERVE
+  if (c->retiredMemory) {
+    munmap(c->retiredMemory, c->retiredBytes);
+    munmap(c->markBits, c->markBitsBytes);
+    c->retiredMemory = 0;
+    c->markBits = 0;
+    c->freshBits = 0;
+  }
+#endif
+}
+
 inline bool fresh(Context* c, void* o)
 {
   return c->nextGen1.contains(o) or c->nextGen2.contains(o)
-         or (c->gen2.contains(o) and c->gen2.indexOf(o) >= c->gen2Base);
+         or (c->gen2.contains(o)
+             and (c->gen2.indexOf(o) >= c->gen2Base
+                  or (c->inPlace and gen2Fresh(c, o))));
 }
 
 inline bool wasCollected(Context* c, void* o)
 {
-  return o and (not fresh(c, o)) and fresh(c, get(o, 0));
+  return o and (not(c->inPlace and c->gen2.contains(o))) and (not fresh(c, o))
+         and fresh(c, get(o, 0));
 }
 
 inline void* follow(Context* c UNUSED, void* o)
@@ -1087,12 +1527,15 @@ void* copy2(Context* c, void* o)
 
   if (c->gen2.contains(o)) {
     assertT(c, c->mode == Heap::MajorCollection);
+    assertT(c, not c->inPlace);
 
     return copyTo(c, &(c->nextGen2), o, size);
   } else if (c->gen1.contains(o)) {
     unsigned age = c->ageMap.get(o);
     if (age == TenureThreshold) {
-      if (c->mode == Heap::MinorCollection) {
+      if (c->inPlace) {
+        return copyToGen2(c, o, size);
+      } else if (c->mode == Heap::MinorCollection) {
         assertT(c, c->gen2.remaining() >= size);
 
         if (c->gen2Base == Top) {
@@ -1163,6 +1606,12 @@ void* update3(Context* c, void* o, bool* needsVisit)
   } else if (immortalHeapContains(c, o)) {
     *needsVisit = false;
     return o;
+  } else if (c->inPlace and c->gen2.contains(o)) {
+    if (not gen2Marked(c, o)) {
+      markInPlace(c, o);
+    }
+    *needsVisit = false;
+    return o;
   } else if (wasCollected(c, o)) {
     *needsVisit = false;
     return follow(c, o);
@@ -1217,7 +1666,7 @@ void updateHeapMap(Context* c,
   Segment* seg;
   Segment::Map* map;
 
-  if (c->mode == Heap::MinorCollection) {
+  if (c->mode == Heap::MinorCollection or c->inPlace) {
     seg = &(c->gen2);
     map = &(c->heapMap);
   } else {
@@ -1690,6 +2139,16 @@ void visitMarkedFixies(Context* c)
   }
 }
 
+void drainAll(Context* c)
+{
+  do {
+    visitMarkedFixies(c);
+    if (c->inPlace) {
+      drainMarkStack(c);
+    }
+  } while (c->markedFixies or c->markStackCount);
+}
+
 void collect(Context* c,
              Segment::Map* map,
              unsigned start,
@@ -1766,7 +2225,7 @@ void collect2(Context* c)
     virtual void visit(void* p)
     {
       local::collect(c, static_cast<void**>(p));
-      visitMarkedFixies(c);
+      drainAll(c);
     }
 
     Context* c;
@@ -1778,7 +2237,7 @@ void collect2(Context* c)
 bool limitExceeded(Context* c, int pendingAllocation)
 {
   unsigned count = c->count + pendingAllocation
-                   - (c->gen2.remaining() * BytesPerWord);
+                   - (c->inPlace ? 0 : c->gen2.remaining() * BytesPerWord);
 
   if (Verbose) {
     if (count > c->limit) {
@@ -1798,17 +2257,22 @@ bool limitExceeded(Context* c, int pendingAllocation)
 
 void collect(Context* c)
 {
-  if (limitExceeded(c, c->pendingAllocation) or oversizedGen2(c)
-      or c->tenureFootprint + c->tenurePadding > c->gen2.remaining()
+  unsigned tenureNeeded = c->tenureFootprint + c->tenurePadding;
+  bool gen2Full
+      = c->inPlace
+            ? (c->gen2.position() - c->freeWords + tenureNeeded
+                   > c->gen2Threshold
+               or c->gen2.position() + tenureNeeded > c->gen2.capacity())
+            : (oversizedGen2(c) or tenureNeeded > c->gen2.remaining());
+
+  if (limitExceeded(c, c->pendingAllocation) or gen2Full
       or c->fixieTenureFootprint + c->tenuredFixieFootprint
          > c->tenuredFixieCeiling) {
     if (Verbose) {
       if (limitExceeded(c, c->pendingAllocation)) {
         fprintf(stderr, "low memory causes ");
-      } else if (oversizedGen2(c)) {
-        fprintf(stderr, "oversized gen2 causes ");
-      } else if (c->tenureFootprint + c->tenurePadding > c->gen2.remaining()) {
-        fprintf(stderr, "undersized gen2 causes ");
+      } else if (gen2Full) {
+        fprintf(stderr, "full gen2 causes ");
       } else {
         fprintf(stderr, "fixie ceiling causes ");
       }
@@ -1828,17 +2292,36 @@ void collect(Context* c)
     then = c->system->now();
   }
 
+  if (c->inPlace and c->compactNext and c->mode == Heap::MajorCollection) {
+    degradeToCopying(c);
+  }
+
   initNextGen1(c);
 
   if (c->mode == Heap::MajorCollection) {
-    initNextGen2(c);
+    if (c->inPlace) {
+      clearMapPrefix(&(c->heapMap), c->gen2.position());
+    } else {
+      initNextGen2(c);
+    }
   }
 
   collect2(c);
 
   c->gen1.replaceWith(&(c->nextGen1));
   if (c->mode == Heap::MajorCollection) {
-    c->gen2.replaceWith(&(c->nextGen2));
+    if (c->inPlace) {
+      sweepGen2(c);
+    } else {
+      if (c->retiredMemory) {
+        c->gen2.data = 0;
+      }
+      c->gen2.replaceWith(&(c->nextGen2));
+      releaseRetired(c);
+    }
+  }
+  if (c->inPlace) {
+    clearFreshCopies(c);
   }
 
   sweepFixies(c);
@@ -2183,6 +2666,10 @@ class MyHeap : public Heap {
                                             : Tenured);
     } else if (c.nextGen1.contains(p)) {
       return Reachable;
+    } else if (c.inPlace and c.gen2.contains(p)) {
+      return (c.mode == Heap::MinorCollection or gen2Marked(&c, p))
+                 ? Tenured
+                 : Unreachable;
     } else if (c.nextGen2.contains(p) or immortalHeapContains(&c, p)
                or (c.gen2.contains(p)
                    and (c.mode == Heap::MinorCollection
