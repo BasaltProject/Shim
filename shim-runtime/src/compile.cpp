@@ -2585,9 +2585,11 @@ GcClass* resolveReferencedClass(Thread* t, GcPair* pair)
   object cached = pair->second();
   if (objectClass(t, cached) == type(t, GcClass::Type)) return cast<GcClass>(t, cached);
   PROTECT(t, pair);
+  GcReference* reference = cast<GcReference>(t, cached);
+  PROTECT(t, reference);
   GcClass* accessor = codeOwner(t, cast<GcMethod>(t, pair->first()));
   PROTECT(t, accessor);
-  GcClass* c = resolveClass(t, accessor->loader(), cast<GcReference>(t, pair->second())->name());
+  GcClass* c = resolveClass(t, accessor->loader(), reference->name());
   PROTECT(t, c);
   checkClassAccess(t, accessor, c);
   pair->setSecond(t, c);
