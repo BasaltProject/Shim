@@ -2971,7 +2971,19 @@ GcClass* loadedClassInPool(Thread* t, GcMethod* method, unsigned index)
 {
   object entry = singletonObject(t, method->code()->pool(), index);
   if (objectClass(t, entry) == type(t, GcReference::Type)) {
-    GcClass* c = findLoadedClass(t, method->class_()->loader(), cast<GcReference>(t, entry)->name());
+    GcClassLoader* loader = method->class_()->loader();
+    PROTECT(t, loader);
+    GcByteArray* name = cast<GcReference>(t, entry)->name();
+    PROTECT(t, name);
+    GcClass* c = findLoadedClass(t, loader, name);
+    if (c == 0 and objectClass(t, loader) == type(t, GcSystemClassLoader::Type)) {
+      if (name->length() == 3 and name->body()[0] == '[') {
+        c = resolveSystemClass(t, loader, name, false);
+      }
+      for (GcClassLoader* parent = loader->parent(); c == 0 and parent; parent = parent->parent()) {
+        c = findLoadedClass(t, parent, name);
+      }
+    }
     return c and classAccessible(t, codeOwner(t, method), c) ? c : 0;
   }
   return cast<GcClass>(t, entry);
@@ -2979,6 +2991,7 @@ GcClass* loadedClassInPool(Thread* t, GcMethod* method, unsigned index)
 
 void checkCast(MyThread* t, GcClass* class_, object o)
 {
+  if (o and objectClass(t, o) == class_) return;
   PROTECT(t, class_);
   PROTECT(t, o);
   if (UNLIKELY(o and not isAssignableFrom(t, class_, objectClass(t, o)))) {
@@ -2989,6 +3002,7 @@ void checkCast(MyThread* t, GcClass* class_, object o)
 void checkCastFromReference(MyThread* t, GcPair* pair, object o)
 {
   if (!o) return;
+  if (objectClass(t, o) == pair->second()) return;
   PROTECT(t, pair);
   PROTECT(t, o);
 
@@ -3197,6 +3211,7 @@ uint64_t instanceOf64(Thread* t, GcClass* class_, object o)
 uint64_t instanceOfFromReference(Thread* t, GcPair* pair, object o)
 {
   if (!o) return 0;
+  if (objectClass(t, o) == pair->second()) return 1;
   PROTECT(t, pair);
   PROTECT(t, o);
 
