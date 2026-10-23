@@ -2622,6 +2622,8 @@ namespace vm {
 
 void dumpHeap(Thread* t, FILE* out);
 
+void dumpHeapStats(Thread* t, FILE* out);
+
 inline void NO_RETURN throw_(Thread* t, GcThrowable* e)
 {
   assertT(t, t->exception == 0);
