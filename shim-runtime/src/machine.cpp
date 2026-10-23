@@ -4001,6 +4001,7 @@ void doCollect(Thread* t, Heap::CollectionType type, int pendingAllocation)
       footprint(m->rootThread),
       pendingAllocation - (t->m->heapPoolIndex * ThreadHeapSizeInWords));
   m->unsafe = false;
+  ++m->gcEpoch;
 
   postCollect(m->rootThread);
 
@@ -4214,7 +4215,8 @@ Machine::Machine(System* system,
       triedBuiltinOnLoad(false),
       dumpedHeapOnOOM(false),
       alive(true),
-      heapPoolIndex(0)
+      heapPoolIndex(0),
+      gcEpoch(1)
 {
   heap->setClient(heapClient);
 
@@ -4335,6 +4337,9 @@ Thread::Thread(Machine* m, GcThread* javaThread, Thread* parent)
       wakePending(0),
       flags(ActiveFlag)
 {
+  monitorCacheEpoch = 0;
+  memset(monitorCacheObject, 0, sizeof(monitorCacheObject));
+  memset(monitorCacheMonitor, 0, sizeof(monitorCacheMonitor));
 }
 
 void Thread::init()
@@ -6531,9 +6536,25 @@ void monitorMapInsert(Thread* t, object o, object m)
 
 }  // namespace
 
+static void rememberMonitor(Thread* t, object o, object monitor)
+{
+  if (t->monitorCacheEpoch != t->m->gcEpoch) {
+    memset(t->monitorCacheObject, 0, sizeof(t->monitorCacheObject));
+    t->monitorCacheEpoch = t->m->gcEpoch;
+  }
+  unsigned slot = (reinterpret_cast<uintptr_t>(o) >> 4) & (Thread::MonitorCacheSize - 1);
+  t->monitorCacheObject[slot] = reinterpret_cast<uintptr_t>(o);
+  t->monitorCacheMonitor[slot] = reinterpret_cast<uintptr_t>(monitor);
+}
+
 GcMonitor* objectMonitor(Thread* t, object o, bool createNew)
 {
   assertT(t, t->state == Thread::ActiveState);
+
+  unsigned slot = (reinterpret_cast<uintptr_t>(o) >> 4) & (Thread::MonitorCacheSize - 1);
+  if (t->monitorCacheEpoch == t->m->gcEpoch and t->monitorCacheObject[slot] == reinterpret_cast<uintptr_t>(o)) {
+    return cast<GcMonitor>(t, reinterpret_cast<object>(static_cast<uintptr_t>(t->monitorCacheMonitor[slot])));
+  }
 
   object m = hashMapFind(t, roots(t)->monitorMap(), o, objectHash, objectEqual);
 
@@ -6542,6 +6563,7 @@ GcMonitor* objectMonitor(Thread* t, object o, bool createNew)
       fprintf(stderr, "found monitor %p for object %x\n", m, objectHash(t, o));
     }
 
+    rememberMonitor(t, o, m);
     return cast<GcMonitor>(t, m);
   } else if (createNew) {
     PROTECT(t, o);
@@ -6552,6 +6574,7 @@ GcMonitor* objectMonitor(Thread* t, object o, bool createNew)
     m = hashMapFind(t, roots(t)->monitorMap(), o, objectHash, objectEqual);
 
     if (m) {
+      rememberMonitor(t, o, m);
       return cast<GcMonitor>(t, m);
     }
 
@@ -6567,6 +6590,7 @@ GcMonitor* objectMonitor(Thread* t, object o, bool createNew)
 
     addFinalizer(t, o, removeMonitor);
 
+    rememberMonitor(t, o, m);
     return cast<GcMonitor>(t, m);
   } else {
     return 0;

@@ -157,7 +157,7 @@ const uintptr_t FixedMark = 3;
 const unsigned ThreadHeapSizeInBytes = 64 * 1024;
 const unsigned ThreadHeapSizeInWords = ThreadHeapSizeInBytes / BytesPerWord;
 
-const unsigned ThreadBackupHeapSizeInBytes = 2 * 1024;
+const unsigned ThreadBackupHeapSizeInBytes = 2 * 1024 - 72;
 const unsigned ThreadBackupHeapSizeInWords = ThreadBackupHeapSizeInBytes
                                              / BytesPerWord;
 
@@ -1105,6 +1105,7 @@ class Machine {
   uintptr_t* heapPool[ThreadHeapPoolSize];
   unsigned heapPoolIndex;
   size_t bootimageSize;
+  uintptr_t gcEpoch;
 };
 
 void printTrace(Thread* t, GcThrowable* exception);
@@ -1382,6 +1383,10 @@ class Thread {
   uintptr_t* defaultHeap;
   uintptr_t* heap;
   uintptr_t backupHeap[ThreadBackupHeapSizeInWords];
+  static const unsigned MonitorCacheSize = 4;
+  uint64_t monitorCacheEpoch;
+  uint64_t monitorCacheObject[MonitorCacheSize];
+  uint64_t monitorCacheMonitor[MonitorCacheSize];
   unsigned backupHeapIndex;
   GcMonitorNode** waitNodeRef;
   uint16_t waitState;
