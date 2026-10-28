@@ -44,6 +44,9 @@ import java.io.IOException;
 
 public class Classes {
   private static final int LinkFlag = 1 << 8;
+  // Values contain no class/method references, so the weak keys do not retain loaders.
+  private static final java.util.Map<VMClass, Integer> linkedDeclaredMethods =
+    new java.util.WeakHashMap<VMClass, Integer>();
 
   public static native VMClass defineVMClass
     (ClassLoader loader, byte[] b, int offset, int length);
@@ -411,6 +414,11 @@ public class Classes {
   private static void linkDeclaredMethods(VMClass c, boolean constructors, boolean publicOnly) {
     link(c);
     if (c.methodTable == null) return;
+    int mode = 1 << ((constructors ? 2 : 0) + (publicOnly ? 0 : 1));
+    synchronized (linkedDeclaredMethods) {
+      Integer linked = linkedDeclaredMethods.get(c);
+      if (linked != null && (linked.intValue() & mode) != 0) return;
+    }
     for (int i = 0, count = declaredMethodCount(c); i < count; ++i) {
       VMMethod method = c.methodTable[i];
       String name = toString(method.name);
@@ -418,6 +426,12 @@ public class Classes {
       if ((constructors ? !constructor : name.startsWith("<"))
           || (publicOnly && (method.flags & Modifier.PUBLIC) == 0)) continue;
       for (int j = 1; j < method.spec.length;) j = resolveSpec(c.loader, method.spec, j);
+    }
+    // Publish only after successful resolution. A failed optional signature must
+    // still fail (or be retried after its dependency becomes available).
+    synchronized (linkedDeclaredMethods) {
+      Integer linked = linkedDeclaredMethods.get(c);
+      linkedDeclaredMethods.put(c, Integer.valueOf((linked == null ? 0 : linked.intValue()) | mode));
     }
   }
 
@@ -648,6 +662,35 @@ public class Classes {
       }
     }
     return count;
+  }
+
+  public static Method[] getPublicMethodsNamed(VMClass vmClass, String name) {
+    linkDeclaredMethods(vmClass, false, true);
+    VMMethod[] table = vmClass.methodTable;
+    if (table == null) return new Method[0];
+    boolean ascii = true;
+    for (int i = 0; i < name.length(); ++i) if (name.charAt(i) > 127) { ascii = false; break; }
+    int count = 0;
+    for (int i = 0, end = declaredMethodCount(vmClass); i < end; ++i) {
+      VMMethod method = table[i];
+      if ((method.flags & Modifier.PUBLIC) != 0 && method.name[0] != '<'
+          && methodNameEquals(method.name, name, ascii)) ++count;
+    }
+    Method[] result = new Method[count];
+    int at = 0;
+    for (int i = 0, end = declaredMethodCount(vmClass); i < end; ++i) {
+      VMMethod method = table[i];
+      if ((method.flags & Modifier.PUBLIC) != 0 && method.name[0] != '<'
+          && methodNameEquals(method.name, name, ascii)) result[at++] = makeMethod(SystemClassLoader.getClass(vmClass), i);
+    }
+    return result;
+  }
+
+  private static boolean methodNameEquals(byte[] bytes, String name, boolean ascii) {
+    if (!ascii) return name.equals(toString(bytes));
+    if (bytes.length != name.length() + 1) return false;
+    for (int i = 0; i < name.length(); ++i) if (bytes[i] != name.charAt(i)) return false;
+    return true;
   }
 
   public static Method[] getMethods(VMClass vmClass, boolean publicOnly) {
