@@ -6,7 +6,12 @@ SPDX-License-Identifier: MIT
 -->
 
 <p align="center">
-  <img src="docs/assets/basalt-logo.png" alt="Basalt" width="360">
+  <a href="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-white.svg#gh-dark-mode-only">
+    <img src="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-white.svg" alt="Basalt" width="360">
+  </a>
+  <a href="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-black.svg#gh-light-mode-only">
+    <img src="https://raw.githubusercontent.com/BasaltProject/.github/main/assets/basalt-logo-black.svg" alt="Basalt" width="360">
+  </a>
 </p>
 
 <h2 align="center">Basalt Shim</h2>
@@ -32,12 +37,15 @@ Shim is an independent runtime project within the Basalt ecosystem. Its scope
 is the VM and the Java class library support needed to execute Java bytecode:
 class loading, verification, execution, memory management and native interfaces.
 
-The organization's long-term motivation is to run legacy Bukkit `.jar` plugins
-without requiring an external JVM installation or process. Shim provides the
-runtime foundation for that goal. Bukkit APIs and plugin lifecycle integration
-will belong to a dedicated module of Server. BungeeCord and Velocity adapters will belong to modules of Proxy.
-Those modules will be developed once Shim is complete. Shim itself only provides
-Java bytecode execution, not Minecraft plugin API compatibility.
+The organization's motivation is to run Bukkit, Spigot and Paper `.jar` plugins
+without requiring an external JVM installation or process. Basalt Server does
+this today: it embeds Shim in its binary and starts it only when a jar is present
+in `plugins-bukkit/`. The Bukkit API and plugin lifecycle live in a Server module,
+not in Shim, which only provides Java bytecode execution. BungeeCord and Velocity
+adapters are planned as modules of Proxy.
+
+Java 25 conformance is still in progress. [docs/java25.md](docs/java25.md)
+records what is validated against OpenJDK 25 and what remains to be implemented.
 
 ## Project layout
 
@@ -61,14 +69,6 @@ The class library lives in `shim-classpath/java/`; its native methods live in
 
 CMake builds the native support libraries, tools and unit tests. GNU Make builds
 the complete VM through the root `GNUmakefile` and `cmake/LegacyMake.mk`.
-
-## Related repositories
-
-| Repository | What it is |
-|---|---|
-| [Avian](https://github.com/ReadyTalk/avian) | The upstream VM that Shim forks |
-| [Server](https://github.com/BasaltProject/Server) | The native Minecraft server motivating future runtime integration |
-| [Proxy](https://github.com/BasaltProject/Proxy) | The Basalt proxy component |
 
 ## License
 
