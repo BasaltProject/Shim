@@ -36,6 +36,7 @@
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <sys/mman.h>
+#include <unistd.h>
 #define SHIM_HEAP_RESERVE 1
 #ifndef MAP_NORESERVE
 #define MAP_NORESERVE 0
@@ -1317,11 +1318,15 @@ void sweepGen2(Context* c)
   memset(c->markBits, 0, markWords * BytesPerWord);
 
 #ifdef SHIM_HEAP_RESERVE
-  const uintptr_t page = LikelyPageSizeInBytes;
+  // madvise operates on OS pages, not the logical 4 KiB GC map granule.
+  // Apple Silicon uses 16 KiB pages: advising a partial last page can discard
+  // a live neighbour outside the free span when the kernel rounds the range.
+  const long nativePage = sysconf(_SC_PAGESIZE);
+  const uintptr_t page = nativePage > 0 ? static_cast<uintptr_t>(nativePage) : 0;
   const unsigned minimumWords = ReleaseSpanInBytes / BytesPerWord;
 
   for (unsigned i = 0; i < c->spanCount; ++i) {
-    if (c->spans[i].length >= minimumWords) {
+    if (page && c->spans[i].length >= minimumWords) {
       uintptr_t from = reinterpret_cast<uintptr_t>(c->gen2.data + c->spans[i].start);
       uintptr_t to = from + c->spans[i].length * BytesPerWord;
       from = (from + page - 1) & ~(page - 1);
@@ -1332,7 +1337,7 @@ void sweepGen2(Context* c)
     }
   }
 
-  if (oldPosition > previousEnd) {
+  if (page && oldPosition > previousEnd) {
     uintptr_t from = reinterpret_cast<uintptr_t>(c->gen2.data + previousEnd);
     uintptr_t to = reinterpret_cast<uintptr_t>(c->gen2.data + oldPosition);
     from = (from + page - 1) & ~(page - 1);
