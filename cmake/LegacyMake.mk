@@ -1837,7 +1837,19 @@ $(generated-code): %.cpp: $(runtime-src)/types.def $(generator) $(classpath-dep)
 $(classpath-dep): $(classpath-sources) $(classpath-jar-dep)
 	@echo "compiling classpath classes"
 	@mkdir -p $(classpath-build)
-	$(if $(shell mkdir -p $(classpath-build)),,)$(file >$(classpath-build)/sources.args,$(classpath-sources))
+	@: > $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 1,500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 501,1000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 1001,1500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 1501,2000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 2001,2500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 2501,3000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 3001,3500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 3501,4000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 4001,4500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 4501,5000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 5001,5500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 5501,6000,$(classpath-sources)) >> $(classpath-build)/sources.args
 	$(javac) $(bootstrap-javac-flags) \
 		-d $(classpath-build) -bootclasspath $(boot-classpath) \
 		@$(classpath-build)/sources.args
