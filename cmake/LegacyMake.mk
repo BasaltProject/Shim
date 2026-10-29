@@ -1837,7 +1837,7 @@ $(generated-code): %.cpp: $(runtime-src)/types.def $(generator) $(classpath-dep)
 $(classpath-dep): $(classpath-sources) $(classpath-jar-dep)
 	@echo "compiling classpath classes"
 	@mkdir -p $(classpath-build)
-	$(file >$(classpath-build)/sources.args,$(classpath-sources))
+	$(if $(shell mkdir -p $(classpath-build)),,)$(file >$(classpath-build)/sources.args,$(classpath-sources))
 	$(javac) $(bootstrap-javac-flags) \
 		-d $(classpath-build) -bootclasspath $(boot-classpath) \
 		@$(classpath-build)/sources.args
