@@ -290,7 +290,19 @@ public class Handler extends URLStreamHandler {
       if (entry == null) {
         throw new IOException("no entry name specified");
       }
-      return file.getInputStream(entry);
+      InputStream stream = file.getInputStream(entry);
+      if (getUseCaches()) return stream;
+      final JarFile owned = file;
+      return new java.io.FilterInputStream(stream) {
+        @Override
+        public void close() throws IOException {
+          try {
+            super.close();
+          } finally {
+            owned.close();
+          }
+        }
+      };
     }
   }
 }

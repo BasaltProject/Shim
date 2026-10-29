@@ -15,6 +15,27 @@ import java.util.Map;
 import java.util.jar.JarFile;
 
 public final class JarCache {
+  private static final class CachedJarFile extends JarFile {
+    private final String key;
+
+    CachedJarFile(File file, String key) throws IOException {
+      super(file, true, java.util.zip.ZipFile.OPEN_READ, Runtime.version());
+      this.key = key;
+    }
+
+    @Override
+    public void close() throws IOException {
+      // JarURLConnection exposes this object to callers, who may close it.
+      // Remove it before closing, so later opens cannot reuse a dead handle.
+      synchronized (kEntries) {
+        Entry current = kEntries.get(key);
+        if (current != null && current.file == this) kEntries.remove(key);
+      }
+      // Do not hold the cache lock while acquiring the ZipFile's own lock.
+      super.close();
+    }
+  }
+
   private static final class Entry {
     final JarFile file;
     final long modified;
@@ -41,7 +62,7 @@ public final class JarCache {
         return e.file;
       }
     }
-    JarFile jar = new JarFile(file, true, java.util.zip.ZipFile.OPEN_READ, Runtime.version());
+    JarFile jar = new CachedJarFile(file, key);
     synchronized (kEntries) {
       Entry e = kEntries.get(key);
       if (e != null && e.modified == modified && e.length == length) {

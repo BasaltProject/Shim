@@ -1218,6 +1218,16 @@ public class Collections {
     public T previous() {
       return innerListIterator.previous();
     }
+
+    @Override
+    public int nextIndex() {
+      return innerListIterator.nextIndex();
+    }
+
+    @Override
+    public int previousIndex() {
+      return innerListIterator.previousIndex();
+    }
   }
   
   static class UnmodifiableCollection<T> implements Collection<T>, java.io.Serializable {
