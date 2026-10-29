@@ -1313,6 +1313,10 @@ vm-sources = \
 	$(runtime-src)/process.cpp \
 	$(runtime-src)/heapdump.cpp
 
+ifeq ($(classpath),shim)
+vm-sources += $(runtime-src)/classpath-string.cpp $(runtime-src)/classpath-digest.cpp
+endif
+
 vm-asm-sources = $(runtime-src)/$(arch).$(asm-format)
 
 target-asm = $(asm)

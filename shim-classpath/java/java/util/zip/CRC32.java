@@ -26,23 +26,16 @@ package java.util.zip;
 import java.nio.ByteBuffer;
 
 public class CRC32 implements Checksum {
-  private static final int Polynomial = 0x04C11DB7;
-  private static final int Width = 32;
-  private static final int Top = 1 << (Width - 1);
   private static final int InitialRemainder = 0xFFFFFFFF;
-  private static final long ResultXor = 0xFFFFFFFFL;
-
   private static final int[] table = new int[256];
 
   static {
-    for (int dividend = 0; dividend < 256; ++ dividend) {
-      int remainder = dividend << (Width - 8);
-      for (int bit = 8; bit > 0; --bit) {
-        remainder = ((remainder & Top) != 0)
-          ? (remainder << 1) ^ Polynomial
-          : (remainder << 1);
+    for (int dividend = 0; dividend < 256; ++dividend) {
+      int crc = dividend;
+      for (int bit = 0; bit < 8; ++bit) {
+        crc = (crc >>> 1) ^ ((crc & 1) != 0 ? 0xEDB88320 : 0);
       }
-      table[dividend] = remainder;
+      table[dividend] = crc;
     }
   }
 
@@ -53,8 +46,7 @@ public class CRC32 implements Checksum {
   }
 
   public void update(int b) {
-    remainder = table[reflect(b, 8) ^ (remainder >>> (Width - 8))]
-      ^ (remainder << 8);
+    remainder = (remainder >>> 8) ^ table[(remainder ^ b) & 0xFF];
   }
 
   public void update(byte[] array, int offset, int length) {
@@ -63,9 +55,7 @@ public class CRC32 implements Checksum {
       throw new ArrayIndexOutOfBoundsException("Range [" + offset + ", " + offset + " + " + length
           + ") out of bounds for length " + size);
     }
-    for (int i = 0; i < length; ++i) {
-      update(array[offset + i] & 0xFF);
-    }
+    if (length != 0) remainder = updateBytes(remainder, array, offset, length);
   }
 
   public void update(byte[] array) {
@@ -77,17 +67,8 @@ public class CRC32 implements Checksum {
   }
 
   public long getValue() {
-    return (reflect(remainder, Width) ^ ResultXor) & 0xFFFFFFFFL;
+    return (remainder ^ 0xFFFFFFFFL) & 0xFFFFFFFFL;
   }
 
-  private static int reflect(int x, int n) {
-    int reflection = 0;
-    for (int i = 0; i < n; ++i) {
-      if ((x & 1) != 0) {
-        reflection |= (1 << ((n - 1) - i));
-      }
-      x = (x >>> 1);
-    }
-    return reflection;
-  }
+  private static native int updateBytes(int remainder, byte[] array, int offset, int length);
 }
