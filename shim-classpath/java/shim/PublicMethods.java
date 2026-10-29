@@ -21,7 +21,9 @@ public final class PublicMethods {
   private static Method[] get(Class<?> type, String name, Class<?>[] parameters) {
     if (type.isPrimitive()) return new Method[0];
     ArrayList<Method> methods = new ArrayList<Method>();
-    for (Method method : type.getDeclaredMethods()) {
+    // Public lookup must not resolve private implementation signatures. Optional libraries
+    // referenced only by those methods need not be installed to use the public API.
+    for (Method method : Classes.getMethods(Classes.toVMClass(type), true)) {
       if (Modifier.isPublic(method.getModifiers())
           && (name == null || (name.equals(method.getName())
               && sameParameters(parameters, method.getParameterTypes())))) methods.add(method);
