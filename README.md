@@ -44,8 +44,7 @@ in `plugins-bukkit/`. The Bukkit API and plugin lifecycle live in a Server modul
 not in Shim, which only provides Java bytecode execution. BungeeCord and Velocity
 adapters are planned as modules of Proxy.
 
-Java 25 conformance is still in progress. [docs/java25.md](docs/java25.md)
-records what is validated against OpenJDK 25 and what remains to be implemented.
+Java 25 conformance is still in progress.
 
 ## Project layout
 
