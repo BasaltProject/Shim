@@ -22,12 +22,21 @@
    details. */
 
 #include <shim/common.h>
+#if defined(__APPLE__) || defined(__GLIBC__)
+#include <execinfo.h>
+#include <unistd.h>
+#endif
 
 namespace shim {
 namespace system {
 
 NO_RETURN void crash()
 {
+#if defined(__APPLE__) || defined(__GLIBC__)
+  void* frames[48];
+  int count = backtrace(frames, 48);
+  backtrace_symbols_fd(frames, count, STDERR_FILENO);
+#endif
   abort();
 }
 
