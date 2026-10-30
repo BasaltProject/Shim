@@ -215,6 +215,9 @@ const unsigned InterfaceMethodFlag = 1 << 2;
 #ifndef JNI_VERSION_1_6
 #define JNI_VERSION_1_6 0x00010006
 #endif
+#ifndef JNI_VERSION_1_8
+#define JNI_VERSION_1_8 0x00010008
+#endif
 
 #ifndef JNI_TRUE
 #define JNI_TRUE 1
@@ -1391,6 +1394,7 @@ class Thread {
   GcMonitorNode** waitNodeRef;
   uint16_t waitState;
   uint16_t wakePending;
+  unsigned systemReferences;
 
  private:
   unsigned flags;
@@ -2813,7 +2817,10 @@ inline bool acquireSystem(Thread* t, Thread* target)
 {
   ACQUIRE_RAW(t, t->m->stateLock);
 
-  if (t->state != Thread::JoinedState) {
+  if (target->state != Thread::JoinedState) {
+    // Several notifiers/interruptors may use the same native thread at once.
+    // Keep its lock alive until the last user releases its pin.
+    ++target->systemReferences;
     target->setFlag(Thread::SystemFlag);
     return true;
   } else {
@@ -2827,7 +2834,10 @@ inline void releaseSystem(Thread* t, Thread* target)
 
   assertT(t, t->state != Thread::JoinedState);
 
-  target->clearFlag(Thread::SystemFlag);
+  expect(t, target->systemReferences != 0);
+  if (--target->systemReferences == 0) {
+    target->clearFlag(Thread::SystemFlag);
+  }
 }
 
 inline bool atomicCompareAndSwapObject(Thread* t,
@@ -3013,14 +3023,19 @@ inline void monitorRelease(Thread* t, GcMonitor* monitor)
   expect(t, monitor->owner() == t);
 
   if (--monitor->depth() == 0) {
+    // Publish the depth decrement and protected Java writes before another
+    // thread can acquire ownership. A barrier after the owner store alone
+    // does not order those preceding stores on weakly ordered CPUs.
+    storeStoreMemoryBarrier();
     monitor->owner() = 0;
 
     storeLoadMemoryBarrier();
 
     Thread* next = monitorAtomicPollAcquire(t, monitor, false);
 
-    // a head that was already signalled and has not run yet needs no second wake up
-    if (next and not next->wakePending and acquireSystem(t, next)) {
+    // Inspect wakePending only while holding the waiter's lock. A stale
+    // unlocked read can suppress the only notification after it starts waiting.
+    if (next and acquireSystem(t, next)) {
       PROTECT(t, monitor);
 
       {

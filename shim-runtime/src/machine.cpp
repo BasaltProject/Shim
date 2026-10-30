@@ -4350,6 +4350,7 @@ Thread::Thread(Machine* m, GcThread* javaThread, Thread* parent)
       waitNodeRef(0),
       waitState(0),
       wakePending(0),
+      systemReferences(0),
       flags(ActiveFlag)
 {
   monitorCacheEpoch = 0;
@@ -6635,14 +6636,19 @@ object clone(Thread* t, object o)
   PROTECT(t, o);
 
   GcClass* class_ = objectClass(t, o);
+  PROTECT(t, class_);
   unsigned size = baseSize(t, o, class_) * BytesPerWord;
   object clone;
 
   if (class_->arrayElementSize()) {
     clone = static_cast<object>(allocate(t, size, class_->objectMask()));
-    memcpy(clone, o, size);
-    // clear any object header flags:
-    setObjectClass(t, o, objectClass(t, o));
+    // Keep the destination allocation's header flags. A source array may
+    // carry an extended identity-hash word after GC; copying that flag without
+    // allocating the extra word corrupts the collector's object boundaries.
+    setObjectClass(t, clone, objectClass(t, o));
+    memcpy(reinterpret_cast<void**>(clone) + 1,
+           reinterpret_cast<void**>(o) + 1,
+           size - BytesPerWord);
   } else if (instanceOf(t, type(t, GcCloneable::Type), o)) {
     clone = make(t, class_);
     memcpy(reinterpret_cast<void**>(clone) + 1,
