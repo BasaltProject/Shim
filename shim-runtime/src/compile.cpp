@@ -9104,6 +9104,14 @@ class MyProcessor : public Processor {
                           &MyThread::newStack,
                           "TARGET_THREAD_NEWSTACK")
           + checkConstant(t,
+                          TARGET_THREAD_SCRATCH,
+                          &MyThread::scratch,
+                          "TARGET_THREAD_SCRATCH")
+          + checkConstant(t,
+                          TARGET_THREAD_CONTINUATION,
+                          &MyThread::continuation,
+                          "TARGET_THREAD_CONTINUATION")
+          + checkConstant(t,
                           TARGET_THREAD_TAILADDRESS,
                           &MyThread::tailAddress,
                           "TARGET_THREAD_TAILADDRESS")
