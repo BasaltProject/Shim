@@ -25,8 +25,6 @@
 
 #include <shim/util/assert.h>
 
-#include <errno.h>
-#include <stdio.h>
 #include "sys/mman.h"
 
 namespace shim {
@@ -62,10 +60,7 @@ util::Slice<uint8_t> Memory::allocate(size_t sizeInBytes,
   }
 #endif
   if (p == MAP_FAILED) {
-    fprintf(stderr, "mmap with MAP_JIT failed or skipped: errno %d\n", errno);
     p = mmap(0, sizeInBytes, prot, MAP_PRIVATE | MAP_ANON | Extra, -1, 0);
-    if (p == MAP_FAILED)
-      fprintf(stderr, "mmap failed: errno %d size %zu prot %u\n", errno, sizeInBytes, prot);
   }
 
   if (p == MAP_FAILED) {

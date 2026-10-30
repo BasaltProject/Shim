@@ -27,7 +27,6 @@
 // TODO: remove reference back into the source directory!
 // Note: this is needed for UNLIKELY
 #include <shim/common.h>
-#include <stdio.h>
 
 namespace shim {
 namespace util {
@@ -43,19 +42,17 @@ inline Aborter* getAborter(Aborter* a)
 }
 
 template <class T>
-inline void NO_RETURN abort(T t, const char* file = __builtin_FILE(), unsigned line = __builtin_LINE())
+inline void NO_RETURN abort(T t)
 {
-  fprintf(stderr, "shim abort at %s:%u\n", file, line);
-  fflush(stderr);
   getAborter(t)->abort();
   ::abort();
 }
 
 template <class T>
-inline void expect(T t, bool v, const char* file = __builtin_FILE(), unsigned line = __builtin_LINE())
+inline void expect(T t, bool v)
 {
   if (UNLIKELY(!v)) {
-    abort(t, file, line);
+    abort(t);
   }
 }
 
