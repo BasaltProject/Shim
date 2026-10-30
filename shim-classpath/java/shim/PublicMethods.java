@@ -10,6 +10,8 @@ package shim;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class PublicMethods {
   private PublicMethods() { }
@@ -21,21 +23,7 @@ public final class PublicMethods {
   private static Method[] get(Class<?> type, String name, Class<?>[] parameters) {
     if (type.isPrimitive()) return new Method[0];
     ArrayList<Method> methods = new ArrayList<Method>();
-    // Public lookup must not resolve private implementation signatures. Optional libraries
-    // referenced only by those methods need not be installed to use the public API.
-    for (Method method : Classes.getMethods(Classes.toVMClass(type), true)) {
-      if (Modifier.isPublic(method.getModifiers())
-          && (name == null || (name.equals(method.getName())
-              && sameParameters(parameters, method.getParameterTypes())))) methods.add(method);
-    }
-    if (!type.isInterface() && type.getSuperclass() != null) {
-      for (Method method : get(type.getSuperclass(), name, parameters)) methods.add(method);
-    }
-    for (Class<?> parent : type.getInterfaces()) {
-      for (Method method : get(parent, name, parameters)) {
-        if (!Modifier.isStatic(method.getModifiers())) methods.add(method);
-      }
-    }
+    collect(type, name, parameters, false, new HashSet<Class<?>>(), methods);
     ArrayList<Method> selected = new ArrayList<Method>();
     for (int i = 0; i < methods.size(); ++i) {
       Method method = methods.get(i);
@@ -52,6 +40,26 @@ public final class PublicMethods {
       if (!hidden) selected.add(method);
     }
     return selected.toArray(new Method[selected.size()]);
+  }
+
+  private static void collect(Class<?> type, String name, Class<?>[] parameters,
+                              boolean inherited, Set<Class<?>> visited, ArrayList<Method> methods) {
+    if (!visited.add(type)) return;
+    // Visit a shared interface only once. Walking every inheritance path makes
+    // ordinary reflection exponential on deep interface diamonds.
+    // Public lookup must not resolve private implementation signatures.
+    Method[] declared = name == null ? Classes.getMethods(Classes.toVMClass(type), true)
+      : Classes.getPublicMethodsNamed(Classes.toVMClass(type), name);
+    for (Method method : declared) {
+      if (inherited && type.isInterface() && Modifier.isStatic(method.getModifiers())) continue;
+      if (Modifier.isPublic(method.getModifiers())
+          && (name == null || (name.equals(method.getName())
+              && sameParameters(parameters, method.getParameterTypes())))) methods.add(method);
+    }
+    if (!type.isInterface() && type.getSuperclass() != null) {
+      collect(type.getSuperclass(), name, parameters, true, visited, methods);
+    }
+    for (Class<?> parent : type.getInterfaces()) collect(parent, name, parameters, true, visited, methods);
   }
 
   private static boolean sameSignature(Method a, Method b) {

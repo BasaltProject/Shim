@@ -46,6 +46,55 @@ public class PublicMethodReflection {
     public static String available() { return "available"; }
   }
 
+  public interface D0 extends Root { }
+  public interface L1 extends D0 { }
+  public interface R1 extends D0 { }
+  public interface D1 extends L1, R1 { }
+  public interface L2 extends D1 { }
+  public interface R2 extends D1 { }
+  public interface D2 extends L2, R2 { }
+  public interface L3 extends D2 { }
+  public interface R3 extends D2 { }
+  public interface D3 extends L3, R3 { }
+  public interface L4 extends D3 { }
+  public interface R4 extends D3 { }
+  public interface D4 extends L4, R4 { }
+  public interface L5 extends D4 { }
+  public interface R5 extends D4 { }
+  public interface D5 extends L5, R5 { }
+  public interface L6 extends D5 { }
+  public interface R6 extends D5 { }
+  public interface D6 extends L6, R6 { }
+  public interface L7 extends D6 { }
+  public interface R7 extends D6 { }
+  public interface D7 extends L7, R7 { }
+  public interface L8 extends D7 { }
+  public interface R8 extends D7 { }
+  public interface D8 extends L8, R8 { }
+  public interface L9 extends D8 { }
+  public interface R9 extends D8 { }
+  public interface D9 extends L9, R9 { }
+  public interface L10 extends D9 { }
+  public interface R10 extends D9 { }
+  public interface D10 extends L10, R10 { }
+  public interface L11 extends D10 { }
+  public interface R11 extends D10 { }
+  public interface D11 extends L11, R11 { }
+  public interface L12 extends D11 { }
+  public interface R12 extends D11 { }
+  public interface D12 extends L12, R12 { }
+  private static void deepDiamond() throws Exception {
+    Method[] methods = D12.class.getMethods();
+    if (methods.length != 2) throw new AssertionError("Repeated inherited methods: " + methods.length);
+    if (D12.class.getMethod("greeting").getDeclaringClass() != Root.class) throw new AssertionError("Wrong declaring type");
+    if (D12.class.getMethod("value").getReturnType() != Object.class) throw new AssertionError("Wrong return type");
+    try {
+      D12.class.getMethod("rootStatic");
+      throw new AssertionError("Inherited interface static method");
+    } catch (NoSuchMethodException expected) { }
+    System.out.println("deep diamond reflection passed");
+  }
+
   private static void optionalPrivateSignature() throws Exception {
     String apiName = OptionalApi.class.getName();
     String missingName = MissingOptionalType.class.getName();
@@ -110,6 +159,7 @@ public class PublicMethodReflection {
 
   public static void main(String[] args) throws Exception {
     optionalPrivateSignature();
+    deepDiamond();
     Class<?>[] types = {Root.class, Left.class, Diamond.class, Narrow.class, Repeated.class,
       Abstract.class, Parent.class, Child.class, ClassWins.class, Empty.class,
       int.class, void.class, String[].class, int[][].class};
