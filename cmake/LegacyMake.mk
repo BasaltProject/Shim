@@ -532,7 +532,7 @@ ifeq ($(use-clang),true)
 		common-lflags += -Wl,-export_dynamic
 	else
 		ifneq ($(platform),windows)
-			common-lflags += -Wl,-E
+			common-lflags += -Wl,-E -Wl,-z,noexecstack
 		else
 			common-lflags += -Wl,--export-all-symbols
 		endif
