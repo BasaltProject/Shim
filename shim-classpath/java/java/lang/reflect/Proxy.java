@@ -64,6 +64,9 @@ public class Proxy implements java.io.Serializable {
 
   private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
     in.defaultReadObject();
+    if (h != null && !(h instanceof Guard)) {
+      h = new Guard(h);
+    }
     methodRefs = methodRefsMap.get(getClass());
   }
 
@@ -88,8 +91,25 @@ public class Proxy implements java.io.Serializable {
         return cached;
       }
       int number = nextNumber++;
+      boolean allPublic = true;
+      String pkg = "";
+      for (Class c: interfaces) {
+        if (!Modifier.isPublic(c.getModifiers())) {
+          allPublic = false;
+          pkg = c.getPackageName();
+        }
+      }
+      if (allPublic) {
+        Integer module = proxyModules.get(loader);
+        if (module == null) {
+          module = Integer.valueOf(proxyModules.size() + 1);
+          proxyModules.put(loader, module);
+        }
+        pkg = "jdk.proxy" + module;
+      }
+      String internal = (pkg.isEmpty() ? "" : pkg.replace('.', '/') + "/") + "$Proxy" + number;
       try {
-        Class made = makeClass(loader, interfaces, "Proxy-" + number);
+        Class made = makeClass(loader, interfaces, internal, allPublic ? 17 : 16);
         classCache.put(key, made);
         return made;
       } catch (IOException e) {
@@ -99,6 +119,8 @@ public class Proxy implements java.io.Serializable {
       }
     }
   }
+
+  private static final Map<ClassLoader, Integer> proxyModules = new java.util.IdentityHashMap<ClassLoader, Integer>();
 
   private static final Map<List<Object>, Class> classCache = new HashMap<List<Object>, Class>();
 
@@ -125,6 +147,10 @@ public class Proxy implements java.io.Serializable {
 
     Guard(InvocationHandler inner) {
       this.inner = inner;
+    }
+
+    private Object writeReplace() {
+      return inner;
     }
 
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
@@ -201,6 +227,7 @@ public class Proxy implements java.io.Serializable {
     write2(out, ConstantPool.addClass(pool, "java/lang/Object") + 1);
 
     int ai = 0;
+    int li = 0;
     int si;
     for (si = 1; spec[si] != ')'; ++si) {
       write1(out, dup);
@@ -214,7 +241,7 @@ public class Proxy implements java.io.Serializable {
         while (spec[si] != ';') ++si;
       
         write1(out, aload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
         break;
 
       case '[':
@@ -231,12 +258,12 @@ public class Proxy implements java.io.Serializable {
         }
 
         write1(out, aload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
         break;
 
       case 'Z':
         write1(out, iload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
@@ -246,7 +273,7 @@ public class Proxy implements java.io.Serializable {
 
       case 'B':
         write1(out, iload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
@@ -256,7 +283,7 @@ public class Proxy implements java.io.Serializable {
 
       case 'S':
         write1(out, iload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
@@ -266,7 +293,7 @@ public class Proxy implements java.io.Serializable {
 
       case 'C':
         write1(out, iload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
@@ -276,7 +303,7 @@ public class Proxy implements java.io.Serializable {
 
       case 'I':
         write1(out, iload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
@@ -286,7 +313,7 @@ public class Proxy implements java.io.Serializable {
 
       case 'F':
         write1(out, fload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
@@ -296,24 +323,24 @@ public class Proxy implements java.io.Serializable {
 
       case 'J':
         write1(out, lload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
                (pool, "java/lang/Long",
                 "valueOf", "(J)Ljava/lang/Long;") + 1);
-        ++ ai;
+        ++ li;
         break;
 
       case 'D':
         write1(out, dload);
-        write1(out, ai + 1);
+        write1(out, li + 1);
 
         write1(out, invokestatic);
         write2(out, ConstantPool.addMethodRef
                (pool, "java/lang/Double",
                 "valueOf", "(D)Ljava/lang/Double;") + 1);
-        ++ ai;
+        ++ li;
         break;
 
       default: throw new IllegalArgumentException();
@@ -322,6 +349,7 @@ public class Proxy implements java.io.Serializable {
       write1(out, aastore);
 
       ++ ai;
+      ++ li;
     }
 
     write1(out, invokeinterface);
@@ -444,7 +472,8 @@ public class Proxy implements java.io.Serializable {
 
   private static Class makeClass(ClassLoader loader,
                                  Class[] interfaces,
-                                 String name)
+                                 String name,
+                                 int classFlags)
     throws IOException
   {
     List<PoolEntry> pool = new ArrayList();
@@ -511,7 +540,8 @@ public class Proxy implements java.io.Serializable {
     Assembler.writeClass
       (out, pool, nameIndex, superIndex, interfaceIndexes,
        new FieldData[0],
-       methodTable.toArray(new MethodData[methodTable.size()]));
+       methodTable.toArray(new MethodData[methodTable.size()]),
+       classFlags);
 
     byte[] classData = out.toByteArray();
     Class result = shim.SystemClassLoader.getClass

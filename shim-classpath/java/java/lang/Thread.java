@@ -185,6 +185,9 @@ public class Thread implements Runnable {
 
   private static void run(Thread t) throws Throwable {
     try {
+      if (shim.jdwp.Agent.eventsActive) {
+        shim.jdwp.Agent.threadStarted(t);
+      }
       t.run();
     } catch (Throwable e) {
       try {
@@ -192,6 +195,9 @@ public class Thread implements Runnable {
       } catch (Throwable ignore) {
       }
     } finally {
+      if (shim.jdwp.Agent.eventsActive) {
+        shim.jdwp.Agent.threadDied(t);
+      }
       synchronized (t) {
         t.state = (byte) State.TERMINATED.ordinal();
         t.notifyAll();

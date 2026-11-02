@@ -38,6 +38,7 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
   private OutputStreamWriter charOut;
   private boolean closing = false;
   private final Charset charset;
+  private boolean asciiFast;
 
   private static Charset toCharset(String csn) throws UnsupportedEncodingException {
     Objects.requireNonNull(csn, "charsetName");
@@ -52,16 +53,14 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
     super(out);
     this.autoFlush = autoFlush;
     this.charset = Charset.defaultCharset();
-    this.charOut = new OutputStreamWriter(this, charset);
-    this.textOut = new BufferedWriter(charOut);
+    this.asciiFast = isAsciiCompatible(charset);
   }
 
   private PrintStream(boolean autoFlush, Charset charset, OutputStream out) {
     super(out);
     this.autoFlush = autoFlush;
     this.charset = charset;
-    this.charOut = new OutputStreamWriter(this, charset);
-    this.textOut = new BufferedWriter(charOut);
+    this.asciiFast = isAsciiCompatible(charset);
   }
 
   public PrintStream(OutputStream out) {
@@ -80,8 +79,7 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
     super(out);
     this.autoFlush = autoFlush;
     this.charset = Objects.requireNonNull(charset, "charset");
-    this.charOut = new OutputStreamWriter(this, charset);
-    this.textOut = new BufferedWriter(charOut);
+    this.asciiFast = isAsciiCompatible(charset);
   }
 
   public PrintStream(String fileName) throws FileNotFoundException {
@@ -112,6 +110,36 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
     return charset;
   }
 
+  private static boolean isAsciiCompatible(Charset cs) {
+    return cs == sun.nio.cs.UTF_8.INSTANCE || cs == sun.nio.cs.US_ASCII.INSTANCE;
+  }
+
+  private BufferedWriter text() {
+    if (textOut == null) {
+      charOut = new OutputStreamWriter(this, charset);
+      textOut = new BufferedWriter(charOut);
+    }
+    return textOut;
+  }
+
+  // Encodes a pure ASCII string straight into the byte stream, avoiding the charset encoder chain.
+  private boolean writeAscii(String s) throws IOException {
+    if (!asciiFast) {
+      return false;
+    }
+    int n = s.length();
+    byte[] b = new byte[n];
+    for (int i = 0; i < n; i++) {
+      char c = s.charAt(i);
+      if (c >= 0x80) {
+        return false;
+      }
+      b[i] = (byte) c;
+    }
+    write(b, 0, n);
+    return true;
+  }
+
   private void ensureOpen() throws IOException {
     if (out == null) {
       throw new IOException("Stream closed");
@@ -134,7 +162,9 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
       if (!closing) {
         closing = true;
         try {
-          textOut.close();
+          if (textOut != null) {
+            textOut.close();
+          }
           out.close();
         } catch (IOException x) {
           trouble = true;
@@ -209,7 +239,7 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
     try {
       synchronized (this) {
         ensureOpen();
-        textOut.write(buf);
+        text().write(buf);
         textOut.flushBuffer();
         charOut.flushBuffer();
         if (autoFlush) {
@@ -231,9 +261,11 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
     try {
       synchronized (this) {
         ensureOpen();
-        textOut.write(s);
-        textOut.flushBuffer();
-        charOut.flushBuffer();
+        if (!writeAscii(s)) {
+          text().write(s);
+          textOut.flushBuffer();
+          charOut.flushBuffer();
+        }
         if (autoFlush && s.indexOf('\n') >= 0) {
           out.flush();
         }
@@ -249,9 +281,11 @@ public class PrintStream extends FilterOutputStream implements Appendable, Close
     try {
       synchronized (this) {
         ensureOpen();
-        textOut.newLine();
-        textOut.flushBuffer();
-        charOut.flushBuffer();
+        if (!writeAscii(System.lineSeparator())) {
+          text().newLine();
+          textOut.flushBuffer();
+          charOut.flushBuffer();
+        }
         if (autoFlush) {
           out.flush();
         }

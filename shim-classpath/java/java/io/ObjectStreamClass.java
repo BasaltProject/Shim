@@ -28,7 +28,7 @@ import shim.VMClass;
 import shim.VMField;
 import shim.VMMethod;
 
-public class ObjectStreamClass implements Serializable {
+public final class ObjectStreamClass implements Serializable {
   public static final ObjectStreamField[] NO_FIELDS = new ObjectStreamField[0];
   private static final long serialVersionUID = -6120832682080437368L;
   private static final ObjectStreamField[] serialPersistentFields = NO_FIELDS;

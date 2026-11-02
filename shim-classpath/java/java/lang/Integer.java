@@ -98,7 +98,32 @@ public final class Integer extends Number implements Comparable<Integer>,
   }
 
   public static String toString(int v) {
-    return toString(v, 10);
+    return toString32(v);
+  }
+
+  static String toString32(long v) {
+    if (v == 0) {
+      return "0";
+    }
+    boolean negative = v < 0;
+    long n = negative ? -v : v;
+    int size = n >= 1000000000L ? 10 : n >= 100000000L ? 9 : n >= 10000000L ? 8
+      : n >= 1000000L ? 7 : n >= 100000L ? 6 : n >= 10000L ? 5 : n >= 1000L ? 4
+      : n >= 100L ? 3 : n >= 10L ? 2 : 1;
+    if (negative) {
+      ++size;
+    }
+    char[] array = new char[size];
+    int i = size;
+    do {
+      long q = (n * 0xCCCCCCCDL) >>> 35;
+      array[--i] = (char) ('0' + (int) (n - q * 10));
+      n = q;
+    } while (n != 0);
+    if (negative) {
+      array[0] = '-';
+    }
+    return new String(array, size, true);
   }
 
   public static String toHexString(int v) {

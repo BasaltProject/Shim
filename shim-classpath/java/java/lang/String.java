@@ -84,6 +84,28 @@ public final class String
     this(new char[0], 0, 0);
   }
 
+  // The caller owns an exactly sized, unshared array that is never modified again.
+  String(char[] exact, int length, boolean trusted) {
+    this.data = exact;
+    this.offset = 0;
+    this.length = length;
+  }
+
+  // Copy constructor for builders: the range 0..count of source is known valid.
+  String(char[] source, int count, byte builder) {
+    this.data = copyCharStorage(source, 0, count);
+    this.offset = 0;
+    this.length = count;
+  }
+
+  void copyTo(char[] dst, int dstOffset) {
+    if (data instanceof char[]) {
+      System.arraycopy(data, offset, dst, dstOffset, length);
+    } else {
+      widenBytes((byte[]) data, offset, dst, dstOffset, length);
+    }
+  }
+
   String(char[] data, int offset, int length, boolean copy) {
     this((Object) data, offset, length, copy);
   }
@@ -188,7 +210,56 @@ public final class String
       char[] ascii = decodeAsciiBytes(bytes, offset, length);
       if (ascii != null) return ascii;
     }
+    if (charset == sun.nio.cs.UTF_8.INSTANCE) {
+      char[] decoded = decodeValidUtf8(bytes, offset, length);
+      if (decoded != null) return decoded;
+    }
     return sun.nio.cs.StringCoding.decode(charset, bytes, offset, length);
+  }
+
+  private static char[] decodeValidUtf8(byte[] bytes, int offset, int length) {
+    char[] out = new char[length];
+    int n = 0;
+    int i = offset;
+    int end = offset + length;
+    while (i < end) {
+      int b = bytes[i];
+      if (b >= 0) {
+        out[n++] = (char) b;
+        i++;
+        continue;
+      }
+      b &= 0xFF;
+      if (b >= 0xC2 && b <= 0xDF) {
+        if (i + 1 >= end) return null;
+        int b1 = bytes[i + 1];
+        if ((b1 & 0xC0) != 0x80) return null;
+        out[n++] = (char) (((b & 0x1F) << 6) | (b1 & 0x3F));
+        i += 2;
+      } else if (b >= 0xE0 && b <= 0xEF) {
+        if (i + 2 >= end) return null;
+        int b1 = bytes[i + 1] & 0xFF;
+        int b2 = bytes[i + 2];
+        if ((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80) return null;
+        if ((b == 0xE0 && b1 < 0xA0) || (b == 0xED && b1 > 0x9F)) return null;
+        out[n++] = (char) (((b & 0x0F) << 12) | ((b1 & 0x3F) << 6) | (b2 & 0x3F));
+        i += 3;
+      } else if (b >= 0xF0 && b <= 0xF4) {
+        if (i + 3 >= end) return null;
+        int b1 = bytes[i + 1] & 0xFF;
+        int b2 = bytes[i + 2];
+        int b3 = bytes[i + 3];
+        if ((b1 & 0xC0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80) return null;
+        if ((b == 0xF0 && b1 < 0x90) || (b == 0xF4 && b1 > 0x8F)) return null;
+        int cp = ((b & 0x07) << 18) | ((b1 & 0x3F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);
+        out[n++] = (char) (0xD7C0 + (cp >> 10));
+        out[n++] = (char) (0xDC00 + (cp & 0x3FF));
+        i += 4;
+      } else {
+        return null;
+      }
+    }
+    return n == length ? out : java.util.Arrays.copyOf(out, n);
   }
 
   public String(byte bytes[], int highByte, int offset, int length) {
@@ -249,6 +320,8 @@ public final class String
   private native int indexOfCodePoint(int codePoint, int start);
   private native int hashStorage();
   private native int compareStorage(String target);
+  private native boolean equalsStorage(String target);
+  private native byte[] encodeAscii();
 
   @Override
   public String toString() {
@@ -274,7 +347,7 @@ public final class String
       return true;
     } else if (o instanceof String) {
       String s = (String) o;
-      return s.length == length && compareTo(s) == 0;
+      return s.length == length && equalsStorage(s);
     } else {
       return false;
     }
@@ -369,7 +442,18 @@ public final class String
     return upper ? sb.toString().toUpperCase() : sb.toString().toLowerCase();
   }
 
+  private native Object caseAscii(boolean upper);
+
+  private String convertAscii(boolean upper) {
+    Object r = caseAscii(upper);
+    if (r == null || r == this) return (String) r;
+    byte[] out = (byte[]) r;
+    return new String(out, 0, out.length, false);
+  }
+
   public String toLowerCase() {
+    String ascii = convertAscii(false);
+    if (ascii != null) return ascii;
     StringBuilder out = null;
     for (int i = 0; i < length; ) {
       int cp = codePointAt(i);
@@ -460,6 +544,8 @@ public final class String
   }
 
   public String toUpperCase() {
+    String ascii = convertAscii(true);
+    if (ascii != null) return ascii;
     StringBuilder out = null;
     for (int i = 0; i < length; ) {
       int cp = codePointAt(i);
@@ -657,23 +743,12 @@ public final class String
   }
 
   private byte[] encodeChars(java.nio.charset.Charset charset) {
+    if (charset == sun.nio.cs.UTF_8.INSTANCE || charset == sun.nio.cs.US_ASCII.INSTANCE
+        || charset == sun.nio.cs.ISO_8859_1.INSTANCE) {
+      byte[] ascii = encodeAscii();
+      if (ascii != null) return ascii;
+    }
     if (data instanceof byte[]) {
-      byte[] source = (byte[]) data;
-      if (charset == sun.nio.cs.UTF_8.INSTANCE || charset == sun.nio.cs.US_ASCII.INSTANCE
-          || charset == sun.nio.cs.ISO_8859_1.INSTANCE) {
-        boolean ascii = true;
-        for (int i = 0; i < length; ++i) {
-          if (source[offset + i] < 0) {
-            ascii = false;
-            break;
-          }
-        }
-        if (ascii) {
-          byte[] b = new byte[length];
-          System.arraycopy(source, offset, b, 0, length);
-          return b;
-        }
-      }
       char[] chars = new char[length];
       getChars(0, length, chars, 0);
       return sun.nio.cs.StringCoding.encode(charset, chars, 0, length);
@@ -1373,5 +1448,15 @@ public final class String
       while (size > 0 && parts.get(size - 1).isEmpty()) --size;
     }
     return parts.subList(0, size).toArray(new String[size]);
+  }
+
+  @Override
+  public java.util.stream.IntStream chars() {
+    return CharSequence.super.chars();
+  }
+
+  @Override
+  public java.util.stream.IntStream codePoints() {
+    return CharSequence.super.codePoints();
   }
 }

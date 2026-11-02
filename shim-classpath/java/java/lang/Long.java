@@ -123,10 +123,13 @@ public final class Long extends Number implements Comparable<Long>,
       array[i] = '-';
     }
 
-    return new String(array, 0, size, false);
+    return new String(array, size, true);
   }
 
   public static String toString(long v) {
+    if (v > -4294967296L && v < 4294967296L) {
+      return Integer.toString32(v);
+    }
     return toString(v, 10);
   }
 

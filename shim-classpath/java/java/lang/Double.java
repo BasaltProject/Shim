@@ -219,9 +219,13 @@ public final class Double extends Number implements Comparable<Double>,
 
   public static native double longBitsToDouble(long bits);
 
-  public static native boolean isInfinite(double value);
+  public static boolean isInfinite(double value) {
+    return value == POSITIVE_INFINITY || value == NEGATIVE_INFINITY;
+  }
 
-  public static native boolean isNaN(double value);
+  public static boolean isNaN(double value) {
+    return value != value;
+  }
 
   private static native double doubleFromString(String s, int[] numRead);
 

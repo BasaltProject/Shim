@@ -24,7 +24,7 @@
 package java.lang;
 
 public final class StringBuilder extends AbstractStringBuilder
-    implements java.io.Serializable, Comparable<StringBuilder>, CharSequence {
+    implements java.io.Serializable, Comparable<StringBuilder>, Appendable, CharSequence {
   private static final long serialVersionUID = 4383685877147921099L;
   private static final java.io.ObjectStreamField[] serialPersistentFields = new java.io.ObjectStreamField[0];
 
@@ -52,7 +52,16 @@ public final class StringBuilder extends AbstractStringBuilder
 
   @Override
   public StringBuilder append(String str) {
-    super.append(str);
+    if (str == null) {
+      super.append((String) null);
+      return this;
+    }
+    int n = count + str.length();
+    if (n > value.length) {
+      ensureCapacityInternal(n);
+    }
+    str.copyTo(value, count);
+    count = n;
     return this;
   }
 
@@ -94,19 +103,54 @@ public final class StringBuilder extends AbstractStringBuilder
 
   @Override
   public StringBuilder append(char c) {
-    super.append(c);
+    int n = count;
+    if (n == value.length) {
+      ensureCapacityInternal(n + 1);
+    }
+    value[n] = c;
+    count = n + 1;
     return this;
   }
 
   @Override
   public StringBuilder append(int i) {
-    super.append(i);
-    return this;
+    if (i == Integer.MIN_VALUE) {
+      return append("-2147483648");
+    }
+    return appendDecimal(i);
   }
 
   @Override
   public StringBuilder append(long lng) {
-    super.append(lng);
+    if (lng == Long.MIN_VALUE) {
+      return append("-9223372036854775808");
+    }
+    return appendDecimal(lng);
+  }
+
+  private StringBuilder appendDecimal(long v) {
+    boolean negative = v < 0;
+    long m = negative ? -v : v;
+    int digits = 1;
+    for (long p = 10; digits < 19 && m >= p; p *= 10) {
+      ++digits;
+    }
+    int len = digits + (negative ? 1 : 0);
+    int n = count + len;
+    if (n > value.length) {
+      ensureCapacityInternal(n);
+    }
+    char[] buf = value;
+    int pos = n;
+    while (pos > n - digits) {
+      long q = m / 10;
+      buf[--pos] = (char) ('0' + (int) (m - q * 10));
+      m = q;
+    }
+    if (negative) {
+      buf[pos - 1] = '-';
+    }
+    count = n;
     return this;
   }
 
@@ -263,7 +307,7 @@ public final class StringBuilder extends AbstractStringBuilder
 
   @Override
   public String toString() {
-    return new String(value, 0, count);
+    return new String(value, count, (byte) 0);
   }
 
   private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {

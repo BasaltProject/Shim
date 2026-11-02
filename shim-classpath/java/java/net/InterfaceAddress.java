@@ -10,7 +10,7 @@ package java.net;
 
 import java.util.Objects;
 
-public class InterfaceAddress {
+public final class InterfaceAddress {
   private InetAddress address;
   private Inet4Address broadcast;
   private short maskLength;

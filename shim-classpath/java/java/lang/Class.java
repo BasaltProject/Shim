@@ -251,7 +251,7 @@ public final class Class <T>
       return getName();
     } else if (isArray()) {
       return getComponentType().getSimpleName() + "[]";
-    } else if (isHidden()) {
+    } else if (isHidden() || (java.lang.reflect.Proxy.class.isAssignableFrom(this) && this != java.lang.reflect.Proxy.class)) {
       String name = getName();
       return name.substring(name.lastIndexOf('.') + 1);
     } else if (isAnonymousClass()) {
@@ -385,7 +385,7 @@ public final class Class <T>
     return shim.PublicMethods.find(this, name, parameterTypes);
   }
 
-  public Constructor getConstructor(Class ... parameterTypes)
+  public Constructor<T> getConstructor(Class<?> ... parameterTypes)
     throws NoSuchMethodException
   {
     int index = Classes.findMethod(vmClass, "<init>", parameterTypes);
@@ -396,7 +396,7 @@ public final class Class <T>
     }
   }
 
-  public Constructor getDeclaredConstructor(Class ... parameterTypes)
+  public Constructor<T> getDeclaredConstructor(Class<?> ... parameterTypes)
     throws NoSuchMethodException
   {
     Constructor c = null;
@@ -431,7 +431,7 @@ public final class Class <T>
     return count;
   }
 
-  public Constructor[] getDeclaredConstructors() {
+  public Constructor<?>[] getDeclaredConstructors() {
     Constructor[] array = new Constructor[countConstructors(false)];
     if (vmClass.methodTable != null) {
       Classes.linkConstructors(vmClass, false);
@@ -447,7 +447,7 @@ public final class Class <T>
     return array;
   }
 
-  public Constructor[] getConstructors() {
+  public Constructor<?>[] getConstructors() {
     Constructor[] array = new Constructor[countConstructors(true)];
     if (vmClass.methodTable != null) {
       Classes.linkConstructors(vmClass, true);
@@ -1124,5 +1124,15 @@ public final class Class <T>
     } catch (ClassNotFoundException | LinkageError e) {
       return null;
     }
+  }
+
+  @Override
+  public <A extends java.lang.annotation.Annotation> A[] getAnnotationsByType(Class<A> annotationClass) {
+    return GenericDeclaration.super.getAnnotationsByType(annotationClass);
+  }
+
+  @Override
+  public <A extends java.lang.annotation.Annotation> A[] getDeclaredAnnotationsByType(Class<A> annotationClass) {
+    return GenericDeclaration.super.getDeclaredAnnotationsByType(annotationClass);
   }
 }

@@ -167,9 +167,13 @@ public final class Float extends Number implements Comparable<Float>,
 
   public static native float intBitsToFloat(int bits);
 
-  public static native boolean isInfinite(float value);
+  public static boolean isInfinite(float value) {
+    return value == POSITIVE_INFINITY || value == NEGATIVE_INFINITY;
+  }
 
-  public static native boolean isNaN(float value);
+  public static boolean isNaN(float value) {
+    return value != value;
+  }
 
   private static native float floatFromString(String s, int[] numRead);
 

@@ -23,7 +23,7 @@
 
 package java.lang;
 
-public class StackTraceElement implements java.io.Serializable {
+public final class StackTraceElement implements java.io.Serializable {
   private static final long serialVersionUID = 6992337162326171013L;
   private static final java.io.ObjectStreamField[] serialPersistentFields = {
     new java.io.ObjectStreamField("classLoaderName", String.class),

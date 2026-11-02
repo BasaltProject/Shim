@@ -196,7 +196,7 @@ public abstract class DateFormat extends Format {
   }
 
   public static Locale[] getAvailableLocales() {
-    return new Locale[] {Locale.ROOT, Locale.US};
+    return Locale.getAvailableLocales();
   }
 
   public void setCalendar(Calendar newCalendar) {

@@ -40,9 +40,7 @@ public class Object {
 
   protected void finalize() throws Throwable { }
 
-  public final Class<? extends Object> getClass() {
-    return shim.SystemClassLoader.getClass(getVMClass());
-  }
+  public final native Class<? extends Object> getClass();
 
   native shim.VMClass getVMClass();
 

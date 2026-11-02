@@ -30,7 +30,7 @@ import shim.Classes;
 
 import java.lang.annotation.Annotation;
 
-public class Method extends Executable {
+public final class Method extends Executable {
   public final VMMethod vmMethod;
   private boolean accessible;
 
@@ -333,29 +333,7 @@ public class Method extends Executable {
   }
 
   public String toGenericString() {
-    StringBuilder sb = new StringBuilder();
-    int mod = getModifiers() & Modifier.methodModifiers();
-    if (mod != 0) {
-      sb.append(Modifier.toString(mod)).append(' ');
-    }
-    sb.append(getReturnType().getTypeName()).append(' ');
-    sb.append(getDeclaringClass().getTypeName()).append('.');
-    sb.append(getName()).append('(');
-    Class<?>[] params = getParameterTypes();
-    for (int i = 0; i < params.length; i++) {
-      if (i > 0) sb.append(',');
-      sb.append(params[i].getTypeName());
-    }
-    sb.append(')');
-    Class<?>[] exceptions = getExceptionTypes();
-    if (exceptions.length > 0) {
-      sb.append(" throws ");
-      for (int i = 0; i < exceptions.length; i++) {
-        if (i > 0) sb.append(',');
-        sb.append(exceptions[i].getTypeName());
-      }
-    }
-    return sb.toString();
+    return sharedToGenericString(Modifier.methodModifiers(), isDefault());
   }
 
   public String getGenericSignature() {
@@ -399,7 +377,9 @@ public class Method extends Executable {
       try {
         SignatureParser.MethodSignature ms =
             SignatureParser.parseMethod(vmMethod.class_.loader, sig, getDeclaringClass(), this);
-        return ms.exceptionTypes;
+        if (ms.exceptionTypes.length > 0) {
+          return ms.exceptionTypes;
+        }
       } catch (Exception ignored) {
       }
     }

@@ -181,4 +181,11 @@ public final class Inet4Address extends InetAddress {
         (byte) address};
     return new Inet4Address(null, b);
   }
+
+  private Object writeReplace() throws java.io.ObjectStreamException {
+    InetAddress a = new InetAddress();
+    a.holderHostName = holderHostName;
+    a.holderAddress = holderAddress;
+    return a;
+  }
 }

@@ -51,6 +51,9 @@ public class Throwable implements Serializable {
     this.message = message;
     this.trace = trace(1);
     this.cause = cause;
+    if (shim.jdwp.Agent.eventsActive) {
+      shim.jdwp.Agent.thrown(this);
+    }
   }
 
   public Throwable(String message) {
@@ -73,6 +76,9 @@ public class Throwable implements Serializable {
     this.suppressionEnabled = enableSuppression;
     if (writableStackTrace) {
       this.trace = trace(1);
+      if (shim.jdwp.Agent.eventsActive) {
+        shim.jdwp.Agent.thrown(this);
+      }
     } else {
       this.trace = null;
     }

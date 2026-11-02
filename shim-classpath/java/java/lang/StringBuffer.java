@@ -24,7 +24,7 @@
 package java.lang;
 
 public final class StringBuffer extends AbstractStringBuilder
-    implements java.io.Serializable, Comparable<StringBuffer>, CharSequence {
+    implements java.io.Serializable, Comparable<StringBuffer>, Appendable, CharSequence {
   private static final long serialVersionUID = 3388685877147921107L;
   private static final java.io.ObjectStreamField[] serialPersistentFields = {
     new java.io.ObjectStreamField("value", char[].class),

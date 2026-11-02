@@ -34,7 +34,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-public class MethodHandles {
+public final class MethodHandles {
   public static Lookup lookup() {
     return new Lookup(java.lang.reflect.Method.getCaller().class_, 0x5f);
   }
@@ -746,7 +746,7 @@ public class MethodHandles {
     return type.cast(elem);
   }
 
-  public static class Lookup {
+  public static final class Lookup {
     public static final int PUBLIC = 0x0001;
     public static final int PRIVATE = 0x0002;
     public static final int PROTECTED = 0x0004;
@@ -1141,8 +1141,29 @@ public class MethodHandles {
     }
 
     public String toString() {
-      return "lookup[" + shim.SystemClassLoader.getClass(class_) + ", "
-        + modes + "]";
+      String cname = shim.SystemClassLoader.getClass(class_).getName();
+      switch (modes) {
+        case 0:
+          return cname + "/noaccess";
+        case UNCONDITIONAL:
+          return cname + "/publicLookup";
+        case PUBLIC:
+          return cname + "/public";
+        case PUBLIC | MODULE:
+          return cname + "/module";
+        case PUBLIC | PACKAGE:
+        case PUBLIC | MODULE | PACKAGE:
+          return cname + "/package";
+        case PUBLIC | PACKAGE | PRIVATE:
+        case PUBLIC | MODULE | PACKAGE | PRIVATE:
+          return cname + "/private";
+        case PUBLIC | PACKAGE | PRIVATE | PROTECTED:
+        case PUBLIC | MODULE | PACKAGE | PRIVATE | PROTECTED:
+        case PUBLIC | MODULE | PACKAGE | PRIVATE | PROTECTED | ORIGINAL:
+          return cname;
+        default:
+          return cname + "/" + Integer.toHexString(modes);
+      }
     }
   }
 

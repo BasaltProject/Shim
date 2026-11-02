@@ -14,7 +14,7 @@ import java.nio.BufferUnderflowException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class CoderResult {
+public final class CoderResult {
   private static final int CR_UNDERFLOW = 0;
   private static final int CR_OVERFLOW = 1;
   private static final int CR_MALFORMED = 2;
