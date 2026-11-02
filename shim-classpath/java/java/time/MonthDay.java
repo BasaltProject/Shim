@@ -236,4 +236,12 @@ public final class MonthDay implements TemporalAccessor, TemporalAdjuster, Compa
     return new StringBuilder(10).append("--").append(month < 10 ? "0" : "").append(month)
         .append(day < 10 ? "-0" : "-").append(day).toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.MONTH_DAY_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

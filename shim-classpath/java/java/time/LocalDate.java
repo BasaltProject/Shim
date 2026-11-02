@@ -846,4 +846,12 @@ public final class LocalDate implements Temporal, TemporalAdjuster, ChronoLocalD
     return buf.append(monthValue < 10 ? "-0" : "-").append(monthValue).append(dayValue < 10 ? "-0" : "-")
         .append(dayValue).toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.LOCAL_DATE_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

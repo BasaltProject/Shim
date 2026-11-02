@@ -15,7 +15,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
-public class Base64 {
+public final class Base64 {
   private static final char[] RFC4648 =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toCharArray();
   private static final char[] RFC4648_URL =
@@ -415,8 +415,8 @@ public class Base64 {
       int len = sl - sp;
       if (len == 0) return 0;
       if (len < 2) {
-        if (isMime && table[src[sp] & 0xFF] == -1) return 0;
-        throw new IllegalArgumentException("Input byte[] should at least have 2 bytes for base64 bytes: " + len);
+        if (isMime && table[0] == -1) return 0;
+        throw new IllegalArgumentException("Input byte[] should at least have 2 bytes for base64 bytes");
       }
       if (isMime) {
         int n = 0;
@@ -442,31 +442,52 @@ public class Base64 {
       if (paddings == 0 && (len & 0x3) != 0) {
         paddings = 4 - (len & 0x3);
       }
-      return 3 * ((len + 3) / 4) - paddings;
+      return 3 * (int) ((len + 3L) / 4) - paddings;
     }
 
     private int decode(byte[] src, int sp, int sl, byte[] dst) {
-      int[] table = isUrl ? FROM_BASE64_URL : FROM_BASE64;
+      int[] base64 = isUrl ? FROM_BASE64_URL : FROM_BASE64;
       int dp = 0;
       int bits = 0;
-      int bitCount = 0;
+      int shiftto = 18;
       while (sp < sl) {
-        int b = src[sp++] & 0xFF;
-        int val = table[b];
-        if (val == -1) {
-          if (isMime) continue;
-          throw new IllegalArgumentException("Illegal base64 character " + Integer.toString((byte) b, 16));
+        int b = src[sp++] & 0xff;
+        if ((b = base64[b]) < 0) {
+          if (b == -2) {
+            if (shiftto == 6 && (sp == sl || src[sp++] != '=') || shiftto == 18) {
+              throw new IllegalArgumentException("Input byte array has wrong 4-byte ending unit");
+            }
+            break;
+          }
+          if (isMime) {
+            continue;
+          } else {
+            throw new IllegalArgumentException("Illegal base64 character " + Integer.toString(src[sp - 1], 16));
+          }
         }
-        if (val == -2) {
-          // padding '='
-          break;
+        bits |= (b << shiftto);
+        shiftto -= 6;
+        if (shiftto < 0) {
+          dst[dp++] = (byte) (bits >> 16);
+          dst[dp++] = (byte) (bits >> 8);
+          dst[dp++] = (byte) (bits);
+          shiftto = 18;
+          bits = 0;
         }
-        bits = (bits << 6) | val;
-        bitCount += 6;
-        if (bitCount >= 8) {
-          bitCount -= 8;
-          dst[dp++] = (byte) ((bits >>> bitCount) & 0xFF);
+      }
+      if (shiftto == 6) {
+        dst[dp++] = (byte) (bits >> 16);
+      } else if (shiftto == 0) {
+        dst[dp++] = (byte) (bits >> 16);
+        dst[dp++] = (byte) (bits >> 8);
+      } else if (shiftto == 12) {
+        throw new IllegalArgumentException("Last unit does not have enough valid bits");
+      }
+      while (sp < sl) {
+        if (isMime && base64[src[sp++] & 0xff] < 0) {
+          continue;
         }
+        throw new IllegalArgumentException("Input byte array has incorrect ending byte at " + sp);
       }
       return dp;
     }

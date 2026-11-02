@@ -448,4 +448,12 @@ public final class Instant implements Temporal, TemporalAdjuster, Comparable<Ins
   public java.time.Duration until(Instant endExclusive) {
     return java.time.Duration.between(this, endExclusive);
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.INSTANT_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

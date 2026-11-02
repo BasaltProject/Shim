@@ -593,4 +593,12 @@ public final class LocalDateTime implements Temporal, TemporalAdjuster, ChronoLo
   public String toString() {
     return date.toString() + 'T' + time.toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.LOCAL_DATE_TIME_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

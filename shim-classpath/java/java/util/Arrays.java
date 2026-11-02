@@ -27,7 +27,7 @@ import java.lang.reflect.Array;
 
 import shim.ArraySorts;
 
-public class Arrays {
+public final class Arrays {
   private Arrays() { }
 
   private static void rangeCheck(int arrayLength, int fromIndex, int toIndex) {
@@ -2036,6 +2036,8 @@ public class Arrays {
   }
 
   private static final class ArrayList<E> extends AbstractList<E> implements RandomAccess, java.io.Serializable {
+    private static final long serialVersionUID = -2764017481108945198L;
+
     private final E[] a;
 
     ArrayList(E[] array) {

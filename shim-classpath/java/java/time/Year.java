@@ -330,4 +330,12 @@ public final class Year implements Temporal, TemporalAdjuster, Comparable<Year>,
   public String toString() {
     return Integer.toString(year);
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.YEAR_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

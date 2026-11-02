@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
-public final class MinguoChronology extends YearShiftedChronology {
+public final class MinguoChronology extends YearShiftedChronology implements java.io.Serializable {
   private static final long serialVersionUID = 1039765215346859963L;
 
   public static final MinguoChronology INSTANCE = new MinguoChronology();

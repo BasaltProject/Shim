@@ -85,4 +85,12 @@ final class ZoneRegion extends ZoneId implements Serializable {
   public ZoneRules getRules() {
     return (rules != null ? rules : ZoneRulesProvider.getRules(id, false));
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.ZONE_REGION_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

@@ -53,7 +53,42 @@ public class SimpleDateFormat extends DateFormat {
   private transient char[] compiled;
   private Date defaultCenturyStart;
   private transient int defaultCenturyStartYear;
-  private final Locale locale;
+  private Locale locale;
+
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("pattern", String.class),
+    new java.io.ObjectStreamField("formatData", DateFormatSymbols.class),
+    new java.io.ObjectStreamField("locale", Locale.class),
+    new java.io.ObjectStreamField("defaultCenturyStart", Date.class),
+    new java.io.ObjectStreamField("serialVersionOnStream", Integer.TYPE)
+  };
+
+  private void writeObject(java.io.ObjectOutputStream stream) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = stream.putFields();
+    f.put("pattern", pattern);
+    f.put("formatData", formatSymbols);
+    f.put("locale", locale);
+    f.put("defaultCenturyStart", defaultCenturyStart);
+    f.put("serialVersionOnStream", 1);
+    stream.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField f = stream.readFields();
+    pattern = (String) f.get("pattern", "");
+    formatSymbols = (DateFormatSymbols) f.get("formatData", null);
+    locale = (Locale) f.get("locale", Locale.getDefault(Locale.Category.FORMAT));
+    defaultCenturyStart = (Date) f.get("defaultCenturyStart", null);
+    if (formatSymbols == null) {
+      formatSymbols = DateFormatSymbols.getInstance(locale);
+    }
+    compiled = compile(pattern);
+    if (defaultCenturyStart != null) {
+      java.util.Calendar c = java.util.Calendar.getInstance();
+      c.setTime(defaultCenturyStart);
+      defaultCenturyStartYear = c.get(java.util.Calendar.YEAR);
+    }
+  }
 
   public SimpleDateFormat() {
     this("M/d/yy, h:mm a", Locale.getDefault(Locale.Category.FORMAT));

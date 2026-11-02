@@ -586,4 +586,12 @@ public final class Duration implements TemporalAmount, Comparable<Duration>, Ser
     buf.append('S');
     return buf.toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.DURATION_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

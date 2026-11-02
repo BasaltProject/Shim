@@ -410,4 +410,12 @@ public final class OffsetTime implements Temporal, TemporalAdjuster, Comparable<
   public String toString() {
     return time.toString() + offset.toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.OFFSET_TIME_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

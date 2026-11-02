@@ -132,7 +132,7 @@ public final class ZonedDateTime implements Temporal, ChronoZonedDateTime<LocalD
     return new ZonedDateTime(localDateTime, offset, zone);
   }
 
-  private static ZonedDateTime ofLenient(LocalDateTime localDateTime, ZoneOffset offset, ZoneId zone) {
+  static ZonedDateTime ofLenient(LocalDateTime localDateTime, ZoneOffset offset, ZoneId zone) {
     Objects.requireNonNull(localDateTime, "localDateTime");
     Objects.requireNonNull(offset, "offset");
     Objects.requireNonNull(zone, "zone");
@@ -568,5 +568,13 @@ public final class ZonedDateTime implements Temporal, ChronoZonedDateTime<LocalD
       str += '[' + zone.toString() + ']';
     }
     return str;
+  }
+
+  private Object writeReplace() {
+    return new Ser(Ser.ZONE_DATE_TIME_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
   }
 }
