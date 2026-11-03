@@ -8,6 +8,8 @@
 
 package java.awt.geom;
 
+import java.awt.Shape;
+
 public class AffineTransform implements Cloneable, java.io.Serializable {
   public static final int TYPE_IDENTITY = 0;
   public static final int TYPE_TRANSLATION = 1;
@@ -992,6 +994,30 @@ public class AffineTransform implements Cloneable, java.io.Serializable {
       ptDst.setLocation(x, y);
       return ptDst;
     }
+  }
+
+  public void deltaTransform(double[] srcPts, int srcOff, double[] dstPts, int dstOff, int numPts) {
+    double[] tmp = new double[numPts * 2];
+    for (int i = 0; i < numPts; i++) {
+      double x = srcPts[srcOff + i * 2];
+      double y = srcPts[srcOff + i * 2 + 1];
+      tmp[i * 2] = x * m00 + y * m01;
+      tmp[i * 2 + 1] = x * m10 + y * m11;
+    }
+    System.arraycopy(tmp, 0, dstPts, dstOff, numPts * 2);
+  }
+
+  public void inverseTransform(double[] srcPts, int srcOff, double[] dstPts, int dstOff, int numPts)
+      throws NoninvertibleTransformException {
+    AffineTransform inverse = createInverse();
+    inverse.transform(srcPts, srcOff, dstPts, dstOff, numPts);
+  }
+
+  public Shape createTransformedShape(Shape pSrc) {
+    if (pSrc == null) {
+      return null;
+    }
+    return new Path2D.Double(pSrc, this);
   }
 
   public boolean isIdentity() {
