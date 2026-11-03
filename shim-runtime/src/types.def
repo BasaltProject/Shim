@@ -382,6 +382,7 @@
   (intArray stackMap)
   (object exceptionHandlerTable)
   (lineNumberTable lineNumberTable)
+  (lineNumberTable localVars)
   (intptr_t compiled)
   (uint32_t compiledSize)
   (uint16_t maxStack)

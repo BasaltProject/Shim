@@ -640,7 +640,20 @@ class CallEvent : public Event {
       op = lir::Call;
     }
 
+    CodePromise* skip = 0;
+    if ((flags & Compiler::PollGuard) and not(TailCalls and (flags & Compiler::TailJump))) {
+      skip = compiler::codePromise(c, static_cast<Promise*>(0));
+      lir::Constant skipTarget(skip);
+      if (not c->assembler->branchIfThreadWordZero(flags >> 8, &skipTarget)) {
+        skip = 0;
+      }
+    }
+
     apply(c, op, c->targetInfo.pointerSize, address->source, address->source);
+
+    if (skip) {
+      skip->offset = c->assembler->offset();
+    }
 
     if (traceHandler) {
       traceHandler->handleTrace(codePromise(c, c->assembler->offset(true)),

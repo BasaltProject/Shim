@@ -3631,8 +3631,6 @@ extern "C" SHIM_EXPORT jint JNICALL
   local::JavaVMInitArgs* a = static_cast<local::JavaVMInitArgs*>(args);
 
 #ifdef __GLIBC__
-  if (not getenv("MALLOC_TRIM_THRESHOLD_")) mallopt(M_TRIM_THRESHOLD, 128 * 1024);
-  if (not getenv("MALLOC_TOP_PAD_")) mallopt(M_TOP_PAD, 0);
   if (not getenv("MALLOC_ARENA_MAX")) mallopt(M_ARENA_MAX, 1);
 #endif
 
@@ -3719,6 +3717,14 @@ extern "C" SHIM_EXPORT jint JNICALL
     }
 #endif
   }
+
+#ifdef __GLIBC__
+  // keep the freed nursery blocks mapped so the next cycle does not page fault them again
+  if (not getenv("MALLOC_TRIM_THRESHOLD_")) {
+    mallopt(M_TRIM_THRESHOLD, static_cast<int>(heapLimit / 8 < 256u * 1024 * 1024 ? heapLimit / 8 : 256u * 1024 * 1024));
+  }
+  if (not getenv("MALLOC_TOP_PAD_")) mallopt(M_TOP_PAD, 1024 * 1024);
+#endif
 
   if (stackLimit == 0)
     stackLimit = 1024 * 1024;

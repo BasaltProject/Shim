@@ -161,10 +161,9 @@ const unsigned ThreadBackupHeapSizeInBytes = 2 * 1024 - 72;
 const unsigned ThreadBackupHeapSizeInWords = ThreadBackupHeapSizeInBytes
                                              / BytesPerWord;
 
-const unsigned ThreadHeapPoolSize = 64;
+const unsigned ThreadHeapPoolSize = 2048;
 
-const unsigned FixedFootprintThresholdInBytes = ThreadHeapPoolSize
-                                                * ThreadHeapSizeInBytes;
+const unsigned MinimumThreadHeapPoolSize = 64;
 
 // number of zombie threads which may accumulate before we force a GC
 // to clean them up:
@@ -1074,7 +1073,6 @@ class Machine {
   const char** arguments;
   unsigned argumentCount;
   unsigned threadCount;
-  unsigned activeCount;
   unsigned liveCount;
   unsigned daemonCount;
   unsigned fixedFootprint;
@@ -1109,6 +1107,8 @@ class Machine {
   unsigned heapPoolIndex;
   size_t bootimageSize;
   uintptr_t gcEpoch;
+  unsigned heapPoolLimit;
+  unsigned fixedFootprintThreshold;
 };
 
 void printTrace(Thread* t, GcThrowable* exception);
@@ -1374,6 +1374,7 @@ class Thread {
   System::Thread* systemThread;
   System::Monitor* lock;
   GcThread* javaThread;
+  volatile uintptr_t pollRequest;
   GcThrowable* exception;
   unsigned heapIndex;
   unsigned heapOffset;
@@ -2078,6 +2079,17 @@ GcByteArray* makeByteArray(Thread* t, const char* format, ...);
 
 GcString* makeString(Thread* t, const char* format, ...);
 
+extern volatile int shimDebugHooks;
+extern volatile int shimDebugArmed;
+
+bool shimDebugUserClass(GcClass* c);
+
+unsigned shimDebugLocalCount(Thread* t);
+
+void shimDebugReadLocals(Thread* t, uint64_t* bits, object* refs);
+
+void shimDebugWriteLocal(Thread* t, unsigned slot, uint64_t bits, object ref, bool isRef);
+
 #ifndef HAVE_StringOffset
 
 inline uint32_t GcString::length(Thread* t)
@@ -2210,7 +2222,7 @@ inline uint32_t objectHash(Thread* t, object o)
   if (objectExtended(t, o)) {
     return extendedWord(t, o, baseSize(t, o, objectClass(t, o)));
   } else {
-    if (not objectFixed(t, o)) {
+    if (not objectFixed(t, o) and not hashTaken(t, o)) {
       markHashTaken(t, o);
     }
     return takeHash(t, o);
@@ -2434,7 +2446,7 @@ unsigned validateMethodDescriptor(Thread* t, GcByteArray* descriptor, bool insta
 
 inline bool emptyMethod(Thread* t UNUSED, GcMethod* method)
 {
-  return ((method->flags() & ACC_NATIVE) == 0)
+  return ((method->flags() & ACC_NATIVE) == 0) and method->code()
          and (method->code()->length() == 1)
          and (method->code()->body()[0] == return_);
 }

@@ -95,6 +95,8 @@ class Compiler {
   static const unsigned NoReturn = 1 << 1;
   static const unsigned TailJump = 1 << 2;
   static const unsigned LongJumpOrCall = 1 << 3;
+  static const unsigned PollGuard = 1 << 4;
+  static unsigned pollGuard(unsigned offsetFromThread) { return PollGuard | (offsetFromThread << 8); }
 
   class State {
   };
@@ -172,6 +174,8 @@ class Compiler {
   virtual ir::Value* load(ir::ExtendMode extendMode,
                           ir::Value* src,
                           ir::Type dstType) = 0;
+
+  virtual ir::Value* bitcast(ir::Type dstType, ir::Value* src) = 0;
 
   virtual void condJump(lir::TernaryOperation op,
                         ir::Value* a,

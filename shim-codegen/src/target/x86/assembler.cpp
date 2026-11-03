@@ -924,6 +924,14 @@ class MyAssembler : public Assembler {
              &handlerConstant);
   }
 
+  virtual bool branchIfThreadWordZero(unsigned offsetFromThread, lir::Constant* target)
+  {
+    lir::Constant zero(resolvedPromise(&c, 0));
+    lir::Memory word(rbx, offsetFromThread);
+    branchCM(&c, lir::JumpIfEqual, TargetBytesPerWord, &zero, &word, target);
+    return true;
+  }
+
   virtual void saveFrame(unsigned stackOffset, unsigned)
   {
     lir::RegisterPair stack(rsp);

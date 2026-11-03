@@ -12,6 +12,18 @@
  */
 
 THUNK(tryInitClass)
+THUNK(debugHook)
+THUNK(debugLocalsBegin)
+THUNK(debugLocalI)
+THUNK(debugLocalJ)
+THUNK(debugLocalF)
+THUNK(debugLocalD)
+THUNK(debugLocalL)
+THUNK(debugGetI)
+THUNK(debugGetJ)
+THUNK(debugGetF)
+THUNK(debugGetD)
+THUNK(debugGetL)
 THUNK(findInterfaceMethodFromInstance)
 THUNK(findInterfaceMethodFromInstanceAndReference)
 THUNK(findSpecialMethodFromReference)

@@ -744,6 +744,23 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   }
 }
 
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_sun_misc_Unsafe_reallocateMemory(Thread* t,
+                                           object,
+                                           uintptr_t* arguments)
+{
+  int64_t address;
+  memcpy(&address, arguments + 1, 8);
+  int64_t size;
+  memcpy(&size, arguments + 3, 8);
+  void* p = realloc(reinterpret_cast<void*>(address), size);
+  if (p || size == 0) {
+    return reinterpret_cast<int64_t>(p);
+  } else {
+    throwNew(t, GcOutOfMemoryError::Type);
+  }
+}
+
 extern "C" SHIM_EXPORT void JNICALL
     Shim_sun_misc_Unsafe_freeMemory(Thread*, object, uintptr_t* arguments)
 {
@@ -1505,6 +1522,13 @@ extern "C" SHIM_EXPORT int64_t JNICALL
       objectClass(t, reinterpret_cast<object>(arguments[0])));
 }
 
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_Object_getClass(Thread* t, object, uintptr_t* arguments)
+{
+  return reinterpret_cast<int64_t>(
+      getJClass(t, objectClass(t, reinterpret_cast<object>(arguments[0]))));
+}
+
 extern "C" SHIM_EXPORT void JNICALL
     Shim_java_lang_Object_wait(Thread* t, object, uintptr_t* arguments)
 {
@@ -1538,4 +1562,136 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 {
   return reinterpret_cast<int64_t>(
       clone(t, reinterpret_cast<object>(arguments[0])));
+}
+
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_shim_jdwp_Agent_setHooks(Thread*, object, uintptr_t* arguments)
+{
+  shimDebugHooks = (arguments[0] & 0xff) ? 1 : 0;
+}
+
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_shim_jdwp_Agent_setArmed(Thread*, object, uintptr_t* arguments)
+{
+  shimDebugArmed = static_cast<int>(arguments[0]);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_jdwp_Agent_lineTable(Thread* t, object, uintptr_t* arguments)
+{
+  GcClass* c = cast<GcJclass>(t, reinterpret_cast<object>(arguments[0]))->vmClass();
+  GcString* name = cast<GcString>(t, reinterpret_cast<object>(arguments[1]));
+  GcString* spec = cast<GcString>(t, reinterpret_cast<object>(arguments[2]));
+  PROTECT(t, c);
+  PROTECT(t, name);
+  PROTECT(t, spec);
+  RUNTIME_ARRAY(char, n, name->length(t) + 1);
+  RUNTIME_ARRAY(char, s, spec->length(t) + 1);
+  stringChars(t, name, RUNTIME_ARRAY_BODY(n));
+  stringChars(t, spec, RUNTIME_ARRAY_BODY(s));
+  GcMethod* m = 0;
+  GcArray* table = cast<GcArray>(t, c->methodTable());
+  for (unsigned i = 0; table and i < table->length(); ++i) {
+    GcMethod* candidate = cast<GcMethod>(t, table->body()[i]);
+    if (strcmp(reinterpret_cast<const char*>(candidate->name()->body().begin()), RUNTIME_ARRAY_BODY(n)) == 0
+        and strcmp(reinterpret_cast<const char*>(candidate->spec()->body().begin()), RUNTIME_ARRAY_BODY(s)) == 0) {
+      m = candidate;
+      break;
+    }
+  }
+  GcLineNumberTable* lnt = (m and m->code()) ? m->code()->lineNumberTable() : 0;
+  unsigned count = lnt ? lnt->length() : 0;
+  PROTECT(t, lnt);
+  GcIntArray* result = makeIntArray(t, count * 2);
+  for (unsigned i = 0; i < count; ++i) {
+    uint64_t ln = lnt->body()[i];
+    result->body()[i * 2] = lineNumberIp(ln);
+    result->body()[i * 2 + 1] = lineNumberLine(ln);
+  }
+  return reinterpret_cast<int64_t>(result);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_jdwp_Locals_localBits(Thread* t, object, uintptr_t*)
+{
+  unsigned n = shimDebugLocalCount(t);
+  uint64_t bits[256];
+  object refs[256];
+  shimDebugReadLocals(t, bits, refs);
+  GcLongArray* result = makeLongArray(t, n);
+  for (unsigned i = 0; i < n; ++i) {
+    result->body()[i] = static_cast<int64_t>(bits[i]);
+  }
+  return reinterpret_cast<int64_t>(result);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_jdwp_Locals_localRefs(Thread* t, object, uintptr_t*)
+{
+  unsigned n = shimDebugLocalCount(t);
+  object result = makeObjectArray(t, n);
+  PROTECT(t, result);
+  uint64_t bits[256];
+  object refs[256];
+  shimDebugReadLocals(t, bits, refs);
+  for (unsigned i = 0; i < n; ++i) {
+    if (refs[i]) {
+      reinterpret_cast<GcArray*>(result)->setBodyElement(t, i, refs[i]);
+    }
+  }
+  return reinterpret_cast<int64_t>(result);
+}
+
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_shim_jdwp_Locals_putLocalBits(Thread* t, object, uintptr_t* arguments)
+{
+  shimDebugWriteLocal(t, arguments[0], static_cast<uint64_t>(*reinterpret_cast<int64_t*>(arguments + 1)), 0, false);
+}
+
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_shim_jdwp_Locals_putLocalRef(Thread* t, object, uintptr_t* arguments)
+{
+  shimDebugWriteLocal(t, arguments[0], 0, reinterpret_cast<object>(arguments[1]), true);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_jdwp_Locals_monitorOwner(Thread* t, object, uintptr_t* arguments)
+{
+  GcMonitor* m = objectMonitor(t, reinterpret_cast<object>(arguments[0]), false);
+  if (m == 0 or m->owner() == 0) {
+    return 0;
+  }
+  return reinterpret_cast<int64_t>(static_cast<Thread*>(m->owner())->javaThread);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_jdwp_Locals_monitorDepth(Thread* t, object, uintptr_t* arguments)
+{
+  GcMonitor* m = objectMonitor(t, reinterpret_cast<object>(arguments[0]), false);
+  return (m == 0 or m->owner() == 0) ? 0 : m->depth();
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_jdwp_Agent_allClasses(Thread* t, object, uintptr_t* arguments)
+{
+  GcClassLoader* loader = cast<GcClassLoader>(t, reinterpret_cast<object>(arguments[0]));
+  if (loader == 0) loader = roots(t)->bootLoader();
+  PROTECT(t, loader);
+  GcHashMap* map = cast<GcHashMap>(t, loader->map());
+  unsigned count = 0;
+  if (map) {
+    PROTECT(t, map);
+    for (HashMapIterator it(t, map); it.hasMore(); it.next()) ++count;
+  }
+  object result = makeObjectArray(t, count);
+  PROTECT(t, result);
+  unsigned i = 0;
+  if (map) {
+    for (HashMapIterator it(t, map); it.hasMore() and i < count;) {
+      GcClass* c = cast<GcClass>(t, it.next()->second());
+      GcJclass* jc = getJClass(t, c);
+      reinterpret_cast<GcArray*>(result)->setBodyElement(t, i++, jc);
+    }
+  }
+  return reinterpret_cast<int64_t>(result);
 }

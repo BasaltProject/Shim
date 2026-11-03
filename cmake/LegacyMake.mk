@@ -1247,6 +1247,12 @@ ifeq ($(mode),small)
 	optimization-cflags = $(cflags_small) -DNDEBUG
 endif
 
+ifeq ($(use-lto),)
+	ifeq ($(platform)-$(mode)-$(use-clang),linux-fast-true)
+		use-lto = true
+	endif
+endif
+
 ifeq ($(use-lto),true)
 	ifeq ($(use-clang),true)
 		optimization-cflags += -flto
@@ -1850,6 +1856,18 @@ $(classpath-dep): $(classpath-sources) $(classpath-jar-dep)
 	@printf '%s\n' $(wordlist 4501,5000,$(classpath-sources)) >> $(classpath-build)/sources.args
 	@printf '%s\n' $(wordlist 5001,5500,$(classpath-sources)) >> $(classpath-build)/sources.args
 	@printf '%s\n' $(wordlist 5501,6000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 6001,6500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 6501,7000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 7001,7500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 7501,8000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 8001,8500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 8501,9000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 9001,9500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 9501,10000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 10001,10500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 10501,11000,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 11001,11500,$(classpath-sources)) >> $(classpath-build)/sources.args
+	@printf '%s\n' $(wordlist 11501,12000,$(classpath-sources)) >> $(classpath-build)/sources.args
 	$(javac) $(bootstrap-javac-flags) \
 		-d $(classpath-build) -bootclasspath $(boot-classpath) \
 		@$(classpath-build)/sources.args
