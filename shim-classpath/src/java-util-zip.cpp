@@ -240,7 +240,7 @@ extern "C" JNIEXPORT void JNICALL
       r = Z_OK;
     }
   }
-  if (r == Z_OK && (paramsApplied || !setParams)) {
+  if (r == Z_OK && !setParams) {
     r = deflate(s, flush);
     if (r == Z_BUF_ERROR) {
       r = Z_OK;

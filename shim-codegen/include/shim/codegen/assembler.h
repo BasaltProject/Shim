@@ -83,6 +83,7 @@ class Assembler {
 
   virtual void checkStackOverflow(uintptr_t handler,
                                   unsigned stackLimitOffsetFromThread) = 0;
+  virtual bool branchIfThreadWordZero(unsigned, lir::Constant*) { return false; }
   virtual void saveFrame(unsigned stackOffset, unsigned ipOffset) = 0;
   virtual void pushFrame(unsigned argumentCount, ...) = 0;
   virtual void allocateFrame(unsigned footprint) = 0;

@@ -23,6 +23,7 @@
 
 #include "shim/jnienv.h"
 #include "shim/machine.h"
+#include <time.h>
 #include "shim/util.h"
 #include <shim/util/stream.h>
 #include "shim/constants.h"
@@ -2434,7 +2435,7 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
             length);
   }
 
-  GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
+  GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
   s.read(code->body().begin(), length);
   PROTECT(t, code);
   unsigned ehtLength = s.read2();
@@ -2488,6 +2489,33 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
         lnt->body()[i] = lineNumber(ip, line);
       }
       code->setLineNumberTable(t, lnt);
+    } else if (vm::strcmp(reinterpret_cast<const int8_t*>("LocalVariableTable"), name->body().begin()) == 0) {
+      if (length < 2) throwNew(t, GcClassFormatError::Type, "Truncated LocalVariableTable");
+      unsigned lvtLength = s.read2();
+      if (length != 2 + 10 * lvtLength) throwNew(t, GcClassFormatError::Type, "Invalid LocalVariableTable length");
+      GcLineNumberTable* lvt = makeLineNumberTable(t, lvtLength);
+      for (unsigned i = 0; i < lvtLength; ++i) {
+        uint64_t start = s.read2();
+        uint64_t span = s.read2();
+        s.read2();
+        unsigned descriptorIndex = s.read2();
+        uint64_t slot = s.read2();
+        uint64_t kind = 0;
+        if (descriptorIndex >= 1 and descriptorIndex <= tags->length() / 2
+            and tags->body()[descriptorIndex - 1] == CONSTANT_Utf8) {
+          GcByteArray* d = cast<GcByteArray>(t, singletonObject(t, pool, descriptorIndex - 1));
+          switch (d->body()[0]) {
+          case 'J': kind = 2; break;
+          case 'F': kind = 3; break;
+          case 'D': kind = 4; break;
+          case 'L':
+          case '[': kind = 5; break;
+          default: kind = 1; break;
+          }
+        }
+        lvt->body()[i] = start | (span << 16) | (slot << 32) | (kind << 48);
+      }
+      code->setLocalVars(t, lvt);
     } else s.skip(length);
   }
   *verificationMaps = stackMaps;
@@ -3088,7 +3116,7 @@ void parseAttributeTable(Thread* t,
     } else if (vm::strcmp(reinterpret_cast<const int8_t*>("BootstrapMethods"),
                           name->body().begin()) == 0) {
       unsigned count = s.read2();
-      GcArray* array = makeArray(t, count);
+      GcArray* array = makeArray(t, count * 2);
       PROTECT(t, array);
 
       for (unsigned i = 0; i < count; ++i) {
@@ -3875,7 +3903,7 @@ void boot(Thread* t)
   m->processor->boot(t, 0, 0);
 
   {
-    GcCode* bootCode = makeCode(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
+    GcCode* bootCode = makeCode(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
     bootCode->body()[0] = impdep1;
     object bootMethod
         = makeMethod(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, bootCode);
@@ -4030,7 +4058,7 @@ void doCollect(Thread* t, Heap::CollectionType type, int pendingAllocation)
   if (m->heap->limitExceeded()) {
     // if we're out of memory, disallow further allocations of fixed
     // objects:
-    m->fixedFootprint = FixedFootprintThresholdInBytes;
+    m->fixedFootprint = m->fixedFootprintThreshold;
   } else {
     m->fixedFootprint = 0;
   }
@@ -4201,7 +4229,6 @@ Machine::Machine(System* system,
       arguments(arguments),
       argumentCount(argumentCount),
       threadCount(0),
-      activeCount(0),
       liveCount(0),
       daemonCount(0),
       fixedFootprint(0),
@@ -4236,6 +4263,14 @@ Machine::Machine(System* system,
   heap->setClient(heapClient);
 
   populateJNITables(&javaVMVTable, &jniEnvVTable);
+
+  // the nursery is at most a sixteenth of the heap limit so a collection always has room to copy into
+  {
+    unsigned blocks = heap->limit() / 16 / ThreadHeapSizeInBytes;
+    heapPoolLimit = blocks < MinimumThreadHeapPoolSize ? MinimumThreadHeapPoolSize
+                    : blocks > ThreadHeapPoolSize ? ThreadHeapPoolSize : blocks;
+    fixedFootprintThreshold = heapPoolLimit * ThreadHeapSizeInBytes;
+  }
 
   // Copying the properties memory (to avoid memory crashes)
   this->properties = (char**)heap->allocate(sizeof(char*) * propertyCount);
@@ -4336,6 +4371,7 @@ Thread::Thread(Machine* m, GcThread* javaThread, Thread* parent)
       systemThread(0),
       lock(0),
       javaThread(javaThread),
+      pollRequest(0),
       exception(0),
       heapIndex(0),
       heapOffset(0),
@@ -4599,6 +4635,29 @@ void shutDown(Thread* t)
   }
 }
 
+static void setPollRequest(Thread* o, uintptr_t value)
+{
+  for (; o; o = o->peer) {
+    o->pollRequest = value;
+    if (o->child) setPollRequest(o->child, value);
+  }
+}
+
+static bool anyOtherActive(Thread* self, Thread* o)
+{
+  for (; o; o = o->peer) {
+    if (o != self
+        && *const_cast<volatile Thread::State*>(&o->state)
+           == Thread::ActiveState) {
+      return true;
+    }
+    if (o->child && anyOtherActive(self, o->child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void enter(Thread* t, Thread::State s)
 {
   stress(t);
@@ -4612,11 +4671,9 @@ void enter(Thread* t, Thread::State s)
   }
 
 #ifdef USE_ATOMIC_OPERATIONS
-#define INCREMENT atomicIncrement
 #define ACQUIRE_LOCK ACQUIRE_RAW(t, t->m->stateLock)
 #define STORE_LOAD_MEMORY_BARRIER storeLoadMemoryBarrier()
 #else
-#define INCREMENT(pointer, value) *(pointer) += value;
 #define ACQUIRE_LOCK
 #define STORE_LOAD_MEMORY_BARRIER
 
@@ -4635,11 +4692,8 @@ void enter(Thread* t, Thread::State s)
 
     switch (t->state) {
     case Thread::ActiveState:
+    case Thread::IdleState:
       break;
-
-    case Thread::IdleState: {
-      INCREMENT(&(t->m->activeCount), 1);
-    } break;
 
     default:
       abort(t);
@@ -4647,10 +4701,11 @@ void enter(Thread* t, Thread::State s)
 
     t->state = Thread::ExclusiveState;
     t->m->exclusive = t;
+    setPollRequest(t->m->rootThread, 1);
 
     STORE_LOAD_MEMORY_BARRIER;
 
-    while (t->m->activeCount > 1) {
+    while (anyOtherActive(t, t->m->rootThread)) {
       t->m->stateLock->wait(t->systemThread, 0);
     }
   } break;
@@ -4658,9 +4713,6 @@ void enter(Thread* t, Thread::State s)
   case Thread::IdleState:
     if (LIKELY(t->state == Thread::ActiveState)) {
       // fast path
-      assertT(t, t->m->activeCount > 0);
-      INCREMENT(&(t->m->activeCount), -1);
-
       t->state = s;
 
       STORE_LOAD_MEMORY_BARRIER;
@@ -4684,6 +4736,7 @@ void enter(Thread* t, Thread::State s)
     case Thread::ExclusiveState: {
       assertT(t, t->m->exclusive == t);
       t->m->exclusive = 0;
+      setPollRequest(t->m->rootThread, 0);
     } break;
 
     case Thread::ActiveState:
@@ -4692,9 +4745,6 @@ void enter(Thread* t, Thread::State s)
     default:
       abort(t);
     }
-
-    assertT(t, t->m->activeCount > 0);
-    INCREMENT(&(t->m->activeCount), -1);
 
     if (s == Thread::ZombieState) {
       assertT(t, t->m->liveCount > 0);
@@ -4713,8 +4763,6 @@ void enter(Thread* t, Thread::State s)
   case Thread::ActiveState:
     if (LIKELY(t->state == Thread::IdleState and t->m->exclusive == 0)) {
       // fast path
-      INCREMENT(&(t->m->activeCount), 1);
-
       t->state = s;
 
       STORE_LOAD_MEMORY_BARRIER;
@@ -4737,6 +4785,7 @@ void enter(Thread* t, Thread::State s)
 
         t->state = s;
         t->m->exclusive = 0;
+        setPollRequest(t->m->rootThread, 0);
 
         t->m->stateLock->notifyAll(t->systemThread);
       } break;
@@ -4747,7 +4796,6 @@ void enter(Thread* t, Thread::State s)
           t->m->stateLock->wait(t->systemThread, 0);
         }
 
-        INCREMENT(&(t->m->activeCount), 1);
         if (t->state == Thread::NoState) {
           ++t->m->liveCount;
           ++t->m->threadCount;
@@ -4778,9 +4826,6 @@ void enter(Thread* t, Thread::State s)
     default:
       abort(t);
     }
-
-    assertT(t, t->m->activeCount > 0);
-    INCREMENT(&(t->m->activeCount), -1);
 
     t->state = s;
 
@@ -4885,7 +4930,7 @@ object allocate3(Thread* t,
           > ThreadHeapSizeInWords) {
         t->heap = 0;
         if ((not t->m->heap->limitExceeded())
-            and t->m->heapPoolIndex < ThreadHeapPoolSize) {
+            and t->m->heapPoolIndex < t->m->heapPoolLimit) {
           t->heap = static_cast<uintptr_t*>(
               t->m->heap->tryAllocate(ThreadHeapSizeInBytes));
 
@@ -4901,7 +4946,7 @@ object allocate3(Thread* t,
       break;
 
     case Machine::FixedAllocation:
-      if (t->m->fixedFootprint + sizeInBytes > FixedFootprintThresholdInBytes) {
+      if (t->m->fixedFootprint + sizeInBytes > t->m->fixedFootprintThreshold) {
         t->heap = 0;
       }
       break;
@@ -4974,7 +5019,27 @@ void collect(Thread* t, Heap::CollectionType type, int pendingAllocation)
     type = Heap::MajorCollection;
   }
 
+#ifndef _WIN32
+  const bool logPauses = getenv("SHIM_GC_STATS") != 0;
+  timespec start, cpuStart;
+  if (logPauses) {
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &cpuStart);
+  }
+#endif
+
   doCollect(t, type, pendingAllocation);
+
+#ifndef _WIN32
+  if (logPauses) {
+    timespec end, cpuEnd;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &cpuEnd);
+    fprintf(stderr, "gc %s pause %.2f ms (cpu %.2f ms)\n", type == Heap::MajorCollection ? "major" : "minor",
+            (end.tv_sec - start.tv_sec) * 1e3 + (end.tv_nsec - start.tv_nsec) / 1e6,
+            (cpuEnd.tv_sec - cpuStart.tv_sec) * 1e3 + (cpuEnd.tv_nsec - cpuStart.tv_nsec) / 1e6);
+  }
+#endif
 
   if (t->m->heap->limitExceeded(pending)) {
     // try once more, giving the heap a chance to squeeze everything
@@ -5522,7 +5587,9 @@ GcClass* parseClass(Thread* t,
   parseAttributeTable(t, s, class_, pool, poolTags, majorVer, invocations);
 
   // Verify declared bytecode with complete metadata, before binding pool references.
-  for (unsigned i = 0; verificationMethods && i < verificationMethods->length(); i += 2) {
+  // The bootstrap classpath is trusted, as in HotSpot's default of not verifying boot classes.
+  bool verifyBytecode = loader != roots(t)->bootLoader() or loader == 0;
+  for (unsigned i = 0; verifyBytecode && verificationMethods && i < verificationMethods->length(); i += 2) {
     GcMethod* method = cast<GcMethod>(t, verificationMethods->body()[i]);
     if (!method) continue;
     PROTECT(t, method);
@@ -5686,8 +5753,9 @@ GcClass* resolveSystemClass(Thread* t,
       }
       memcpy(RUNTIME_ARRAY_BODY(file) + fileLength, ".class", 7);
 
+      const char* source = 0;
       System::Region* region = validPath ? static_cast<Finder*>(sysLoader->finder())
-                                   ->find(RUNTIME_ARRAY_BODY(file)) : 0;
+                                   ->find(RUNTIME_ARRAY_BODY(file), &source) : 0;
 
       if (region) {
         if (Verbose) {
@@ -5724,9 +5792,6 @@ GcClass* resolveSystemClass(Thread* t,
         }
 
         {
-          const char* source = static_cast<Finder*>(sysLoader->finder())
-                                   ->sourceUrl(RUNTIME_ARRAY_BODY(file));
-
           if (source) {
             unsigned length = strlen(source);
             GcByteArray* array = makeByteArray(t, length + 1);
@@ -6305,6 +6370,15 @@ void initClass(Thread* t, GcClass* c)
     }
   }
 
+  if ((shimDebugArmed & 2) and shimDebugUserClass(c)) {
+    GcJclass* jc = getJClass(t, c);
+    t->m->processor->invoke(
+        t, roots(t)->bootLoader(), "shim/jdwp/Agent", "classPrepared", "(Ljava/lang/Class;)V", 0, jc);
+    if (t->exception) {
+      t->exception = 0;
+    }
+  }
+
   if (preInitClass(t, c)) {
     OBJECT_RESOURCE(t, c, postInitClass(t, cast<GcClass>(t, c)));
 
@@ -6540,6 +6614,7 @@ void monitorMapInsert(Thread* t, object o, object m)
     if (array == 0 or map->size() + 1 >= array->length() * 2) {
       hashMapResize(t, map, objectHash, array ? array->length() * 2 : 1 << 16);
     }
+    map = cast<GcHashMap>(t, roots(t)->monitorMap());
     array = map->array();
   }
 
@@ -7214,6 +7289,21 @@ void noop()
 }
 
 #include "type-constructors.cpp"
+
+volatile int shimDebugHooks = 0;
+volatile int shimDebugArmed = 0;
+
+bool shimDebugUserClass(GcClass* c)
+{
+  static const char* const skipped[] = {"java/", "javax/", "jdk/", "sun/", "com/sun/", "shim/", "avian/"};
+  const char* name = reinterpret_cast<const char*>(c->name()->body().begin());
+  for (unsigned i = 0; i < sizeof(skipped) / sizeof(skipped[0]); ++i) {
+    if (strncmp(name, skipped[i], strlen(skipped[i])) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
 
 }  // namespace vm
 

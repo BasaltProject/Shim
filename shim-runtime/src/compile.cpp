@@ -268,6 +268,41 @@ class MyThread : public Thread {
     t->transition = 0;
   }
 
+  class DebugLocals : public Thread::Protector {
+   public:
+    static const unsigned kMax = 256;
+
+    DebugLocals(Thread* t) : Protector(t), used(false), top(0)
+    {
+      memset(bits, 0, sizeof(bits));
+      memset(refs, 0, sizeof(refs));
+    }
+
+    void clear()
+    {
+      memset(bits, 0, top * sizeof(bits[0]));
+      memset(refs, 0, top * sizeof(refs[0]));
+      top = 0;
+    }
+
+    virtual void visit(Heap::Visitor* v)
+    {
+      if (not used) {
+        return;
+      }
+      for (unsigned i = 0; i < kMax; ++i) {
+        if (refs[i]) {
+          v->visit(&refs[i]);
+        }
+      }
+    }
+
+    bool used;
+    unsigned top;
+    uint64_t bits[kMax];
+    object refs[kMax];
+  };
+
   MyThread(Machine* m,
            GcThread* javaThread,
            MyThread* parent,
@@ -297,8 +332,15 @@ class MyThread : public Thread {
         traceContext(0),
         stackLimit(0),
         referenceFrame(0),
-        methodLockIsClean(true)
+        methodLockIsClean(true),
+        interfaceCacheEpoch(0),
+        assignableCacheEpoch(0),
+        nativeCacheEpoch(0),
+        debugLocals(this)
   {
+    memset(nativeCache, 0, sizeof(nativeCache));
+    memset(interfaceCache, 0, sizeof(interfaceCache));
+    memset(assignableCache, 0, sizeof(assignableCache));
     arch->acquire();
   }
 
@@ -325,6 +367,41 @@ class MyThread : public Thread {
   uintptr_t stackLimit;
   List<Reference*>* referenceFrame;
   bool methodLockIsClean;
+
+  static const unsigned InterfaceCacheSize = 256;
+
+  struct InterfaceCacheEntry {
+    uintptr_t class_;
+    uintptr_t method;
+    uintptr_t address;
+  };
+
+  uintptr_t interfaceCacheEpoch;
+  InterfaceCacheEntry interfaceCache[InterfaceCacheSize];
+
+  static const unsigned AssignableCacheSize = 256;
+
+  struct AssignableCacheEntry {
+    uintptr_t to;
+    uintptr_t from;
+    uintptr_t result;
+  };
+
+  uintptr_t assignableCacheEpoch;
+  AssignableCacheEntry assignableCache[AssignableCacheSize];
+
+  static const unsigned NativeCacheSize = 256;
+
+  struct NativeCacheEntry {
+    uintptr_t ip;
+    GcMethod* method;
+    void* function;
+    uintptr_t fast;
+  };
+
+  uintptr_t nativeCacheEpoch;
+  DebugLocals debugLocals;
+  NativeCacheEntry nativeCache[NativeCacheSize];
 };
 
 void transition(MyThread* t,
@@ -2428,6 +2505,158 @@ void tryInitClass(MyThread* t, GcClass* class_)
   initClass(t, class_);
 }
 
+bool debugHookable(GcMethod* method)
+{
+  if (method->code() == 0 or method->code()->lineNumberTable() == 0) {
+    return false;
+  }
+  return shimDebugUserClass(method->class_());
+}
+
+bool isLineStart(GcMethod* method, unsigned ip)
+{
+  GcLineNumberTable* lnt = method->code()->lineNumberTable();
+  for (unsigned i = 0; i < lnt->length(); ++i) {
+    if (lineNumberIp(lnt->body()[i]) == ip) {
+      return true;
+    }
+  }
+  return false;
+}
+
+int32_t sourceLineAt(GcMethod* method, unsigned ip)
+{
+  GcLineNumberTable* lnt = method->code()->lineNumberTable();
+  int32_t line = 0;
+  for (unsigned i = 0; i < lnt->length(); ++i) {
+    if (lineNumberIp(lnt->body()[i]) <= ip) {
+      line = lineNumberLine(lnt->body()[i]);
+    }
+  }
+  return line;
+}
+
+void debugHook(MyThread* t, GcMethod* method, int32_t ip, int32_t line)
+{
+  if (not(shimDebugArmed & 1)) {
+    return;
+  }
+  PROTECT(t, method);
+  object jclass = getJClass(t, method->class_());
+  PROTECT(t, jclass);
+  GcString* name = makeString(t, "%s", method->name()->body().begin());
+  PROTECT(t, name);
+  GcString* spec = makeString(t, "%s", method->spec()->body().begin());
+  PROTECT(t, spec);
+  t->m->processor->invoke(t,
+                          roots(t)->bootLoader(),
+                          "shim/jdwp/Agent",
+                          "hit",
+                          "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;II)V",
+                          0,
+                          jclass,
+                          name,
+                          spec,
+                          ip,
+                          line);
+}
+
+void debugLocalsBegin(MyThread* t)
+{
+  t->debugLocals.clear();
+}
+
+void debugLocalI(MyThread* t, int32_t slot, int32_t v)
+{
+  t->debugLocals.top = slot + 1 > t->debugLocals.top ? slot + 1 : t->debugLocals.top;
+  t->debugLocals.bits[slot] = static_cast<uint64_t>(static_cast<int64_t>(v));
+}
+
+void debugLocalJ(MyThread* t, int32_t slot, int64_t v)
+{
+  t->debugLocals.top = slot + 1 > t->debugLocals.top ? slot + 1 : t->debugLocals.top;
+  t->debugLocals.bits[slot] = static_cast<uint64_t>(v);
+}
+
+void debugLocalF(MyThread* t, int32_t slot, uint32_t v)
+{
+  t->debugLocals.top = slot + 1 > t->debugLocals.top ? slot + 1 : t->debugLocals.top;
+  t->debugLocals.bits[slot] = v;
+}
+
+void debugLocalD(MyThread* t, int32_t slot, uint64_t v)
+{
+  t->debugLocals.top = slot + 2 > t->debugLocals.top ? slot + 2 : t->debugLocals.top;
+  t->debugLocals.bits[slot] = v;
+}
+
+void debugLocalL(MyThread* t, int32_t slot, object v)
+{
+  t->debugLocals.used = true;
+  t->debugLocals.top = slot + 1 > t->debugLocals.top ? slot + 1 : t->debugLocals.top;
+  t->debugLocals.refs[slot] = v;
+}
+
+int32_t debugGetI(MyThread* t, int32_t slot)
+{
+  return static_cast<int32_t>(t->debugLocals.bits[slot]);
+}
+
+int64_t debugGetJ(MyThread* t, int32_t slot)
+{
+  return static_cast<int64_t>(t->debugLocals.bits[slot]);
+}
+
+uint64_t debugGetF(MyThread* t, int32_t slot)
+{
+  return static_cast<uint32_t>(t->debugLocals.bits[slot]);
+}
+
+uint64_t debugGetD(MyThread* t, int32_t slot)
+{
+  return t->debugLocals.bits[slot];
+}
+
+object debugGetL(MyThread* t, int32_t slot)
+{
+  return t->debugLocals.refs[slot];
+}
+
+unsigned debugLiveVars(GcMethod* method, unsigned ip, unsigned* slots, unsigned* kinds)
+{
+  GcLineNumberTable* lvt = method->code()->localVars();
+  unsigned n = 0;
+  for (unsigned i = 0; lvt and i < lvt->length(); ++i) {
+    uint64_t e = lvt->body()[i];
+    unsigned start = e & 0xffff;
+    unsigned span = (e >> 16) & 0xffff;
+    unsigned slot = (e >> 32) & 0xffff;
+    unsigned kind = (e >> 48) & 0xffff;
+    if (kind == 0 or ip < start or ip >= start + span or slot >= MyThread::DebugLocals::kMax) {
+      continue;
+    }
+    bool seen = false;
+    for (unsigned j = 0; j < n; ++j) {
+      seen |= slots[j] == slot;
+    }
+    if (not seen and n < 62) {
+      slots[n] = slot;
+      kinds[n++] = kind;
+    }
+  }
+  if (not(method->flags() & ACC_STATIC)) {
+    bool seen = false;
+    for (unsigned j = 0; j < n; ++j) {
+      seen |= slots[j] == 0;
+    }
+    if (not seen) {
+      slots[n] = 0;
+      kinds[n++] = 5;
+    }
+  }
+  return n;
+}
+
 void compile(MyThread* t,
              FixedAllocator* allocator,
              BootContext* bootContext,
@@ -2492,16 +2721,52 @@ int64_t prepareMethodForCall(MyThread* t, GcMethod* target)
   }
 }
 
-int64_t findInterfaceMethodFromInstance(MyThread* t,
-                                        GcMethod* method,
-                                        object instance)
+__attribute__((noinline)) int64_t findInterfaceMethodSlow(MyThread* t, GcMethod* method, object instance)
 {
   if (instance) {
-    return prepareMethodForCall(
-        t, findInterfaceMethod(t, method, objectClass(t, instance)));
+    GcClass* class_ = objectClass(t, instance);
+    uintptr_t epoch = t->m->gcEpoch;
+    MyThread::InterfaceCacheEntry* entry = t->interfaceCache
+                                           + (((reinterpret_cast<uintptr_t>(class_) >> 4)
+                                               ^ (reinterpret_cast<uintptr_t>(method) >> 3))
+                                              & (MyThread::InterfaceCacheSize - 1));
+
+    GcMethod* target = findInterfaceMethod(t, method, class_);
+    bool cacheable = (target->flags() & ACC_NATIVE) == 0;
+    int64_t address = prepareMethodForCall(t, target);
+
+    // the cache keys are raw pointers, so only a collection-free call may fill it
+    if (cacheable and t->m->gcEpoch == epoch) {
+      if (t->interfaceCacheEpoch != epoch) {
+        memset(t->interfaceCache, 0, sizeof(t->interfaceCache));
+        t->interfaceCacheEpoch = epoch;
+      }
+      entry->class_ = reinterpret_cast<uintptr_t>(class_);
+      entry->method = reinterpret_cast<uintptr_t>(method);
+      entry->address = static_cast<uintptr_t>(address);
+    }
+
+    return address;
   } else {
     throwNew(t, GcNullPointerException::Type);
   }
+}
+
+int64_t findInterfaceMethodFromInstance(MyThread* t, GcMethod* method, object instance)
+{
+  if (LIKELY(instance)) {
+    uintptr_t class_ = reinterpret_cast<uintptr_t>(objectClass(t, instance));
+    MyThread::InterfaceCacheEntry* entry = t->interfaceCache
+                                           + (((class_ >> 4) ^ (reinterpret_cast<uintptr_t>(method) >> 3))
+                                              & (MyThread::InterfaceCacheSize - 1));
+
+    if (LIKELY(t->interfaceCacheEpoch == t->m->gcEpoch and entry->class_ == class_
+               and entry->method == reinterpret_cast<uintptr_t>(method))) {
+      return static_cast<int64_t>(entry->address);
+    }
+  }
+
+  return findInterfaceMethodSlow(t, method, instance);
 }
 
 int64_t findInterfaceMethodFromInstanceAndReference(MyThread* t,
@@ -2971,6 +3236,7 @@ GcClass* loadedClassInPool(Thread* t, GcMethod* method, unsigned index)
 {
   object entry = singletonObject(t, method->code()->pool(), index);
   if (objectClass(t, entry) == type(t, GcReference::Type)) {
+    PROTECT(t, method);
     GcClassLoader* loader = method->class_()->loader();
     PROTECT(t, loader);
     GcByteArray* name = cast<GcReference>(t, entry)->name();
@@ -2989,14 +3255,52 @@ GcClass* loadedClassInPool(Thread* t, GcMethod* method, unsigned index)
   return cast<GcClass>(t, entry);
 }
 
-void checkCast(MyThread* t, GcClass* class_, object o)
+bool assignableCached(MyThread* t, GcClass* to, GcClass* from)
 {
-  if (o and objectClass(t, o) == class_) return;
+  uintptr_t epoch = t->m->gcEpoch;
+  MyThread::AssignableCacheEntry* entry
+      = t->assignableCache
+        + (((reinterpret_cast<uintptr_t>(to) >> 4)
+            ^ (reinterpret_cast<uintptr_t>(from) >> 3))
+           & (MyThread::AssignableCacheSize - 1));
+
+  if (LIKELY(t->assignableCacheEpoch == epoch
+             and entry->to == reinterpret_cast<uintptr_t>(to)
+             and entry->from == reinterpret_cast<uintptr_t>(from))) {
+    return entry->result;
+  }
+
+  uintptr_t toAddress = reinterpret_cast<uintptr_t>(to);
+  uintptr_t fromAddress = reinterpret_cast<uintptr_t>(from);
+  bool result = isAssignableFrom(t, to, from);
+
+  // the keys are raw pointers, so only a collection-free call may fill the cache
+  if (t->m->gcEpoch == epoch) {
+    if (t->assignableCacheEpoch != epoch) {
+      memset(t->assignableCache, 0, sizeof(t->assignableCache));
+      t->assignableCacheEpoch = epoch;
+    }
+    entry->to = toAddress;
+    entry->from = fromAddress;
+    entry->result = result;
+  }
+
+  return result;
+}
+
+__attribute__((noinline)) void checkCastSlow(MyThread* t, GcClass* class_, object o)
+{
   PROTECT(t, class_);
   PROTECT(t, o);
-  if (UNLIKELY(o and not isAssignableFrom(t, class_, objectClass(t, o)))) {
+  if (UNLIKELY(o and not assignableCached(t, class_, objectClass(t, o)))) {
     throwClassCast(t, objectClass(t, o), class_);
   }
+}
+
+void checkCast(MyThread* t, GcClass* class_, object o)
+{
+  if (o == 0 or objectClass(t, o) == class_) return;
+  checkCastSlow(t, class_, o);
 }
 
 void checkCastFromReference(MyThread* t, GcPair* pair, object o)
@@ -3205,7 +3509,10 @@ void setFieldValueFromReference(MyThread* t,
 
 uint64_t instanceOf64(Thread* t, GcClass* class_, object o)
 {
-  return instanceOf(t, class_, o);
+  if (o == 0) {
+    return 0;
+  }
+  return assignableCached(static_cast<MyThread*>(t), class_, objectClass(t, o));
 }
 
 uint64_t instanceOfFromReference(Thread* t, GcPair* pair, object o)
@@ -3232,6 +3539,17 @@ uint64_t makeNewGeneral64(Thread* t, GcClass* class_)
 
 uint64_t makeNew64(Thread* t, GcClass* class_)
 {
+  if (LIKELY(class_->vmFlags() & InitializedFlag)) {
+    unsigned sizeInBytes = pad(class_->fixedSize());
+    unsigned words = sizeInBytes / BytesPerWord;
+    if (LIKELY(t->heapIndex + words <= ThreadHeapSizeInWords
+               and t->m->exclusive == 0)) {
+      object o = allocateSmall(t, sizeInBytes);
+      setObjectClass(t, o, class_);
+      return reinterpret_cast<uintptr_t>(o);
+    }
+  }
+
   PROTECT(t, class_);
 
   initClass(t, class_);
@@ -3380,7 +3698,7 @@ void compileSafePoint(MyThread* t, Compiler* c, Frame* frame)
 {
   c->nativeCall(
       c->constant(getThunk(t, idleIfNecessaryThunk), ir::Type::iptr()),
-      0,
+      Compiler::pollGuard(TARGET_THREAD_POLLREQUEST),
       frame->trace(0, 0),
       ir::Type::void_(),
       args(c->threadRegister()));
@@ -3456,11 +3774,251 @@ void compileDirectInvoke(MyThread* t,
   }
 }
 
+lir::TernaryOperation toCompilerBinaryOp(MyThread* t, unsigned instruction);
+unsigned targetFieldOffset(Context* context, GcField* field);
+bool inTryBlock(MyThread* t, GcCode* code, unsigned ip);
+
+namespace {
+const unsigned kInlineMaxCodeLength = 48;
+const unsigned kInlineMaxSlots = 12;
+
+unsigned inlineOpLength(unsigned op)
+{
+  switch (op) {
+  case bipush: case ldc: case iload: case lload: case fload: case dload: return 2;
+  case sipush: case ldc_w: case ldc2_w: case getfield: return 3;
+  default: return 1;
+  }
+}
+
+bool inlinableOpcode(unsigned op)
+{
+  switch (op) {
+  case iconst_m1: case iconst_0: case iconst_1: case iconst_2: case iconst_3: case iconst_4: case iconst_5:
+  case lconst_0: case lconst_1:
+  case fconst_0: case fconst_1: case fconst_2:
+  case dconst_0: case dconst_1:
+  case bipush: case sipush: case ldc: case ldc_w: case ldc2_w:
+  case iload: case lload: case fload: case dload:
+  case aload_0: case getfield: case areturn:
+  case iload_0: case iload_1: case iload_2: case iload_3:
+  case lload_0: case lload_1: case lload_2: case lload_3:
+  case fload_0: case fload_1: case fload_2: case fload_3:
+  case dload_0: case dload_1: case dload_2: case dload_3:
+  case iadd: case isub: case imul: case ineg:
+  case ladd: case lsub: case lmul: case lneg:
+  case vm::fadd: case vm::fsub: case vm::fmul: case vm::fdiv: case fneg:
+  case dadd: case dsub: case dmul: case ddiv: case dneg:
+  case i2l: case l2i: case i2f: case i2d:
+  case ireturn: case lreturn: case freturn: case dreturn: case return_:
+    return true;
+  default:
+    return false;
+  }
+}
+
+// Straight-line static leaf methods only: arguments are consumed from the caller's stack and the body is emitted in place.
+bool inlineTrivial(MyThread* t, Frame* frame, GcMethod* target, bool allowInstance)
+{
+  if (target->flags() & (ACC_NATIVE | ACC_SYNCHRONIZED | ACC_ABSTRACT)) return false;
+  PROTECT(t, target);
+  const bool isStatic = (target->flags() & ACC_STATIC) != 0;
+  if (not isStatic) {
+    if (not allowInstance or (target->flags() & ACC_PRIVATE) == 0
+        and (target->flags() & ACC_FINAL) == 0 and (target->class_()->flags() & ACC_FINAL) == 0) {
+      return false;
+    }
+  }
+  GcCode* code = target->code();
+  if (code == 0 or code->length() == 0 or code->length() > kInlineMaxCodeLength or code->exceptionHandlerTable() != 0) return false;
+  if (code->maxLocals() > kInlineMaxSlots or code->maxStack() > kInlineMaxSlots) return false;
+  if (isStatic and classNeedsInit(t, target->class_())) return false;
+
+  bool sawGetfield = false;
+  for (unsigned i = 0; i < code->length(); i += inlineOpLength(code->body()[i])) {
+    unsigned op = code->body()[i];
+    if (not inlinableOpcode(op) or i + inlineOpLength(op) > code->length()) return false;
+    if (op == aload_0 or op == getfield or op == areturn) {
+      if (isStatic and op != areturn) return false;
+      if (op == aload_0 and (i + 1 >= code->length() or code->body()[i + 1] != getfield)) return false;
+      if (op == getfield) {
+        if (i == 0 or code->body()[i - 1] != aload_0) return false;
+        unsigned index = (code->body()[i + 1] << 8) | code->body()[i + 2];
+        if (index == 0) return false;
+        GcField* field = resolveField(t, target, index - 1, false);
+        code = target->code();
+        if (field == 0 or (field->flags() & (ACC_VOLATILE | ACC_STATIC)) or field->code() == BooleanField
+            or field->code() == ByteField or field->code() == CharField or field->code() == ShortField
+            or ((field->code() == LongField or field->code() == DoubleField) and TargetBytesPerWord == 4)) {
+          return false;
+        }
+        sawGetfield = true;
+      }
+    }
+    if (op == ldc or op == ldc_w or op == ldc2_w) {
+      unsigned index = op == ldc ? code->body()[i + 1] : ((code->body()[i + 1] << 8) | code->body()[i + 2]);
+      if (index == 0 or singletonIsObject(t, code->pool(), index - 1)) return false;
+    }
+  }
+  Compiler* c = frame->c;
+
+  if (not isStatic and not sawGetfield) return false;
+  // a bare float or double getter feeding Float.floatToRawIntBits trips the register allocator (bitcast of a memory operand)
+  if (not isStatic and code->length() == 5 and (target->returnCode() == FloatField or target->returnCode() == DoubleField)) return false;
+  uint8_t argKinds[kInlineMaxSlots];
+  const ir::Type kindTypes[5] = {ir::Type::i4(), ir::Type::f4(), ir::Type::i8(), ir::Type::f8(), ir::Type::object()};
+  unsigned argCount = 0;
+  if (not isStatic) argKinds[argCount++] = 4;
+  {
+    MethodSpecIterator it(t, reinterpret_cast<const char*>(target->spec()->body().begin()));
+    while (it.hasNext()) {
+      if (argCount >= kInlineMaxSlots) return false;
+      unsigned type = fieldType(t, fieldCode(t, *it.next()));
+      switch (type) {
+      case INT32_TYPE: argKinds[argCount++] = 0; break;
+      case FLOAT_TYPE: argKinds[argCount++] = 1; break;
+      case INT64_TYPE: argKinds[argCount++] = 2; break;
+      case DOUBLE_TYPE: argKinds[argCount++] = 3; break;
+      default: return false;
+      }
+    }
+  }
+  unsigned returnCode = target->returnCode();
+  ir::Type returnType = ir::Type::i4();
+  switch (returnCode) {
+  case IntField: returnType = ir::Type::i4(); break;
+  case FloatField: returnType = ir::Type::f4(); break;
+  case LongField: returnType = ir::Type::i8(); break;
+  case DoubleField: returnType = ir::Type::f8(); break;
+  case ObjectField: returnType = ir::Type::object(); break;
+  case VoidField: break;
+  default: return false;
+  }
+
+  ir::Value* locals[kInlineMaxSlots] = {};
+  {
+    unsigned slot = 0;
+    for (unsigned i = 0; i < argCount; ++i) {
+      slot += (argKinds[i] == 2 or argKinds[i] == 3) ? 2 : 1;
+    }
+    for (unsigned i = argCount; i-- > 0;) {
+      bool large = argKinds[i] == 2 or argKinds[i] == 3;
+      slot -= large ? 2 : 1;
+      locals[slot] = large ? frame->popLarge(kindTypes[argKinds[i]]) : frame->pop(kindTypes[argKinds[i]]);
+    }
+  }
+
+  ir::Value* stack[kInlineMaxSlots];
+  unsigned sp = 0;
+  auto push = [&](ir::Type, ir::Value* v) { stack[sp++] = v; };
+  auto pop = [&]() { return stack[--sp]; };
+
+  for (unsigned ip = 0; ip < code->length();) {
+    unsigned op = code->body()[ip];
+    ip += inlineOpLength(op);
+    switch (op) {
+    case dconst_0: push(ir::Type::f8(), c->constant(doubleToBits(0.0), ir::Type::f8())); break;
+    case dconst_1: push(ir::Type::f8(), c->constant(doubleToBits(1.0), ir::Type::f8())); break;
+    case bipush: push(ir::Type::i4(), c->constant(static_cast<int8_t>(code->body()[ip - 1]), ir::Type::i4())); break;
+    case sipush: push(ir::Type::i4(), c->constant(static_cast<int16_t>((code->body()[ip - 2] << 8) | code->body()[ip - 1]), ir::Type::i4())); break;
+    case ldc: case ldc_w: {
+      unsigned index = op == ldc ? code->body()[ip - 1] : ((code->body()[ip - 2] << 8) | code->body()[ip - 1]);
+      GcSingleton* pool = code->pool();
+      ir::Type type = singletonBit(t, pool, poolSize(t, pool), index - 1) ? ir::Type::f4() : ir::Type::i4();
+      push(type, c->constant(singletonValue(t, pool, index - 1), type));
+    } break;
+    case ldc2_w: {
+      unsigned index = (code->body()[ip - 2] << 8) | code->body()[ip - 1];
+      GcSingleton* pool = code->pool();
+      uint64_t v;
+      memcpy(&v, &singletonValue(t, pool, index - 1), 8);
+      ir::Type type = singletonBit(t, pool, poolSize(t, pool), index - 1) ? ir::Type::f8() : ir::Type::i8();
+      push(type, c->constant(v, type));
+    } break;
+    case aload_0: push(ir::Type::object(), locals[0]); break;
+    case getfield: {
+      unsigned index = (code->body()[ip - 2] << 8) | code->body()[ip - 1];
+      GcField* field = resolveField(t, target, index - 1, false);
+      code = target->code();
+      ir::Value* table = pop();
+      ir::Type ft = field->code() == FloatField ? ir::Type::f4() : field->code() == IntField ? ir::Type::i4()
+          : field->code() == LongField ? ir::Type::i8() : field->code() == DoubleField ? ir::Type::f8() : ir::Type::object();
+      push(ft, c->load(ir::ExtendMode::Signed, c->memory(table, ft, targetFieldOffset(frame->context, field)), ft));
+    } break;
+    case iload: case lload: case fload: case dload: {
+      unsigned n = code->body()[ip - 1];
+      push(op == iload ? ir::Type::i4() : op == lload ? ir::Type::i8() : op == fload ? ir::Type::f4() : ir::Type::f8(), locals[n]);
+    } break;
+    case iconst_m1: push(ir::Type::i4(), c->constant(-1, ir::Type::i4())); break;
+    case iconst_0: push(ir::Type::i4(), c->constant(0, ir::Type::i4())); break;
+    case iconst_1: push(ir::Type::i4(), c->constant(1, ir::Type::i4())); break;
+    case iconst_2: push(ir::Type::i4(), c->constant(2, ir::Type::i4())); break;
+    case iconst_3: push(ir::Type::i4(), c->constant(3, ir::Type::i4())); break;
+    case iconst_4: push(ir::Type::i4(), c->constant(4, ir::Type::i4())); break;
+    case iconst_5: push(ir::Type::i4(), c->constant(5, ir::Type::i4())); break;
+    case lconst_0: push(ir::Type::i8(), c->constant(0, ir::Type::i8())); break;
+    case lconst_1: push(ir::Type::i8(), c->constant(1, ir::Type::i8())); break;
+    case fconst_0: push(ir::Type::f4(), c->constant(floatToBits(0.0), ir::Type::f4())); break;
+    case fconst_1: push(ir::Type::f4(), c->constant(floatToBits(1.0), ir::Type::f4())); break;
+    case fconst_2: push(ir::Type::f4(), c->constant(floatToBits(2.0), ir::Type::f4())); break;
+    case iload_0: case iload_1: case iload_2: case iload_3:
+      push(ir::Type::i4(), locals[op - iload_0]); break;
+    case lload_0: case lload_1: case lload_2: case lload_3:
+      push(ir::Type::i8(), locals[op - lload_0]); break;
+    case fload_0: case fload_1: case fload_2: case fload_3:
+      push(ir::Type::f4(), locals[op - fload_0]); break;
+    case dload_0: case dload_1: case dload_2: case dload_3:
+      push(ir::Type::f8(), locals[op - dload_0]); break;
+    case iadd: case isub: case imul: {
+      ir::Value* a = pop(); ir::Value* b = pop();
+      push(ir::Type::i4(), c->binaryOp(toCompilerBinaryOp(t, op), ir::Type::i4(), a, b));
+    } break;
+    case ladd: case lsub: case lmul: {
+      ir::Value* a = pop(); ir::Value* b = pop();
+      push(ir::Type::i8(), c->binaryOp(toCompilerBinaryOp(t, op), ir::Type::i8(), a, b));
+    } break;
+    case vm::fadd: case vm::fsub: case vm::fmul: case vm::fdiv: {
+      ir::Value* a = pop(); ir::Value* b = pop();
+      push(ir::Type::f4(), c->binaryOp(toCompilerBinaryOp(t, op), ir::Type::f4(), a, b));
+    } break;
+    case dadd: case dsub: case dmul: case ddiv: {
+      ir::Value* a = pop(); ir::Value* b = pop();
+      push(ir::Type::f8(), c->binaryOp(toCompilerBinaryOp(t, op), ir::Type::f8(), a, b));
+    } break;
+    case ineg: push(ir::Type::i4(), c->unaryOp(lir::Negate, pop())); break;
+    case lneg: push(ir::Type::i8(), c->unaryOp(lir::Negate, pop())); break;
+    case fneg: push(ir::Type::f4(), c->unaryOp(lir::FloatNegate, pop())); break;
+    case dneg: push(ir::Type::f8(), c->unaryOp(lir::FloatNegate, pop())); break;
+    case i2l:
+      push(ir::Type::i8(), c->truncateThenExtend(ir::ExtendMode::Signed, ir::Type::i8(), ir::Type::i4(), pop()));
+      break;
+    case l2i: push(ir::Type::i4(), c->truncate(ir::Type::i4(), pop())); break;
+    case i2f: push(ir::Type::f4(), c->i2f(ir::Type::f4(), pop())); break;
+    case i2d: push(ir::Type::f8(), c->i2f(ir::Type::f8(), pop())); break;
+    case ireturn: case lreturn: case freturn: case dreturn: case areturn: {
+      ir::Value* v = pop();
+      if (returnCode == LongField or returnCode == DoubleField) frame->pushLarge(returnType, v); else frame->push(returnType, v);
+      return true;
+    }
+    case return_:
+      return true;
+    default:
+      abort(t);
+    }
+  }
+  abort(t);
+}
+}  // namespace
+
 bool compileDirectInvoke(MyThread* t,
                          Frame* frame,
                          GcMethod* target,
                          bool tailCall)
 {
+  if (not(shim::codegen::TailCalls and tailCall) and inlineTrivial(t, frame, target, false)) {
+    return false;
+  }
+
   // don't bother calling an empty method unless calling it might
   // cause the class to be initialized, which may have side effects
   if (emptyMethod(t, target) and (not classNeedsInit(t, target->class_()))) {
@@ -3914,6 +4472,46 @@ bool intrinsic(MyThread* t UNUSED, Frame* frame, GcMethod* target)
         return true;
       }
     }
+  } else if (UNLIKELY(MATCH(className, "java/lang/Thread"))) {
+    shim::codegen::Compiler* c = frame->c;
+    if (MATCH(target->name(), "currentThread")
+        and MATCH(target->spec(), "()Ljava/lang/Thread;")) {
+      frame->push(ir::Type::object(),
+                  c->load(ir::ExtendMode::Signed,
+                          c->memory(c->threadRegister(),
+                                    ir::Type::object(),
+                                    TARGET_THREAD_JAVATHREAD),
+                          ir::Type::object()));
+      return true;
+    }
+  } else if (UNLIKELY(MATCH(className, "java/lang/Double"))) {
+    shim::codegen::Compiler* c = frame->c;
+    if (MATCH(target->name(), "doubleToRawLongBits")
+        and MATCH(target->spec(), "(D)J")) {
+      frame->pushLarge(
+          ir::Type::i8(),
+          c->bitcast(ir::Type::i8(), frame->popLarge(ir::Type::f8())));
+      return true;
+    } else if (MATCH(target->name(), "longBitsToDouble")
+               and MATCH(target->spec(), "(J)D")) {
+      frame->pushLarge(
+          ir::Type::f8(),
+          c->bitcast(ir::Type::f8(), frame->popLarge(ir::Type::i8())));
+      return true;
+    }
+  } else if (UNLIKELY(MATCH(className, "java/lang/Float"))) {
+    shim::codegen::Compiler* c = frame->c;
+    if (MATCH(target->name(), "floatToRawIntBits")
+        and MATCH(target->spec(), "(F)I")) {
+      frame->push(ir::Type::i4(),
+                  c->bitcast(ir::Type::i4(), frame->pop(ir::Type::f4())));
+      return true;
+    } else if (MATCH(target->name(), "intBitsToFloat")
+               and MATCH(target->spec(), "(I)F")) {
+      frame->push(ir::Type::f4(),
+                  c->bitcast(ir::Type::f4(), frame->pop(ir::Type::i4())));
+      return true;
+    }
   } else if (UNLIKELY(MATCH(className, "sun/misc/Unsafe"))) {
     shim::codegen::Compiler* c = frame->c;
     if (MATCH(target->name(), "getByte") and MATCH(target->spec(), "(J)B")) {
@@ -4283,6 +4881,78 @@ loop:
           frame->trace(0, 0),
           ir::Type::void_(),
           args(c->threadRegister()));
+    }
+
+    if (shimDebugHooks and debugHookable(context->method)) {
+      unsigned opcode = code->body()[ip];
+      int32_t hookIps[2] = {0, 0};
+      unsigned hooks = 0;
+      bool lineStart = isLineStart(context->method, ip);
+      if (lineStart) {
+        hookIps[hooks++] = ip;
+      }
+      if (opcode >= ireturn and opcode <= return_) {
+        hookIps[hooks++] = -static_cast<int32_t>(ip) - 1;
+      }
+      unsigned varSlots[64];
+      unsigned varKinds[64];
+      unsigned vars = lineStart ? debugLiveVars(context->method, ip, varSlots, varKinds) : 0;
+      if (lineStart) {
+        c->nativeCall(c->constant(getThunk(t, debugLocalsBeginThunk), ir::Type::iptr()),
+                      0,
+                      frame->trace(0, 0),
+                      ir::Type::void_(),
+                      args(c->threadRegister()));
+      }
+      for (unsigned v = 0; v < vars; ++v) {
+        ir::Type type = varKinds[v] == 1   ? ir::Type::i4()
+                        : varKinds[v] == 2 ? ir::Type::i8()
+                        : varKinds[v] == 3 ? ir::Type::f4()
+                        : varKinds[v] == 4 ? ir::Type::f8()
+                                           : ir::Type::object();
+        unsigned footprint = (varKinds[v] == 2 or varKinds[v] == 4) ? 2 : 1;
+        Thunk thunk = varKinds[v] == 1   ? debugLocalIThunk
+                      : varKinds[v] == 2 ? debugLocalJThunk
+                      : varKinds[v] == 3 ? debugLocalFThunk
+                      : varKinds[v] == 4 ? debugLocalDThunk
+                                         : debugLocalLThunk;
+        c->nativeCall(c->constant(getThunk(t, thunk), ir::Type::iptr()),
+                      0,
+                      frame->trace(0, 0),
+                      ir::Type::void_(),
+                      args(c->threadRegister(),
+                           c->constant(varSlots[v], ir::Type::i4()),
+                           loadLocal(context, footprint, type, varSlots[v])));
+      }
+      for (unsigned h = 0; h < hooks; ++h) {
+        c->nativeCall(c->constant(getThunk(t, debugHookThunk), ir::Type::iptr()),
+                      0,
+                      frame->trace(0, 0),
+                      ir::Type::void_(),
+                      args(c->threadRegister(),
+                           frame->append(context->method),
+                           c->constant(hookIps[h], ir::Type::i4()),
+                           c->constant(sourceLineAt(context->method, ip), ir::Type::i4())));
+      }
+      for (unsigned v = 0; v < vars; ++v) {
+        ir::Type type = varKinds[v] == 1   ? ir::Type::i4()
+                        : varKinds[v] == 2 ? ir::Type::i8()
+                        : varKinds[v] == 3 ? ir::Type::f4()
+                        : varKinds[v] == 4 ? ir::Type::f8()
+                                           : ir::Type::object();
+        unsigned footprint = (varKinds[v] == 2 or varKinds[v] == 4) ? 2 : 1;
+        Thunk thunk = varKinds[v] == 1   ? debugGetIThunk
+                      : varKinds[v] == 2 ? debugGetJThunk
+                      : varKinds[v] == 3 ? debugGetFThunk
+                      : varKinds[v] == 4 ? debugGetDThunk
+                                         : debugGetLThunk;
+        ir::Value* value = c->nativeCall(c->constant(getThunk(t, thunk), ir::Type::iptr()),
+                                         0,
+                                         frame->trace(0, 0),
+                                         type,
+                                         args(c->threadRegister(), c->constant(varSlots[v], ir::Type::i4())));
+        storeLocal(context, footprint, type, value, varSlots[v]);
+      }
     }
 
     if (DebugInstructions) {
@@ -5400,6 +6070,13 @@ loop:
                                               method->spec()->body().begin())),
                   kind);
 
+              if (lambda == nullptr) {
+                e->vtable->ExceptionDescribe(e);
+                throwNew(t,
+                         GcVirtualMachineError::Type,
+                         "the host VM failed to synthesize a lambda");
+              }
+
               uint8_t* bytes = reinterpret_cast<uint8_t*>(
                   e->vtable->GetPrimitiveArrayCritical(e, lambda, 0));
 
@@ -5633,7 +6310,10 @@ loop:
       if (LIKELY(target)) {
         checkMethod(t, target, false);
 
-        if (not intrinsic(t, frame, target)) {
+        if (not intrinsic(t, frame, target)
+            and not((target->class_()->flags() & ACC_INTERFACE) == 0
+                    and not inTryBlock(t, code, ip - 3)
+                    and inlineTrivial(t, frame, target, true))) {
           bool tailCall = isTailCall(t, code, ip, context->method, target);
 
           if (target->class_()->flags() & ACC_INTERFACE) {
@@ -7472,6 +8152,7 @@ void finish(MyThread* t, FixedAllocator* allocator, Context* context)
                     0,
                     newExceptionHandlerTable,
                     newLineNumberTable,
+                    0,
                     reinterpret_cast<uintptr_t>(start),
                     codeSize,
                     code->maxStack(),
@@ -7738,6 +8419,15 @@ uint64_t compileVirtualMethod(MyThread* t)
   unsigned index = t->virtualCallIndex;
   t->virtualCallIndex = 0;
 
+  if (LIKELY((class_->vmFlags() & BootstrapFlag) == 0)) {
+    GcMethod* target = cast<GcMethod>(
+        t, cast<GcArray>(t, class_->virtualTable())->body()[index]);
+    if ((target->flags() & (ACC_NATIVE | ACC_STATIC)) == ACC_NATIVE) {
+      t->trace->nativeMethod = target;
+      return methodAddress(t, target);
+    }
+  }
+
   return reinterpret_cast<uintptr_t>(compileVirtualMethod2(t, class_, index));
 }
 
@@ -7965,20 +8655,15 @@ uint64_t invokeNativeSlow(MyThread* t, GcMethod* method, void* function)
   return result;
 }
 
-uint64_t invokeNative2(MyThread* t, GcMethod* method)
-{
-  GcNative* native = getMethodRuntimeData(t, method)->native();
-  if (native->fast()) {
-    return invokeNativeFast(t, method, native->function());
-  } else {
-    return invokeNativeSlow(t, method, native->function());
-  }
-}
-
 uint64_t invokeNative(MyThread* t)
 {
+  uint64_t result = 0;
+  void* ip = 0;
+  bool cacheable = false;
+  MyThread::NativeCacheEntry* entry = 0;
+  const uintptr_t epoch = t->m->gcEpoch;
+
   if (t->trace->nativeMethod == 0) {
-    void* ip;
     if (t->tailAddress) {
       ip = t->tailAddress;
       t->tailAddress = 0;
@@ -7986,24 +8671,56 @@ uint64_t invokeNative(MyThread* t)
       ip = getIp(t);
     }
 
+    uintptr_t key = reinterpret_cast<uintptr_t>(ip);
+    entry = t->nativeCache + (((key >> 3) ^ (key >> 11)) & (MyThread::NativeCacheSize - 1));
+    if (LIKELY(t->nativeCacheEpoch == epoch and entry->ip == key)) {
+      t->trace->nativeMethod = entry->method;
+      t->trace->targetMethod = entry->method;
+      result = entry->fast ? invokeNativeFast(t, entry->method, entry->function)
+                           : invokeNativeSlow(t, entry->method, entry->function);
+      goto done;
+    }
+
     GcCallNode* node = findCallNode(t, ip);
     GcMethod* target = node->target();
     if (node->flags() & TraceElement::VirtualCall) {
       target = resolveTarget(t, t->stack, target);
+    } else {
+      cacheable = true;
     }
     t->trace->nativeMethod = target;
   }
 
   assertT(t, t->tailAddress == 0);
 
-  uint64_t result = 0;
-
   t->trace->targetMethod = t->trace->nativeMethod;
 
-  t->m->classpath->resolveNative(t, t->trace->nativeMethod);
+  {
+    GcMethod* method = t->trace->nativeMethod;
+    GcNative* native = 0;
+    if (LIKELY(method->class_()->vmFlags() & InitializedFlag)) {
+      native = getMethodRuntimeData(t, method)->native();
+    }
+    if (UNLIKELY(native == 0)) {
+      t->m->classpath->resolveNative(t, t->trace->nativeMethod);
+      method = t->trace->nativeMethod;
+      native = getMethodRuntimeData(t, method)->native();
+    }
+    if (cacheable and t->m->gcEpoch == epoch) {
+      if (t->nativeCacheEpoch != epoch) {
+        memset(t->nativeCache, 0, sizeof(t->nativeCache));
+        t->nativeCacheEpoch = epoch;
+      }
+      entry->ip = reinterpret_cast<uintptr_t>(ip);
+      entry->method = method;
+      entry->function = native->function();
+      entry->fast = native->fast();
+    }
+    result = native->fast() ? invokeNativeFast(t, method, native->function())
+                            : invokeNativeSlow(t, method, native->function());
+  }
 
-  result = invokeNative2(t, t->trace->nativeMethod);
-
+done:
   unsigned parameterFootprint = t->trace->targetMethod->parameterFootprint();
 
   uintptr_t* stack = static_cast<uintptr_t*>(t->stack);
@@ -8973,8 +9690,8 @@ class CompilationHandlerList {
 template <class T, class C>
 int checkConstant(MyThread* t, size_t expected, T C::*field, const char* name)
 {
-  size_t actual = reinterpret_cast<uint8_t*>(&(t->*field))
-                  - reinterpret_cast<uint8_t*>(t);
+  size_t actual = reinterpret_cast<const volatile uint8_t*>(&(t->*field))
+                  - reinterpret_cast<const volatile uint8_t*>(t);
   if (expected != actual) {
     fprintf(stderr,
             "constant mismatch (%s): \n\tconstant says: %d\n\tc++ compiler "
@@ -9080,6 +9797,10 @@ class MyProcessor : public Processor {
 
     int mismatches
         = checkConstant(t,
+                        TARGET_THREAD_JAVATHREAD,
+                        &Thread::javaThread,
+                        "TARGET_THREAD_JAVATHREAD")
+          + checkConstant(t,
                         TARGET_THREAD_EXCEPTION,
                         &Thread::exception,
                         "TARGET_THREAD_EXCEPTION")
@@ -9095,6 +9816,10 @@ class MyProcessor : public Processor {
                           TARGET_THREAD_EXCEPTIONHANDLER,
                           &MyThread::exceptionHandler,
                           "TARGET_THREAD_EXCEPTIONHANDLER")
+          + checkConstant(t,
+                          TARGET_THREAD_POLLREQUEST,
+                          &MyThread::pollRequest,
+                          "TARGET_THREAD_POLLREQUEST")
           + checkConstant(
                 t, TARGET_THREAD_IP, &MyThread::ip, "TARGET_THREAD_IP")
           + checkConstant(
@@ -11082,6 +11807,32 @@ Allocator* allocator(MyThread* t)
 }  // namespace
 
 namespace vm {
+
+unsigned shimDebugLocalCount(Thread* t)
+{
+  return static_cast<local::MyThread*>(t)->debugLocals.top;
+}
+
+void shimDebugReadLocals(Thread* t, uint64_t* bits, object* refs)
+{
+  local::MyThread* mt = static_cast<local::MyThread*>(t);
+  memcpy(bits, mt->debugLocals.bits, mt->debugLocals.top * sizeof(bits[0]));
+  memcpy(refs, mt->debugLocals.refs, mt->debugLocals.top * sizeof(refs[0]));
+}
+
+void shimDebugWriteLocal(Thread* t, unsigned slot, uint64_t bits, object ref, bool isRef)
+{
+  local::MyThread* mt = static_cast<local::MyThread*>(t);
+  if (slot < local::MyThread::DebugLocals::kMax) {
+    mt->debugLocals.top = slot + 1 > mt->debugLocals.top ? slot + 1 : mt->debugLocals.top;
+    if (isRef) {
+      mt->debugLocals.used = true;
+      mt->debugLocals.refs[slot] = ref;
+    } else {
+      mt->debugLocals.bits[slot] = bits;
+    }
+  }
+}
 
 Processor* makeProcessor(System* system,
                          Allocator* allocator,

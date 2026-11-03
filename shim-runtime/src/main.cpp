@@ -163,9 +163,16 @@ int main(int ac, const char** av)
   int argc = 0;
   const char** argv = 0;
   const char* classpath = ".";
+  const char* jdwpOptions = 0;
 
   for (int i = 1; i < ac; ++i) {
-    if (strcmp(av[i], "-cp") == 0 or strcmp(av[i], "-classpath") == 0) {
+    if (strncmp(av[i], "-agentlib:jdwp", 14) == 0 or strncmp(av[i], "-Xrunjdwp:", 10) == 0) {
+      jdwpOptions = strchr(av[i], '=');
+      if (jdwpOptions == 0) {
+        jdwpOptions = strchr(av[i], ':');
+      }
+      jdwpOptions = jdwpOptions ? jdwpOptions + 1 : "";
+    } else if (strcmp(av[i], "-cp") == 0 or strcmp(av[i], "-classpath") == 0) {
       if (i + 1 == ac)
         usageAndExit(av[0]);
       classpath = av[++i];
@@ -259,6 +266,9 @@ int main(int ac, const char** av)
       = RUNTIME_ARRAY_BODY(classpathPropertyBuffer);
 
   for (int i = 1; i < ac; ++i) {
+    if (strncmp(av[i], "-Xrunjdwp:", 10) == 0) {
+      continue;
+    }
     if (strncmp(av[i], "-X", 2) == 0 or strncmp(av[i], "-D", 2) == 0) {
       vmArgs.options[optionIndex++].optionString = const_cast<char*>(av[i]);
     } else if (strcmp(av[i], "--enable-preview") == 0) {
@@ -274,6 +284,20 @@ int main(int ac, const char** av)
   void* env;
   JNI_CreateJavaVM(&vm, &env, &vmArgs);
   JNIEnv* e = static_cast<JNIEnv*>(env);
+
+  if (jdwpOptions and not e->ExceptionCheck()) {
+    jclass agent = e->FindClass("shim/jdwp/Agent");
+    if (not e->ExceptionCheck()) {
+      jmethodID start = e->GetStaticMethodID(agent, "start", "(Ljava/lang/String;)V");
+      if (not e->ExceptionCheck()) {
+        e->CallStaticVoidMethod(agent, start, e->NewStringUTF(jdwpOptions));
+      }
+    }
+    if (e->ExceptionCheck()) {
+      e->ExceptionDescribe();
+      e->ExceptionClear();
+    }
+  }
 
   jclass c = 0;
   if (not e->ExceptionCheck()) {

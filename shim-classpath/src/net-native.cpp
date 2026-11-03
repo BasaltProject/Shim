@@ -222,7 +222,12 @@ void throwForError(JNIEnv* e, int err, const char* what)
   if (message == 0) {
     message = errorText(err);
   }
-  (void)what;
+  if (what != 0 && strcmp(what, "connect-nb") == 0 && cls != 0 && strcmp(cls, "java/net/SocketException") != 0) {
+    char full[512];
+    snprintf(full, sizeof(full), "%s (connect failed)", message);
+    throwNewUtf8(e, cls, full);
+    return;
+  }
   throwNewUtf8(e, cls, message);
 }
 
@@ -467,7 +472,7 @@ extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_connect(JNIEnv* e, jclass,
       int err = NET_ERRNO();
       if (err != NET_EINPROGRESS && err != NET_EWOULDBLOCK) {
         setBlocking(fd, true);
-        throwForError(e, err, "connect");
+        throwForError(e, err, "connect-nb");
         return;
       }
       int waitErr = 0;
@@ -475,7 +480,7 @@ extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_connect(JNIEnv* e, jclass,
       if (!ready) {
         setBlocking(fd, true);
         if (waitErr != 0) {
-          throwForError(e, waitErr, "connect");
+          throwForError(e, waitErr, "connect-nb");
         } else {
           throwNew(e, "java/net/SocketTimeoutException", "Connect timed out");
         }
@@ -486,7 +491,7 @@ extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_connect(JNIEnv* e, jclass,
       getsockopt(fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&soError), &sl);
       if (soError != 0) {
         setBlocking(fd, true);
-        throwForError(e, soError, "connect");
+        throwForError(e, soError, "connect-nb");
         return;
       }
     }
@@ -614,7 +619,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NetNative_sendTo(JNIEnv* e, jclass, 
   free(tmp);
   if (n < 0) {
     if (err == NET_ECONNREFUSED) {
-      throwNew(e, "java/net/PortUnreachableException", "ICMP Port Unreachable");
+      throwNew(e, "java/net/PortUnreachableException", 0);
     } else {
       throwForError(e, err, "send");
     }
@@ -667,7 +672,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NetNative_recvFrom(JNIEnv* e, jclass
       int err = NET_ERRNO();
       free(tmp);
       if (err == NET_ECONNREFUSED) {
-        throwNew(e, "java/net/PortUnreachableException", "ICMP Port Unreachable");
+        throwNew(e, "java/net/PortUnreachableException", 0);
       } else {
         throwForError(e, err, "receive");
       }
@@ -1338,7 +1343,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_shim_NetNative_connectNb(JNIEnv* e, j
     if (err == NET_EINPROGRESS || err == NET_EWOULDBLOCK) {
       return JNI_FALSE;
     }
-    throwForError(e, err, "connect");
+    throwForError(e, err, "connect-nb");
     return JNI_FALSE;
   }
 }
@@ -1349,7 +1354,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_shim_NetNative_finishConnect(JNIEnv* 
   int err = 0;
   if (!waitFor(fd, true, timeoutMs, &err)) {
     if (err != 0) {
-      throwForError(e, err, "connect");
+      throwForError(e, err, "connect-nb");
     }
     return JNI_FALSE;
   }
@@ -1357,7 +1362,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_shim_NetNative_finishConnect(JNIEnv* 
   NetLen sl = sizeof(soError);
   getsockopt(fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&soError), &sl);
   if (soError != 0) {
-    throwForError(e, soError, "connect");
+    throwForError(e, soError, "connect-nb");
     return JNI_FALSE;
   }
   return JNI_TRUE;

@@ -53,11 +53,11 @@ namespace local {
 const unsigned Top = ~static_cast<unsigned>(0);
 
 const unsigned InitialGen2CapacityInBytes = 4 * 1024 * 1024;
-const unsigned MinimumGen2HeadroomInBytes = 8 * 1024 * 1024;
+const unsigned MinimumGen2HeadroomInBytes = 16 * 1024 * 1024;
 const unsigned MinimumSpanInWords = 4;
 const unsigned ReleaseSpanInBytes = 128 * 1024;
 const unsigned MaxSpansScanned = 32;
-const unsigned InitialTenuredFixieCeilingInBytes = 4 * 1024 * 1024;
+const unsigned InitialTenuredFixieCeilingInBytes = 32 * 1024 * 1024;
 
 const bool Verbose = false;
 const bool Verbose2 = false;
@@ -801,9 +801,9 @@ class Context {
         freshCopies(0),
         freshCopyCount(0),
         freshCopyCapacity(0),
-        gen2Threshold(InitialGen2CapacityInBytes / BytesPerWord),
+        gen2Threshold(max(InitialGen2CapacityInBytes, limit / 16) / BytesPerWord),
         logMajor(getenv("SHIM_GC_STATS") != 0),
-        headroomPercent(getenv("SHIM_GC_HEADROOM_PERCENT") ? atoi(getenv("SHIM_GC_HEADROOM_PERCENT")) : 12),
+        headroomPercent(getenv("SHIM_GC_HEADROOM_PERCENT") ? atoi(getenv("SHIM_GC_HEADROOM_PERCENT")) : 100),
         compactNext(false),
         retiredMemory(0),
         retiredBytes(0)
@@ -1533,7 +1533,7 @@ void sweepFixies(Context* c)
   }
 
   c->tenuredFixieCeiling
-      = max(c->tenuredFixieFootprint * 2, InitialTenuredFixieCeilingInBytes);
+      = max(c->tenuredFixieFootprint * 3, InitialTenuredFixieCeilingInBytes);
 }
 
 inline void* copyTo(Context* c, Segment* s, void* o, unsigned size)
@@ -1584,6 +1584,11 @@ void* copy2(Context* c, void* o)
 
       return o;
     }
+  } else if (TenureThreshold == 0 and c->inPlace) {
+    assertT(c, not c->nextGen1.contains(o));
+    assertT(c, not immortalHeapContains(c, o));
+
+    return copyToGen2(c, o, size);
   } else {
     assertT(c, not c->nextGen1.contains(o));
     assertT(c, not c->nextGen2.contains(o));
@@ -2306,7 +2311,9 @@ void collect(Context* c)
       = c->inPlace
             ? (c->gen2.position() - c->freeWords + tenureNeeded
                    > c->gen2Threshold
-               or c->gen2.position() + tenureNeeded > c->gen2.capacity())
+               or c->gen2.position() + tenureNeeded
+                      + (TenureThreshold == 0 ? c->incomingFootprint : 0)
+                  > c->gen2.capacity())
             : (oversizedGen2(c) or tenureNeeded > c->gen2.remaining());
 
   if (limitExceeded(c, c->pendingAllocation) or gen2Full

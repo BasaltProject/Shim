@@ -26,6 +26,9 @@
 #include "shim/process.h"
 
 #include <shim/util/runtime-array.h>
+#ifndef PLATFORM_WINDOWS
+#include <time.h>
+#endif
 
 using namespace vm;
 
@@ -469,6 +472,18 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   }
 
   return reinterpret_cast<int64_t>(array);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_System_nanoTime(Thread* t, object, uintptr_t*)
+{
+#ifdef PLATFORM_WINDOWS
+  return t->m->system->now() * 1000 * 1000;
+#else
+  timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return static_cast<int64_t>(ts.tv_sec) * 1000000000 + ts.tv_nsec;
+#endif
 }
 
 extern "C" SHIM_EXPORT void JNICALL

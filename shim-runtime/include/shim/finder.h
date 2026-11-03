@@ -203,6 +203,7 @@ class Finder {
 
   virtual IteratorImp* iterator() = 0;
   virtual System::Region* find(const char* name) = 0;
+  virtual System::Region* find(const char* name, const char** sourceUrl) = 0;
   virtual System::FileType stat(const char* name,
                                 size_t* length,
                                 bool tryDirectory = false) = 0;

@@ -2805,6 +2805,26 @@ class MyCompiler : public Compiler {
     return dst;
   }
 
+  virtual ir::Value* bitcast(ir::Type dstType, ir::Value* src)
+  {
+    assertT(&c, src->type.size(c.targetInfo) == dstType.size(c.targetInfo));
+    assertT(&c, src->type.flavor() != dstType.flavor());
+
+    Value* dst = value(&c, dstType);
+    appendMove(&c,
+               lir::Move,
+               src->type.size(c.targetInfo),
+               src->type.size(c.targetInfo),
+               static_cast<Value*>(src),
+               dstType.size(c.targetInfo),
+               dst);
+    if (dstType.flavor() == ir::Type::Integer) {
+      // a plain add re-homes the value in a general register so later narrowing moves cannot alias the float register
+      return binaryOp(lir::Add, dstType, dst, constant(0, dstType));
+    }
+    return dst;
+  }
+
   virtual void condJump(lir::TernaryOperation op,
                         ir::Value* a,
                         ir::Value* b,

@@ -504,7 +504,8 @@ class JarElement : public Element {
         sourceUrl_(this->name ? append(allocator, "file:", this->name) : 0),
         region(0),
         index(0),
-        multiRelease(-1)
+        multiRelease(-1),
+        versionMask(0)
   {
   }
 
@@ -521,7 +522,8 @@ class JarElement : public Element {
         region(new (allocator->allocate(sizeof(PointerRegion)))
                PointerRegion(s, allocator, jarData, jarLength)),
         index(JarIndex::open(s, allocator, region)),
-        multiRelease(-1)
+        multiRelease(-1),
+        versionMask(0)
   {
   }
 
@@ -544,6 +546,20 @@ class JarElement : public Element {
         }
         manifest->dispose();
       }
+      if (multiRelease == 1) {
+        static const char prefix[] = "META-INF/versions/";
+        for (unsigned i = 0; i < index->position; ++i) {
+          const uint8_t* entry = index->nodes[i].item.entry;
+          size_t length = fileNameLength(entry);
+          const char* n = reinterpret_cast<const char*>(fileName(entry));
+          if (length > sizeof(prefix) and strncmp(n, prefix, sizeof(prefix) - 1) == 0) {
+            unsigned v = 0;
+            size_t j = sizeof(prefix) - 1;
+            while (j < length and n[j] >= '0' and n[j] <= '9' and v < 100) v = v * 10 + (n[j++] - '0');
+            if (j < length and n[j] == '/' and v >= 9 and v <= 25) versionMask |= 1u << v;
+          }
+        }
+      }
     }
     return multiRelease == 1;
   }
@@ -551,7 +567,15 @@ class JarElement : public Element {
   bool versionedName(const char* name, int version, char* out, size_t size)
   {
     if (strncmp(name, "META-INF/", 9) == 0) return false;
-    return ::snprintf(out, size, "META-INF/versions/%d/%s", version, name) < static_cast<int>(size);
+    size_t length = strlen(name);
+    if (length + 24 > size) return false;
+    memcpy(out, "META-INF/versions/", 18);
+    char* p = out + 18;
+    if (version >= 10) *p++ = static_cast<char>('0' + version / 10);
+    *p++ = static_cast<char>('0' + version % 10);
+    *p++ = '/';
+    memcpy(p, name, length + 1);
+    return true;
   }
 
   virtual Element::Iterator* iterator()
@@ -584,7 +608,7 @@ class JarElement : public Element {
     if (index and isMultiRelease()) {
       char versioned[1024];
       for (int v = 25; not r and v >= 9; --v) {
-        if (versionedName(name, v, versioned, sizeof(versioned))) r = index->find(versioned, region->start());
+        if ((versionMask & (1u << v)) and versionedName(name, v, versioned, sizeof(versioned))) r = index->find(versioned, region->start());
       }
     }
     if (r == 0) r = (index ? index->find(name, region->start()) : 0);
@@ -611,7 +635,7 @@ class JarElement : public Element {
     if (index and isMultiRelease()) {
       char versioned[1024];
       for (int v = 25; type == System::TypeDoesNotExist and v >= 9; --v) {
-        if (versionedName(name, v, versioned, sizeof(versioned))) type = index->stat(versioned, length, false);
+        if ((versionMask & (1u << v)) and versionedName(name, v, versioned, sizeof(versioned))) type = index->stat(versioned, length, false);
       }
     }
     if (type == System::TypeDoesNotExist) {
@@ -666,6 +690,7 @@ class JarElement : public Element {
   System::Region* region;
   JarIndex* index;
   int multiRelease;
+  uint32_t versionMask;
 };
 
 class BuiltinElement : public JarElement {
@@ -1066,6 +1091,20 @@ class MyFinder : public Finder {
       }
     }
 
+    return 0;
+  }
+
+  virtual System::Region* find(const char* name, const char** sourceUrl)
+  {
+    for (Element* e = path_; e; e = e->next) {
+      System::Region* r = e->find(name);
+      if (r) {
+        *sourceUrl = e->sourceUrl();
+        return r;
+      }
+    }
+
+    *sourceUrl = 0;
     return 0;
   }
 

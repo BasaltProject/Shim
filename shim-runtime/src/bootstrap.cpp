@@ -155,7 +155,7 @@ static object invokeBootstrap(Thread* t, GcInvocation* invocation, object typeAr
     GcClass* caller = invocation->class_();
     PROTECT(t, caller);
     GcArray* table = cast<GcArray>(t, invocation->bootstrapMethodTable());
-    if (table == 0 or invocation->bootstrap() >= table->length()) {
+    if (table == 0 or invocation->bootstrap() >= table->length() / 2) {
         throwNew(t, GcBootstrapMethodError::Type, "Invalid bootstrap method index");
     }
     GcCharArray* constants = cast<GcCharArray>(t, table->body()[invocation->bootstrap()]);

@@ -44,6 +44,41 @@ int32_t findString(const Source* source, int32_t length,
   }
   return -1;
 }
+
+inline int32_t firstMismatch(const uint8_t* a, const uint8_t* b, int32_t n)
+{
+  int32_t i = 0;
+  for (; i + 8 <= n; i += 8) {
+    uint64_t x, y;
+    std::memcpy(&x, a + i, 8);
+    std::memcpy(&y, b + i, 8);
+    if (x != y) break;
+  }
+  while (i < n && a[i] == b[i]) ++i;
+  return i;
+}
+
+template <class Unit>
+inline uint32_t hashUnits(const Unit* p, int32_t n)
+{
+  uint32_t h = 0;
+  int32_t i = 0;
+  for (; i + 4 <= n; i += 4) {
+    h = h * 923521u + p[i] * 29791u + p[i + 1] * 961u + p[i + 2] * 31u + p[i + 3];
+  }
+  for (; i < n; ++i) h = h * 31 + p[i];
+  return h;
+}
+
+template <class A, class B>
+inline int32_t compareUnits(const A* a, const B* b, int32_t n)
+{
+  for (int32_t i = 0; i < n; ++i) {
+    const int32_t d = static_cast<int32_t>(a[i]) - b[i];
+    if (d) return d;
+  }
+  return 0;
+}
 } // namespace
 
 extern "C" SHIM_EXPORT int64_t JNICALL
@@ -55,19 +90,20 @@ Shim_java_lang_String_copyCharStorage(Thread* t, object, uintptr_t* arguments)
   // Allocation may move the input. Keep a rooted reference and reacquire its
   // body afterwards; never retain a body pointer across a GC safepoint.
   PROTECT(t, source);
-  bool ascii = true;
-  for (int32_t i = 0; i < length; ++i) {
-    if (source->body()[offset + i] >= 0x80) { ascii = false; break; }
+  uint16_t bits = 0;
+  {
+    const uint16_t* in = source->body().begin() + offset;
+    for (int32_t i = 0; i < length; ++i) bits |= in[i];
   }
-  if (ascii) {
+  if (bits < 0x80) {
     GcByteArray* result = makeByteArray(t, length);
-    for (int32_t i = 0; i < length; ++i) {
-      result->body()[i] = source->body()[offset + i];
-    }
+    const uint16_t* in = source->body().begin() + offset;
+    uint8_t* out = reinterpret_cast<uint8_t*>(result->body().begin());
+    for (int32_t i = 0; i < length; ++i) out[i] = static_cast<uint8_t>(in[i]);
     return reinterpret_cast<int64_t>(result);
   }
   GcCharArray* result = makeCharArray(t, length);
-  if (length != 0) std::memcpy(&result->body()[0], &source->body()[offset], length * sizeof(uint16_t));
+  if (length != 0) std::memcpy(result->body().begin(), source->body().begin() + offset, length * sizeof(uint16_t));
   return reinterpret_cast<int64_t>(result);
 }
 
@@ -135,8 +171,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 Shim_java_lang_String_hashStorage(Thread* t, object, uintptr_t* arguments)
 {
   StringView source(t, reinterpret_cast<GcString*>(arguments[0]));
-  uint32_t hash = 0;
-  for (int32_t i = 0; i < source.length; ++i) hash = hash * 31 + source.at(i);
+  const uint32_t hash = source.bytes ? hashUnits(source.bytes, source.length) : hashUnits(source.chars, source.length);
   return static_cast<int32_t>(hash);
 }
 
@@ -146,11 +181,18 @@ Shim_java_lang_String_compareStorage(Thread* t, object, uintptr_t* arguments)
   StringView source(t, reinterpret_cast<GcString*>(arguments[0]));
   StringView target(t, reinterpret_cast<GcString*>(arguments[1]));
   const int32_t end = source.length < target.length ? source.length : target.length;
-  for (int32_t i = 0; i < end; ++i) {
-    const int32_t difference = static_cast<int32_t>(source.at(i)) - target.at(i);
-    if (difference) return difference;
+  int32_t difference;
+  if (source.bytes && target.bytes) {
+    const int32_t i = firstMismatch(source.bytes, target.bytes, end);
+    difference = i < end ? static_cast<int32_t>(source.bytes[i]) - target.bytes[i] : 0;
+  } else if (source.bytes) {
+    difference = compareUnits(source.bytes, target.chars, end);
+  } else if (target.bytes) {
+    difference = compareUnits(source.chars, target.bytes, end);
+  } else {
+    difference = compareUnits(source.chars, target.chars, end);
   }
-  return source.length - target.length;
+  return difference ? difference : source.length - target.length;
 }
 
 // This is only a fast path for validated UTF-8/US-ASCII input. Any high byte
@@ -162,12 +204,91 @@ Shim_java_lang_String_decodeAsciiBytes(Thread* t, object, uintptr_t* arguments)
   const int32_t offset = arguments[1];
   const int32_t length = arguments[2];
   PROTECT(t, source);
-  for (int32_t i = 0; i < length; ++i) {
-    if (source->body()[offset + i] < 0) return 0;
+  {
+    const uint8_t* in = reinterpret_cast<const uint8_t*>(source->body().begin() + offset);
+    uint8_t bits = 0;
+    for (int32_t i = 0; i < length; ++i) bits |= in[i];
+    if (bits & 0x80) return 0;
   }
   GcCharArray* result = makeCharArray(t, length);
-  for (int32_t i = 0; i < length; ++i) {
-    result->body()[i] = static_cast<uint8_t>(source->body()[offset + i]);
+  {
+    const uint8_t* in = reinterpret_cast<const uint8_t*>(source->body().begin() + offset);
+    uint16_t* out = result->body().begin();
+    for (int32_t i = 0; i < length; ++i) out[i] = in[i];
+  }
+  return reinterpret_cast<int64_t>(result);
+}
+
+namespace {
+template <class Unit>
+inline int32_t scanCase(const Unit* p, int32_t n, uint16_t lo, uint16_t hi)
+{
+  uint16_t bits = 0;
+  int32_t changed = 0;
+  for (int32_t i = 0; i < n; ++i) {
+    bits |= p[i];
+    changed |= (p[i] >= lo && p[i] <= hi);
+  }
+  return bits >= 0x80 ? -1 : changed;
+}
+}
+
+// Returns null for non-ASCII input, this when nothing changes, else the converted bytes.
+extern "C" SHIM_EXPORT int64_t JNICALL
+Shim_java_lang_String_caseAscii(Thread* t, object, uintptr_t* arguments)
+{
+  GcString* self = reinterpret_cast<GcString*>(arguments[0]);
+  const bool upper = arguments[1] != 0;
+  const uint16_t lo = upper ? 'a' : 'A';
+  const uint16_t hi = upper ? 'z' : 'Z';
+  int32_t changed;
+  {
+    StringView v(t, self);
+    changed = v.bytes ? scanCase(v.bytes, v.length, lo, hi) : scanCase(v.chars, v.length, lo, hi);
+  }
+  if (changed < 0) return 0;
+  if (changed == 0) return reinterpret_cast<int64_t>(self);
+  PROTECT(t, self);
+  GcByteArray* result = makeByteArray(t, self->length(t));
+  StringView v(t, self);
+  uint8_t* out = reinterpret_cast<uint8_t*>(result->body().begin());
+  for (int32_t i = 0; i < v.length; ++i) {
+    const uint16_t c = v.at(i);
+    out[i] = static_cast<uint8_t>(c >= lo && c <= hi ? (upper ? c - 32 : c + 32) : c);
+  }
+  return reinterpret_cast<int64_t>(result);
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+Shim_java_lang_String_equalsStorage(Thread* t, object, uintptr_t* arguments)
+{
+  StringView a(t, reinterpret_cast<GcString*>(arguments[0]));
+  StringView b(t, reinterpret_cast<GcString*>(arguments[1]));
+  if (a.length != b.length) return 0;
+  if (a.bytes && b.bytes) return std::memcmp(a.bytes, b.bytes, a.length) == 0;
+  if (a.chars && b.chars) return std::memcmp(a.chars, b.chars, a.length * sizeof(uint16_t)) == 0;
+  return compareUnits(a.bytes ? a.bytes : b.bytes, a.bytes ? b.chars : a.chars, a.length) == 0;
+}
+
+// Returns null when a unit is not ASCII.
+extern "C" SHIM_EXPORT int64_t JNICALL
+Shim_java_lang_String_encodeAscii(Thread* t, object, uintptr_t* arguments)
+{
+  GcString* self = reinterpret_cast<GcString*>(arguments[0]);
+  int32_t bits;
+  {
+    StringView v(t, self);
+    bits = v.bytes ? scanCase(v.bytes, v.length, 1, 0) : scanCase(v.chars, v.length, 1, 0);
+  }
+  if (bits < 0) return 0;
+  PROTECT(t, self);
+  GcByteArray* result = makeByteArray(t, self->length(t));
+  StringView v(t, self);
+  uint8_t* out = reinterpret_cast<uint8_t*>(result->body().begin());
+  if (v.bytes) {
+    std::memcpy(out, v.bytes, v.length);
+  } else {
+    for (int32_t i = 0; i < v.length; ++i) out[i] = static_cast<uint8_t>(v.chars[i]);
   }
   return reinterpret_cast<int64_t>(result);
 }
