@@ -150,7 +150,7 @@ jint err()
 }  // namespace
 
 extern "C" JNIEXPORT jint JNICALL
-    Java_shim_FileNative_open(JNIEnv* e, jclass, jstring path, jint flags, jint mode)
+    Java_shim_FileNative_open0(JNIEnv* e, jclass, jstring path, jint flags, jint mode)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -424,7 +424,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_shim_FileNative_available(JNIEnv*, jclas
 }
 
 extern "C" JNIEXPORT jint JNICALL
-    Java_shim_FileNative_stat(JNIEnv* e, jclass, jstring path, jlongArray out, jboolean follow)
+    Java_shim_FileNative_stat0(JNIEnv* e, jclass, jstring path, jlongArray out, jboolean follow)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -454,7 +454,7 @@ extern "C" JNIEXPORT jint JNICALL
   return 0;
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_access(JNIEnv* e, jclass, jstring path, jint mode)
+extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_access0(JNIEnv* e, jclass, jstring path, jint mode)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -467,7 +467,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_access(JNIEnv* e, jclass,
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_mkdir(JNIEnv* e, jclass, jstring path, jint mode)
+extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_mkdir0(JNIEnv* e, jclass, jstring path, jint mode)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -480,7 +480,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_mkdir(JNIEnv* e, jclass, 
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_unlink(JNIEnv* e, jclass, jstring path)
+extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_unlink0(JNIEnv* e, jclass, jstring path)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -493,7 +493,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_unlink(JNIEnv* e, jclass,
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_rmdir(JNIEnv* e, jclass, jstring path)
+extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_rmdir0(JNIEnv* e, jclass, jstring path)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -507,7 +507,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_rmdir(JNIEnv* e, jclass, 
 }
 
 extern "C" JNIEXPORT jint JNICALL
-    Java_shim_FileNative_rename(JNIEnv* e, jclass, jstring from, jstring to)
+    Java_shim_FileNative_rename0(JNIEnv* e, jclass, jstring from, jstring to)
 {
   FsString a;
   FsString b;
@@ -522,7 +522,7 @@ extern "C" JNIEXPORT jint JNICALL
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_chmod(JNIEnv* e, jclass, jstring path, jint mode)
+extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_chmod0(JNIEnv* e, jclass, jstring path, jint mode)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -536,7 +536,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_FileNative_chmod(JNIEnv* e, jclass, 
 }
 
 extern "C" JNIEXPORT jint JNICALL
-    Java_shim_FileNative_setModified(JNIEnv* e, jclass, jstring path, jlong millis)
+    Java_shim_FileNative_setModified0(JNIEnv* e, jclass, jstring path, jlong millis)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -561,7 +561,7 @@ extern "C" JNIEXPORT jint JNICALL
 #endif
 }
 
-extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_realpath(JNIEnv* e, jclass, jstring path)
+extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_realpath0(JNIEnv* e, jclass, jstring path)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -594,7 +594,7 @@ static bool isDotEntry(const char* n)
 }
 #endif
 
-extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_FileNative_list(JNIEnv* e, jclass, jstring path)
+extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_FileNative_list0(JNIEnv* e, jclass, jstring path)
 {
   FsString p;
   if (!toPath(e, path, p)) {
@@ -659,7 +659,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_FileNative_list(JNIEnv* e, j
 }
 
 extern "C" JNIEXPORT jint JNICALL
-    Java_shim_FileNative_space(JNIEnv* e, jclass, jstring path, jlongArray out)
+    Java_shim_FileNative_space0(JNIEnv* e, jclass, jstring path, jlongArray out)
 {
   FsString p;
   if (!toPath(e, path, p)) {
