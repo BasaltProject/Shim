@@ -29,6 +29,7 @@ public class HelperHashMap<K, V> implements Map<K, V> {
   private static final int MinimumCapacity = 16;
 
   private int size;
+  private int modCount;
   private Cell[] array;
   private final Helper helper;
 
@@ -117,6 +118,7 @@ public class HelperHashMap<K, V> implements Map<K, V> {
 
   private void insert(Cell<K, V> cell) {
     ++ size;
+    ++ modCount;
 
     grow();
 
@@ -136,6 +138,7 @@ public class HelperHashMap<K, V> implements Map<K, V> {
           p.setNext(c.next());
         }
         -- size;
+        ++ modCount;
         break;
       }
     }
@@ -190,6 +193,7 @@ public class HelperHashMap<K, V> implements Map<K, V> {
             p.setNext(c.next());
           }
           -- size;
+          ++ modCount;
           break;
         }
         p = c;
@@ -226,6 +230,7 @@ public class HelperHashMap<K, V> implements Map<K, V> {
   public void clear() {
     array = null;
     size = 0;
+    ++ modCount;
   }
 
   public Set<Entry<K, V>> entrySet() {
@@ -358,12 +363,16 @@ public class HelperHashMap<K, V> implements Map<K, V> {
     private Cell<K, V> previousCell;
     private Cell<K, V> currentCell;
     private Cell<K, V> nextCell;
+    private int expectedModCount = modCount;
 
     public MyIterator() {
       hasNext();
     }
 
     public Entry<K, V> next() {
+      if (expectedModCount != modCount) {
+        throw new ConcurrentModificationException();
+      }
       if (hasNext()) {
         if (currentCell != null) {
           if (currentCell.next() != null) {
@@ -398,6 +407,9 @@ public class HelperHashMap<K, V> implements Map<K, V> {
 
     public void remove() {
       if (currentCell != null) {
+        if (expectedModCount != modCount) {
+          throw new ConcurrentModificationException();
+        }
         if (previousCell == null) {
           array[currentIndex] = currentCell.next();
         } else {
@@ -408,6 +420,8 @@ public class HelperHashMap<K, V> implements Map<K, V> {
         }
         currentCell = null;
         -- size;
+        ++ modCount;
+        expectedModCount = modCount;
       } else {
         throw new IllegalStateException();
       }

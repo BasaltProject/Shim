@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class ThreadLocalRandom extends Random {
+public final class ThreadLocalRandom extends Random {
   private static final long serialVersionUID = -5851777807851030925L;
 
   private static final long GAMMA = 0x9e3779b97f4a7c15L;

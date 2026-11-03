@@ -51,9 +51,10 @@ public final class Pattern implements Serializable {
   private static final int kAllFlags = 0x1ff;
   private static final int kInf = Nodes.kInfinity;
 
-  private final String pattern;
+  private final String userPattern;
+  private String pattern;
   private int flags;
-  private final int flags0;
+  private transient int flags0;
   transient Node root;
   transient int capturingGroupCount;
   transient int localCount;
@@ -87,12 +88,12 @@ public final class Pattern implements Serializable {
   }
 
   public String pattern() {
-    return pattern;
+    return userPattern;
   }
 
   @Override
   public String toString() {
-    return pattern;
+    return userPattern;
   }
 
   public Matcher matcher(CharSequence input) {
@@ -216,11 +217,26 @@ public final class Pattern implements Serializable {
     return Collections.unmodifiableMap(new HashMap<String, Integer>(namedGroups));
   }
 
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    s.defaultReadObject();
+    flags0 = flags;
+    if (pattern.length() > 0) {
+      compile();
+    } else {
+      root = new Nodes.Accept();
+      capturingGroupCount = 1;
+      localCount = 0;
+      namedGroups = new HashMap<String, Integer>();
+      compiled = true;
+    }
+  }
+
   private Pattern(String p, int f) {
     if ((f & ~kAllFlags) != 0) {
       throw new IllegalArgumentException("Unknown flag 0x" + Integer.toHexString(f));
     }
-    pattern = Objects.requireNonNull(p, "regex");
+    userPattern = Objects.requireNonNull(p, "regex");
+    pattern = (f & CANON_EQ) != 0 && (f & LITERAL) == 0 ? canonExpand(p) : p;
     if ((f & UNICODE_CHARACTER_CLASS) != 0) {
       f |= UNICODE_CASE;
     }
@@ -235,6 +251,35 @@ public final class Pattern implements Serializable {
       namedGroups = new HashMap<String, Integer>();
       compiled = true;
     }
+  }
+
+  private static String canonExpand(String p) {
+    String n = java.text.Normalizer.normalize(p, java.text.Normalizer.Form.NFC);
+    StringBuilder sb = new StringBuilder();
+    int depth = 0;
+    for (int i = 0; i < n.length();) {
+      int cp = n.codePointAt(i);
+      i += Character.charCount(cp);
+      if (cp == '\\' && i < n.length()) {
+        int e = n.codePointAt(i);
+        i += Character.charCount(e);
+        sb.appendCodePoint(cp).appendCodePoint(e);
+        continue;
+      }
+      if (cp == '[') {
+        depth++;
+      } else if (cp == ']' && depth > 0) {
+        depth--;
+      }
+      String d = depth == 0 ? java.text.Normalizer.normalize(new String(Character.toChars(cp)),
+          java.text.Normalizer.Form.NFD) : null;
+      if (d != null && d.codePointCount(0, d.length()) > 1) {
+        sb.append("(?:").appendCodePoint(cp).append('|').append(d).append(')');
+      } else {
+        sb.appendCodePoint(cp);
+      }
+    }
+    return sb.toString();
   }
 
   private PatternSyntaxException error(String s) {

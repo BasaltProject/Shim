@@ -75,4 +75,31 @@ public class DoubleAccumulator extends Number implements Serializable {
   public float floatValue() {
     return (float) get();
   }
+
+  private static class SerializationProxy implements Serializable {
+    private static final long serialVersionUID = 7249069246863182397L;
+    private final double value;
+    private final DoubleBinaryOperator function;
+    private final long identity;
+
+    SerializationProxy(DoubleAccumulator a) {
+      value = a.get();
+      function = a.function;
+      identity = Double.doubleToRawLongBits(a.identity);
+    }
+
+    private Object readResolve() {
+      DoubleAccumulator a = new DoubleAccumulator(function, Double.longBitsToDouble(identity));
+      a.bits.set(Double.doubleToRawLongBits(value));
+      return a;
+    }
+  }
+
+  private Object writeReplace() {
+    return new SerializationProxy(this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Proxy required");
+  }
 }

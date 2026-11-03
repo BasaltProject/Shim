@@ -41,9 +41,9 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
   private final Comparator<? super K> comparator;
   private transient Node<K, V> head;
   private transient int level;
-  private final AtomicInteger size = new AtomicInteger(0);
-  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-  private final Random random = new Random();
+  private transient AtomicInteger size = new AtomicInteger(0);
+  private transient ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  private transient Random random = new Random();
 
   public ConcurrentSkipListMap() {
     this((Comparator<? super K>) null);
@@ -1529,12 +1529,11 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
     lock.readLock().lock();
     try {
       out.defaultWriteObject();
-      out.writeObject(comparator);
-      out.writeInt(size.get());
       for (Map.Entry<K, V> entry : entrySet()) {
         out.writeObject(entry.getKey());
         out.writeObject(entry.getValue());
       }
+      out.writeObject(null);
     } finally {
       lock.readLock().unlock();
     }
@@ -1544,18 +1543,15 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
   private void readObject(ObjectInputStream in)
       throws IOException, ClassNotFoundException {
     in.defaultReadObject();
-    Comparator<? super K> comp = (Comparator<? super K>) in.readObject();
-    try {
-      java.lang.reflect.Field f = ConcurrentSkipListMap.class.getDeclaredField("comparator");
-      f.setAccessible(true);
-      f.set(this, comp);
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
+    size = new AtomicInteger(0);
+    lock = new ReentrantReadWriteLock();
+    random = new Random();
     initialize();
-    int s = in.readInt();
-    for (int i = 0; i < s; i++) {
+    for (;;) {
       K key = (K) in.readObject();
+      if (key == null) {
+        break;
+      }
       V value = (V) in.readObject();
       put(key, value);
     }

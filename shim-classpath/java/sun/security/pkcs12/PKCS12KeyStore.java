@@ -59,6 +59,14 @@ public class PKCS12KeyStore extends KeyStoreSpi {
   private static final String kFriendlyNameOid = "1.2.840.113549.1.9.20";
   private static final String kLocalKeyIdOid = "1.2.840.113549.1.9.21";
   private static final String kTrustedKeyUsageOid = "2.16.840.1.113894.746875.1.1";
+  private static final String kSecretBagOid = "1.2.840.113549.1.12.10.1.5";
+  private static final String[][] kSecretOids = {
+    {"AES", "2.16.840.1.101.3.4.1"}, {"DES", "1.3.14.3.2.7"}, {"DESede", "1.2.840.113549.3.7"},
+    {"Blowfish", "1.3.6.1.4.1.3029.1.2"}, {"RC2", "1.2.840.113549.3.2"}, {"ARCFOUR", "1.2.840.113549.3.4"},
+    {"HmacSHA1", "1.2.840.113549.2.7"}, {"HmacSHA224", "1.2.840.113549.2.8"}, {"HmacSHA256", "1.2.840.113549.2.9"},
+    {"HmacSHA384", "1.2.840.113549.2.10"}, {"HmacSHA512", "1.2.840.113549.2.11"},
+    {"ChaCha20", "1.2.840.113549.1.9.16.3.18"},
+  };
   private static final String kAnyEkuOid = "2.5.29.37.0";
 
   private static class Entry {
@@ -71,6 +79,7 @@ public class PKCS12KeyStore extends KeyStoreSpi {
     byte[] protectedKey;
     byte[] plainKey;
     Certificate[] chain;
+    boolean secret;
   }
 
   private static final class CertEntry extends Entry {
@@ -86,6 +95,7 @@ public class PKCS12KeyStore extends KeyStoreSpi {
     boolean trusted;
     boolean shrouded;
     boolean isKey;
+    boolean secret;
   }
 
   private final Map<String, Entry> entries = new LinkedHashMap<String, Entry>();
@@ -127,6 +137,22 @@ public class PKCS12KeyStore extends KeyStoreSpi {
         UnrecoverableKeyException uke = new UnrecoverableKeyException("Get Key failed: " + ex.getMessage());
         uke.initCause(ex);
         throw uke;
+      }
+    }
+    if (ke.secret) {
+      try {
+        DerInputStream si = new DerValue(plain).data();
+        si.getInteger();
+        String oid = si.getDerValue().data().getOID().toString();
+        String name = oid;
+        for (String[] so : kSecretOids) {
+          if (so[1].equals(oid)) {
+            name = so[0];
+          }
+        }
+        return new javax.crypto.spec.SecretKeySpec(si.getOctetString(), name);
+      } catch (IOException ex) {
+        throw new UnrecoverableKeyException("Get Key failed: " + ex.getMessage());
       }
     }
     try {
@@ -172,8 +198,65 @@ public class PKCS12KeyStore extends KeyStoreSpi {
   }
 
   @Override
+  public void engineSetEntry(String alias, java.security.KeyStore.Entry entry,
+      java.security.KeyStore.ProtectionParameter param) throws KeyStoreException {
+    if (entry instanceof java.security.KeyStore.SecretKeyEntry) {
+      if (!(param instanceof java.security.KeyStore.PasswordProtection)) {
+        throw new KeyStoreException("unsupported protection parameter");
+      }
+      char[] pw = ((java.security.KeyStore.PasswordProtection) param).getPassword();
+      setSecret(alias, ((java.security.KeyStore.SecretKeyEntry) entry).getSecretKey(), pw);
+      return;
+    }
+    super.engineSetEntry(alias, entry, param);
+  }
+
+  private void setSecret(String alias, javax.crypto.SecretKey key, char[] password) throws KeyStoreException {
+    String oid = null;
+    for (String[] so : kSecretOids) {
+      if (so[0].equalsIgnoreCase(key.getAlgorithm())) {
+        oid = so[1];
+      }
+    }
+    if (oid == null) {
+      throw new KeyStoreException("Unsupported secret key algorithm: " + key.getAlgorithm());
+    }
+    if (password == null) {
+      throw new KeyStoreException("non-null password required to create PKCS12 secret key entry");
+    }
+    try {
+      DerOutputStream algId = new DerOutputStream();
+      algId.putOID(new ObjectIdentifier(oid));
+      DerOutputStream body = new DerOutputStream();
+      body.putInteger(0);
+      body.write(DerValue.tag_Sequence, algId);
+      body.putOctetString(key.getEncoded());
+      DerOutputStream plain = new DerOutputStream();
+      plain.write(DerValue.tag_Sequence, body);
+      byte[][] enc = PKCS12Crypto.encryptPbes2(password, plain.toByteArray(), new SecureRandom());
+      DerOutputStream out = new DerOutputStream();
+      out.write(enc[0]);
+      out.putOctetString(enc[1]);
+      DerOutputStream info = new DerOutputStream();
+      info.write(DerValue.tag_Sequence, out);
+      KeyEntry ke = new KeyEntry();
+      ke.alias = alias;
+      ke.secret = true;
+      ke.keyId = ("Time " + System.currentTimeMillis()).getBytes(StandardCharsets.UTF_8);
+      ke.protectedKey = info.toByteArray();
+      entries.put(norm(alias), ke);
+    } catch (GeneralSecurityException | IOException e) {
+      throw new KeyStoreException("Key protection algorithm not found: " + e, e);
+    }
+  }
+
+  @Override
   public void engineSetKeyEntry(String alias, Key key, char[] password, Certificate[] chain)
       throws KeyStoreException {
+    if (key instanceof javax.crypto.SecretKey) {
+      setSecret(alias, (javax.crypto.SecretKey) key, password);
+      return;
+    }
     if (!(key instanceof PrivateKey)) {
       throw new KeyStoreException("Key is not a PrivateKey");
     }
@@ -334,7 +417,10 @@ public class PKCS12KeyStore extends KeyStoreSpi {
       if (e instanceof KeyEntry) {
         KeyEntry ke = (KeyEntry) e;
         byte[] id = attribute(kLocalKeyIdOid, tlv(4, ke.keyId));
-        if (ke.protectedKey != null) {
+        if (ke.secret) {
+          byte[] sv = tlv(DerValue.tag_Sequence, cat(oidDer(kShroudedKeyBagOid), tlv(0xa0, ke.protectedKey)));
+          keyBags.write(bag(kSecretBagOid, sv, attributes(name, id)));
+        } else if (ke.protectedKey != null) {
           keyBags.write(bag(kShroudedKeyBagOid, ke.protectedKey, attributes(name, id)));
         } else {
           keyBags.write(bag(kKeyBagOid, ke.plainKey, attributes(name, id)));
@@ -531,6 +617,13 @@ public class PKCS12KeyStore extends KeyStoreSpi {
         bag.isKey = true;
         bag.shrouded = true;
         bag.value = inner;
+      } else if (bagOid.equals(kSecretBagOid)) {
+        DerInputStream sb = new DerValue(inner).data();
+        sb.getOID();
+        bag.isKey = true;
+        bag.shrouded = true;
+        bag.secret = true;
+        bag.value = sb.getDerValue().getDataBytes();
       } else if (bagOid.equals(kKeyBagOid)) {
         bag.isKey = true;
         bag.value = inner;
@@ -572,14 +665,15 @@ public class PKCS12KeyStore extends KeyStoreSpi {
         ke.plainKey = kb.value;
       }
       ke.keyId = kb.keyId;
+      ke.secret = kb.secret;
       Bag first = null;
-      for (Bag cb : certs) {
+      for (Bag cb : kb.secret ? new ArrayList<Bag>() : certs) {
         if (sameId(cb.keyId, kb.keyId)) {
           first = cb;
           break;
         }
       }
-      if (first == null && keys.size() == 1 && kb.keyId == null) {
+      if (first == null && !kb.secret && keys.size() == 1 && kb.keyId == null) {
         for (Bag cb : certs) {
           if (cb.keyId == null) {
             first = cb;

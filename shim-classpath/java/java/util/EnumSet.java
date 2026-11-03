@@ -29,7 +29,7 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
   private Class<T> elementType;
   
   private static class SerializationProxy<E extends Enum<E>> implements java.io.Serializable {
-    private static final long serialVersionUID = 1009687484059888093L;
+    private static final long serialVersionUID = 362491234563181265L;
     private final Class<E> elementType;
     private final Enum<?>[] elements;
 
@@ -239,6 +239,7 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
     private int currentIndex = 0;
     private boolean removeAllowed = false;
     private final T[] universe = elementType.getEnumConstants();
+    private final BitSet unseen = (BitSet) bitset.clone();
     
     public T next() {
       if (!hasNext()) {
@@ -272,7 +273,7 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
     }
     
     private int nextIndex() {
-      return bitset.nextSetBit(currentIndex);
+      return unseen.nextSetBit(currentIndex);
     }
   }
 }

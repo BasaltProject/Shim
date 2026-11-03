@@ -30,10 +30,27 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
     }
   }
 
-  private final AtomicInteger stateCell = new AtomicInteger();
-  private final Object queueLock = new Object();
-  private final LinkedList<Node> queue = new LinkedList<Node>();
-  private volatile boolean contended;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("state", Integer.TYPE)
+  };
+
+  private transient AtomicInteger stateCell = new AtomicInteger();
+  private transient Object queueLock = new Object();
+  private transient LinkedList<Node> queue = new LinkedList<Node>();
+  private transient volatile boolean contended;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = s.putFields();
+    f.put("state", stateCell.get());
+    s.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    int st = s.readFields().get("state", 0);
+    stateCell = new AtomicInteger(st);
+    queueLock = new Object();
+    queue = new LinkedList<Node>();
+  }
 
   protected AbstractQueuedSynchronizer() { }
 
@@ -350,7 +367,12 @@ public abstract class AbstractQueuedSynchronizer extends AbstractOwnableSynchron
   public class ConditionObject implements Condition, Serializable {
     private static final long serialVersionUID = 1173984872572414699L;
 
-    private final LinkedList<Node> waiters = new LinkedList<Node>();
+    private transient LinkedList<Node> waiters = new LinkedList<Node>();
+
+    private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+      in.defaultReadObject();
+      waiters = new LinkedList<Node>();
+    }
 
     public ConditionObject() { }
 

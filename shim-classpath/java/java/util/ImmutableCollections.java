@@ -75,6 +75,10 @@ final class ImmutableCollections {
       }
     }
 
+    private Object writeReplace() {
+      return new CollSer(1, elements.clone());
+    }
+
     @Override
     public int size() {
       return elements.length;
@@ -309,6 +313,10 @@ final class ImmutableCollections {
       }
     }
 
+    private Object writeReplace() {
+      return new CollSer(2, elements.clone());
+    }
+
     @Override
     public int size() {
       return elements.length;
@@ -490,6 +498,10 @@ final class ImmutableCollections {
         this.table[i] = k;
         this.table[i + 1] = v;
       }
+    }
+
+    private Object writeReplace() {
+      return new CollSer(3, table.clone());
     }
 
     @Override

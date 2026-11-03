@@ -54,6 +54,14 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
   }
 
   final int trySetException(Throwable ex) {
+    int[] out = new int[1];
+    if (setThrown(ex, out)) {
+      internalPropagateException(ex);
+    }
+    return out[0];
+  }
+
+  private boolean setThrown(Throwable ex, int[] out) {
     boolean set = false;
     int s;
     synchronized (this) {
@@ -66,16 +74,16 @@ public abstract class ForkJoinTask<V> implements Future<V>, Serializable {
         notifyAll();
       }
     }
-    if (set) {
-      internalPropagateException(ex);
-    }
-    return s;
+    out[0] = s;
+    return set;
   }
 
   void internalPropagateException(Throwable ex) { }
 
   final boolean trySetThrown(Throwable ex) {
-    return (trySetException(ex) & THROWN) != 0 && exception == ex;
+    int[] out = new int[1];
+    setThrown(ex, out);
+    return (out[0] & THROWN) != 0 && exception == ex;
   }
 
   final int doExec() {

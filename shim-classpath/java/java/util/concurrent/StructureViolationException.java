@@ -8,7 +8,7 @@
 
 package java.util.concurrent;
 
-public class StructureViolationException extends RuntimeException {
+public final class StructureViolationException extends RuntimeException {
   private static final long serialVersionUID = -7705327650798235468L;
 
   public StructureViolationException() { }

@@ -1520,7 +1520,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
 
   private void writeObject(ObjectOutputStream out) throws IOException {
     out.defaultWriteObject();
-    out.writeObject(comparator);
     out.writeInt(size);
     for (Map.Entry<K, V> entry : entrySet()) {
       out.writeObject(entry.getKey());
@@ -1532,14 +1531,6 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
   private void readObject(ObjectInputStream in)
       throws IOException, ClassNotFoundException {
     in.defaultReadObject();
-    Comparator<? super K> comp = (Comparator<? super K>) in.readObject();
-    try {
-      java.lang.reflect.Field f = TreeMap.class.getDeclaredField("comparator");
-      f.setAccessible(true);
-      f.set(this, comp);
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
     int s = in.readInt();
     for (int i = 0; i < s; i++) {
       K key = (K) in.readObject();

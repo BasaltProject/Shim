@@ -189,4 +189,164 @@ public final class Unsafe {
   }
 
   public native void throwException(Throwable t);
+
+  public static final int INVALID_FIELD_OFFSET = -1;
+  public static final int ARRAY_BOOLEAN_BASE_OFFSET = theUnsafe.arrayBaseOffset(boolean[].class);
+  public static final int ARRAY_BYTE_BASE_OFFSET = theUnsafe.arrayBaseOffset(byte[].class);
+  public static final int ARRAY_SHORT_BASE_OFFSET = theUnsafe.arrayBaseOffset(short[].class);
+  public static final int ARRAY_CHAR_BASE_OFFSET = theUnsafe.arrayBaseOffset(char[].class);
+  public static final int ARRAY_INT_BASE_OFFSET = theUnsafe.arrayBaseOffset(int[].class);
+  public static final int ARRAY_LONG_BASE_OFFSET = theUnsafe.arrayBaseOffset(long[].class);
+  public static final int ARRAY_FLOAT_BASE_OFFSET = theUnsafe.arrayBaseOffset(float[].class);
+  public static final int ARRAY_DOUBLE_BASE_OFFSET = theUnsafe.arrayBaseOffset(double[].class);
+  public static final int ARRAY_OBJECT_BASE_OFFSET = theUnsafe.arrayBaseOffset(Object[].class);
+  public static final int ARRAY_BOOLEAN_INDEX_SCALE = theUnsafe.arrayIndexScale(boolean[].class);
+  public static final int ARRAY_BYTE_INDEX_SCALE = theUnsafe.arrayIndexScale(byte[].class);
+  public static final int ARRAY_SHORT_INDEX_SCALE = theUnsafe.arrayIndexScale(short[].class);
+  public static final int ARRAY_CHAR_INDEX_SCALE = theUnsafe.arrayIndexScale(char[].class);
+  public static final int ARRAY_INT_INDEX_SCALE = theUnsafe.arrayIndexScale(int[].class);
+  public static final int ARRAY_LONG_INDEX_SCALE = theUnsafe.arrayIndexScale(long[].class);
+  public static final int ARRAY_FLOAT_INDEX_SCALE = theUnsafe.arrayIndexScale(float[].class);
+  public static final int ARRAY_DOUBLE_INDEX_SCALE = theUnsafe.arrayIndexScale(double[].class);
+  public static final int ARRAY_OBJECT_INDEX_SCALE = theUnsafe.arrayIndexScale(Object[].class);
+  public static final int ADDRESS_SIZE = theUnsafe.addressSize();
+
+  public int addressSize() {
+    return "32".equals(System.getProperty("sun.arch.data.model")) ? 4 : 8;
+  }
+
+  public int pageSize() {
+    return 4096;
+  }
+
+  public native long reallocateMemory(long address, long bytes);
+
+  public void setMemory(long address, long bytes, byte value) {
+    setMemory(null, address, bytes, value);
+  }
+
+  public int getLoadAverage(double[] loadavg, int nelems) {
+    if (nelems < 0 || nelems > 3 || nelems > loadavg.length) {
+      throw new ArrayIndexOutOfBoundsException();
+    }
+    try {
+      java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader("/proc/loadavg"));
+      try {
+        String[] parts = r.readLine().split(" ");
+        int n = Math.min(nelems, 3);
+        for (int i = 0; i < n; i++) {
+          loadavg[i] = Double.parseDouble(parts[i]);
+        }
+        return n;
+      } finally {
+        r.close();
+      }
+    } catch (java.io.IOException e) {
+      return -1;
+    } catch (RuntimeException e) {
+      return -1;
+    }
+  }
+
+  private static volatile int fenceCounter;
+
+  public void loadFence() {
+    int x = fenceCounter;
+  }
+
+  public void storeFence() {
+    fenceCounter = 0;
+  }
+
+  public void fullFence() {
+    fenceCounter = fenceCounter + 1;
+  }
+
+  public boolean getBoolean(Object o, long offset) {
+    return getBooleanVolatile(o, offset);
+  }
+
+  public void putBoolean(Object o, long offset, boolean x) {
+    putBooleanVolatile(o, offset, x);
+  }
+
+  public byte getByte(Object o, long offset) {
+    return getByteVolatile(o, offset);
+  }
+
+  public void putByte(Object o, long offset, byte x) {
+    putByteVolatile(o, offset, x);
+  }
+
+  public short getShort(Object o, long offset) {
+    return getShortVolatile(o, offset);
+  }
+
+  public void putShort(Object o, long offset, short x) {
+    putShortVolatile(o, offset, x);
+  }
+
+  public char getChar(Object o, long offset) {
+    return getCharVolatile(o, offset);
+  }
+
+  public void putChar(Object o, long offset, char x) {
+    putCharVolatile(o, offset, x);
+  }
+
+  public int getInt(Object o, long offset) {
+    return getIntVolatile(o, offset);
+  }
+
+  public void putInt(Object o, long offset, int x) {
+    putIntVolatile(o, offset, x);
+  }
+
+  public float getFloat(Object o, long offset) {
+    return getFloatVolatile(o, offset);
+  }
+
+  public void putFloat(Object o, long offset, float x) {
+    putFloatVolatile(o, offset, x);
+  }
+
+  public final int getAndAddInt(Object o, long offset, int delta) {
+    int v;
+    do {
+      v = getIntVolatile(o, offset);
+    } while (!compareAndSwapInt(o, offset, v, v + delta));
+    return v;
+  }
+
+  public final long getAndAddLong(Object o, long offset, long delta) {
+    long v;
+    do {
+      v = getLongVolatile(o, offset);
+    } while (!compareAndSwapLong(o, offset, v, v + delta));
+    return v;
+  }
+
+  public final int getAndSetInt(Object o, long offset, int newValue) {
+    int v;
+    do {
+      v = getIntVolatile(o, offset);
+    } while (!compareAndSwapInt(o, offset, v, newValue));
+    return v;
+  }
+
+  public final long getAndSetLong(Object o, long offset, long newValue) {
+    long v;
+    do {
+      v = getLongVolatile(o, offset);
+    } while (!compareAndSwapLong(o, offset, v, newValue));
+    return v;
+  }
+
+  public final Object getAndSetObject(Object o, long offset, Object newValue) {
+    Object v;
+    do {
+      v = getObjectVolatile(o, offset);
+    } while (!compareAndSwapObject(o, offset, v, newValue));
+    return v;
+  }
 }

@@ -37,7 +37,7 @@ public class AtomicLong extends Number implements java.io.Serializable {
   
   static {
     try {
-      Field<?> f = AtomicLong.class.getDeclaredField("value");
+      Field f = AtomicLong.class.getDeclaredField("value");
       valueOffset = unsafe.objectFieldOffset(f);
     } catch (NoSuchFieldException e) {
       throw new Error(e);

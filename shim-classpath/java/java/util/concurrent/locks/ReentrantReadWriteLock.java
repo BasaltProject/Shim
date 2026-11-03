@@ -388,6 +388,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
       private static final long serialVersionUID = -3992448646407690164L;
       private final Object condSync = new Object();
       private int waiting;
+      private long signals;
 
       WriteLock lockOwner() {
         return WriteLock.this;
@@ -451,13 +452,16 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
         synchronized (condSync) {
           count = release();
           try {
-            long remaining = deadline - System.nanoTime();
-            if (remaining > 0) {
-              long millis = remaining / 1000000L;
-              int remNanos = (int) (remaining % 1000000L);
-              waitOn(millis, remNanos);
+            long seen = signals;
+            while (true) {
+              long remaining = deadline - System.nanoTime();
+              if (remaining <= 0) {
+                timedOut = signals == seen;
+                break;
+              }
+              waitOn(remaining / 1000000L, (int) (remaining % 1000000L));
+              if (signals != seen) break;
             }
-            if (System.nanoTime() >= deadline) timedOut = true;
           } catch (InterruptedException e) {
             interrupted = true;
           }
@@ -524,6 +528,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
       public void signal() {
         if (!isHeldByCurrentThread()) throw new IllegalMonitorStateException();
         synchronized (condSync) {
+          signals++;
           condSync.notify();
         }
       }
@@ -531,6 +536,7 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
       public void signalAll() {
         if (!isHeldByCurrentThread()) throw new IllegalMonitorStateException();
         synchronized (condSync) {
+          signals++;
           condSync.notifyAll();
         }
       }

@@ -42,7 +42,21 @@ public abstract class TimeZone implements Serializable, Cloneable {
   private static final int kMillisPerHour = 3600000;
   private static volatile TimeZone defaultTimeZone;
 
-  private String id;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("ID", String.class)
+  };
+
+  private transient String id;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = s.putFields();
+    f.put("ID", id);
+    s.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    id = (String) s.readFields().get("ID", null);
+  }
 
   public TimeZone() { }
 

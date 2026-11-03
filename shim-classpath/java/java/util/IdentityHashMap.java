@@ -35,7 +35,7 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V
     java.io.ObjectOutputStream.PutField fields = s.putFields();
     fields.put("size", map.size());
     s.writeFields();
-    s.writeInt(map.size() * 2);
+    s.writeInt(map.size());
     for (Entry<K, V> e : map.entrySet()) {
       s.writeObject(e.getKey());
       s.writeObject(e.getValue());

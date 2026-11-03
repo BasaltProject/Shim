@@ -53,6 +53,25 @@ public final class Sun extends Provider {
         "2.16.840.1.101.3.4.2.11", "SHAKE128");
     addDigest("SHAKE256-512", "sun.security.provider.SHA3$SHAKE256Hash", "OID.2.16.840.1.101.3.4.2.12",
         "2.16.840.1.101.3.4.2.12", "SHAKE256");
+    addSoftware("KeyPairGenerator", "DSA", "sun.security.provider.DSAKeyPairGenerator", "OID.1.2.840.10040.4.1",
+        "1.2.840.10040.4.1", "1.3.14.3.2.12");
+    addSoftware("KeyFactory", "DSA", "sun.security.provider.DSAKeyFactory", "OID.1.2.840.10040.4.1",
+        "1.2.840.10040.4.1", "1.3.14.3.2.12");
+    addSoftware("AlgorithmParameters", "DSA", "sun.security.provider.DSAParameters", "OID.1.2.840.10040.4.1",
+        "1.2.840.10040.4.1", "1.3.14.3.2.12");
+    addSoftware("AlgorithmParameterGenerator", "DSA", "sun.security.provider.DSAParameterGenerator");
+    addSoftware("Signature", "SHA1withDSA", "sun.security.provider.DSA$SHA1withDSA", "DSA", "DSS", "SHA/DSA",
+        "SHA-1/DSA", "SHA1/DSA", "SHAwithDSA", "DSAWithSHA1", "OID.1.2.840.10040.4.3", "1.2.840.10040.4.3",
+        "1.3.14.3.2.13", "1.3.14.3.2.27");
+    addSoftware("Signature", "SHA224withDSA", "sun.security.provider.DSA$SHA224withDSA", "OID.2.16.840.1.101.3.4.3.1",
+        "2.16.840.1.101.3.4.3.1");
+    addSoftware("Signature", "SHA256withDSA", "sun.security.provider.DSA$SHA256withDSA", "OID.2.16.840.1.101.3.4.3.2",
+        "2.16.840.1.101.3.4.3.2");
+    addSoftware("Signature", "SHA384withDSA", "sun.security.provider.DSA$SHA384withDSA", "OID.2.16.840.1.101.3.4.3.3",
+        "2.16.840.1.101.3.4.3.3");
+    addSoftware("Signature", "SHA512withDSA", "sun.security.provider.DSA$SHA512withDSA", "OID.2.16.840.1.101.3.4.3.4",
+        "2.16.840.1.101.3.4.3.4");
+    addSoftware("Signature", "NONEwithDSA", "sun.security.provider.DSA$RawDSA", "RawDSA");
     addSoftware("CertificateFactory", "X.509", "sun.security.provider.X509Factory", "X509");
     addSoftware("KeyStore", "JKS", "sun.security.provider.JavaKeyStore$DualFormatJKS");
     putService(new Provider.Service(this, "KeyStore", "PKCS12", "sun.security.pkcs12.PKCS12KeyStore$DualFormatPKCS12",

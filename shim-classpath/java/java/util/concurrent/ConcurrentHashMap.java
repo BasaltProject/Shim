@@ -1014,7 +1014,7 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V> implements Concur
     }
   }
 
-  public static class KeySetView<K, V> extends CollectionView<K, V, K> implements Set<K>, Serializable {
+  public static final class KeySetView<K, V> extends CollectionView<K, V, K> implements Set<K>, Serializable {
     private final V value;
 
     KeySetView(ConcurrentHashMap<K, V> map, V value) {
