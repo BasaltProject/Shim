@@ -13,7 +13,7 @@ import java.util.Enumeration;
 
 public interface Name extends Cloneable, Serializable, Comparable<Object> {
   @SuppressWarnings("serial")
-  long serialVersionUID = 1L;
+  long serialVersionUID = -3617482732056931635L;
 
   Object clone();
 

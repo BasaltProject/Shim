@@ -1,0 +1,70 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package javax.naming.event;
+
+import javax.naming.Binding;
+
+public class NamingEvent extends java.util.EventObject {
+  private static final long serialVersionUID = -7126752885365133499L;
+
+  public static final int OBJECT_ADDED = 0;
+  public static final int OBJECT_REMOVED = 1;
+  public static final int OBJECT_RENAMED = 2;
+  public static final int OBJECT_CHANGED = 3;
+
+  protected Object changeInfo;
+  protected int type;
+  protected Binding oldBinding;
+  protected Binding newBinding;
+
+  public NamingEvent(EventContext source, int type, Binding oldBd, Binding newBd, Object changeInfo) {
+    super(source);
+    this.type = type;
+    oldBinding = oldBd;
+    newBinding = newBd;
+    this.changeInfo = changeInfo;
+  }
+
+  public int getType() {
+    return type;
+  }
+
+  public EventContext getEventContext() {
+    return (EventContext) getSource();
+  }
+
+  public Binding getOldBinding() {
+    return oldBinding;
+  }
+
+  public Binding getNewBinding() {
+    return newBinding;
+  }
+
+  public Object getChangeInfo() {
+    return changeInfo;
+  }
+
+  public void dispatch(NamingListener listener) {
+    switch (type) {
+      case OBJECT_ADDED:
+        ((NamespaceChangeListener) listener).objectAdded(this);
+        break;
+      case OBJECT_REMOVED:
+        ((NamespaceChangeListener) listener).objectRemoved(this);
+        break;
+      case OBJECT_RENAMED:
+        ((NamespaceChangeListener) listener).objectRenamed(this);
+        break;
+      case OBJECT_CHANGED:
+        ((ObjectChangeListener) listener).objectChanged(this);
+        break;
+    }
+  }
+}
