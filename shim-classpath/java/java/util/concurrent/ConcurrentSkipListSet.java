@@ -203,32 +203,4 @@ public class ConcurrentSkipListSet<E> extends AbstractSet<E>
     clone.m = new ConcurrentSkipListMap<E, Object>((java.util.SortedMap<E, ?>) m);
     return clone;
   }
-
-  private void writeObject(ObjectOutputStream out) throws IOException {
-    out.defaultWriteObject();
-    out.writeObject(m.comparator());
-    out.writeInt(m.size());
-    for (E e : m.keySet()) {
-      out.writeObject(e);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private void readObject(ObjectInputStream in)
-      throws IOException, ClassNotFoundException {
-    in.defaultReadObject();
-    Comparator<? super E> c = (Comparator<? super E>) in.readObject();
-    ConcurrentSkipListMap<E, Object> map = new ConcurrentSkipListMap<E, Object>(c);
-    int size = in.readInt();
-    for (int i = 0; i < size; i++) {
-      map.put((E) in.readObject(), PRESENT);
-    }
-    try {
-      java.lang.reflect.Field f = ConcurrentSkipListSet.class.getDeclaredField("m");
-      f.setAccessible(true);
-      f.set(this, map);
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
-  }
 }

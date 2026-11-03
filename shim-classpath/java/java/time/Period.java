@@ -377,4 +377,12 @@ public final class Period implements ChronoPeriod, Serializable {
       return buf.toString();
     }
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.PERIOD_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

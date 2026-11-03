@@ -18,7 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public class DynamicCallSiteDesc {
+public final class DynamicCallSiteDesc {
   private final DirectMethodHandleDesc bootstrapMethod;
   private final String invocationName;
   private final MethodTypeDesc invocationType;

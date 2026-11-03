@@ -98,8 +98,9 @@ public interface Comparator<T> {
     return (c1, c2) -> Double.compare(keyExtractor.applyAsDouble(c1), keyExtractor.applyAsDouble(c2));
   }
 
+  @SuppressWarnings("unchecked")
   public static <T extends Comparable<? super T>> Comparator<T> naturalOrder() {
-    return (c1, c2) -> ((Comparable) c1).compareTo(c2);
+    return (Comparator<T>) Comparators.NaturalOrderComparator.INSTANCE;
   }
 
   public static <T extends Comparable<? super T>> Comparator<T> reverseOrder() {

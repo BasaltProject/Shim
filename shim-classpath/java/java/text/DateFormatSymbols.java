@@ -31,6 +31,48 @@ import java.util.Objects;
 public class DateFormatSymbols implements Serializable, Cloneable {
   private static final long serialVersionUID = -5987973545549424702L;
 
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("eras", String[].class),
+    new java.io.ObjectStreamField("months", String[].class),
+    new java.io.ObjectStreamField("shortMonths", String[].class),
+    new java.io.ObjectStreamField("weekdays", String[].class),
+    new java.io.ObjectStreamField("shortWeekdays", String[].class),
+    new java.io.ObjectStreamField("ampms", String[].class),
+    new java.io.ObjectStreamField("zoneStrings", String[][].class),
+    new java.io.ObjectStreamField("localPatternChars", String.class),
+    new java.io.ObjectStreamField("locale", Locale.class)
+  };
+
+  private void writeObject(java.io.ObjectOutputStream stream) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = stream.putFields();
+    f.put("eras", eras);
+    f.put("months", months);
+    f.put("shortMonths", shortMonths);
+    f.put("weekdays", weekdays);
+    f.put("shortWeekdays", shortWeekdays);
+    f.put("ampms", ampm);
+    f.put("zoneStrings", getZoneStrings());
+    f.put("localPatternChars", localPatternChars);
+    f.put("locale", zoneLocale);
+    stream.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField f = stream.readFields();
+    eras = (String[]) f.get("eras", eras);
+    months = (String[]) f.get("months", months);
+    shortMonths = (String[]) f.get("shortMonths", shortMonths);
+    weekdays = (String[]) f.get("weekdays", weekdays);
+    shortWeekdays = (String[]) f.get("shortWeekdays", shortWeekdays);
+    ampm = (String[]) f.get("ampms", ampm);
+    zoneStrings = (String[][]) f.get("zoneStrings", null);
+    localPatternChars = (String) f.get("localPatternChars", localPatternChars);
+    Locale l = (Locale) f.get("locale", null);
+    if (l != null) {
+      zoneLocale = l;
+    }
+  }
+
   private String[] eras = new String[] {"BC", "AD"};
   private String[] months = new String[] {
     "January", "February", "March", "April", "May", "June",

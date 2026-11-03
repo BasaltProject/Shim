@@ -67,4 +67,27 @@ public class DoubleAdder extends Number implements Serializable {
   public float floatValue() {
     return (float) sum();
   }
+
+  private static class SerializationProxy implements Serializable {
+    private static final long serialVersionUID = 7249069246863182397L;
+    private final double value;
+
+    SerializationProxy(DoubleAdder a) {
+      value = a.sum();
+    }
+
+    private Object readResolve() {
+      DoubleAdder a = new DoubleAdder();
+      a.bits.set(Double.doubleToRawLongBits(value));
+      return a;
+    }
+  }
+
+  private Object writeReplace() {
+    return new SerializationProxy(this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Proxy required");
+  }
 }

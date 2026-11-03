@@ -8,7 +8,7 @@
 
 package java.nio.charset;
 
-public class CodingErrorAction {
+public final class CodingErrorAction {
   private final String name;
 
   private CodingErrorAction(String name) {

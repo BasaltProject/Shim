@@ -25,7 +25,7 @@ package java.lang;
 
 import java.security.BasicPermission;
 
-public class RuntimePermission extends BasicPermission {
+public final class RuntimePermission extends BasicPermission {
   private static final long serialVersionUID = 7399184964622342223L;
 
 

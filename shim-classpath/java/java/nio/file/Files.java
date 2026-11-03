@@ -306,9 +306,47 @@ public final class Files {
     if (provider(target) == provider) {
       provider.copy(source, target, options);
     } else {
-      throw new ProviderMismatchException();
+      copyForeign(source, target, options);
     }
     return target;
+  }
+
+  private static void copyForeign(Path source, Path target, CopyOption... options) throws IOException {
+    boolean replace = false;
+    boolean attrs = false;
+    for (CopyOption o : options) {
+      if (o == StandardCopyOption.REPLACE_EXISTING) {
+        replace = true;
+      } else if (o == StandardCopyOption.COPY_ATTRIBUTES) {
+        attrs = true;
+      } else if (o == null) {
+        throw new NullPointerException();
+      }
+    }
+    BasicFileAttributes sa = readAttributes(source, BasicFileAttributes.class);
+    if (sa.isSymbolicLink()) {
+      throw new IOException("Copying of symbolic links not supported");
+    }
+    if (exists(target, new LinkOption[0])) {
+      if (!replace) {
+        throw new FileAlreadyExistsException(target.toString());
+      }
+      delete(target);
+    }
+    if (sa.isDirectory()) {
+      createDirectory(target);
+    } else {
+      try (java.io.InputStream in = newInputStream(source)) {
+        copy(in, target);
+      }
+    }
+    if (attrs) {
+      try {
+        BasicFileAttributeView v = getFileAttributeView(target, BasicFileAttributeView.class);
+        v.setTimes(sa.lastModifiedTime(), sa.lastAccessTime(), sa.creationTime());
+      } catch (IOException ignore) {
+      }
+    }
   }
 
   public static Path move(Path source, Path target, CopyOption... options) throws IOException {
@@ -316,7 +354,17 @@ public final class Files {
     if (provider(target) == provider) {
       provider.move(source, target, options);
     } else {
-      throw new ProviderMismatchException();
+      boolean atomic = false;
+      for (CopyOption o : options) {
+        if (o == StandardCopyOption.ATOMIC_MOVE) {
+          atomic = true;
+        }
+      }
+      if (atomic) {
+        throw new AtomicMoveNotSupportedException(source.toString(), target.toString(), "Atomic move between providers is not supported");
+      }
+      copyForeign(source, target, options);
+      delete(source);
     }
     return target;
   }

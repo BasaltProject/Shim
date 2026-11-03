@@ -26,7 +26,7 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
 import java.util.Objects;
 
-public class Channels {
+public final class Channels {
   public static InputStream newInputStream(ReadableByteChannel channel) {
     return new MyInputStream(channel);
   }

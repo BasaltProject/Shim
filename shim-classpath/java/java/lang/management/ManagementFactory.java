@@ -171,6 +171,22 @@ public class ManagementFactory {
     return hotSpot;
   }
 
+  private static PlatformManagedObject flightRecorder;
+
+  private static synchronized PlatformManagedObject flightRecorderBean() {
+    if (flightRecorder == null) {
+      try {
+        java.lang.reflect.Constructor<?> c = Class.forName("jdk.management.jfr.FlightRecorderMXBeanImpl")
+            .getDeclaredConstructor();
+        c.setAccessible(true);
+        flightRecorder = (PlatformManagedObject) c.newInstance();
+      } catch (ReflectiveOperationException e) {
+        throw new InternalError(e);
+      }
+    }
+    return flightRecorder;
+  }
+
   private static List<PlatformManagedObject> allBeans() {
     List<PlatformManagedObject> all = new ArrayList<PlatformManagedObject>();
     all.add(getClassLoadingMXBean());
@@ -181,6 +197,7 @@ public class ManagementFactory {
     all.add(getThreadMXBean());
     all.add(loggingBean());
     all.add(hotSpotDiagnostic());
+    all.add(flightRecorderBean());
     all.addAll(getGarbageCollectorMXBeans());
     all.addAll(getMemoryPoolMXBeans());
     all.addAll(getBufferPools());
@@ -210,7 +227,7 @@ public class ManagementFactory {
         || c == OperatingSystemMXBean.class || c == RuntimeMXBean.class || c == ThreadMXBean.class
         || c == PlatformLoggingMXBean.class || c == GarbageCollectorMXBean.class || c == MemoryManagerMXBean.class
         || c == MemoryPoolMXBean.class || c == BufferPoolMXBean.class
-        || c == com.sun.management.HotSpotDiagnosticMXBean.class
+        || c == com.sun.management.HotSpotDiagnosticMXBean.class || c == jdk.management.jfr.FlightRecorderMXBean.class
         || c == com.sun.management.OperatingSystemMXBean.class || c == com.sun.management.UnixOperatingSystemMXBean.class
         || c == com.sun.management.ThreadMXBean.class || c == com.sun.management.GarbageCollectorMXBean.class;
   }

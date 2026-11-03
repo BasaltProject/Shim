@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
-public final class ThaiBuddhistChronology extends YearShiftedChronology {
+public final class ThaiBuddhistChronology extends YearShiftedChronology implements java.io.Serializable {
   private static final long serialVersionUID = 2775954514031616474L;
 
   public static final ThaiBuddhistChronology INSTANCE = new ThaiBuddhistChronology();

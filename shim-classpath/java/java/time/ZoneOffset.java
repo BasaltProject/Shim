@@ -296,4 +296,12 @@ public final class ZoneOffset extends ZoneId implements TemporalAccessor, Tempor
   public String toString() {
     return id;
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.ZONE_OFFSET_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

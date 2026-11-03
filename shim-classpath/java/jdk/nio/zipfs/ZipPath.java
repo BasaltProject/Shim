@@ -155,7 +155,7 @@ final class ZipPath implements Path {
   public Path getFileName() {
     initOffsets();
     int count = offsets.length;
-    if (count == 0) {
+    if (count == 0 || path.length() == 0) {
       return null;
     }
     if (count == 1 && path.length() > 0 && path.charAt(0) != '/') {
@@ -258,7 +258,7 @@ final class ZipPath implements Path {
 
   void checkAccess() throws IOException {
     if (!zfs.exists(this)) {
-      throw new NoSuchFileException(toString());
+      throw new NoSuchFileException(zfs.toString());
     }
   }
 

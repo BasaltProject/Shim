@@ -100,6 +100,6 @@ public abstract class BreakIterator implements Cloneable {
   }
 
   public static synchronized Locale[] getAvailableLocales() {
-    return Locale.getAvailableLocales();
+    return shim.LocaleLists.collation();
   }
 }

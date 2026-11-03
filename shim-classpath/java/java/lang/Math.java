@@ -246,9 +246,31 @@ public final class Math {
     return Static.random.nextDouble();
   }
 
-  public static native double floor(double v);
+  public static double floor(double v) {
+    long bits = Double.doubleToRawLongBits(v);
+    int exp = (int) ((bits >>> 52) & 0x7ff) - 1023;
+    if (exp >= 52) {
+      return v;
+    }
+    if (exp < 0) {
+      if ((bits & 0x7fffffffffffffffL) == 0) {
+        return v;
+      }
+      return bits < 0 ? -1.0 : 0.0;
+    }
+    long mask = 0x000fffffffffffffL >> exp;
+    if ((bits & mask) == 0) {
+      return v;
+    }
+    if (bits < 0) {
+      bits += 0x0010000000000000L >> exp;
+    }
+    return Double.longBitsToDouble(bits & ~mask);
+  }
 
-  public static native double ceil(double v);
+  public static double ceil(double v) {
+    return -floor(-v);
+  }
 
   public static native double exp(double v);
 

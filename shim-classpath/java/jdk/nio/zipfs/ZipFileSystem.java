@@ -654,7 +654,7 @@ class ZipFileSystem extends FileSystem {
         if (n != null && options.contains(StandardOpenOption.APPEND)) {
           initial = n.data != null ? n.data : readSource(n);
         }
-        return new WriteChannel(p, initial, options.contains(StandardOpenOption.APPEND));
+        return new EntryOutputChannel(p, initial, options.contains(StandardOpenOption.APPEND));
       }
       if (n == null || n.dir) {
         throw new NoSuchFileException(path.toString());
@@ -735,7 +735,7 @@ class ZipFileSystem extends FileSystem {
     }
   }
 
-  private final class WriteChannel implements SeekableByteChannel {
+  private final class EntryOutputChannel implements SeekableByteChannel {
     private final String path;
     private final boolean append;
     private byte[] buf;
@@ -743,7 +743,7 @@ class ZipFileSystem extends FileSystem {
     private long pos;
     private boolean open = true;
 
-    WriteChannel(String path, byte[] initial, boolean append) {
+    EntryOutputChannel(String path, byte[] initial, boolean append) {
       this.path = path;
       this.buf = initial.clone();
       this.len = initial.length;
@@ -865,7 +865,9 @@ class ZipFileSystem extends FileSystem {
         throw new NoSuchFileException(src.toString());
       }
       Node d = nodes.get(dp);
+      int keptSeq = -1;
       if (d != null) {
+        keptSeq = d.seq;
         if (sp.equals(dp)) {
           return;
         }
@@ -890,7 +892,7 @@ class ZipFileSystem extends FileSystem {
         c.atime = s.atime;
         c.ctime = s.ctime;
       }
-      c.seq = nextSeq++;
+      c.seq = keptSeq >= 0 ? keptSeq : nextSeq++;
       addNode(c);
       if (deleteSource && !(s.dir && !s.children.isEmpty())) {
         nodes.get(parentOf(sp)).children.remove(s);
@@ -1009,5 +1011,10 @@ class ZipFileSystem extends FileSystem {
       n.seq = nextSeq++;
       addNode(n);
     }
+  }
+
+  @Override
+  public String toString() {
+    return zfpath.toString();
   }
 }

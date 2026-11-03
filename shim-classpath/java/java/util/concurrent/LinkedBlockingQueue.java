@@ -26,8 +26,17 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E> implements Blocking
     }
   }
 
-  private final int capacity;
-  private int count;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("capacity", Integer.TYPE),
+    new java.io.ObjectStreamField("count", java.util.concurrent.atomic.AtomicInteger.class),
+    new java.io.ObjectStreamField("takeLock", java.util.concurrent.locks.ReentrantLock.class),
+    new java.io.ObjectStreamField("notEmpty", java.util.concurrent.locks.Condition.class),
+    new java.io.ObjectStreamField("putLock", java.util.concurrent.locks.ReentrantLock.class),
+    new java.io.ObjectStreamField("notFull", java.util.concurrent.locks.Condition.class)
+  };
+
+  private transient int capacity;
+  private transient int count;
   private transient Node<E> head;
   private transient Node<E> last;
   private transient Object lock = new Object();
@@ -426,7 +435,16 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E> implements Blocking
 
   private void writeObject(ObjectOutputStream s) throws IOException {
     synchronized (lock) {
-      s.defaultWriteObject();
+      java.io.ObjectOutputStream.PutField f = s.putFields();
+      f.put("capacity", capacity);
+      f.put("count", new java.util.concurrent.atomic.AtomicInteger(count));
+      java.util.concurrent.locks.ReentrantLock tl = new java.util.concurrent.locks.ReentrantLock();
+      java.util.concurrent.locks.ReentrantLock pl = new java.util.concurrent.locks.ReentrantLock();
+      f.put("takeLock", tl);
+      f.put("notEmpty", java.util.concurrent.locks.SerialSupport.condition(tl));
+      f.put("putLock", pl);
+      f.put("notFull", java.util.concurrent.locks.SerialSupport.condition(pl));
+      s.writeFields();
       for (Node<E> p = head.next; p != null; p = p.next) {
         s.writeObject(p.item);
       }
@@ -436,7 +454,7 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E> implements Blocking
 
   @SuppressWarnings("unchecked")
   private void readObject(ObjectInputStream s) throws IOException, ClassNotFoundException {
-    s.defaultReadObject();
+    capacity = s.readFields().get("capacity", Integer.MAX_VALUE);
     lock = new Object();
     count = 0;
     last = head = new Node<E>(null);

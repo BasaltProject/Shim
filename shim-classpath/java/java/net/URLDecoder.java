@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Objects;
 
-public class URLDecoder {
+public final class URLDecoder {
   private URLDecoder() {
   }
 

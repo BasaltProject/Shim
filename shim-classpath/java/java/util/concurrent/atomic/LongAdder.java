@@ -66,4 +66,27 @@ public class LongAdder extends Number implements Serializable {
   public double doubleValue() {
     return (double) sum();
   }
+
+  private static class SerializationProxy implements Serializable {
+    private static final long serialVersionUID = 7249069246863182397L;
+    private final long value;
+
+    SerializationProxy(LongAdder a) {
+      value = a.sum();
+    }
+
+    private Object readResolve() {
+      LongAdder a = new LongAdder();
+      a.value.set(value);
+      return a;
+    }
+  }
+
+  private Object writeReplace() {
+    return new SerializationProxy(this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Proxy required");
+  }
 }

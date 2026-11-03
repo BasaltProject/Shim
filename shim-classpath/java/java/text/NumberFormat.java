@@ -45,6 +45,53 @@ public abstract class NumberFormat extends Format {
     public static final Field SUFFIX = new Field("suffix");
   }
 
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("groupingUsed", Boolean.TYPE),
+    new java.io.ObjectStreamField("maxFractionDigits", Byte.TYPE),
+    new java.io.ObjectStreamField("maxIntegerDigits", Byte.TYPE),
+    new java.io.ObjectStreamField("maximumFractionDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("maximumIntegerDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("minFractionDigits", Byte.TYPE),
+    new java.io.ObjectStreamField("minIntegerDigits", Byte.TYPE),
+    new java.io.ObjectStreamField("minimumFractionDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("minimumIntegerDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("parseIntegerOnly", Boolean.TYPE),
+    new java.io.ObjectStreamField("serialVersionOnStream", Integer.TYPE)
+  };
+
+  private void writeObject(java.io.ObjectOutputStream stream) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = stream.putFields();
+    f.put("groupingUsed", groupingUsed);
+    f.put("maxFractionDigits", (byte) Math.min(maximumFractionDigits, Byte.MAX_VALUE));
+    f.put("maxIntegerDigits", (byte) Math.min(maximumIntegerDigits, Byte.MAX_VALUE));
+    f.put("maximumFractionDigits", maximumFractionDigits);
+    f.put("maximumIntegerDigits", maximumIntegerDigits);
+    f.put("minFractionDigits", (byte) Math.min(minimumFractionDigits, Byte.MAX_VALUE));
+    f.put("minIntegerDigits", (byte) Math.min(minimumIntegerDigits, Byte.MAX_VALUE));
+    f.put("minimumFractionDigits", minimumFractionDigits);
+    f.put("minimumIntegerDigits", minimumIntegerDigits);
+    f.put("parseIntegerOnly", parseIntegerOnly);
+    f.put("serialVersionOnStream", 2);
+    stream.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField f = stream.readFields();
+    groupingUsed = f.get("groupingUsed", true);
+    parseIntegerOnly = f.get("parseIntegerOnly", false);
+    if (f.get("serialVersionOnStream", 0) < 1) {
+      maximumIntegerDigits = f.get("maxIntegerDigits", (byte) 40);
+      minimumIntegerDigits = f.get("minIntegerDigits", (byte) 1);
+      maximumFractionDigits = f.get("maxFractionDigits", (byte) 3);
+      minimumFractionDigits = f.get("minFractionDigits", (byte) 0);
+    } else {
+      maximumIntegerDigits = f.get("maximumIntegerDigits", 40);
+      minimumIntegerDigits = f.get("minimumIntegerDigits", 1);
+      maximumFractionDigits = f.get("maximumFractionDigits", 3);
+      minimumFractionDigits = f.get("minimumFractionDigits", 0);
+    }
+  }
+
   private boolean groupingUsed = true;
   private int maximumIntegerDigits = 40;
   private int minimumIntegerDigits = 1;
@@ -161,12 +208,6 @@ public abstract class NumberFormat extends Format {
     LONG
   }
 
-  private static final String[] kShortPatterns = {"", "", "", "0K", "00K", "000K", "0M", "00M", "000M", "0B", "00B",
-      "000B", "0T", "00T", "000T"};
-  private static final String[] kLongPatterns = {"", "", "", "0 thousand", "00 thousand", "000 thousand",
-      "0 million", "00 million", "000 million", "0 billion", "00 billion", "000 billion", "0 trillion",
-      "00 trillion", "000 trillion"};
-
   public static NumberFormat getCompactNumberInstance() {
     return getCompactNumberInstance(Locale.getDefault(Locale.Category.FORMAT), Style.SHORT);
   }
@@ -174,12 +215,16 @@ public abstract class NumberFormat extends Format {
   public static NumberFormat getCompactNumberInstance(Locale locale, Style formatStyle) {
     Objects.requireNonNull(locale);
     Objects.requireNonNull(formatStyle);
-    return new CompactNumberFormat("#,##0.###", DecimalFormatSymbols.getInstance(locale),
-        formatStyle == Style.SHORT ? kShortPatterns : kLongPatterns);
+    shim.LocaleTable table = shim.LocaleDb.compact();
+    String[] patterns = table.list(locale, formatStyle == Style.SHORT ? "CS" : "CL");
+    String rules = table.get(locale, "CR");
+    String decimal = table.get(locale, "CD");
+    return new CompactNumberFormat(decimal == null ? "#,##0.###" : decimal, DecimalFormatSymbols.getInstance(locale),
+        patterns, rules == null ? "" : rules);
   }
 
   public static Locale[] getAvailableLocales() {
-    return new Locale[] {Locale.ROOT, Locale.US};
+    return Locale.getAvailableLocales();
   }
 
   public boolean isGroupingUsed() {

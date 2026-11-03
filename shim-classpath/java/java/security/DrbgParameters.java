@@ -10,7 +10,7 @@ package java.security;
 
 import java.util.Objects;
 
-public class DrbgParameters {
+public final class DrbgParameters {
   private DrbgParameters() {
   }
 

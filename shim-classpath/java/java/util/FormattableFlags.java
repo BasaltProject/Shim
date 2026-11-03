@@ -7,7 +7,7 @@
 
 package java.util;
 
-public class FormattableFlags {
+public final class FormattableFlags {
   private FormattableFlags() { }
 
   public static final int LEFT_JUSTIFY = 1 << 0;

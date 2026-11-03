@@ -30,7 +30,7 @@ import shim.Classes;
 
 import java.lang.annotation.Annotation;
 
-public class Field<T> extends AccessibleObject implements Member {
+public final class Field extends AccessibleObject implements Member {
   private static final int VoidField = 0;
   private static final int ByteField = 1;
   private static final int CharField = 2;
@@ -60,7 +60,7 @@ public class Field<T> extends AccessibleObject implements Member {
     overridden = v;
   }
 
-  public Class<T> getDeclaringClass() {
+  public Class<?> getDeclaringClass() {
     return SystemClassLoader.getClass(vmField.class_);
   }
 

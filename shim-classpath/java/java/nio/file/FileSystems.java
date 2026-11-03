@@ -36,10 +36,7 @@ public final class FileSystems {
     String scheme = uri.getScheme();
     for (FileSystemProvider provider : FileSystemProvider.installedProviders()) {
       if (scheme.equalsIgnoreCase(provider.getScheme())) {
-        try {
-          return provider.getFileSystem(uri);
-        } catch (FileSystemNotFoundException ignore) {
-        }
+        return provider.getFileSystem(uri);
       }
     }
     throw new ProviderNotFoundException("Provider \"" + scheme + "\" not found");

@@ -52,6 +52,87 @@ public class DecimalFormat extends NumberFormat {
   private Currency currency;
   private transient java.util.List<Object[]> segs;
 
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("positivePrefix", String.class),
+    new java.io.ObjectStreamField("positiveSuffix", String.class),
+    new java.io.ObjectStreamField("negativePrefix", String.class),
+    new java.io.ObjectStreamField("negativeSuffix", String.class),
+    new java.io.ObjectStreamField("posPrefixPattern", String.class),
+    new java.io.ObjectStreamField("posSuffixPattern", String.class),
+    new java.io.ObjectStreamField("negPrefixPattern", String.class),
+    new java.io.ObjectStreamField("negSuffixPattern", String.class),
+    new java.io.ObjectStreamField("multiplier", Integer.TYPE),
+    new java.io.ObjectStreamField("groupingSize", Byte.TYPE),
+    new java.io.ObjectStreamField("decimalSeparatorAlwaysShown", Boolean.TYPE),
+    new java.io.ObjectStreamField("parseBigDecimal", Boolean.TYPE),
+    new java.io.ObjectStreamField("roundingMode", RoundingMode.class),
+    new java.io.ObjectStreamField("symbols", DecimalFormatSymbols.class),
+    new java.io.ObjectStreamField("useExponentialNotation", Boolean.TYPE),
+    new java.io.ObjectStreamField("minExponentDigits", Byte.TYPE),
+    new java.io.ObjectStreamField("maximumIntegerDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("minimumIntegerDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("maximumFractionDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("minimumFractionDigits", Integer.TYPE),
+    new java.io.ObjectStreamField("serialVersionOnStream", Integer.TYPE),
+    new java.io.ObjectStreamField("parseStrict", Boolean.TYPE)
+  };
+
+  private void writeObject(java.io.ObjectOutputStream stream) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = stream.putFields();
+    f.put("positivePrefix", positivePrefix);
+    f.put("positiveSuffix", positiveSuffix);
+    f.put("negativePrefix", negativePrefix);
+    f.put("negativeSuffix", negativeSuffix);
+    f.put("posPrefixPattern", posPrefixPattern);
+    f.put("posSuffixPattern", posSuffixPattern);
+    f.put("negPrefixPattern", negPrefixPattern);
+    f.put("negSuffixPattern", negSuffixPattern);
+    f.put("multiplier", multiplier);
+    f.put("groupingSize", (byte) groupingSize);
+    f.put("decimalSeparatorAlwaysShown", decimalSeparatorAlwaysShown);
+    f.put("parseBigDecimal", parseBigDecimal);
+    f.put("roundingMode", roundingMode);
+    f.put("symbols", symbols);
+    f.put("useExponentialNotation", useExponentialNotation);
+    f.put("minExponentDigits", (byte) minExponentDigits);
+    f.put("maximumIntegerDigits", maxIntegerDigits);
+    f.put("minimumIntegerDigits", minIntegerDigits);
+    f.put("maximumFractionDigits", maxFractionDigits);
+    f.put("minimumFractionDigits", minFractionDigits);
+    f.put("serialVersionOnStream", 4);
+    f.put("parseStrict", strict);
+    stream.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField f = stream.readFields();
+    positivePrefix = (String) f.get("positivePrefix", "");
+    positiveSuffix = (String) f.get("positiveSuffix", "");
+    negativePrefix = (String) f.get("negativePrefix", "-");
+    negativeSuffix = (String) f.get("negativeSuffix", "");
+    posPrefixPattern = (String) f.get("posPrefixPattern", null);
+    posSuffixPattern = (String) f.get("posSuffixPattern", null);
+    negPrefixPattern = (String) f.get("negPrefixPattern", null);
+    negSuffixPattern = (String) f.get("negSuffixPattern", null);
+    multiplier = f.get("multiplier", 1);
+    groupingSize = f.get("groupingSize", (byte) 3);
+    decimalSeparatorAlwaysShown = f.get("decimalSeparatorAlwaysShown", false);
+    parseBigDecimal = f.get("parseBigDecimal", false);
+    roundingMode = (RoundingMode) f.get("roundingMode", RoundingMode.HALF_EVEN);
+    symbols = (DecimalFormatSymbols) f.get("symbols", null);
+    if (symbols == null) {
+      symbols = DecimalFormatSymbols.getInstance(Locale.getDefault(Locale.Category.FORMAT));
+    }
+    useExponentialNotation = f.get("useExponentialNotation", false);
+    minExponentDigits = f.get("minExponentDigits", (byte) 0);
+    maxIntegerDigits = f.get("maximumIntegerDigits", kMaxInteger);
+    minIntegerDigits = f.get("minimumIntegerDigits", 1);
+    maxFractionDigits = f.get("maximumFractionDigits", 3);
+    minFractionDigits = f.get("minimumFractionDigits", 0);
+    strict = f.get("parseStrict", false);
+    digitList = new DigitList();
+  }
+
   public DecimalFormat() {
     this("#,##0.###", DecimalFormatSymbols.getInstance(Locale.getDefault(Locale.Category.FORMAT)));
   }

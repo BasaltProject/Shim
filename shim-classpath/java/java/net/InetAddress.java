@@ -16,8 +16,47 @@ import shim.NetNative;
 public class InetAddress implements Serializable {
   private static final long serialVersionUID = 3286316764910316507L;
 
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("hostName", String.class),
+    new java.io.ObjectStreamField("address", Integer.TYPE),
+    new java.io.ObjectStreamField("family", Integer.TYPE)
+  };
+
   String holderHostName;
   byte[] holderAddress;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws IOException {
+    java.io.ObjectOutputStream.PutField pf = s.putFields();
+    pf.put("hostName", holderHostName);
+    int address = 0;
+    int family = 2;
+    if (holderAddress != null && holderAddress.length == 4) {
+      address = ((holderAddress[0] & 0xff) << 24) | ((holderAddress[1] & 0xff) << 16)
+          | ((holderAddress[2] & 0xff) << 8) | (holderAddress[3] & 0xff);
+    }
+    pf.put("address", address);
+    pf.put("family", family);
+    s.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField gf = s.readFields();
+    String host = (String) gf.get("hostName", null);
+    int address = gf.get("address", 0);
+    int family = gf.get("family", 0);
+    if (family != 1 && family != 2) {
+      throw new java.io.InvalidObjectException("invalid address family type: " + family);
+    }
+    holderHostName = host;
+    if (getClass() == InetAddress.class) {
+      holderAddress = new byte[] {(byte) (address >>> 24), (byte) (address >>> 16), (byte) (address >>> 8),
+          (byte) address};
+    }
+  }
+
+  private Object readResolve() throws java.io.ObjectStreamException {
+    return new Inet4Address(holderHostName, holderAddress);
+  }
 
   InetAddress() { }
 

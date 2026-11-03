@@ -85,7 +85,7 @@ public class GZIPInputStream extends InflaterInputStream {
   private int readUByte() throws IOException {
     int b = in.read();
     if (b < 0) {
-      throw new EOFException("Unexpected end of ZLIB input stream");
+      throw new EOFException();
     }
     return b;
   }
@@ -94,7 +94,7 @@ public class GZIPInputStream extends InflaterInputStream {
     while (len > 0) {
       int n = in.read(b, off, len);
       if (n < 0) {
-        throw new EOFException("Unexpected end of ZLIB input stream");
+        throw new EOFException();
       }
       off += n;
       len -= n;

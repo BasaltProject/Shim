@@ -337,6 +337,181 @@ public final class DateTimeFormatterBuilder {
     return this;
   }
 
+  public DateTimeFormatterBuilder appendLocalized(String requestedTemplate) {
+    Objects.requireNonNull(requestedTemplate, "requestedTemplate");
+    validateTemplate(requestedTemplate);
+    appendInternal(new LocalizedPrinterParser(requestedTemplate));
+    return this;
+  }
+
+  public DateTimeFormatterBuilder appendGenericZoneText(TextStyle textStyle, Set<ZoneId> preferredZones) {
+    Objects.requireNonNull(preferredZones, "preferredZones");
+    appendInternal(new ZoneTextPrinterParser(textStyle, true));
+    return this;
+  }
+
+  private static void validateTemplate(String t) {
+    String allowed = "GyYuQqMLwWEcedDFgBbhHKkjJmsSAzZOvVXx";
+    boolean[] seen = new boolean[128];
+    for (int i = 0; i < t.length(); i++) {
+      char c = t.charAt(i);
+      if (allowed.indexOf(c) < 0 || "bBzZOvVXx".indexOf(c) >= 0 && "bB".indexOf(c) < 0 && false) {
+        throw new IllegalArgumentException("Requested template is invalid: " + t);
+      }
+      if (i > 0 && t.charAt(i - 1) != c && t.indexOf(c) != i) {
+        throw new IllegalArgumentException("Requested template is invalid: " + t);
+      }
+    }
+    if (t.length() == 0) {
+      throw new IllegalArgumentException("Requested template is invalid: " + t);
+    }
+  }
+
+  public static String getLocalizedDateTimePattern(String requestedTemplate, Chronology chrono, Locale locale) {
+    Objects.requireNonNull(requestedTemplate, "requestedTemplate");
+    Objects.requireNonNull(chrono, "chrono");
+    Objects.requireNonNull(locale, "locale");
+    validateTemplate(requestedTemplate);
+    StringBuilder datePart = new StringBuilder();
+    StringBuilder timePart = new StringBuilder();
+    for (int i = 0; i < requestedTemplate.length(); i++) {
+      char c = requestedTemplate.charAt(i);
+      if ("hHKkjJmsSAaB".indexOf(c) >= 0) {
+        timePart.append(c);
+      } else {
+        datePart.append(c);
+      }
+    }
+    String date = datePart.length() == 0 ? null : buildDatePattern(datePart.toString(), chrono, locale);
+    String time = timePart.length() == 0 ? null : buildTimePattern(timePart.toString(), chrono, locale);
+    if (date != null && time != null) {
+      String lang = locale.getLanguage();
+      String sep = (lang.equals("en") || lang.equals("de")) ? ", " : " ";
+      return date + sep + time;
+    }
+    return date != null ? date : time;
+  }
+
+  private static String run(String skel, char c) {
+    int n = 0;
+    for (int i = 0; i < skel.length(); i++) {
+      if (skel.charAt(i) == c) {
+        n++;
+      }
+    }
+    return n == 0 ? null : skel.substring(skel.indexOf(c), skel.indexOf(c) + n);
+  }
+
+  private static String buildDatePattern(String skel, Chronology chrono, Locale locale) {
+    String model = getLocalizedDateTimePattern(FormatStyle.SHORT, null, chrono, locale);
+    String y = run(skel, 'y');
+    String m = run(skel, 'M') != null ? run(skel, 'M') : run(skel, 'L');
+    String d = run(skel, 'd');
+    String e = run(skel, 'E');
+    String g = run(skel, 'G');
+    int yi = model.indexOf('y');
+    int mi = Math.max(model.indexOf('M'), model.indexOf('L'));
+    int di = model.indexOf('d');
+    if (yi < 0) {
+      yi = model.indexOf('u');
+    }
+    boolean textMonth = m != null && m.length() >= 3;
+    char sepc = '/';
+    for (int i = 0; i < model.length(); i++) {
+      char c = model.charAt(i);
+      if (!Character.isLetter(c) && c != ' ' && c != '\'') {
+        sepc = c;
+        break;
+      }
+    }
+    java.util.List<String> parts = new java.util.ArrayList<String>();
+    java.util.TreeMap<Integer, String> order = new java.util.TreeMap<Integer, String>();
+    if (y != null) {
+      order.put(yi < 0 ? 100 : yi, y);
+    }
+    if (m != null) {
+      order.put(mi < 0 ? 50 : mi, m);
+    }
+    if (d != null) {
+      order.put(di < 0 ? 10 : di, d);
+    }
+    if (textMonth && order.size() > 1) {
+      java.util.TreeMap<Integer, String> alt = new java.util.TreeMap<Integer, String>();
+      boolean monthFirst = locale.getLanguage().equals("en") && !locale.getCountry().equals("GB");
+      if (monthFirst) {
+        if (m != null) {
+          alt.put(1, m);
+        }
+        if (d != null) {
+          alt.put(2, d);
+        }
+        if (y != null) {
+          alt.put(3, y);
+        }
+      } else {
+        if (d != null) {
+          alt.put(1, d);
+        }
+        if (m != null) {
+          alt.put(2, m);
+        }
+        if (y != null) {
+          alt.put(3, y);
+        }
+      }
+      order = alt;
+    }
+    StringBuilder b = new StringBuilder();
+    boolean first = true;
+    for (Map.Entry<Integer, String> en : order.entrySet()) {
+      if (!first) {
+        if (textMonth) {
+          boolean enMonthFirst = locale.getLanguage().equals("en") && !locale.getCountry().equals("GB");
+          b.append(en.getValue().startsWith("y") && enMonthFirst && d != null ? ", " : (locale.getLanguage().equals("de") && en.getValue().startsWith("M") ? ". " : " "));
+        } else {
+          b.append(sepc);
+        }
+      }
+      b.append(en.getValue());
+      first = false;
+    }
+    String out = b.toString();
+    if (e != null) {
+      out = e + (textMonth ? ", " : ", ") + out;
+    }
+    if (g != null) {
+      out = out + " " + g;
+    }
+    return out;
+  }
+
+  private static String buildTimePattern(String skel, Chronology chrono, Locale locale) {
+    String model = getLocalizedDateTimePattern(null, FormatStyle.SHORT, chrono, locale);
+    boolean twelve = skel.indexOf('h') >= 0 || skel.indexOf('K') >= 0
+        || (skel.indexOf('j') >= 0 && model.indexOf('a') >= 0);
+    boolean twoDigitHour = model.indexOf("HH") >= 0 || model.indexOf("hh") >= 0;
+    StringBuilder b = new StringBuilder();
+    boolean hasHour = skel.indexOf('j') >= 0 || skel.indexOf('h') >= 0 || skel.indexOf('H') >= 0
+        || skel.indexOf('k') >= 0 || skel.indexOf('K') >= 0;
+    if (hasHour) {
+      if (twelve) {
+        b.append('h');
+      } else {
+        b.append(twoDigitHour || skel.indexOf('H') >= 0 && !locale.getLanguage().equals("ja") ? "HH" : "H");
+      }
+    }
+    if (skel.indexOf('m') >= 0) {
+      b.append(b.length() > 0 ? ":mm" : "m");
+    }
+    if (skel.indexOf('s') >= 0) {
+      b.append(b.length() > 0 ? ":ss" : "s");
+    }
+    if (twelve && hasHour) {
+      b.append(" a");
+    }
+    return b.toString();
+  }
+
   public DateTimeFormatterBuilder appendLocalized(FormatStyle dateStyle, FormatStyle timeStyle) {
     if (dateStyle == null && timeStyle == null) {
       throw new IllegalArgumentException("Either the date or time style must be non-null");
@@ -806,14 +981,23 @@ public final class DateTimeFormatterBuilder {
   static final class LocalizedPrinterParser implements DateTimePrinterParser {
     private final FormatStyle dateStyle;
     private final FormatStyle timeStyle;
+    private final String requestedTemplate;
 
     LocalizedPrinterParser(FormatStyle dateStyle, FormatStyle timeStyle) {
       this.dateStyle = dateStyle;
       this.timeStyle = timeStyle;
+      this.requestedTemplate = null;
+    }
+
+    LocalizedPrinterParser(String requestedTemplate) {
+      this.dateStyle = null;
+      this.timeStyle = null;
+      this.requestedTemplate = requestedTemplate;
     }
 
     private DateTimeFormatter formatter(Locale locale, Chronology chrono) {
-      String pattern = getLocalizedDateTimePattern(dateStyle, timeStyle, chrono, locale);
+      String pattern = requestedTemplate != null ? getLocalizedDateTimePattern(requestedTemplate, chrono, locale)
+          : getLocalizedDateTimePattern(dateStyle, timeStyle, chrono, locale);
       return new DateTimeFormatterBuilder().appendPattern(pattern).toFormatter(locale);
     }
 

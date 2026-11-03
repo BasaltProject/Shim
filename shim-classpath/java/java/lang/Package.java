@@ -26,7 +26,7 @@ package java.lang;
 
 import java.net.URL;
 
-public class Package implements java.lang.reflect.AnnotatedElement {
+public final class Package implements java.lang.reflect.AnnotatedElement {
   private final String name;
   private final String implementationTitle;
   private final String implementationVendor;

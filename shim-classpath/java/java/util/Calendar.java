@@ -200,7 +200,7 @@ public abstract class Calendar implements Serializable, Cloneable, Comparable<Ca
   }
 
   public static synchronized Locale[] getAvailableLocales() {
-    return new Locale[] {Locale.ROOT, Locale.US, Locale.ENGLISH};
+    return Locale.getAvailableLocales();
   }
 
   protected abstract void computeTime();

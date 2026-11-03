@@ -309,16 +309,7 @@ final class Nodes {
       if (i <= lo || i >= hiBound) {
         return next.match(m, i, seq);
       }
-      int prev = cpBefore(seq, i, lo);
-      int cur = cpAt(seq, i, hiBound);
-      if (prev == '\r' && cur == '\n') {
-        return false;
-      }
-      int t = Character.getType(cur);
-      boolean extend = t == Character.NON_SPACING_MARK || t == Character.ENCLOSING_MARK
-          || t == Character.COMBINING_SPACING_MARK || cur == 0x200d || (cur >= 0xfe00 && cur <= 0xfe0f)
-          || (cur >= 0x1f3fb && cur <= 0x1f3ff);
-      if (extend || prev == 0x200d) {
+      if (!GraphemeBreak.isBoundary(seq, i, lo, hiBound)) {
         return false;
       }
       return next.match(m, i, seq);
@@ -353,31 +344,7 @@ final class Nodes {
         m.hitEnd = true;
         return false;
       }
-      int j = i;
-      int c = cpAt(seq, j, m.hi);
-      j += Character.charCount(c);
-      if (c == '\r' && j < m.hi && seq.charAt(j) == '\n') {
-        return next.match(m, j + 1, seq);
-      }
-      for (;;) {
-        while (j < m.hi) {
-          int d = cpAt(seq, j, m.hi);
-          int t = Character.getType(d);
-          if (t == Character.NON_SPACING_MARK || t == Character.ENCLOSING_MARK
-              || t == Character.COMBINING_SPACING_MARK || d == 0x200d || (d >= 0xfe00 && d <= 0xfe0f)
-              || (d >= 0x1f3fb && d <= 0x1f3ff) || (d >= 0xe0020 && d <= 0xe007f)) {
-            j += Character.charCount(d);
-            if (d == 0x200d && j < m.hi) {
-              int e = cpAt(seq, j, m.hi);
-              j += Character.charCount(e);
-            }
-          } else {
-            break;
-          }
-        }
-        break;
-      }
-      return next.match(m, j, seq);
+      return next.match(m, GraphemeBreak.next(seq, i, m.hi), seq);
     }
   }
 

@@ -405,4 +405,12 @@ public final class YearMonth implements Temporal, TemporalAdjuster, Comparable<Y
     }
     return buf.append(month < 10 ? "-0" : "-").append(month).toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.YEAR_MONTH_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

@@ -29,7 +29,21 @@ public class AtomicBoolean implements java.io.Serializable {
   private static final int FALSE_VALUE = 0;
   private static final int TRUE_VALUE = 1;
   
-  private final AtomicInteger value;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("value", Integer.TYPE)
+  };
+
+  private transient AtomicInteger value;
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField fields = s.putFields();
+    fields.put("value", value.get());
+    s.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    value = new AtomicInteger(s.readFields().get("value", 0));
+  }
   
   public AtomicBoolean() {
     this(false);

@@ -21,14 +21,25 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQueue<E>, Serializable {
   private static final long serialVersionUID = -817911632652898426L;
 
-  final Object[] items;
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("items", Object[].class),
+    new java.io.ObjectStreamField("takeIndex", Integer.TYPE),
+    new java.io.ObjectStreamField("putIndex", Integer.TYPE),
+    new java.io.ObjectStreamField("count", Integer.TYPE),
+    new java.io.ObjectStreamField("lock", ReentrantLock.class),
+    new java.io.ObjectStreamField("notEmpty", Condition.class),
+    new java.io.ObjectStreamField("notFull", Condition.class)
+  };
+
+  Object[] items;
   int takeIndex;
   int putIndex;
   int count;
 
-  final ReentrantLock lock;
-  private final Condition notEmpty;
-  private final Condition notFull;
+  transient ReentrantLock lock;
+  private transient Condition notEmpty;
+  private transient Condition notFull;
+  private transient boolean fairLock;
 
   public ArrayBlockingQueue(int capacity) {
     this(capacity, false);
@@ -39,6 +50,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
       throw new IllegalArgumentException();
     }
     this.items = new Object[capacity];
+    this.fairLock = fair;
     this.lock = new ReentrantLock(fair);
     this.notEmpty = lock.newCondition();
     this.notFull = lock.newCondition();
@@ -269,5 +281,36 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
       }
       return (E) snapshot[cursor++];
     }
+  }
+
+  private void writeObject(java.io.ObjectOutputStream out) throws java.io.IOException {
+    lock.lock();
+    try {
+      java.io.ObjectOutputStream.PutField f = out.putFields();
+      ReentrantLock l = new ReentrantLock(fairLock);
+      f.put("items", items);
+      f.put("takeIndex", takeIndex);
+      f.put("putIndex", putIndex);
+      f.put("count", count);
+      f.put("lock", l);
+      f.put("notEmpty", java.util.concurrent.locks.SerialSupport.condition(l));
+      f.put("notFull", java.util.concurrent.locks.SerialSupport.condition(l));
+      out.writeFields();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField f = in.readFields();
+    items = (Object[]) f.get("items", null);
+    takeIndex = f.get("takeIndex", 0);
+    putIndex = f.get("putIndex", 0);
+    count = f.get("count", 0);
+    ReentrantLock l = (ReentrantLock) f.get("lock", null);
+    fairLock = l != null && l.isFair();
+    lock = new ReentrantLock(fairLock);
+    notEmpty = lock.newCondition();
+    notFull = lock.newCondition();
   }
 }

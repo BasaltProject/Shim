@@ -13,7 +13,7 @@ import java.nio.charset.Charset;
 import java.util.Formatter;
 import java.util.Locale;
 
-public final class Console implements Flushable {
+public class Console implements Flushable {
   private static Console instance;
   private static boolean resolved;
 

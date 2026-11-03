@@ -80,15 +80,38 @@ final class ChannelIo {
       throw new IndexOutOfBoundsException();
     }
     long total = 0;
-    for (int i = offset; i < offset + length; i++) {
-      if (!srcs[i].hasRemaining()) {
-        continue;
+    while (true) {
+      int len = 0;
+      for (int i = offset; i < offset + length && len < kChunk; i++) {
+        len = (int) Math.min((long) len + srcs[i].remaining(), kChunk);
       }
-      total += write(handle, srcs[i], blocking);
-      if (srcs[i].hasRemaining()) {
-        break;
+      if (len == 0) {
+        return total;
+      }
+      byte[] tmp = new byte[len];
+      int filled = 0;
+      for (int i = offset; i < offset + length && filled < len; i++) {
+        int take = Math.min(srcs[i].remaining(), len - filled);
+        srcs[i].duplicate().get(tmp, filled, take);
+        filled += take;
+      }
+      int n;
+      if (blocking) {
+        NetNative.write(handle, tmp, 0, len);
+        n = len;
+      } else {
+        n = NetNative.writeNb(handle, tmp, 0, len);
+      }
+      int left = n;
+      for (int i = offset; i < offset + length && left > 0; i++) {
+        int take = Math.min(srcs[i].remaining(), left);
+        srcs[i].position(srcs[i].position() + take);
+        left -= take;
+      }
+      total += n;
+      if (n < len) {
+        return total;
       }
     }
-    return total;
   }
 }

@@ -15,6 +15,36 @@ public final class Inet6Address extends InetAddress {
 
   static final int INADDRSZ = 16;
 
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("ipaddress", byte[].class),
+    new java.io.ObjectStreamField("scope_id", Integer.TYPE),
+    new java.io.ObjectStreamField("scope_id_set", Boolean.TYPE),
+    new java.io.ObjectStreamField("scope_ifname_set", Boolean.TYPE),
+    new java.io.ObjectStreamField("ifname", String.class)
+  };
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField pf = s.putFields();
+    pf.put("ipaddress", holderAddress);
+    pf.put("scope_id", scopeId);
+    pf.put("scope_id_set", scopeIdSet);
+    pf.put("scope_ifname_set", scopeIfnameName != null);
+    pf.put("ifname", scopeIfnameName);
+    s.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField gf = s.readFields();
+    byte[] ipaddress = (byte[]) gf.get("ipaddress", null);
+    if (ipaddress == null || ipaddress.length != INADDRSZ) {
+      throw new java.io.InvalidObjectException("invalid address length: " + (ipaddress == null ? 0 : ipaddress.length));
+    }
+    holderAddress = ipaddress.clone();
+    scopeId = gf.get("scope_id", -1);
+    scopeIdSet = gf.get("scope_id_set", false);
+    scopeIfnameName = (String) gf.get("ifname", null);
+  }
+
   private int scopeId;
   private boolean scopeIdSet;
   private NetworkInterface scopeIfname;

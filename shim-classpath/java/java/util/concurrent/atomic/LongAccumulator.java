@@ -72,4 +72,31 @@ public class LongAccumulator extends Number implements Serializable {
   public double doubleValue() {
     return (double) get();
   }
+
+  private static class SerializationProxy implements Serializable {
+    private static final long serialVersionUID = 7249069246863182397L;
+    private final long value;
+    private final LongBinaryOperator function;
+    private final long identity;
+
+    SerializationProxy(LongAccumulator a) {
+      value = a.get();
+      function = a.function;
+      identity = a.identity;
+    }
+
+    private Object readResolve() {
+      LongAccumulator a = new LongAccumulator(function, identity);
+      a.value.set(value);
+      return a;
+    }
+  }
+
+  private Object writeReplace() {
+    return new SerializationProxy(this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Proxy required");
+  }
 }

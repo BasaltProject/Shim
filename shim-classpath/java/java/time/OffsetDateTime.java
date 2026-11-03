@@ -536,4 +536,12 @@ public final class OffsetDateTime implements Temporal, TemporalAdjuster, Compara
   public String toString() {
     return dateTime.toString() + offset.toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.OFFSET_DATE_TIME_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

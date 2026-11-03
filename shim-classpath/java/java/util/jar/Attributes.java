@@ -38,11 +38,11 @@ public class Attributes implements Map<Object, Object>, Cloneable {
   }
 
   public Attributes(int size) {
-    this.map = new HashMap<Object, Object>(size);
+    this.map = new java.util.LinkedHashMap<Object, Object>(size);
   }
 
   public Attributes(Attributes attr) {
-    this.map = new HashMap<Object, Object>(attr.map);
+    this.map = new java.util.LinkedHashMap<Object, Object>(attr.map);
   }
 
   public Object get(Object key) {

@@ -71,7 +71,7 @@ public abstract class Collator implements Comparator<Object>, Cloneable {
   }
 
   public static synchronized Locale[] getAvailableLocales() {
-    return Locale.getAvailableLocales();
+    return shim.LocaleLists.collation();
   }
 
   @Override

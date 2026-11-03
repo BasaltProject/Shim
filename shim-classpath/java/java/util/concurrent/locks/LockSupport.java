@@ -25,7 +25,7 @@ package java.util.concurrent.locks;
 
 import sun.misc.Unsafe;
 
-public class LockSupport {
+public final class LockSupport {
   private LockSupport() {
     // can't construct
   }

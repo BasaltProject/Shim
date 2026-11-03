@@ -52,7 +52,7 @@ import shim.SystemClassLoader;
 //
 //   http://cr.openjdk.java.net/~briangoetz/lambda/lambda-translation.html
 
-public class LambdaMetafactory {
+public final class LambdaMetafactory {
   private static int nextNumber = 0;
 
   public static final int FLAG_SERIALIZABLE = 1;
@@ -601,7 +601,7 @@ public class LambdaMetafactory {
                                        implementationSpec,
                                        implementationKind),
                       emptyInterfaceList,
-                      null,
+                      new MethodType(methodType),
                       new MethodType[0],
                       null,
                       false);

@@ -39,7 +39,7 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Runtime {
+public final class Runtime {
   private static final Runtime instance = new Runtime();
 
   private static Version version;

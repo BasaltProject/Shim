@@ -16,6 +16,87 @@ import java.util.Objects;
 public class DecimalFormatSymbols implements Cloneable, Serializable {
   private static final long serialVersionUID = 5772796243397350300L;
 
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("zeroDigit", Character.TYPE),
+    new java.io.ObjectStreamField("groupingSeparator", Character.TYPE),
+    new java.io.ObjectStreamField("decimalSeparator", Character.TYPE),
+    new java.io.ObjectStreamField("perMill", Character.TYPE),
+    new java.io.ObjectStreamField("percent", Character.TYPE),
+    new java.io.ObjectStreamField("digit", Character.TYPE),
+    new java.io.ObjectStreamField("patternSeparator", Character.TYPE),
+    new java.io.ObjectStreamField("infinity", String.class),
+    new java.io.ObjectStreamField("NaN", String.class),
+    new java.io.ObjectStreamField("minusSign", Character.TYPE),
+    new java.io.ObjectStreamField("currencySymbol", String.class),
+    new java.io.ObjectStreamField("intlCurrencySymbol", String.class),
+    new java.io.ObjectStreamField("monetarySeparator", Character.TYPE),
+    new java.io.ObjectStreamField("exponential", Character.TYPE),
+    new java.io.ObjectStreamField("exponentialSeparator", String.class),
+    new java.io.ObjectStreamField("locale", Locale.class),
+    new java.io.ObjectStreamField("monetaryGroupingSeparator", Character.TYPE),
+    new java.io.ObjectStreamField("minusSignText", String.class),
+    new java.io.ObjectStreamField("percentText", String.class),
+    new java.io.ObjectStreamField("perMillText", String.class),
+    new java.io.ObjectStreamField("serialVersionOnStream", Integer.TYPE)
+  };
+
+  private void writeObject(java.io.ObjectOutputStream stream) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = stream.putFields();
+    f.put("zeroDigit", zeroDigit);
+    f.put("groupingSeparator", groupingSeparator);
+    f.put("decimalSeparator", decimalSeparator);
+    f.put("perMill", perMill);
+    f.put("percent", percent);
+    f.put("digit", digit);
+    f.put("patternSeparator", patternSeparator);
+    f.put("infinity", infinity);
+    f.put("NaN", NaN);
+    f.put("minusSign", minusSign);
+    f.put("currencySymbol", currencySymbol);
+    f.put("intlCurrencySymbol", intlCurrencySymbol);
+    f.put("monetarySeparator", monetaryDecimalSeparator);
+    f.put("exponential", exponentSeparator == null || exponentSeparator.isEmpty() ? 'E' : exponentSeparator.charAt(0));
+    f.put("exponentialSeparator", exponentSeparator);
+    f.put("locale", locale);
+    f.put("monetaryGroupingSeparator", monetaryGroupingSeparator);
+    f.put("minusSignText", minusSignText);
+    f.put("percentText", percentText);
+    f.put("perMillText", perMillText);
+    f.put("serialVersionOnStream", 4);
+    stream.writeFields();
+  }
+
+  private void readObject(java.io.ObjectInputStream stream) throws java.io.IOException, ClassNotFoundException {
+    java.io.ObjectInputStream.GetField f = stream.readFields();
+    zeroDigit = f.get("zeroDigit", '0');
+    groupingSeparator = f.get("groupingSeparator", ',');
+    decimalSeparator = f.get("decimalSeparator", '.');
+    perMill = f.get("perMill", '\u2030');
+    percent = f.get("percent", '%');
+    digit = f.get("digit", '#');
+    patternSeparator = f.get("patternSeparator", ';');
+    infinity = (String) f.get("infinity", "\u221e");
+    NaN = (String) f.get("NaN", "NaN");
+    minusSign = f.get("minusSign", '-');
+    currencySymbol = (String) f.get("currencySymbol", "\u00a4");
+    intlCurrencySymbol = (String) f.get("intlCurrencySymbol", "XXX");
+    monetaryDecimalSeparator = f.get("monetarySeparator", decimalSeparator);
+    exponentSeparator = (String) f.get("exponentialSeparator", "E");
+    locale = (Locale) f.get("locale", Locale.ROOT);
+    monetaryGroupingSeparator = f.get("monetaryGroupingSeparator", groupingSeparator);
+    minusSignText = (String) f.get("minusSignText", String.valueOf(minusSign));
+    percentText = (String) f.get("percentText", String.valueOf(percent));
+    perMillText = (String) f.get("perMillText", String.valueOf(perMill));
+    try {
+      if (intlCurrencySymbol == null) {
+        throw new IllegalArgumentException();
+      }
+      currency = Currency.getInstance(intlCurrencySymbol);
+    } catch (IllegalArgumentException e) {
+      currency = null;
+    }
+  }
+
   private char zeroDigit;
   private char groupingSeparator;
   private char decimalSeparator;
@@ -132,7 +213,7 @@ public class DecimalFormatSymbols implements Cloneable, Serializable {
   }
 
   public static Locale[] getAvailableLocales() {
-    return new Locale[] {Locale.ROOT, Locale.US};
+    return Locale.getAvailableLocales();
   }
 
   public char getZeroDigit() {

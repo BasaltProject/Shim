@@ -17,16 +17,58 @@ import java.util.concurrent.TimeUnit;
 public class ReentrantLock implements Lock, Serializable {
   private static final long serialVersionUID = 7373984872572414699L;
 
-  private final boolean fair;
-  private transient Object sync = new Object();
+  private static final java.io.ObjectStreamField[] serialPersistentFields = {
+    new java.io.ObjectStreamField("sync", Sync.class)
+  };
+
+  abstract static class Sync extends AbstractQueuedSynchronizer {
+    private static final long serialVersionUID = -5179523762034025860L;
+
+    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
+      s.defaultReadObject();
+      setState(0);
+    }
+  }
+
+  static final class NonfairSync extends Sync {
+    private static final long serialVersionUID = 7316153563782823691L;
+  }
+
+  static final class FairSync extends Sync {
+    private static final long serialVersionUID = -3000897897090466540L;
+  }
+
+  private transient boolean fair;
+  private transient Object monitor = new Object();
   private transient Thread owner;
   private transient int holdCount;
   private transient int waiters;
-  private transient final java.util.Set<Thread> queued = new java.util.LinkedHashSet<Thread>();
+  private transient java.util.Set<Thread> queued = new java.util.LinkedHashSet<Thread>();
+
+  private transient Sync serialSync;
+
+  private synchronized Sync serialSync() {
+    if (serialSync == null) {
+      serialSync = fair ? new FairSync() : new NonfairSync();
+    }
+    return serialSync;
+  }
+
+  static Condition serialCondition(ReentrantLock lock) {
+    return lock.serialSync().new ConditionObject();
+  }
+
+  private void writeObject(java.io.ObjectOutputStream s) throws java.io.IOException {
+    java.io.ObjectOutputStream.PutField f = s.putFields();
+    f.put("sync", serialSync());
+    s.writeFields();
+  }
 
   private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
-    s.defaultReadObject();
-    sync = new Object();
+    Object sy = s.readFields().get("sync", null);
+    fair = sy instanceof FairSync;
+    monitor = new Object();
+    queued = new java.util.LinkedHashSet<Thread>();
   }
 
   public ReentrantLock() {
@@ -38,10 +80,15 @@ public class ReentrantLock implements Lock, Serializable {
   }
 
   public void lock() {
-    synchronized (sync) {
+    synchronized (monitor) {
       Thread current = Thread.currentThread();
       if (owner == current) {
         holdCount++;
+        return;
+      }
+      if (owner == null) {
+        owner = current;
+        holdCount = 1;
         return;
       }
       waiters++;
@@ -50,7 +97,7 @@ public class ReentrantLock implements Lock, Serializable {
       try {
         while (owner != null) {
           try {
-            sync.wait();
+            monitor.wait();
           } catch (InterruptedException e) {
             interrupted = true;
           }
@@ -71,7 +118,7 @@ public class ReentrantLock implements Lock, Serializable {
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
-    synchronized (sync) {
+    synchronized (monitor) {
       Thread current = Thread.currentThread();
       if (owner == current) {
         holdCount++;
@@ -81,7 +128,7 @@ public class ReentrantLock implements Lock, Serializable {
       queued.add(Thread.currentThread());
       try {
         while (owner != null) {
-          sync.wait();
+          monitor.wait();
         }
         owner = current;
         holdCount = 1;
@@ -93,7 +140,7 @@ public class ReentrantLock implements Lock, Serializable {
   }
 
   public boolean tryLock() {
-    synchronized (sync) {
+    synchronized (monitor) {
       Thread current = Thread.currentThread();
       if (owner == null) {
         owner = current;
@@ -116,7 +163,7 @@ public class ReentrantLock implements Lock, Serializable {
       return tryLock();
     }
     long deadline = System.nanoTime() + nanos;
-    synchronized (sync) {
+    synchronized (monitor) {
       Thread current = Thread.currentThread();
       if (owner == null) {
         owner = current;
@@ -136,7 +183,7 @@ public class ReentrantLock implements Lock, Serializable {
           }
           long millis = remaining / 1000000L;
           int remNanos = (int) (remaining % 1000000L);
-          sync.wait(millis, remNanos);
+          monitor.wait(millis, remNanos);
         }
         owner = current;
         holdCount = 1;
@@ -149,7 +196,7 @@ public class ReentrantLock implements Lock, Serializable {
   }
 
   public void unlock() {
-    synchronized (sync) {
+    synchronized (monitor) {
       Thread current = Thread.currentThread();
       if (owner != current) {
         throw new IllegalMonitorStateException();
@@ -157,13 +204,15 @@ public class ReentrantLock implements Lock, Serializable {
       holdCount--;
       if (holdCount == 0) {
         owner = null;
-        sync.notifyAll();
+        if (waiters > 0) {
+          monitor.notifyAll();
+        }
       }
     }
   }
 
   int fullyRelease() {
-    synchronized (sync) {
+    synchronized (monitor) {
       Thread current = Thread.currentThread();
       if (owner != current) {
         throw new IllegalMonitorStateException();
@@ -171,13 +220,15 @@ public class ReentrantLock implements Lock, Serializable {
       int count = holdCount;
       holdCount = 0;
       owner = null;
-      sync.notifyAll();
+      if (waiters > 0) {
+        monitor.notifyAll();
+      }
       return count;
     }
   }
 
   void reacquire(int count) {
-    synchronized (sync) {
+    synchronized (monitor) {
       Thread current = Thread.currentThread();
       boolean interrupted = false;
       waiters++;
@@ -185,7 +236,7 @@ public class ReentrantLock implements Lock, Serializable {
       try {
         while (owner != null) {
           try {
-            sync.wait();
+            monitor.wait();
           } catch (InterruptedException e) {
             interrupted = true;
           }
@@ -207,19 +258,19 @@ public class ReentrantLock implements Lock, Serializable {
   }
 
   public int getHoldCount() {
-    synchronized (sync) {
+    synchronized (monitor) {
       return (owner == Thread.currentThread()) ? holdCount : 0;
     }
   }
 
   public boolean isHeldByCurrentThread() {
-    synchronized (sync) {
+    synchronized (monitor) {
       return owner == Thread.currentThread();
     }
   }
 
   public boolean isLocked() {
-    synchronized (sync) {
+    synchronized (monitor) {
       return holdCount > 0;
     }
   }
@@ -229,26 +280,26 @@ public class ReentrantLock implements Lock, Serializable {
   }
 
   protected Thread getOwner() {
-    synchronized (sync) {
+    synchronized (monitor) {
       return owner;
     }
   }
 
   public boolean hasQueuedThreads() {
-    synchronized (sync) {
+    synchronized (monitor) {
       return waiters > 0;
     }
   }
 
   public final boolean hasQueuedThread(Thread thread) {
     java.util.Objects.requireNonNull(thread);
-    synchronized (sync) {
+    synchronized (monitor) {
       return queued.contains(thread);
     }
   }
 
   public int getQueueLength() {
-    synchronized (sync) {
+    synchronized (monitor) {
       return waiters;
     }
   }
@@ -283,6 +334,7 @@ public class ReentrantLock implements Lock, Serializable {
     private static final long serialVersionUID = -5782782379348924978L;
     private final Object condSync = new Object();
     private int condWaiters;
+    private long condSignals;
 
     public void await() throws InterruptedException {
       if (Thread.interrupted()) {
@@ -325,14 +377,17 @@ public class ReentrantLock implements Lock, Serializable {
         count = fullyRelease();
         condWaiters++;
         try {
-          long remaining = deadline - System.nanoTime();
-          if (remaining > 0) {
-            long millis = remaining / 1000000L;
-            int remNanos = (int) (remaining % 1000000L);
-            condSync.wait(millis, remNanos);
-          }
-          if (System.nanoTime() >= deadline) {
-            timedOut = true;
+          long seen = condSignals;
+          while (true) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) {
+              timedOut = condSignals == seen;
+              break;
+            }
+            condSync.wait(remaining / 1000000L, (int) (remaining % 1000000L));
+            if (condSignals != seen) {
+              break;
+            }
           }
         } catch (InterruptedException e) {
           interrupted = true;
@@ -420,7 +475,8 @@ public class ReentrantLock implements Lock, Serializable {
         throw new IllegalMonitorStateException();
       }
       synchronized (condSync) {
-        condSync.notify();
+        condSignals++;
+      condSync.notify();
       }
     }
 
@@ -429,7 +485,8 @@ public class ReentrantLock implements Lock, Serializable {
         throw new IllegalMonitorStateException();
       }
       synchronized (condSync) {
-        condSync.notifyAll();
+        condSignals++;
+      condSync.notifyAll();
       }
     }
   }

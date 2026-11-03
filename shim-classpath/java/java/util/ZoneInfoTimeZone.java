@@ -46,6 +46,14 @@ final class ZoneInfoTimeZone extends TimeZone {
     }
   }
 
+  private Object writeReplace() {
+    return sun.util.calendar.ZoneInfo.fromZone(this);
+  }
+
+  List<java.time.zone.ZoneOffsetTransitionRule> transitionRules() {
+    return rules.getTransitionRules();
+  }
+
   private Object readResolve() {
     ZoneInfoTimeZone resolved = (ZoneInfoTimeZone) find(getID());
     if (resolved == null) {

@@ -639,4 +639,12 @@ public final class LocalTime implements Temporal, TemporalAdjuster, Comparable<L
     }
     return buf.toString();
   }
+
+  private Object writeReplace() {
+    return new Ser(Ser.LOCAL_TIME_TYPE, this);
+  }
+
+  private void readObject(java.io.ObjectInputStream s) throws java.io.InvalidObjectException {
+    throw new java.io.InvalidObjectException("Deserialization via serialization delegate");
+  }
 }

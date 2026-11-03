@@ -147,6 +147,11 @@ public final class DateTimeFormatter {
         .toFormatter(ResolverStyle.SMART, IsoChronology.INSTANCE);
   }
 
+  public static DateTimeFormatter ofLocalizedPattern(String requestedTemplate) {
+    return new DateTimeFormatterBuilder().appendLocalized(requestedTemplate)
+        .toFormatter(ResolverStyle.SMART, IsoChronology.INSTANCE);
+  }
+
   public static DateTimeFormatter ofLocalizedTime(FormatStyle timeStyle) {
     Objects.requireNonNull(timeStyle, "timeStyle");
     return new DateTimeFormatterBuilder().appendLocalized(null, timeStyle)

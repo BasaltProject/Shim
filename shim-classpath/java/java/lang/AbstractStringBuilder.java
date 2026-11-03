@@ -81,7 +81,7 @@ abstract class AbstractStringBuilder implements Appendable, CharSequence {
     }
   }
 
-  private void ensureCapacityInternal(int minimumCapacity) {
+  void ensureCapacityInternal(int minimumCapacity) {
     int oldCapacity = value.length;
     if (minimumCapacity - oldCapacity > 0) {
       value = java.util.Arrays.copyOf(value, newCapacity(minimumCapacity));
