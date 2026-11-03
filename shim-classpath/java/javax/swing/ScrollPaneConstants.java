@@ -1,0 +1,33 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+package javax.swing;
+
+public interface ScrollPaneConstants {
+  java.lang.String VIEWPORT = "VIEWPORT";
+  java.lang.String VERTICAL_SCROLLBAR = "VERTICAL_SCROLLBAR";
+  java.lang.String HORIZONTAL_SCROLLBAR = "HORIZONTAL_SCROLLBAR";
+  java.lang.String ROW_HEADER = "ROW_HEADER";
+  java.lang.String COLUMN_HEADER = "COLUMN_HEADER";
+  java.lang.String LOWER_LEFT_CORNER = "LOWER_LEFT_CORNER";
+  java.lang.String LOWER_RIGHT_CORNER = "LOWER_RIGHT_CORNER";
+  java.lang.String UPPER_LEFT_CORNER = "UPPER_LEFT_CORNER";
+  java.lang.String UPPER_RIGHT_CORNER = "UPPER_RIGHT_CORNER";
+  java.lang.String LOWER_LEADING_CORNER = "LOWER_LEADING_CORNER";
+  java.lang.String LOWER_TRAILING_CORNER = "LOWER_TRAILING_CORNER";
+  java.lang.String UPPER_LEADING_CORNER = "UPPER_LEADING_CORNER";
+  java.lang.String UPPER_TRAILING_CORNER = "UPPER_TRAILING_CORNER";
+  java.lang.String VERTICAL_SCROLLBAR_POLICY = "VERTICAL_SCROLLBAR_POLICY";
+  java.lang.String HORIZONTAL_SCROLLBAR_POLICY = "HORIZONTAL_SCROLLBAR_POLICY";
+  int VERTICAL_SCROLLBAR_AS_NEEDED = 20;
+  int VERTICAL_SCROLLBAR_NEVER = 21;
+  int VERTICAL_SCROLLBAR_ALWAYS = 22;
+  int HORIZONTAL_SCROLLBAR_AS_NEEDED = 30;
+  int HORIZONTAL_SCROLLBAR_NEVER = 31;
+  int HORIZONTAL_SCROLLBAR_ALWAYS = 32;
+}
