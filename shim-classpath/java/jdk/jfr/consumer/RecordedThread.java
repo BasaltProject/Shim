@@ -8,12 +8,36 @@
 
 package jdk.jfr.consumer;
 
-public final class RecordedThread extends jdk.jfr.consumer.RecordedObject {
-  public jdk.jfr.consumer.RecordedThreadGroup getThreadGroup() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public boolean isVirtual() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public long getId() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getOSName() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public long getOSThreadId() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public java.lang.String getJavaName() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public long getJavaThreadId() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+public final class RecordedThread extends RecordedObject {
+  RecordedThread(Chunk.TypeDef td, Object[] vals, Chunk chunk) {
+    super(td, vals, chunk);
+  }
+
+  public RecordedThreadGroup getThreadGroup() {
+    return (RecordedThreadGroup) getValue("group");
+  }
+
+  public boolean isVirtual() {
+    return getBoolean("virtual");
+  }
+
+  public long getId() {
+    return getLong("javaThreadId");
+  }
+
+  public String getOSName() {
+    return getString("osName");
+  }
+
+  public long getOSThreadId() {
+    return getLong("osThreadId");
+  }
+
+  public String getJavaName() {
+    return getString("javaName");
+  }
+
+  public long getJavaThreadId() {
+    return getLong("javaThreadId");
+  }
 }

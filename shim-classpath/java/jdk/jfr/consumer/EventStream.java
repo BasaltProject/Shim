@@ -8,24 +8,61 @@
 
 package jdk.jfr.consumer;
 
-public interface EventStream extends java.lang.AutoCloseable {
-  public boolean remove(java.lang.Object arg0);
-  public void start();
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.function.Consumer;
+
+public interface EventStream extends AutoCloseable {
+  public static EventStream openRepository() throws IOException {
+    return new Streams.RepositoryStream(null);
+  }
+
+  public static EventStream openRepository(Path directory) throws IOException {
+    java.util.Objects.requireNonNull(directory);
+    if (!java.nio.file.Files.isDirectory(directory)) {
+      throw new java.nio.file.NoSuchFileException(directory.toString());
+    }
+    return new Streams.RepositoryStream(directory);
+  }
+
+  public static EventStream openFile(Path file) throws IOException {
+    java.util.Objects.requireNonNull(file);
+    return new Streams.FileStream(file);
+  }
+
+  public default void onMetadata(Consumer<MetadataEvent> handler) {
+    throw new UnsupportedOperationException("Metadata handlers are not supported by this stream");
+  }
+
+  public void setReuse(boolean reuse);
+
+  public void setOrdered(boolean ordered);
+
+  public void setStartTime(Instant startTime);
+
+  public void setEndTime(Instant endTime);
+
+  public void onEvent(String eventName, Consumer<RecordedEvent> handler);
+
+  public void onEvent(Consumer<RecordedEvent> handler);
+
+  public void onFlush(Runnable handler);
+
+  public void onClose(Runnable handler);
+
+  public void onError(Consumer<Throwable> handler);
+
+  public boolean remove(Object handler);
+
   public void close();
-  public void onClose(java.lang.Runnable arg0);
-  public void awaitTermination() throws java.lang.InterruptedException;
-  public void awaitTermination(java.time.Duration arg0) throws java.lang.InterruptedException;
-  public void setStartTime(java.time.Instant arg0);
-  public static jdk.jfr.consumer.EventStream openRepository() throws java.io.IOException { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public static jdk.jfr.consumer.EventStream openRepository(java.nio.file.Path arg0) throws java.io.IOException { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public static jdk.jfr.consumer.EventStream openFile(java.nio.file.Path arg0) throws java.io.IOException { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public default void onMetadata(java.util.function.Consumer<jdk.jfr.consumer.MetadataEvent> arg0) { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public void onEvent(java.util.function.Consumer<jdk.jfr.consumer.RecordedEvent> arg0);
-  public void onEvent(java.lang.String arg0, java.util.function.Consumer<jdk.jfr.consumer.RecordedEvent> arg1);
-  public void onFlush(java.lang.Runnable arg0);
-  public void onError(java.util.function.Consumer<java.lang.Throwable> arg0);
-  public void setReuse(boolean arg0);
-  public void setOrdered(boolean arg0);
-  public void setEndTime(java.time.Instant arg0);
+
+  public void start();
+
   public void startAsync();
+
+  public void awaitTermination(Duration timeout) throws InterruptedException;
+
+  public void awaitTermination() throws InterruptedException;
 }

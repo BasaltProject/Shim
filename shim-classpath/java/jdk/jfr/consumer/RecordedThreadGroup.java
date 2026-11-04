@@ -8,7 +8,16 @@
 
 package jdk.jfr.consumer;
 
-public final class RecordedThreadGroup extends jdk.jfr.consumer.RecordedObject {
-  public java.lang.String getName() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public jdk.jfr.consumer.RecordedThreadGroup getParent() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+public final class RecordedThreadGroup extends RecordedObject {
+  RecordedThreadGroup(Chunk.TypeDef td, Object[] vals, Chunk chunk) {
+    super(td, vals, chunk);
+  }
+
+  public RecordedThreadGroup getParent() {
+    return (RecordedThreadGroup) getValue("parent");
+  }
+
+  public String getName() {
+    return getString("name");
+  }
 }

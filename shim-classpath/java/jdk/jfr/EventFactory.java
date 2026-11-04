@@ -8,10 +8,52 @@
 
 package jdk.jfr;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class EventFactory {
-  public void register() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public static jdk.jfr.EventFactory create(java.util.List<jdk.jfr.AnnotationElement> arg0, java.util.List<jdk.jfr.ValueDescriptor> arg1) { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public void unregister() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public jdk.jfr.EventType getEventType() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
-  public jdk.jfr.Event newEvent() { throw new UnsupportedOperationException("Flight Recorder is not available"); }
+  private final EventInfo info;
+
+  private EventFactory(EventInfo info) {
+    this.info = info;
+  }
+
+  public static EventFactory create(List<AnnotationElement> annotationElements, List<ValueDescriptor> fields) {
+    java.util.Objects.requireNonNull(annotationElements);
+    java.util.Objects.requireNonNull(fields);
+    List<AnnotationElement> anns = new ArrayList<AnnotationElement>(annotationElements);
+    List<ValueDescriptor> fs = new ArrayList<ValueDescriptor>(fields);
+    for (ValueDescriptor v : fs) {
+      String n = v.getName();
+      if (n.equals("startTime") || n.equals("duration") || n.equals("eventThread") || n.equals("stackTrace")) {
+        throw new IllegalArgumentException("Field name '" + n + "' is reserved");
+      }
+    }
+    boolean named = false;
+    for (AnnotationElement a : anns) {
+      if (a.getTypeName().equals(Name.class.getName())) {
+        named = true;
+      }
+    }
+    if (!named) {
+      throw new IllegalArgumentException("Annotation element " + Name.class.getName() + " is required");
+    }
+    return new EventFactory(EventInfo.dynamic(anns, fs));
+  }
+
+  public Event newEvent() {
+    return new DynamicEvent(info);
+  }
+
+  public EventType getEventType() {
+    return info.type;
+  }
+
+  public void register() {
+    JfrRuntime.register(info);
+  }
+
+  public void unregister() {
+    JfrRuntime.unregister(info);
+  }
 }
