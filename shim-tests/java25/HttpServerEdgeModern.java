@@ -36,7 +36,7 @@ public class HttpServerEdgeModern {
 
   static void t(String n, Callable<Object> c) {
     try {
-      System.out.println(n + " = " + c.call());
+      System.out.println(n + " = " + String.valueOf(c.call()).replaceAll("@[0-9a-f]+", "@H"));
     } catch (Throwable e) {
       System.out.println(n + " ! " + e.getClass().getName() + (e instanceof NullPointerException ? "" : ": " + e.getMessage()));
     }
@@ -65,7 +65,7 @@ public class HttpServerEdgeModern {
   t("keySet-remove", ()->{ Headers h=new Headers(); h.add("k","1"); h.keySet().remove("K"); return h; });
   t("replaceAll", ()->{ Headers h=new Headers(); h.add("k","1"); h.replaceAll((k,v)->List.of("r")); return h; });
   t("replaceAll-bad", ()->{ Headers h=new Headers(); h.add("k","1"); h.replaceAll((k,v)->List.of("r\n")); return h; });
-  t("copy-ctor", ()->{ Map<String,List<String>> m=new HashMap<>(); m.put("abc",List.of("1")); m.put("ABC", List.of("2")); return new TreeMap<>(new Headers(m)); });
+  t("copy-ctor", ()->{ Map<String,List<String>> m=new HashMap<>(); List<String> l=new ArrayList<>(List.of("1")); m.put("abc",l); Headers h=new Headers(m); l.add("2"); return new TreeMap<>(h); });
   t("copy-ctor-bad", ()->{ Map<String,List<String>> m=new HashMap<>(); m.put("a\n",List.of("1")); return new Headers(m); });
   t("clear", ()->{ Headers h=new Headers(); h.add("k","1"); h.clear(); return h.size(); });
   t("equals-map", ()->{ Headers h=new Headers(); h.add("K","1"); return h.equals(Map.of("K", List.of("1"))); });
