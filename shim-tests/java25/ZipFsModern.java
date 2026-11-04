@@ -53,7 +53,7 @@ public class ZipFsModern {
   }
 
   static String clean(String s) {
-    return s.replace(dir.toString(), "$DIR").replace(dir.toUri().toString(), "$DIRURI");
+    return s.replace(dir.toString(), "$DIR").replace(dir.toUri().toString(), "$DIRURI").replaceAll("@[0-9a-f]+", "@H");
   }
 
   static Path makeZip(String name) throws IOException {
@@ -145,7 +145,7 @@ public class ZipFsModern {
     t("open-twice", () -> FileSystems.newFileSystem(uri, new HashMap<String, Object>()));
     t("get-after-open", () -> FileSystems.getFileSystem(uri) == fs);
     t("fs-props", () -> fs.isOpen() + " " + fs.isReadOnly() + " " + fs.getSeparator() + " "
-        + fs.supportedFileAttributeViews() + " " + fs.provider().getScheme());
+        + new java.util.TreeSet<>(fs.supportedFileAttributeViews()) + " " + fs.provider().getScheme());
     t("roots", () -> {
       List<String> l = new ArrayList<>();
       for (Path r : fs.getRootDirectories()) {
