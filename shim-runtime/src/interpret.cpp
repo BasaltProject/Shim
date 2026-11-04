@@ -3670,6 +3670,15 @@ class MyProcessor : public Processor {
 
 namespace vm {
 
+unsigned shimDebugLocalCount(Thread*)
+{
+  return 0;
+}
+
+void shimDebugReadLocals(Thread*, uint64_t*, object*) {}
+
+void shimDebugWriteLocal(Thread*, unsigned, uint64_t, object, bool) {}
+
 Processor* makeProcessor(System* system,
                          Allocator* allocator,
                          const char* crashDumpDirectory,
