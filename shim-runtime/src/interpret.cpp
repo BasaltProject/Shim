@@ -3571,10 +3571,35 @@ class MyProcessor : public Processor {
     return local::invoke(t, method);
   }
 
-  virtual object getStackTrace(vm::Thread* t, vm::Thread*)
+  static bool isLive(vm::Thread* x, vm::Thread* target)
   {
-    // not implemented
-    return makeObjectArray(t, 0);
+    for (; x; x = x->peer) {
+      if (x == target) {
+        return x->state != vm::Thread::NoState
+               && x->state != vm::Thread::ZombieState
+               && x->state != vm::Thread::JoinedState;
+      }
+      if (x->child && isLive(x->child, target)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // The interpreter keeps a thread's frames in its own stack array, which the
+  // thread rewrites on every call, so another thread can only read them while
+  // the world is stopped. Exclusive state gives that: every other thread is idle,
+  // either at a safe point or inside native code, with its frame chain complete.
+  virtual object getStackTrace(vm::Thread* t, vm::Thread* target)
+  {
+    enter(t, vm::Thread::ExclusiveState);
+    object trace = 0;
+    if (isLive(t->m->rootThread, target)) {
+      trace = makeTrace(t, target);
+    }
+    // Leaving exclusive state cannot wait on a collection, so the trace stays valid.
+    enter(t, vm::Thread::ActiveState);
+    return trace ? trace : makeObjectArray(t, 0);
   }
 
   virtual void initialize(BootImage*, shim::util::Slice<uint8_t>)
