@@ -14,6 +14,7 @@ public final class LocaleDb {
   private static LocaleTable currency;
   private static LocaleTable names;
   private static LocaleTable zones;
+  private static LocaleTable compact;
 
   private LocaleDb() { }
 
@@ -36,6 +37,13 @@ public final class LocaleDb {
       names = new LocaleTable(LocaleDbDataNames.kLanguages, LocaleDbDataNames.kParts);
     }
     return names;
+  }
+
+  public static synchronized LocaleTable compact() {
+    if (compact == null) {
+      compact = new LocaleTable(LocaleDbDataCompact.kLanguages, LocaleDbDataCompact.kParts);
+    }
+    return compact;
   }
 
   public static synchronized LocaleTable zones() {

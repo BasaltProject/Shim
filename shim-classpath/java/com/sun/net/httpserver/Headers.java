@@ -28,7 +28,7 @@ public class Headers implements Map<String, List<String>> {
     Objects.requireNonNull(headers);
     map = new HashMap<String, List<String>>(Math.max(32, headers.size() * 2));
     for (Map.Entry<String, List<String>> e : headers.entrySet()) {
-      put(e.getKey(), e.getValue());
+      put(e.getKey(), new java.util.LinkedList<String>(e.getValue()));
     }
   }
 
