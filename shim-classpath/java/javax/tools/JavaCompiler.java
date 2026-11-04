@@ -23,7 +23,7 @@ public interface JavaCompiler extends Tool, OptionChecker {
   interface CompilationTask extends java.util.concurrent.Callable<Boolean> {
     void addModules(Iterable<String> moduleNames);
 
-    void setProcessors(Iterable<? extends Object> processors);
+    void setProcessors(Iterable<? extends javax.annotation.processing.Processor> processors);
 
     void setLocale(Locale locale);
 

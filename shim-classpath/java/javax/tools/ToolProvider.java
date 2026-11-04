@@ -12,11 +12,11 @@ public class ToolProvider {
   private ToolProvider() { }
 
   public static JavaCompiler getSystemJavaCompiler() {
-    return null;
+    return new com.sun.tools.javac.api.JavacTool();
   }
 
   public static DocumentationTool getSystemDocumentationTool() {
-    return null;
+    return new shim.javadoc.JavadocTool();
   }
 
   @Deprecated
