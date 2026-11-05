@@ -3993,6 +3993,42 @@ class HeapClient : public Heap::Client {
     }
   }
 
+  virtual unsigned copiedSizeInWordsOf(void* p, uintptr_t header)
+  {
+    Thread* t = m->rootThread;
+    object o = static_cast<object>(p);
+    GcClass* class_ = static_cast<GcClass*>(m->heap->follow(maskAlignedPointer(reinterpret_cast<void*>(header))));
+
+    unsigned n = baseSize(t, o, class_);
+    uintptr_t flags = header & (~PointerMask);
+    if (flags == ExtendedMark or flags == HashTakenMark) {
+      ++n;
+    }
+
+    return n;
+  }
+
+  virtual void copyFrom(void* srcp, void* dstp, uintptr_t header)
+  {
+    Thread* t = m->rootThread;
+    object src = static_cast<object>(srcp);
+    object dst = static_cast<object>(dstp);
+    GcClass* class_ = static_cast<GcClass*>(m->heap->follow(maskAlignedPointer(reinterpret_cast<void*>(header))));
+
+    unsigned base = baseSize(t, src, class_);
+    uintptr_t flags = header & (~PointerMask);
+    unsigned n = base + (flags == ExtendedMark ? 1 : 0);
+
+    memcpy(dst, src, n * BytesPerWord);
+    alias(dst, 0) = header;
+
+    if (flags == HashTakenMark) {
+      alias(dst, 0) &= PointerMask;
+      alias(dst, 0) |= ExtendedMark;
+      extendedWord(t, dst, base) = takeHash(t, src);
+    }
+  }
+
   virtual void walk(void* p, Heap::Walker* w)
   {
     object o = static_cast<object>(m->heap->follow(maskAlignedPointer(p)));

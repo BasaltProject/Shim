@@ -33,13 +33,19 @@
 #endif
 
 #include <stdlib.h>
+#include <time.h>
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <sys/mman.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <sched.h>
 #define SHIM_HEAP_RESERVE 1
 #ifndef MAP_NORESERVE
 #define MAP_NORESERVE 0
+#endif
+#if defined(__LP64__) || defined(_LP64)
+#define SHIM_HEAP_PARALLEL 1
 #endif
 #endif
 
@@ -51,6 +57,15 @@ namespace {
 namespace local {
 
 const unsigned Top = ~static_cast<unsigned>(0);
+
+const uintptr_t ForwardTag = 4;
+
+inline int64_t nowNs()
+{
+  timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
 
 const unsigned InitialGen2CapacityInBytes = 4 * 1024 * 1024;
 const unsigned MinimumGen2HeadroomInBytes = 16 * 1024 * 1024;
@@ -89,6 +104,9 @@ class MutexLock {
 };
 
 class Context;
+struct ParGc;
+ParGc* makeParGcForContext(Context* c);
+void disposeParGc(Context* c);
 
 Aborter* getAborter(Context* c);
 
@@ -803,6 +821,11 @@ class Context {
         freshCopyCapacity(0),
         gen2Threshold(max(InitialGen2CapacityInBytes, limit / 16) / BytesPerWord),
         logMajor(getenv("SHIM_GC_STATS") != 0),
+        tagged(false),
+        par(0),
+        statObjects(0),
+        statWords(0),
+        statUpdates(0),
         headroomPercent(getenv("SHIM_GC_HEADROOM_PERCENT") ? atoi(getenv("SHIM_GC_HEADROOM_PERCENT")) : 100),
         compactNext(false),
         retiredMemory(0),
@@ -814,10 +837,18 @@ class Context {
     if (not getenv("SHIM_GC_COPYING")) {
       inPlace = reserveGen2(this);
     }
+#ifdef SHIM_HEAP_PARALLEL
+    if (inPlace and TenureThreshold == 0 and not getenv("SHIM_GC_OLD")) {
+      par = makeParGcForContext(this);
+    }
+#endif
   }
 
   void dispose()
   {
+#ifdef SHIM_HEAP_PARALLEL
+    disposeParGc(this);
+#endif
     releaseGen2(this);
     gen1.dispose();
     nextGen1.dispose();
@@ -907,6 +938,12 @@ class Context {
   unsigned freshCopyCapacity;
   unsigned gen2Threshold;
   bool logMajor;
+  bool tagged;
+  struct ParGc* par;
+  uint64_t statObjects;
+  uint64_t statWords;
+  uint64_t statUpdates;
+  int64_t statT[4];
   unsigned headroomPercent;
   bool compactNext;
   void* retiredMemory;
@@ -1211,6 +1248,8 @@ void* allocateGen2(Context* c, unsigned size, bool* fromSpan)
 
 void* copyToGen2(Context* c, void* o, unsigned size)
 {
+  ++c->statObjects;
+  c->statWords += size;
   unsigned before = c->gen2.position();
   bool fromSpan;
   void* dst = allocateGen2(c, size, &fromSpan);
@@ -1411,6 +1450,10 @@ inline bool fresh(Context* c, void* o)
 
 inline bool wasCollected(Context* c, void* o)
 {
+  if (c->tagged) {
+    return o and (not c->gen2.contains(o))
+           and (__atomic_load_n(&fieldAtOffset<uintptr_t>(o, 0), __ATOMIC_ACQUIRE) & ForwardTag);
+  }
   return o and (not(c->inPlace and c->gen2.contains(o))) and (not fresh(c, o))
          and fresh(c, get(o, 0));
 }
@@ -1418,6 +1461,9 @@ inline bool wasCollected(Context* c, void* o)
 inline void* follow(Context* c UNUSED, void* o)
 {
   assertT(c, wasCollected(c, o));
+  if (c->tagged) {
+    return maskAlignedPointer(fieldAtOffset<void*>(o, 0));
+  }
   return fieldAtOffset<void*>(o, 0);
 }
 
@@ -1754,6 +1800,7 @@ void* update(Context* c,
     return 0;
   }
 
+  ++c->statUpdates;
   void* result = update2(c, maskAlignedPointer(*p), needsVisit);
 
   if (result) {
@@ -2242,8 +2289,25 @@ void collect(Context* c,
   assertT(c, wasDirty or not expectDirty);
 }
 
+#ifdef SHIM_HEAP_PARALLEL
+#include "minor-gc.inc"
+
+ParGc* makeParGcForContext(Context* c)
+{
+  unsigned n = 4;
+  if (const char* e = getenv("SHIM_GC_THREADS")) {
+    n = static_cast<unsigned>(atoi(e));
+  }
+  if (n == 0) {
+    return 0;
+  }
+  return makeParGc(c, min(n, MaxHelpers + 1));
+}
+#endif
+
 void collect2(Context* c)
 {
+  c->statObjects = c->statWords = c->statUpdates = 0;
   c->gen2Base = Top;
   c->tenureFootprint = 0;
   c->fixieTenureFootprint = 0;
@@ -2254,16 +2318,27 @@ void collect2(Context* c)
     c->gen2Padding = 0;
   }
 
+#ifdef SHIM_HEAP_PARALLEL
+  c->tagged = c->par and c->inPlace and c->mode == Heap::MinorCollection;
+  if (c->tagged) {
+    collectMinorParallel(c);
+    return;
+  }
+#endif
+
+  int64_t t0 = c->logMajor ? nowNs() : 0;
   if (c->mode == Heap::MinorCollection and c->gen2.position()) {
     unsigned start = 0;
     unsigned end = start + c->gen2.position();
     bool dirty;
     collect(c, &(c->heapMap), start, end, &dirty, false);
   }
+  int64_t t1 = c->logMajor ? nowNs() : 0;
 
   if (c->mode == Heap::MinorCollection) {
     visitDirtyFixies(c, &(c->dirtyTenuredFixies));
   }
+  int64_t t2 = c->logMajor ? nowNs() : 0;
 
   class Visitor : public Heap::Visitor {
    public:
@@ -2281,6 +2356,12 @@ void collect2(Context* c)
   } v(c);
 
   c->client->visitRoots(&v);
+  if (c->logMajor) {
+    int64_t t3 = nowNs();
+    c->statT[0] = t1 - t0;
+    c->statT[1] = t2 - t1;
+    c->statT[2] = t3 - t2;
+  }
 }
 
 bool limitExceeded(Context* c, int pendingAllocation)
@@ -2376,6 +2457,18 @@ void collect(Context* c)
   }
 
   sweepFixies(c);
+
+  if (c->logMajor and c->mode == Heap::MinorCollection) {
+    fprintf(stderr,
+            "gc minor detail: remset %.1f ms, dirty fixies %.1f ms, roots+copy %.1f ms, copied %llu objects %llu KB, "
+            "updates %llu\n",
+            c->statT[0] / 1e6,
+            c->statT[1] / 1e6,
+            c->statT[2] / 1e6,
+            static_cast<unsigned long long>(c->statObjects),
+            static_cast<unsigned long long>(c->statWords * BytesPerWord / 1024),
+            static_cast<unsigned long long>(c->statUpdates));
+  }
 
 #ifdef __GLIBC__
   if (c->mode == Heap::MajorCollection) {
@@ -2680,6 +2773,13 @@ class MyHeap : public Heap {
 
   virtual void* follow(void* p)
   {
+    if (c.tagged) {
+      if (p == 0) {
+        return p;
+      }
+      uintptr_t header = __atomic_load_n(&fieldAtOffset<uintptr_t>(p, 0), __ATOMIC_ACQUIRE);
+      return (header & ForwardTag) ? maskAlignedPointer(reinterpret_cast<void*>(header)) : p;
+    }
     if (p == 0 or c.client->isFixed(p)) {
       return p;
     } else if (wasCollected(&c, p)) {
