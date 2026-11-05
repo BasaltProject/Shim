@@ -351,4 +351,10 @@ public final class JapaneseChronology extends AbstractChronology implements Seri
     Objects.requireNonNull(locale, "locale");
     return "Japanese Calendar";
   }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public ChronoLocalDateTime<JapaneseDate> localDateTime(java.time.temporal.TemporalAccessor temporal) {
+    return (ChronoLocalDateTime<JapaneseDate>) super.localDateTime(temporal);
+  }
 }

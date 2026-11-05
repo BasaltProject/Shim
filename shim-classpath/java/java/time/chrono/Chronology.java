@@ -111,9 +111,26 @@ public interface Chronology extends Comparable<Chronology> {
     }
   }
 
-  ChronoZonedDateTime<? extends ChronoLocalDate> zonedDateTime(TemporalAccessor temporal);
+  default ChronoZonedDateTime<? extends ChronoLocalDate> zonedDateTime(TemporalAccessor temporal) {
+    try {
+      ZoneId zone = ZoneId.from(temporal);
+      try {
+        Instant instant = Instant.from(temporal);
+        return zonedDateTime(instant, zone);
+      } catch (DateTimeException ex1) {
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ChronoLocalDateTimeImpl<ChronoLocalDate> cldt = (ChronoLocalDateTimeImpl) localDateTime(temporal);
+        return ChronoZonedDateTimeImpl.ofBest(cldt, zone, null);
+      }
+    } catch (DateTimeException ex) {
+      throw new DateTimeException("Unable to obtain ChronoZonedDateTime from TemporalAccessor: "
+          + temporal.getClass(), ex);
+    }
+  }
 
-  ChronoZonedDateTime<? extends ChronoLocalDate> zonedDateTime(Instant instant, ZoneId zone);
+  default ChronoZonedDateTime<? extends ChronoLocalDate> zonedDateTime(Instant instant, ZoneId zone) {
+    return ChronoZonedDateTimeImpl.ofInstant(this, instant, zone);
+  }
 
   boolean isLeapYear(long prolepticYear);
 
@@ -131,7 +148,9 @@ public interface Chronology extends Comparable<Chronology> {
 
   ChronoLocalDate resolveDate(Map<TemporalField, Long> fieldValues, ResolverStyle resolverStyle);
 
-  ChronoPeriod period(int years, int months, int days);
+  default ChronoPeriod period(int years, int months, int days) {
+    return new ChronoPeriodImpl(this, years, months, days);
+  }
 
   default long epochSecond(int prolepticYear, int month, int dayOfMonth, int hour, int minute, int second,
       ZoneOffset zoneOffset) {

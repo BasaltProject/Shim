@@ -18,6 +18,7 @@ import shim.SystemClassLoader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.invoke.ConstantCallSite;
+import java.lang.invoke.DirectMethodHandle;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -186,7 +187,7 @@ public final class ObjectMethods {
     Class<?> generated = SystemClassLoader.getClass(
         Classes.defineVMClass(cl, data, 0, data.length));
     Method m = generated.getMethod("make", methodType.parameterArray());
-    return new MethodHandle(MethodHandle.REF_invokeStatic, cl, Classes.toVMMethod(m));
+    return new DirectMethodHandle(MethodHandle.REF_invokeStatic, cl, Classes.toVMMethod(m));
   }
 
   private static void op(ByteArrayOutputStream code, int opcode) throws IOException {

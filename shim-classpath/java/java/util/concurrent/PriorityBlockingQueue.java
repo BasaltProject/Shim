@@ -498,4 +498,14 @@ public class PriorityBlockingQueue<E> extends AbstractQueue<E>
   public Spliterator<E> spliterator() {
     return Spliterators.spliterator(this, Spliterator.NONNULL);
   }
+
+  @Override
+  public boolean removeIf(java.util.function.Predicate<? super E> filter) {
+    return super.removeIf(filter);
+  }
+
+  @Override
+  public void forEach(java.util.function.Consumer<? super E> action) {
+    super.forEach(action);
+  }
 }

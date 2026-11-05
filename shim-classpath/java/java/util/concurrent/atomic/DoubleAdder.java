@@ -11,7 +11,7 @@ package java.util.concurrent.atomic;
 
 import java.io.Serializable;
 
-public class DoubleAdder extends Number implements Serializable {
+public class DoubleAdder extends Striped64 implements Serializable {
   private static final long serialVersionUID = 7249069246863182397L;
 
   private final AtomicLong bits = new AtomicLong();

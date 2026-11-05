@@ -52,7 +52,7 @@ public final class DynamicCallSiteDesc {
     return of(bootstrapMethod, ConstantDescs.DEFAULT_NAME, invocationType);
   }
 
-  public DirectMethodHandleDesc bootstrapMethod() {
+  public MethodHandleDesc bootstrapMethod() {
     return bootstrapMethod;
   }
 

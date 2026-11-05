@@ -21,7 +21,7 @@ public interface SequenceLayout extends MemoryLayout {
   SequenceLayout withName(String name);
 
   @Override
-  SequenceLayout withoutName();
+  MemoryLayout withoutName();
 
   @Override
   SequenceLayout withByteAlignment(long byteAlignment);

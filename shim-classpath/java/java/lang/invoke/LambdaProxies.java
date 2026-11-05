@@ -26,7 +26,7 @@ final class LambdaProxies {
     try {
       Method make = LambdaProxies.class.getDeclaredMethod
         ("make", Class.class, String.class, MethodHandle.class, Class[].class, Object[].class);
-      MethodHandle factory = new MethodHandle
+      MethodHandle factory = new DirectMethodHandle
         (MethodHandle.REF_invokeStatic, invokedType.loader, shim.Classes.toVMMethod(make));
       factory = MethodHandles.insertArguments(factory, 0, invokedType.returnType(), name, implementation, markers);
       return new ConstantCallSite

@@ -330,4 +330,9 @@ final class ProcessHandleImpl implements ProcessHandle {
       return Optional.empty();
     }
   }
+
+  @Override
+  public int compareTo(ProcessHandle other) {
+    return Long.compare(pid(), other.pid());
+  }
 }

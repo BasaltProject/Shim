@@ -13,7 +13,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Objects;
 
-public class ZipInputStream extends InflaterInputStream {
+public class ZipInputStream extends InflaterInputStream implements ZipConstants {
   private static final long LOCSIG = 0x04034b50L;
   private static final long EXTSIG = 0x08074b50L;
   private static final long CENSIG = 0x02014b50L;

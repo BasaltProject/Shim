@@ -29,6 +29,16 @@ final class SegmentVarHandle extends VarHandle {
     this.elementSize = elementSize;
   }
 
+  @Override
+  public VarHandle withInvokeExactBehavior() {
+    return exactBehaviorView();
+  }
+
+  @Override
+  public VarHandle withInvokeBehavior() {
+    return this;
+  }
+
   private long computeOffset(Object[] args) {
     long base = ((Number) args[1]).longValue();
     if (elementSize == 0L) {

@@ -135,4 +135,24 @@ public class IdentityHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V
       return a == b;
     }    
   }
+
+  @Override
+  public boolean remove(Object key, Object value) {
+    return super.remove(key, value);
+  }
+
+  @Override
+  public boolean replace(K key, V oldValue, V newValue) {
+    return super.replace(key, oldValue, newValue);
+  }
+
+  @Override
+  public void replaceAll(java.util.function.BiFunction<? super K, ? super V, ? extends V> function) {
+    super.replaceAll(function);
+  }
+
+  @Override
+  public void forEach(java.util.function.BiConsumer<? super K, ? super V> action) {
+    super.forEach(action);
+  }
 }

@@ -100,8 +100,12 @@ public abstract class VarHandle implements java.lang.constant.Constable {
     return coordinateTypes;
   }
 
-  public abstract Object get(Object... args);
-  public abstract void set(Object... args);
+  public Object get(Object... args) {
+    throw new UnsupportedOperationException();
+  }
+  public void set(Object... args) {
+    throw new UnsupportedOperationException();
+  }
 
   public Object getVolatile(Object... args) {
     return get(args);
@@ -127,7 +131,9 @@ public abstract class VarHandle implements java.lang.constant.Constable {
     set(args);
   }
 
-  public abstract boolean compareAndSet(Object... args);
+  public boolean compareAndSet(Object... args) {
+    throw new UnsupportedOperationException();
+  }
 
   private static final Object[] STRIPES = new Object[64];
 
@@ -150,9 +156,13 @@ public abstract class VarHandle implements java.lang.constant.Constable {
     return type.isPrimitive() && a.equals(b);
   }
 
-  public abstract Object getAndSet(Object... args);
+  public Object getAndSet(Object... args) {
+    throw new UnsupportedOperationException();
+  }
 
-  public abstract Object getAndAdd(Object... args);
+  public Object getAndAdd(Object... args) {
+    throw new UnsupportedOperationException();
+  }
 
   public Object compareAndExchange(Object... args) {
     synchronized (lockFor(args)) {
@@ -311,12 +321,12 @@ public abstract class VarHandle implements java.lang.constant.Constable {
     return false;
   }
 
-  public VarHandle withInvokeExactBehavior() {
-    return new ExactView(this);
-  }
+  public abstract VarHandle withInvokeExactBehavior();
 
-  public VarHandle withInvokeBehavior() {
-    return this;
+  public abstract VarHandle withInvokeBehavior();
+
+  protected final VarHandle exactBehaviorView() {
+    return new ExactView(this);
   }
 
   private static final class ExactView extends VarHandle {
@@ -603,6 +613,16 @@ public abstract class VarHandle implements java.lang.constant.Constable {
   }
 
   private static class InstanceFieldVarHandle extends VarHandle {
+    @Override
+    public VarHandle withInvokeExactBehavior() {
+      return exactBehaviorView();
+    }
+
+    @Override
+    public VarHandle withInvokeBehavior() {
+      return this;
+    }
+
     private final Field field;
     private final char fast;
     private final long offset;
@@ -753,6 +773,16 @@ public abstract class VarHandle implements java.lang.constant.Constable {
   }
 
   private static class StaticFieldVarHandle extends VarHandle {
+    @Override
+    public VarHandle withInvokeExactBehavior() {
+      return exactBehaviorView();
+    }
+
+    @Override
+    public VarHandle withInvokeBehavior() {
+      return this;
+    }
+
     private final Field field;
 
     StaticFieldVarHandle(Field field) {
@@ -878,6 +908,16 @@ public abstract class VarHandle implements java.lang.constant.Constable {
   }
 
   private static class ArrayVarHandle extends VarHandle {
+    @Override
+    public VarHandle withInvokeExactBehavior() {
+      return exactBehaviorView();
+    }
+
+    @Override
+    public VarHandle withInvokeBehavior() {
+      return this;
+    }
+
     private final Class<?> arrayClass;
     private final char fast;
     private final long base;
@@ -1091,6 +1131,16 @@ public abstract class VarHandle implements java.lang.constant.Constable {
   }
 
   private static class ByteArrayViewVarHandle extends VarHandle {
+    @Override
+    public VarHandle withInvokeExactBehavior() {
+      return exactBehaviorView();
+    }
+
+    @Override
+    public VarHandle withInvokeBehavior() {
+      return this;
+    }
+
     private final Class<?> componentType;
     private final ByteOrder byteOrder;
     private final int alignment;
@@ -1250,6 +1300,16 @@ public abstract class VarHandle implements java.lang.constant.Constable {
   }
 
   private static class ByteBufferViewVarHandle extends VarHandle {
+    @Override
+    public VarHandle withInvokeExactBehavior() {
+      return exactBehaviorView();
+    }
+
+    @Override
+    public VarHandle withInvokeBehavior() {
+      return this;
+    }
+
     private final Class<?> componentType;
     private final ByteOrder byteOrder;
     private final int alignment;
@@ -1486,6 +1546,16 @@ public abstract class VarHandle implements java.lang.constant.Constable {
   }
 
   private static abstract class AdaptedVarHandle extends VarHandle {
+    @Override
+    public VarHandle withInvokeExactBehavior() {
+      return exactBehaviorView();
+    }
+
+    @Override
+    public VarHandle withInvokeBehavior() {
+      return this;
+    }
+
     protected final VarHandle target;
 
     protected AdaptedVarHandle(VarHandle target, Class<?> varType, List<Class<?>> coordinates) {

@@ -256,58 +256,15 @@ public class BasicScrollPaneUI extends ScrollPaneUI implements ScrollPaneConstan
   }
 
   protected ChangeListener createViewportChangeListener() {
-    return new ChangeListener() {
-      public void stateChanged(ChangeEvent e) {
-        if (!viewportAdjusting) {
-          syncScrollPaneWithViewport();
-        }
-      }
-    };
+    return new ViewportChangeHandler();
   }
 
   protected ChangeListener createHSBChangeListener() {
-    return new ChangeListener() {
-      public void stateChanged(ChangeEvent e) {
-        JViewport viewport = scrollpane.getViewport();
-        if (viewport != null) {
-          javax.swing.BoundedRangeModel model = (javax.swing.BoundedRangeModel) e.getSource();
-          Point p = viewport.getViewPosition();
-          int value = model.getValue();
-          if (scrollpane.getComponentOrientation().isLeftToRight()) {
-            p.x = value;
-          } else {
-            int max = viewport.getViewSize().width;
-            int extent = viewport.getExtentSize().width;
-            p.x = max - extent - value;
-          }
-          viewportAdjusting = true;
-          try {
-            viewport.setViewPosition(p);
-          } finally {
-            viewportAdjusting = false;
-          }
-        }
-      }
-    };
+    return new HSBChangeListener();
   }
 
   protected ChangeListener createVSBChangeListener() {
-    return new ChangeListener() {
-      public void stateChanged(ChangeEvent e) {
-        JViewport viewport = scrollpane.getViewport();
-        if (viewport != null) {
-          javax.swing.BoundedRangeModel model = (javax.swing.BoundedRangeModel) e.getSource();
-          Point p = viewport.getViewPosition();
-          p.y = model.getValue();
-          viewportAdjusting = true;
-          try {
-            viewport.setViewPosition(p);
-          } finally {
-            viewportAdjusting = false;
-          }
-        }
-      }
-    };
+    return new VSBChangeListener();
   }
 
   protected MouseWheelListener createMouseWheelListener() {
@@ -331,28 +288,7 @@ public class BasicScrollPaneUI extends ScrollPaneUI implements ScrollPaneConstan
   }
 
   protected PropertyChangeListener createPropertyChangeListener() {
-    return new PropertyChangeListener() {
-      public void propertyChange(PropertyChangeEvent e) {
-        String propertyName = e.getPropertyName();
-        if ("verticalScrollBarDisplayPolicy".equals(propertyName)
-            || "horizontalScrollBarDisplayPolicy".equals(propertyName)) {
-          updateScrollBarDisplayPolicy(e);
-        } else if ("viewport".equals(propertyName)) {
-          updateViewport(e);
-        } else if ("rowHeader".equals(propertyName)) {
-          updateRowHeader(e);
-        } else if ("columnHeader".equals(propertyName)) {
-          updateColumnHeader(e);
-        } else if ("verticalScrollBar".equals(propertyName)) {
-          updateScrollBar(e, vsbChangeListener);
-        } else if ("horizontalScrollBar".equals(propertyName)) {
-          updateScrollBar(e, hsbChangeListener);
-        } else if ("componentOrientation".equals(propertyName)) {
-          scrollpane.revalidate();
-          scrollpane.repaint();
-        }
-      }
-    };
+    return new PropertyChangeHandler();
   }
 
   public int getBaseline(JComponent c, int width, int height) {
@@ -409,5 +345,77 @@ public class BasicScrollPaneUI extends ScrollPaneUI implements ScrollPaneConstan
       return Component.BaselineResizeBehavior.CONSTANT_ASCENT;
     }
     return Component.BaselineResizeBehavior.OTHER;
+  }
+
+  public class ViewportChangeHandler implements ChangeListener {
+    public void stateChanged(ChangeEvent e) {
+      if (!viewportAdjusting) {
+        syncScrollPaneWithViewport();
+      }
+    }
+  }
+
+  public class HSBChangeListener implements ChangeListener {
+    public void stateChanged(ChangeEvent e) {
+      JViewport viewport = scrollpane.getViewport();
+      if (viewport != null) {
+        javax.swing.BoundedRangeModel model = (javax.swing.BoundedRangeModel) e.getSource();
+        Point p = viewport.getViewPosition();
+        int value = model.getValue();
+        if (scrollpane.getComponentOrientation().isLeftToRight()) {
+          p.x = value;
+        } else {
+          int max = viewport.getViewSize().width;
+          int extent = viewport.getExtentSize().width;
+          p.x = max - extent - value;
+        }
+        viewportAdjusting = true;
+        try {
+          viewport.setViewPosition(p);
+        } finally {
+          viewportAdjusting = false;
+        }
+      }
+    }
+  }
+
+  public class VSBChangeListener implements ChangeListener {
+    public void stateChanged(ChangeEvent e) {
+      JViewport viewport = scrollpane.getViewport();
+      if (viewport != null) {
+        javax.swing.BoundedRangeModel model = (javax.swing.BoundedRangeModel) e.getSource();
+        Point p = viewport.getViewPosition();
+        p.y = model.getValue();
+        viewportAdjusting = true;
+        try {
+          viewport.setViewPosition(p);
+        } finally {
+          viewportAdjusting = false;
+        }
+      }
+    }
+  }
+
+  public class PropertyChangeHandler implements PropertyChangeListener {
+    public void propertyChange(PropertyChangeEvent e) {
+      String propertyName = e.getPropertyName();
+      if ("verticalScrollBarDisplayPolicy".equals(propertyName)
+          || "horizontalScrollBarDisplayPolicy".equals(propertyName)) {
+        updateScrollBarDisplayPolicy(e);
+      } else if ("viewport".equals(propertyName)) {
+        updateViewport(e);
+      } else if ("rowHeader".equals(propertyName)) {
+        updateRowHeader(e);
+      } else if ("columnHeader".equals(propertyName)) {
+        updateColumnHeader(e);
+      } else if ("verticalScrollBar".equals(propertyName)) {
+        updateScrollBar(e, vsbChangeListener);
+      } else if ("horizontalScrollBar".equals(propertyName)) {
+        updateScrollBar(e, hsbChangeListener);
+      } else if ("componentOrientation".equals(propertyName)) {
+        scrollpane.revalidate();
+        scrollpane.repaint();
+      }
+    }
   }
 }

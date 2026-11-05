@@ -13,7 +13,7 @@ import java.io.Serializable;
 import java.util.Objects;
 import java.util.function.LongBinaryOperator;
 
-public class LongAccumulator extends Number implements Serializable {
+public class LongAccumulator extends Striped64 implements Serializable {
   private static final long serialVersionUID = 7249069246863182397L;
 
   private final LongBinaryOperator function;

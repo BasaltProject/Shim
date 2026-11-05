@@ -126,4 +126,9 @@ public class CopyOnWriteArraySet<E> extends AbstractSet<E> implements Serializab
   public void forEach(Consumer<? super E> action) {
     al.forEach(action);
   }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return super.spliterator();
+  }
 }

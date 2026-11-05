@@ -9,21 +9,9 @@
 package com.sun.management;
 
 public interface ThreadMXBean extends java.lang.management.ThreadMXBean {
-  default long[] getThreadCpuTime(long[] ids) {
-    long[] out = new long[ids.length];
-    for (int i = 0; i < ids.length; i++) {
-      out[i] = getThreadCpuTime(ids[i]);
-    }
-    return out;
-  }
+  long[] getThreadCpuTime(long[] ids);
 
-  default long[] getThreadUserTime(long[] ids) {
-    long[] out = new long[ids.length];
-    for (int i = 0; i < ids.length; i++) {
-      out[i] = getThreadUserTime(ids[i]);
-    }
-    return out;
-  }
+  long[] getThreadUserTime(long[] ids);
 
   long getThreadAllocatedBytes(long id);
 

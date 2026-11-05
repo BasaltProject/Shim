@@ -313,4 +313,19 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E> implements BlockingQ
     notEmpty = lock.newCondition();
     notFull = lock.newCondition();
   }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return super.spliterator();
+  }
+
+  @Override
+  public boolean removeIf(java.util.function.Predicate<? super E> filter) {
+    return super.removeIf(filter);
+  }
+
+  @Override
+  public void forEach(java.util.function.Consumer<? super E> action) {
+    super.forEach(action);
+  }
 }

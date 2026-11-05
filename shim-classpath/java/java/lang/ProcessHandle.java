@@ -37,10 +37,7 @@ public interface ProcessHandle extends Comparable<ProcessHandle> {
 
   boolean isAlive();
 
-  @Override
-  default int compareTo(ProcessHandle other) {
-    return Long.compare(pid(), other.pid());
-  }
+  int compareTo(ProcessHandle other);
 
   static Optional<ProcessHandle> of(long pid) {
     return ProcessHandleImpl.of(pid);

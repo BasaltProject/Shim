@@ -15,7 +15,7 @@ import shim.xml.FactoryFinder;
 
 public abstract class DatatypeFactory {
   public static final String DATATYPEFACTORY_PROPERTY = "javax.xml.datatype.DatatypeFactory";
-  public static final String DATATYPEFACTORY_IMPLEMENTATION_CLASS = "shim.xml.datatype.DatatypeFactoryImpl";
+  public static final String DATATYPEFACTORY_IMPLEMENTATION_CLASS = "com.sun.org.apache.xerces.internal.jaxp.datatype.DatatypeFactoryImpl";
 
   protected DatatypeFactory() {
   }

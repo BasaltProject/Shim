@@ -203,4 +203,14 @@ public class ConcurrentSkipListSet<E> extends AbstractSet<E>
     clone.m = new ConcurrentSkipListMap<E, Object>((java.util.SortedMap<E, ?>) m);
     return clone;
   }
+
+  @Override
+  public void addFirst(E e) {
+    NavigableSet.super.addFirst(e);
+  }
+
+  @Override
+  public void addLast(E e) {
+    NavigableSet.super.addLast(e);
+  }
 }

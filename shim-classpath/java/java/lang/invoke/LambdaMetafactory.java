@@ -596,7 +596,7 @@ public final class LambdaMetafactory {
     return makeLambda(invokedName,
                       new MethodType(invokedType),
                       new MethodType(methodType),
-                      new MethodHandle(implementationClass,
+                      new DirectMethodHandle(implementationClass,
                                        implementationName,
                                        implementationSpec,
                                        implementationKind),
@@ -720,7 +720,7 @@ public final class LambdaMetafactory {
       throws AssertionError {
     try {
       return new ConstantCallSite
-              (new MethodHandle
+              (new DirectMethodHandle
                       (MethodHandle.REF_invokeStatic, invokedType.loader, Classes.toVMMethod
                               (shim.SystemClassLoader.getClass
                                       (shim.Classes.defineLambdaVMClass

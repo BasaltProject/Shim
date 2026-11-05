@@ -31,7 +31,7 @@ import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-public class ZipEntry implements Cloneable {
+public class ZipEntry implements ZipConstants, Cloneable {
   public static final int STORED = 0;
   public static final int DEFLATED = 8;
 

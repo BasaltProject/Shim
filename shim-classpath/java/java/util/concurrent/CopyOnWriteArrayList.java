@@ -646,4 +646,44 @@ public class CopyOnWriteArrayList<E> implements List<E>, RandomAccess, Cloneable
       }
     }
   }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return List.super.spliterator();
+  }
+
+  @Override
+  public E getFirst() {
+    return List.super.getFirst();
+  }
+
+  @Override
+  public E getLast() {
+    return List.super.getLast();
+  }
+
+  @Override
+  public void addFirst(E e) {
+    List.super.addFirst(e);
+  }
+
+  @Override
+  public void addLast(E e) {
+    List.super.addLast(e);
+  }
+
+  @Override
+  public E removeFirst() {
+    return List.super.removeFirst();
+  }
+
+  @Override
+  public E removeLast() {
+    return List.super.removeLast();
+  }
+
+  @Override
+  public java.util.List<E> reversed() {
+    return List.super.reversed();
+  }
 }

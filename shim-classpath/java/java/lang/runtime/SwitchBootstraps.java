@@ -19,6 +19,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.invoke.CallSite;
 import java.lang.invoke.ConstantCallSite;
+import java.lang.invoke.DirectMethodHandle;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -112,7 +113,7 @@ public final class SwitchBootstraps {
     Class<?> generated = SystemClassLoader.getClass(
         Classes.defineVMClass(cl, data, 0, data.length));
     Method m = generated.getMethod("make", invocationType.parameterArray());
-    return new MethodHandle(MethodHandle.REF_invokeStatic, cl, Classes.toVMMethod(m));
+    return new DirectMethodHandle(MethodHandle.REF_invokeStatic, cl, Classes.toVMMethod(m));
   }
 
   private static byte[] assembleSwitch(List<PoolEntry> pool, int labelId, boolean isEnum) throws IOException {

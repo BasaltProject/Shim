@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-public class ZipOutputStream extends DeflaterOutputStream {
+public class ZipOutputStream extends DeflaterOutputStream implements ZipConstants {
   public static final int STORED = ZipEntry.STORED;
   public static final int DEFLATED = ZipEntry.DEFLATED;
 
