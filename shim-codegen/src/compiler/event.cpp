@@ -649,6 +649,19 @@ class CallEvent : public Event {
       }
     }
 
+    if ((flags & Compiler::ClassGuard) and not skip and not(TailCalls and (flags & Compiler::TailJump))
+        and not(address->source->type(c) == lir::Operand::Type::RegisterPair
+                and static_cast<RegisterSite*>(address->source)->number == c->arch->returnLow())) {
+      skip = compiler::codePromise(c, static_cast<Promise*>(0));
+      lir::Constant skipTarget(skip);
+      if (not c->assembler->branchIfNullOrClassEquals(c->arch->argumentRegister(1),
+                                                      c->arch->argumentRegister(2),
+                                                      (flags & Compiler::ClassGuardResult) != 0,
+                                                      &skipTarget)) {
+        skip = 0;
+      }
+    }
+
     apply(c, op, c->targetInfo.pointerSize, address->source, address->source);
 
     if (skip) {

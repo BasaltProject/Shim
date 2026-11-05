@@ -932,6 +932,28 @@ class MyAssembler : public Assembler {
     return true;
   }
 
+  virtual bool branchIfNullOrClassEquals(Register klass, Register object, bool materializeResult, lir::Constant* target)
+  {
+    if (object == rax or klass == rax) {
+      return false;
+    }
+    lir::Constant zero(resolvedPromise(&c, 0));
+    lir::Constant one(resolvedPromise(&c, 1));
+    lir::RegisterPair klassRegister(klass);
+    lir::RegisterPair objectRegister(object);
+    lir::RegisterPair result(rax);
+    lir::Memory header(object, 0);
+    if (materializeResult) {
+      moveCR(&c, TargetBytesPerWord, &zero, TargetBytesPerWord, &result);
+    }
+    branchCR(&c, lir::JumpIfEqual, TargetBytesPerWord, &zero, &objectRegister, target);
+    if (materializeResult) {
+      moveCR(&c, TargetBytesPerWord, &one, TargetBytesPerWord, &result);
+    }
+    branchRM(&c, lir::JumpIfEqual, TargetBytesPerWord, &klassRegister, &header, target);
+    return true;
+  }
+
   virtual void saveFrame(unsigned stackOffset, unsigned)
   {
     lir::RegisterPair stack(rsp);

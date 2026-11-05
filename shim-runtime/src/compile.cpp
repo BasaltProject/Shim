@@ -368,7 +368,7 @@ class MyThread : public Thread {
   List<Reference*>* referenceFrame;
   bool methodLockIsClean;
 
-  static const unsigned InterfaceCacheSize = 256;
+  static const unsigned InterfaceCacheSize = 1024;
 
   struct InterfaceCacheEntry {
     uintptr_t class_;
@@ -379,7 +379,7 @@ class MyThread : public Thread {
   uintptr_t interfaceCacheEpoch;
   InterfaceCacheEntry interfaceCache[InterfaceCacheSize];
 
-  static const unsigned AssignableCacheSize = 256;
+  static const unsigned AssignableCacheSize = 1024;
 
   struct AssignableCacheEntry {
     uintptr_t to;
@@ -5282,7 +5282,7 @@ loop:
 
       c->nativeCall(
           c->constant(getThunk(t, thunk), ir::Type::iptr()),
-          0,
+          LIKELY(class_) ? Compiler::ClassGuard : 0,
           frame->trace(0, 0),
           ir::Type::void_(),
           args(c->threadRegister(), frame->append(argument), instance));
@@ -5939,7 +5939,7 @@ loop:
           ir::Type::i4(),
           c->nativeCall(
               c->constant(getThunk(t, thunk), ir::Type::iptr()),
-              0,
+              LIKELY(class_) ? (Compiler::ClassGuard | Compiler::ClassGuardResult) : 0,
               frame->trace(0, 0),
               ir::Type::i4(),
               args(c->threadRegister(), frame->append(argument), instance)));

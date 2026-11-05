@@ -96,6 +96,8 @@ class Compiler {
   static const unsigned TailJump = 1 << 2;
   static const unsigned LongJumpOrCall = 1 << 3;
   static const unsigned PollGuard = 1 << 4;
+  static const unsigned ClassGuard = 1 << 5;
+  static const unsigned ClassGuardResult = 1 << 6;
   static unsigned pollGuard(unsigned offsetFromThread) { return PollGuard | (offsetFromThread << 8); }
 
   class State {
