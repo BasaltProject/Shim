@@ -47,6 +47,15 @@ public final class SimpleFontMetrics extends FontMetrics {
   }
 
   public int stringWidth(String str) {
+    if (frc != null && frc.usesFractionalMetrics()) {
+      float total = 0f;
+      for (int i = 0; i < str.length();) {
+        int cp = str.codePointAt(i);
+        total += face.pixelAdvance(cp, size, true, false);
+        i += Character.charCount(cp);
+      }
+      return Math.round(total);
+    }
     int w = 0;
     for (int i = 0; i < str.length();) {
       int cp = str.codePointAt(i);

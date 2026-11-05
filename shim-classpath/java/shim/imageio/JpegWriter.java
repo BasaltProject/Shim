@@ -30,32 +30,7 @@ public final class JpegWriter extends CodecWriter {
   }
 
   public ImageWriteParam getDefaultWriteParam() {
-    return new JpegWriteParam(getLocale());
-  }
-
-  private static final class JpegWriteParam extends ImageWriteParam {
-    JpegWriteParam(java.util.Locale locale) {
-      super(locale);
-      canWriteCompressed = true;
-      compressionTypes = new String[] {"JPEG"};
-      compressionType = "JPEG";
-      compressionMode = MODE_COPY_FROM_METADATA;
-      compressionQuality = 0.75f;
-      canWriteProgressive = true;
-      progressiveMode = MODE_DISABLED;
-    }
-
-    public boolean isCompressionLossless() {
-      return false;
-    }
-
-    public String[] getCompressionQualityDescriptions() {
-      return new String[] {"Minimum useful", "Visually lossless", "Maximum useful"};
-    }
-
-    public float[] getCompressionQualityValues() {
-      return new float[] {0.0f, 0.05f, 0.75f, 0.95f, 1.0f};
-    }
+    return new javax.imageio.plugins.jpeg.JPEGImageWriteParam(getLocale());
   }
 
   private static void build(int[] bits, int[] vals, int[] code, int[] len) {

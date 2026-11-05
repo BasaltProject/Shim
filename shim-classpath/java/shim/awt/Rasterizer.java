@@ -23,6 +23,59 @@ public final class Rasterizer {
 
   private Rasterizer() { }
 
+  public static Shape adjusted(Shape shape, AffineTransform at) {
+    PathIterator pi = shape.getPathIterator(at);
+    java.awt.geom.Path2D.Float out = new java.awt.geom.Path2D.Float(pi.getWindingRule());
+    float[] c = new float[6];
+    float adjx = 0;
+    float adjy = 0;
+    while (!pi.isDone()) {
+      switch (pi.currentSegment(c)) {
+      case PathIterator.SEG_MOVETO: {
+        float nx = (float) Math.floor(c[0] + 0.25f) + 0.25f;
+        float ny = (float) Math.floor(c[1] + 0.25f) + 0.25f;
+        adjx = nx - c[0];
+        adjy = ny - c[1];
+        out.moveTo(nx, ny);
+        break;
+      }
+      case PathIterator.SEG_LINETO: {
+        float nx = (float) Math.floor(c[0] + 0.25f) + 0.25f;
+        float ny = (float) Math.floor(c[1] + 0.25f) + 0.25f;
+        adjx = nx - c[0];
+        adjy = ny - c[1];
+        out.lineTo(nx, ny);
+        break;
+      }
+      case PathIterator.SEG_QUADTO: {
+        float nx = (float) Math.floor(c[2] + 0.25f) + 0.25f;
+        float ny = (float) Math.floor(c[3] + 0.25f) + 0.25f;
+        float dx = nx - c[2];
+        float dy = ny - c[3];
+        out.quadTo(c[0] + (dx + adjx) / 2, c[1] + (dy + adjy) / 2, nx, ny);
+        adjx = dx;
+        adjy = dy;
+        break;
+      }
+      case PathIterator.SEG_CUBICTO: {
+        float nx = (float) Math.floor(c[4] + 0.25f) + 0.25f;
+        float ny = (float) Math.floor(c[5] + 0.25f) + 0.25f;
+        float dx = nx - c[4];
+        float dy = ny - c[5];
+        out.curveTo(c[0] + adjx, c[1] + adjy, c[2] + dx, c[3] + dy, nx, ny);
+        adjx = dx;
+        adjy = dy;
+        break;
+      }
+      default:
+        out.closePath();
+        break;
+      }
+      pi.next();
+    }
+    return out;
+  }
+
   public static void fill(Shape shape, AffineTransform at, int cx0, int cy0, int cx1, int cy1, boolean aa,
       RowSink sink) {
     if (cx1 <= cx0 || cy1 <= cy0) {

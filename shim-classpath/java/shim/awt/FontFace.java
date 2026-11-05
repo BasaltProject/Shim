@@ -25,6 +25,14 @@ public abstract class FontFace {
 
   public abstract float leading();
 
+  public String fullName() {
+    return null;
+  }
+
+  public String postScriptName() {
+    return null;
+  }
+
   public int numGlyphs() {
     return 95;
   }

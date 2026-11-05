@@ -154,12 +154,27 @@ public final class SoftwareGraphics2D extends Graphics2D {
       int v = fast[fastBase + y * fastStride + x];
       return fastAlpha ? v : v | 0xff000000;
     }
+    int type = image.getType();
+    if (type == BufferedImage.TYPE_BYTE_GRAY || type == BufferedImage.TYPE_USHORT_GRAY) {
+      int g = image.getRaster().getSample(x, y, 0);
+      g = type == BufferedImage.TYPE_BYTE_GRAY ? g : (g * 255 + 32895) / 65535;
+      return 0xff000000 | g << 16 | g << 8 | g;
+    }
     return image.getRGB(x, y);
   }
 
   private void setPixel(int x, int y, int argb) {
     if (fast != null) {
       fast[fastBase + y * fastStride + x] = fastAlpha ? argb : argb & 0x00ffffff;
+      return;
+    }
+    int type = image.getType();
+    if (type == BufferedImage.TYPE_BYTE_GRAY || type == BufferedImage.TYPE_USHORT_GRAY) {
+      int r = argb >> 16 & 0xff;
+      int gr = argb >> 8 & 0xff;
+      int b = argb & 0xff;
+      image.getRaster().setSample(x, y, 0, type == BufferedImage.TYPE_BYTE_GRAY ? (19672 * r + 38620 * gr + 7500 * b) >> 16
+          : (19595 * r + 38470 * gr + 7471 * b) * 257 + 32768 >> 16);
       return;
     }
     image.setRGB(x, y, argb);
@@ -511,6 +526,11 @@ public final class SoftwareGraphics2D extends Graphics2D {
   }
 
   public void fill(Shape s) {
+    if (!aa() && stroke instanceof BasicStroke
+        && hints.get(RenderingHints.KEY_STROKE_CONTROL) != RenderingHints.VALUE_STROKE_PURE) {
+      fillDevice(Rasterizer.adjusted(s, tx), null, false, paint, s.getBounds2D());
+      return;
+    }
     fillDevice(s, tx, aa(), paint, s.getBounds2D());
   }
 
