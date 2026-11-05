@@ -61,6 +61,35 @@ public final class Fonts {
     return kFaces.computeIfAbsent("logical:" + family + ":" + style, k -> systemFace(family, st));
   }
 
+  private static final String[] kFallbackNames = {"Droid Sans Fallback", "Noto Sans CJK SC", "Noto Sans CJK JP",
+      "Noto Sans CJK KR", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "Noto Sans", "Noto Sans Symbols",
+      "Noto Sans Symbols2", "FreeSans", "FreeSerif", "Unifont", "Symbola"};
+  private static java.util.List<FontFace> kFallbackFaces;
+  private static final Map<Integer, FontFace> kFallbackByCp = new HashMap<>();
+
+  static synchronized FontFace fallbackFace(int cp) {
+    if (kFallbackFaces == null) {
+      kFallbackFaces = new java.util.ArrayList<>();
+      for (String n : kFallbackNames) {
+        FontFace f = installedFace(n, 0);
+        if (f != null) {
+          kFallbackFaces.add(f);
+        }
+      }
+    }
+    if (!kFallbackByCp.containsKey(cp)) {
+      FontFace found = null;
+      for (FontFace f : kFallbackFaces) {
+        if (f.canDisplay(cp)) {
+          found = f;
+          break;
+        }
+      }
+      kFallbackByCp.put(cp, found);
+    }
+    return kFallbackByCp.get(cp);
+  }
+
   private static FontFace installedFace(String name, int style) {
     SystemFonts.Entry e = SystemFonts.find(name, style);
     if (e == null) {
@@ -71,7 +100,7 @@ public final class Fonts {
     if (f == null) {
       try {
         f = new NamedFace(e.family, TrueTypeFace.parse(java.nio.file.Files.readAllBytes(e.file.toPath()), 0),
-            e.style != 0);
+            e.style != 0, false);
       } catch (Exception | LinkageError ex) {
         return null;
       }
@@ -84,6 +113,10 @@ public final class Fonts {
     if (logicalFamily(name) != null) {
       return null;
     }
+    FontFace registered = name == null ? null : kFaces.get(name.toLowerCase(java.util.Locale.ROOT));
+    if (registered != null && registered.fullName() != null) {
+      return registered.fullName();
+    }
     SystemFonts.Entry e = SystemFonts.find(name, style);
     return e == null ? null : e.full;
   }
@@ -91,6 +124,10 @@ public final class Fonts {
   public static synchronized String postScriptName(String name, int style) {
     if (logicalFamily(name) != null) {
       return null;
+    }
+    FontFace registered = name == null ? null : kFaces.get(name.toLowerCase(java.util.Locale.ROOT));
+    if (registered != null && registered.postScriptName() != null) {
+      return registered.postScriptName();
     }
     SystemFonts.Entry e = SystemFonts.find(name, style);
     return e == null ? null : e.ps;
@@ -144,7 +181,7 @@ public final class Fonts {
           java.io.File file = new java.io.File(dir + f);
           if (file.isFile()) {
             try {
-              return new NamedFace(family, TrueTypeFace.parse(java.nio.file.Files.readAllBytes(file.toPath()), 0), true);
+              return new NamedFace(family, TrueTypeFace.parse(java.nio.file.Files.readAllBytes(file.toPath()), 0), true, true);
             } catch (Exception | LinkageError e) {
               continue;
             }
@@ -168,7 +205,7 @@ public final class Fonts {
         java.io.File file = new java.io.File(dir + f);
         if (file.isFile()) {
           try {
-            return new NamedFace(family, TrueTypeFace.parse(java.nio.file.Files.readAllBytes(file.toPath()), 0), false);
+            return new NamedFace(family, TrueTypeFace.parse(java.nio.file.Files.readAllBytes(file.toPath()), 0), false, true);
           } catch (Exception | LinkageError e) {
             continue;
           }
@@ -182,20 +219,32 @@ public final class Fonts {
     private final String name;
     private final FontFace delegate;
     private final boolean styled;
+    private final boolean composite;
 
-    NamedFace(String name, FontFace delegate, boolean styled) {
+    NamedFace(String name, FontFace delegate, boolean styled, boolean composite) {
       this.name = name;
       this.delegate = delegate;
       this.styled = styled;
+      this.composite = composite;
+    }
+
+    private FontFace fallback(int cp) {
+      return composite && cp >= 0x80 && !delegate.canDisplay(cp) ? Fonts.fallbackFace(cp) : null;
     }
 
     public String family() { return name; }
 
-    public boolean canDisplay(int cp) { return delegate.canDisplay(cp); }
+    public boolean canDisplay(int cp) { return delegate.canDisplay(cp) || fallback(cp) != null; }
 
-    public float advance(int cp) { return delegate.advance(cp); }
+    public float advance(int cp) {
+      FontFace f = fallback(cp);
+      return (f != null ? f : delegate).advance(cp);
+    }
 
-    public java.awt.Shape outline(int cp, boolean bold, boolean italic) { return delegate.outline(cp, bold, italic); }
+    public java.awt.Shape outline(int cp, boolean bold, boolean italic) {
+      FontFace f = fallback(cp);
+      return (f != null ? f : delegate).outline(cp, bold, italic);
+    }
 
     public float ascent() { return delegate.ascent(); }
 
@@ -209,7 +258,9 @@ public final class Fonts {
 
     public float kerning(int a, int b) { return delegate.kerning(a, b); }
 
-    public int hintedAdvance(int cp, float size) { return delegate.hintedAdvance(cp, size); }
+    public int hintedAdvance(int cp, float size) {
+      return fallback(cp) != null ? -1 : delegate.hintedAdvance(cp, size);
+    }
 
     public boolean styled() { return styled; }
 

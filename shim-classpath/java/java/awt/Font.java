@@ -110,6 +110,17 @@ public class Font implements java.io.Serializable {
       if (((n3 = sizeObj instanceof Number ? (Number) sizeObj : null) != null)) {
         sz = n3.floatValue();
       }
+      for (Map.Entry<? extends AttributedCharacterIterator.Attribute, ?> e : attributes.entrySet()) {
+        if (e.getKey() instanceof TextAttribute && e.getKey() != TextAttribute.FONT && e.getKey() != TextAttribute.FAMILY
+            && e.getKey() != TextAttribute.WEIGHT && e.getKey() != TextAttribute.POSTURE
+            && e.getKey() != TextAttribute.SIZE && e.getKey() != TextAttribute.TRANSFORM
+            && e.getKey() != TextAttribute.SUPERSCRIPT && e.getKey() != TextAttribute.WIDTH && e.getValue() != null) {
+          if (extra == null) {
+            extra = new HashMap<>();
+          }
+          extra.put((TextAttribute) e.getKey(), e.getValue());
+        }
+      }
       Object tr = attributes.get(TextAttribute.TRANSFORM);
       AffineTransform at = null;
       if (((at = tr instanceof AffineTransform ? (AffineTransform) tr : null) != null) && !at.isIdentity()) {
@@ -136,6 +147,9 @@ public class Font implements java.io.Serializable {
         : new java.awt.font.TransformAttribute(fontTransform));
     m.put(TextAttribute.SUPERSCRIPT, 0);
     m.put(TextAttribute.WIDTH, TextAttribute.WIDTH_REGULAR);
+    if (extra != null) {
+      m.putAll(extra);
+    }
     return m;
   }
 
@@ -154,10 +168,10 @@ public class Font implements java.io.Serializable {
       throw new IllegalArgumentException("font format not recognized");
     }
     byte[] data = fontStream.readAllBytes();
-    FontFace face = shim.awt.TrueTypeFace.parse(data, 0);
-    String family = face.family();
-    Fonts.register(family, face);
-    return new Font(family, PLAIN, 1f);
+    shim.awt.TrueTypeFace face = shim.awt.TrueTypeFace.parse(data, 0);
+    String key = face.fullName() != null ? face.fullName() : face.family();
+    Fonts.register(key, face);
+    return new Font(key, face.fontStyle(), 1f);
   }
 
   public static Font[] createFonts(InputStream fontStream) throws FontFormatException, IOException {
@@ -196,12 +210,14 @@ public class Font implements java.io.Serializable {
 
   public Font deriveFont(int style, float size) {
     Font f = new Font(name, style, size);
+    f.extra = extra;
     f.fontTransform = fontTransform;
     return f;
   }
 
   public Font deriveFont(float size) {
     Font f = new Font(name, style, size);
+    f.extra = extra;
     f.fontTransform = fontTransform;
     return f;
   }
@@ -211,6 +227,7 @@ public class Font implements java.io.Serializable {
       throw new IllegalArgumentException("transform must not be null");
     }
     Font f = new Font(name, style, pointSize);
+    f.extra = extra;
     f.fontTransform = trans.isIdentity() ? null : new AffineTransform(trans);
     return f;
   }
@@ -220,12 +237,14 @@ public class Font implements java.io.Serializable {
       throw new IllegalArgumentException("transform must not be null");
     }
     Font f = new Font(name, style, pointSize);
+    f.extra = extra;
     f.fontTransform = trans.isIdentity() ? null : new AffineTransform(trans);
     return f;
   }
 
   public Font deriveFont(int style) {
     Font f = new Font(name, style, pointSize);
+    f.extra = extra;
     f.fontTransform = fontTransform;
     return f;
   }

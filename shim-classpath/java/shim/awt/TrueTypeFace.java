@@ -27,6 +27,10 @@ public final class TrueTypeFace extends FontFace {
   private float lineGap;
   private int maxAdvanceUnits = 1;
   private String family = "Unknown";
+  private String fullName;
+  private String psName;
+  private int macStyle;
+  private CffOutlines cff;
   private int[] cmapSegments;
   private int cmapFormat;
   private int cmapOffset;
@@ -65,7 +69,7 @@ public final class TrueTypeFace extends FontFace {
         base = (int) u32(12 + fontIndex * 4);
         tag = u32(base);
       }
-      if (tag != 0x00010000L && tag != 0x74727565L) {
+      if (tag != 0x00010000L && tag != 0x74727565L && tag != 0x4F54544FL) {
         throw new FontFormatException("Unsupported font format");
       }
       int n = u16(base + 4);
@@ -77,6 +81,7 @@ public final class TrueTypeFace extends FontFace {
       int[] head = need("head");
       unitsPerEm = u16(head[0] + 18);
       locaFormat = s16(head[0] + 50);
+      macStyle = u16(head[0] + 44);
       numGlyphs = u16(need("maxp")[0] + 4);
       int[] hhea = need("hhea");
       ascent = s16(hhea[0] + 4) / (float) unitsPerEm;
@@ -84,8 +89,13 @@ public final class TrueTypeFace extends FontFace {
       lineGap = s16(hhea[0] + 8) / (float) unitsPerEm;
       numHMetrics = u16(hhea[0] + 34);
       maxAdvanceUnits = u16(hhea[0] + 10);
-      need("loca");
-      need("glyf");
+      int[] cff = tables.get("CFF ");
+      if (cff != null) {
+        this.cff = new CffOutlines(d, cff[0], cff[1], unitsPerEm);
+      } else {
+        need("loca");
+        need("glyf");
+      }
       need("hmtx");
       readCmap();
       readName();
@@ -109,29 +119,34 @@ public final class TrueTypeFace extends FontFace {
     }
     int count = u16(t[0] + 2);
     int strings = t[0] + u16(t[0] + 4);
-    String best = null;
+    String[] best = new String[7];
+    int[] rank = new int[7];
     for (int i = 0; i < count; i++) {
       int rec = t[0] + 6 + i * 12;
       int platform = u16(rec);
+      int lang = u16(rec + 4);
       int nameId = u16(rec + 6);
-      if (nameId != 1 && nameId != 16) {
+      if (nameId != 1 && nameId != 4 && nameId != 6 && nameId != 16) {
         continue;
       }
+      int slot = nameId == 16 ? 0 : nameId;
       int len = u16(rec + 8);
       int off = strings + u16(rec + 10);
-      String s;
-      if (platform == 3 || platform == 0) {
-        s = new String(d, off, len, java.nio.charset.StandardCharsets.UTF_16BE);
-      } else {
-        s = new String(d, off, len, java.nio.charset.StandardCharsets.ISO_8859_1);
+      int score = platform == 3 && lang == 0x409 ? 3 : platform == 3 || platform == 0 ? 2 : 1;
+      if (score <= rank[slot]) {
+        continue;
       }
-      if (best == null || nameId == 16) {
-        best = s;
-      }
+      rank[slot] = score;
+      best[slot] = platform == 3 || platform == 0 ? new String(d, off, len, java.nio.charset.StandardCharsets.UTF_16BE)
+          : new String(d, off, len, java.nio.charset.StandardCharsets.ISO_8859_1);
     }
-    if (best != null) {
-      family = best;
+    if (best[1] != null) {
+      family = best[1];
+    } else if (best[0] != null) {
+      family = best[0];
     }
+    fullName = best[4];
+    psName = best[6];
   }
 
   private void readCmap() throws FontFormatException {
@@ -225,6 +240,14 @@ public final class TrueTypeFace extends FontFace {
 
   public String family() { return family; }
 
+  public String fullName() { return fullName; }
+
+  public String postScriptName() { return psName; }
+
+  public int fontStyle() { return (macStyle & 1) | (macStyle >> 1 & 1) << 1; }
+
+  public boolean styled() { return (macStyle & 3) != 0; }
+
   public boolean canDisplay(int cp) { return glyphFor(cp) != 0; }
 
   public int numGlyphs() { return numGlyphs; }
@@ -240,6 +263,9 @@ public final class TrueTypeFace extends FontFace {
   private boolean hinterTried;
 
   public synchronized int hintedAdvance(int cp, float size) {
+    if (cff != null) {
+      return -1;
+    }
     if (!hinterTried) {
       hinterTried = true;
       try {
@@ -313,6 +339,12 @@ public final class TrueTypeFace extends FontFace {
 
   private void glyph(int g, Path2D.Float out, AffineTransform at, int depth) {
     if (g < 0 || g >= numGlyphs || depth > 6) {
+      return;
+    }
+    if (cff != null) {
+      Path2D.Float raw = new Path2D.Float(Path2D.WIND_NON_ZERO);
+      cff.glyph(g, raw);
+      out.append(raw.getPathIterator(at), false);
       return;
     }
     int[] len = new int[1];
