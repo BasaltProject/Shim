@@ -17,6 +17,10 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import jdk.internal.random.L32X64MixRandom;
+import jdk.internal.random.L64X128MixRandom;
+import jdk.internal.random.L64X128StarStarRandom;
+import jdk.internal.random.L64X256MixRandom;
+import jdk.internal.random.Xoshiro256PlusPlus;
 import jdk.internal.random.Xoroshiro128PlusPlus;
 
 public final class RandomGeneratorFactory<T extends RandomGenerator> {
@@ -101,6 +105,86 @@ public final class RandomGeneratorFactory<T extends RandomGenerator> {
         L32X64MixRandom::new,
         L32X64MixRandom::new,
         L32X64MixRandom::new));
+
+    register(new RandomGeneratorFactory<>(
+        "L64X128MixRandom",
+        "LXM",
+        192,
+        2,
+        BigInteger.ONE.shiftLeft(128).subtract(BigInteger.ONE).shiftLeft(64),
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        L64X128MixRandom.class,
+        L64X128MixRandom::new,
+        L64X128MixRandom::new,
+        L64X128MixRandom::new));
+
+    register(new RandomGeneratorFactory<>(
+        "L64X128StarStarRandom",
+        "LXM",
+        192,
+        2,
+        BigInteger.ONE.shiftLeft(128).subtract(BigInteger.ONE).shiftLeft(64),
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        L64X128StarStarRandom.class,
+        L64X128StarStarRandom::new,
+        L64X128StarStarRandom::new,
+        L64X128StarStarRandom::new));
+
+    register(new RandomGeneratorFactory<>(
+        "L64X256MixRandom",
+        "LXM",
+        320,
+        4,
+        BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE).shiftLeft(64),
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        L64X256MixRandom.class,
+        L64X256MixRandom::new,
+        L64X256MixRandom::new,
+        L64X256MixRandom::new));
+
+    register(new RandomGeneratorFactory<>(
+        "Xoshiro256PlusPlus",
+        "Xoshiro",
+        256,
+        4,
+        BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE),
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        Xoshiro256PlusPlus.class,
+        Xoshiro256PlusPlus::new,
+        Xoshiro256PlusPlus::new,
+        Xoshiro256PlusPlus::new));
 
     register(new RandomGeneratorFactory<>(
         "Xoroshiro128PlusPlus",

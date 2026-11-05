@@ -818,7 +818,9 @@ Locale getLocale()
 {
   Locale fallback;
 
-  const char* LANG = getenv("LANG");
+  const char* LANG = getenv("LC_ALL");
+  if (!LANG || !*LANG)
+    LANG = getenv("LANG");
   if (!LANG || strcmp(LANG, "C") == 0)
     return fallback;
 

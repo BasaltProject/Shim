@@ -867,8 +867,7 @@ loop:
                  and static_cast<uintptr_t>(index)
                      < objectArrayLength(t, array))) {
         if (value && !instanceOf(t, objectClass(t, array)->arrayElementClass(), value)) {
-          exception = makeThrowable(t, GcArrayStoreException::Type);
-          goto throw_;
+          throwArrayStore(t, objectClass(t, value));
         }
         setField(t, array, ArrayBody + (index * BytesPerWord), value);
       } else {

@@ -4582,6 +4582,13 @@ static void moduleDescription(Thread* t, GcClass* c, char* out, unsigned size)
   }
 }
 
+void NO_RETURN throwArrayStore(Thread* t, GcClass* valueClass)
+{
+  char name[512];
+  dottedName(valueClass->name(), name, sizeof(name));
+  throwNew(t, GcArrayStoreException::Type, "%s", name);
+}
+
 void NO_RETURN throwClassCast(Thread* t, GcClass* from, GcClass* to)
 {
   char a[512];
