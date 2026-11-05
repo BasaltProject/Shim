@@ -59,6 +59,8 @@ class Heap : public shim::util::Allocator {
     virtual unsigned sizeInWords(void*) = 0;
     virtual unsigned copiedSizeInWords(void*) = 0;
     virtual void copy(void*, void*) = 0;
+    virtual unsigned copiedSizeInWordsOf(void*, uintptr_t header) = 0;
+    virtual void copyFrom(void*, void*, uintptr_t header) = 0;
     virtual void walk(void*, Walker*) = 0;
   };
 
