@@ -338,7 +338,7 @@ public class SignatureParser {
     }
     if (type instanceof Class) {
       Class<?> clazz = (Class<?>) type;
-      return clazz.getName();
+      return clazz.getTypeName();
     }
     return type.toString();
   }

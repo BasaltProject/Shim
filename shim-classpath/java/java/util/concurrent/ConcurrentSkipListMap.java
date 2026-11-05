@@ -1559,7 +1559,17 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
 
   @Override
   public void replaceAll(java.util.function.BiFunction<? super K, ? super V, ? extends V> function) {
-    super.replaceAll(function);
+    java.util.Objects.requireNonNull(function);
+    for (Map.Entry<K, V> e : entrySet()) {
+      K k = e.getKey();
+      V v = e.getValue();
+      while (!replace(k, v, java.util.Objects.requireNonNull(function.apply(k, v)))) {
+        v = get(k);
+        if (v == null) {
+          break;
+        }
+      }
+    }
   }
 
   @Override

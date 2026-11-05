@@ -72,10 +72,12 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
   }
 
   public boolean isEmpty() {
+    poll();
     return map.isEmpty();
   }
 
   public int size() {
+    poll();
     return map.size();
   }
 
@@ -100,6 +102,7 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
   }
 
   public void putAll(Map<? extends K,? extends V> elts) {
+    poll();
     map.putAll(elts);
   }
 
@@ -109,18 +112,22 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
   }
 
   public void clear() {
+    poll();
     map.clear();
   }
 
   public Set<Entry<K, V>> entrySet() {
+    poll();
     return map.entrySet();
   }
 
   public Set<K> keySet() {
+    poll();
     return map.keySet();
   }
 
   public Collection<V> values() {
+    poll();
     return map.values();
   }
 

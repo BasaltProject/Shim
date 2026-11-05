@@ -2707,6 +2707,8 @@ inline void NO_RETURN
 
 void NO_RETURN throwClassCast(Thread* t, GcClass* from, GcClass* to);
 
+void NO_RETURN throwArrayStore(Thread* t, GcClass* valueClass);
+
 object findInHierarchyOrNull(
     Thread* t,
     GcClass* class_,

@@ -3065,7 +3065,7 @@ void storeReferenceArray(MyThread* t, object array, uint32_t index, object value
              static_cast<int32_t>(index), static_cast<int32_t>(objectArrayLength(t, array)));
   }
   if (value && !instanceOf(t, objectClass(t, array)->arrayElementClass(), value)) {
-    throwNew(t, GcArrayStoreException::Type);
+    throwArrayStore(t, objectClass(t, value));
   }
   setField(t, array, ArrayBody + (index * BytesPerWord), value);
 }
