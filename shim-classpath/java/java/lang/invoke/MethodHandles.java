@@ -875,7 +875,7 @@ public final class MethodHandles {
       }
       checkAccess(refc, m.getDeclaringClass(), m.getModifiers(), name);
       int kind = refc.isInterface() ? MethodHandle.REF_invokeInterface : MethodHandle.REF_invokeVirtual;
-      return varargsAware(new MethodHandle(kind, refc.getClassLoader(), m.vmMethod));
+      return varargsAware(new DirectMethodHandle(kind, refc.getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle findStatic(Class<?> refc, String name, MethodType type)
@@ -894,7 +894,7 @@ public final class MethodHandles {
         throw new IllegalAccessException("Method is not static: " + name);
       }
       checkAccess(refc, m.getDeclaringClass(), m.getModifiers(), name);
-      return varargsAware(new MethodHandle(MethodHandle.REF_invokeStatic, refc.getClassLoader(), m.vmMethod));
+      return varargsAware(new DirectMethodHandle(MethodHandle.REF_invokeStatic, refc.getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle findSpecial(Class<?> refc, String name, MethodType type, Class<?> specialCaller)
@@ -910,7 +910,7 @@ public final class MethodHandles {
       if (!m.getReturnType().equals(type.returnType())) {
         throw new NoSuchMethodException(name);
       }
-      return varargsAware(new MethodHandle(MethodHandle.REF_invokeSpecial, refc.getClassLoader(), m.vmMethod));
+      return varargsAware(new DirectMethodHandle(MethodHandle.REF_invokeSpecial, refc.getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle findConstructor(Class<?> refc, MethodType type)
@@ -922,29 +922,29 @@ public final class MethodHandles {
       }
       Constructor<?> c = refc.getDeclaredConstructor(type.parameterArray());
       checkAccess(refc, refc, c.getModifiers(), "<init>");
-      return varargsAware(new MethodHandle(MethodHandle.REF_newInvokeSpecial, refc.getClassLoader(), c.method.vmMethod));
+      return varargsAware(new DirectMethodHandle(MethodHandle.REF_newInvokeSpecial, refc.getClassLoader(), c.method.vmMethod));
     }
 
     public MethodHandle unreflect(Method m) throws IllegalAccessException {
       Objects.requireNonNull(m);
       if (!m.isAccessible()) checkAccess(m.getDeclaringClass(), m.getDeclaringClass(), m.getModifiers(), m.getName());
       if ((m.getModifiers() & Modifier.STATIC) != 0) {
-        return varargsAware(new MethodHandle(MethodHandle.REF_invokeStatic, m.getDeclaringClass().getClassLoader(), m.vmMethod));
+        return varargsAware(new DirectMethodHandle(MethodHandle.REF_invokeStatic, m.getDeclaringClass().getClassLoader(), m.vmMethod));
       }
       int kind = m.getDeclaringClass().isInterface() ? MethodHandle.REF_invokeInterface : MethodHandle.REF_invokeVirtual;
-      return varargsAware(new MethodHandle(kind, m.getDeclaringClass().getClassLoader(), m.vmMethod));
+      return varargsAware(new DirectMethodHandle(kind, m.getDeclaringClass().getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle unreflectSpecial(Method m, Class<?> specialCaller)
         throws IllegalAccessException {
       Objects.requireNonNull(m);
-      return varargsAware(new MethodHandle(MethodHandle.REF_invokeSpecial, m.getDeclaringClass().getClassLoader(), m.vmMethod));
+      return varargsAware(new DirectMethodHandle(MethodHandle.REF_invokeSpecial, m.getDeclaringClass().getClassLoader(), m.vmMethod));
     }
 
     public MethodHandle unreflectConstructor(Constructor<?> c) throws IllegalAccessException {
       Objects.requireNonNull(c);
       if (!c.isAccessible()) checkAccess(c.getDeclaringClass(), c.getDeclaringClass(), c.getModifiers(), "<init>");
-      return varargsAware(new MethodHandle(MethodHandle.REF_newInvokeSpecial, c.getDeclaringClass().getClassLoader(), c.method.vmMethod));
+      return varargsAware(new DirectMethodHandle(MethodHandle.REF_newInvokeSpecial, c.getDeclaringClass().getClassLoader(), c.method.vmMethod));
     }
 
     public MethodHandle findGetter(Class<?> refc, String name, Class<?> type)

@@ -23,7 +23,7 @@
 
 package java.util;
 
-public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Cloneable, java.io.Serializable {
+public abstract class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Cloneable, java.io.Serializable {
   
   private BitSet bitset;
   private Class<T> elementType;
@@ -56,7 +56,7 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
     throw new java.io.InvalidObjectException("Proxy required");
   }
 
-  private EnumSet(int size, Class<T> type) {
+  EnumSet(int size, Class<T> type) {
     bitset = new BitSet(size);
     elementType = type;
   }
@@ -206,7 +206,7 @@ public class EnumSet<T extends Enum<T>> extends AbstractSet<T> implements Clonea
   
   private static <T extends Enum<T>>EnumSet<T> createEmptyEnumSet(Class<T> elementType) {
     T[] constants = elementType.getEnumConstants();
-    EnumSet<T> enumSet = new EnumSet<T>(constants.length, elementType);
+    EnumSet<T> enumSet = new RegularEnumSet<T>(constants.length, elementType);
     
     return enumSet;
   }

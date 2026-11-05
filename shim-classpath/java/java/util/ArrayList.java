@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ *
+ * Licensed under the MIT License; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
 
 package java.util;
 
@@ -599,5 +607,40 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     } else {
       throw new java.io.InvalidObjectException("Invalid size: " + size);
     }
+  }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return super.spliterator();
+  }
+
+  @Override
+  public E getFirst() {
+    return super.getFirst();
+  }
+
+  @Override
+  public E getLast() {
+    return super.getLast();
+  }
+
+  @Override
+  public void addFirst(E e) {
+    super.addFirst(e);
+  }
+
+  @Override
+  public void addLast(E e) {
+    super.addLast(e);
+  }
+
+  @Override
+  public E removeFirst() {
+    return super.removeFirst();
+  }
+
+  @Override
+  public E removeLast() {
+    return super.removeLast();
   }
 }

@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ *
+ * Licensed under the MIT License; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
 
 package java.util;
 
@@ -633,5 +641,10 @@ public class Vector<E> extends AbstractList<E> implements List<E>, RandomAccess,
       throw new ConcurrentModificationException();
     }
     modCount++;
+  }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return super.spliterator();
   }
 }

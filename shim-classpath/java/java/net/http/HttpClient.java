@@ -90,11 +90,8 @@ public abstract class HttpClient implements AutoCloseable {
   public abstract <T> CompletableFuture<HttpResponse<T>> sendAsync(
       HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler);
 
-  public <T> CompletableFuture<HttpResponse<T>> sendAsync(
-      HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler, HttpResponse.PushPromiseHandler<T> pushPromiseHandler)
-  {
-    return sendAsync(request, responseBodyHandler);
-  }
+  public abstract <T> CompletableFuture<HttpResponse<T>> sendAsync(
+      HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler, HttpResponse.PushPromiseHandler<T> pushPromiseHandler);
 
   public WebSocket.Builder newWebSocketBuilder() {
     return new WebSocketClient.BuilderImpl(this, executor().orElse(null));
@@ -585,6 +582,14 @@ public abstract class HttpClient implements AutoCloseable {
         throw new IOException(cause);
       }
       return new HttpResponseImpl<T>(code, request, respHeaders, body, uri, Version.HTTP_2);
+    }
+
+    @Override
+    public <T> CompletableFuture<HttpResponse<T>> sendAsync(
+        HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler,
+        HttpResponse.PushPromiseHandler<T> pushPromiseHandler)
+    {
+      return sendAsync(request, responseBodyHandler);
     }
 
     @Override

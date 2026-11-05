@@ -57,9 +57,7 @@ public interface MemoryLayout {
 
   MemoryLayout withByteAlignment(long byteAlignment);
 
-  default long scale(long offset, long index) {
-    return offset + Math.multiplyExact(index, byteSize());
-  }
+  long scale(long offset, long index);
 
   MethodHandle scaleHandle();
 

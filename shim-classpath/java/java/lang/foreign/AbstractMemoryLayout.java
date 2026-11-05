@@ -239,4 +239,9 @@ abstract class AbstractMemoryLayout implements MemoryLayout {
   static String formatName(String str, String name) {
     return name != null ? str + "(" + name + ")" : str;
   }
+
+  @Override
+  public long scale(long offset, long index) {
+    return offset + Math.multiplyExact(index, byteSize());
+  }
 }

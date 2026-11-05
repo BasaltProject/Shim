@@ -24,328 +24,22 @@
 package java.util.concurrent;
 
 public enum TimeUnit {
-  NANOSECONDS {
-    @Override
-    public long toNanos(long d) {
-      return d;
-    }
-    
-    @Override
-    public long toMicros(long d) {
-      return d / NANOSECONDS_PER_MICROSECOND;
-    }
-    
-    @Override
-    public long toMillis(long d) {
-      return d / NANOSECONDS_PER_MILLISECOND;
-    }
-    
-    @Override
-    public long toSeconds(long d) {
-      return d / NANOSECONDS_PER_SECOND;
-    }
-    
-    @Override
-    public long toMinutes(long d) {
-      return d / NANOSECONDS_PER_MINUTE;
-    }
-    
-    @Override
-    public long toHours(long d) {
-      return d / NANOSECONDS_PER_HOUR;
-    }
-    
-    @Override
-    public long toDays(long d) {
-      return d / NANOSECONDS_PER_DAY;
-    }
-    
-    @Override
-    public long convert(long d, TimeUnit u) {
-      return u.toNanos(d);
-    }
-    
-    @Override
-    int excessNanos(long d, long m) {
-      return (int) (d - (m * NANOSECONDS_PER_MILLISECOND));
-    }
-  },
-  MICROSECONDS {
-    @Override
-    public long toNanos(long d) {
-      return scale(d, NANOSECONDS_PER_MICROSECOND);
-    }
-    
-    @Override
-    public long toMicros(long d) {
-      return d;
-    }
-    
-    @Override
-    public long toMillis(long d) {
-      return d / MICROSECONDS_PER_MILLISECOND;
-    }
-    
-    @Override
-    public long toSeconds(long d) {
-      return d / MICROSECONDS_PER_SECOND;
-    }
-    
-    @Override
-    public long toMinutes(long d) {
-      return d / MICROSECONDS_PER_MINUTE;
-    }
-    
-    @Override
-    public long toHours(long d) {
-      return d / MICROSECONDS_PER_HOUR;
-    }
-    
-    @Override
-    public long toDays(long d) {
-      return d / MICROSECONDS_PER_DAY;
-    }
-    
-    @Override
-    public long convert(long d, TimeUnit u) {
-      return u.toMicros(d);
-    }
-    
-    @Override
-    int excessNanos(long d, long m) {
-      return (int) ((d * NANOSECONDS_PER_MICROSECOND) - (m * NANOSECONDS_PER_MILLISECOND));
-    }
-  },
-  MILLISECONDS {
-    @Override
-    public long toNanos(long d) {
-      return scale(d, NANOSECONDS_PER_MILLISECOND);
-    }
-    
-    @Override
-    public long toMicros(long d) {
-      return scale(d, MICROSECONDS_PER_MILLISECOND);
-    }
-    
-    @Override
-    public long toMillis(long d) {
-      return d;
-    }
-    
-    @Override
-    public long toSeconds(long d) {
-      return d / MILLISECONDS_PER_SECOND;
-    }
-    
-    @Override
-    public long toMinutes(long d) {
-      return d / MILLISECONDS_PER_MINUTE;
-    }
-    
-    @Override
-    public long toHours(long d) {
-      return d / MILLISECONDS_PER_HOUR;
-    }
-    
-    @Override
-    public long toDays(long d) {
-      return d / MILLISECONDS_PER_DAY;
-    }
-    
-    @Override
-    public long convert(long d, TimeUnit u) {
-      return u.toMillis(d);
-    }
-    
-    @Override
-    int excessNanos(long d, long m) {
-      return 0;
-    }
-  },
-  SECONDS {
-    @Override
-    public long toNanos(long d) {
-      return scale(d, NANOSECONDS_PER_SECOND);
-    }
-    
-    @Override
-    public long toMicros(long d) {
-      return scale(d, MICROSECONDS_PER_SECOND);
-    }
-    
-    @Override
-    public long toMillis(long d) {
-      return scale(d, MILLISECONDS_PER_SECOND);
-    }
-    
-    @Override
-    public long toSeconds(long d) {
-      return d;
-    }
-    
-    @Override
-    public long toMinutes(long d) {
-      return d / SECONDS_PER_MINUTE;
-    }
-    
-    @Override
-    public long toHours(long d) {
-      return d / SECONDS_PER_HOUR;
-    }
-    
-    @Override
-    public long toDays(long d) {
-      return d / SECONDS_PER_DAY;
-    }
-    
-    @Override
-    public long convert(long d, TimeUnit u) {
-      return u.toSeconds(d);
-    }
-    
-    @Override
-    int excessNanos(long d, long m) {
-      return 0;
-    }
-  },
-  MINUTES {
-    @Override
-    public long toNanos(long d) {
-      return scale(d, NANOSECONDS_PER_MINUTE);
-    }
-    
-    @Override
-    public long toMicros(long d) {
-      return scale(d, MICROSECONDS_PER_MINUTE);
-    }
-    
-    @Override
-    public long toMillis(long d) {
-      return scale(d, MILLISECONDS_PER_MINUTE);
-    }
-    
-    @Override
-    public long toSeconds(long d) {
-      return scale(d, SECONDS_PER_MINUTE);
-    }
-    
-    @Override
-    public long toMinutes(long d) {
-      return d;
-    }
-    
-    @Override
-    public long toHours(long d) {
-      return d / MINUETS_PER_HOUR;
-    }
-    
-    @Override
-    public long toDays(long d) {
-      return d / MINUETS_PER_DAY;
-    }
-    
-    @Override
-    public long convert(long d, TimeUnit u) {
-      return u.toMinutes(d);
-    }
-    
-    @Override
-    int excessNanos(long d, long m) {
-      return 0;
-    }
-  },
-  HOURS {
-    @Override
-    public long toNanos(long d) {
-      return scale(d, NANOSECONDS_PER_HOUR);
-    }
-    
-    @Override
-    public long toMicros(long d) {
-      return scale(d, MICROSECONDS_PER_HOUR);
-    }
-    
-    @Override
-    public long toMillis(long d) {
-      return scale(d, MILLISECONDS_PER_HOUR);
-    }
-    
-    @Override
-    public long toSeconds(long d) {
-      return scale(d, SECONDS_PER_HOUR);
-    }
-    
-    @Override
-    public long toMinutes(long d) {
-      return scale(d, MINUETS_PER_HOUR);
-    }
-    
-    @Override
-    public long toHours(long d) {
-      return d;
-    }
-    
-    @Override
-    public long toDays(long d) {
-      return d / HOURS_PER_DAY;
-    }
-    
-    @Override
-    public long convert(long d, TimeUnit u) {
-      return u.toHours(d);
-    }
-    
-    @Override
-    int excessNanos(long d, long m) {
-      return 0;
-    }
-  },
-  DAYS {
-    @Override
-    public long toNanos(long d) {
-      return scale(d, NANOSECONDS_PER_DAY);
-    }
-    
-    @Override
-    public long toMicros(long d) {
-      return scale(d, MICROSECONDS_PER_DAY);
-    }
-    
-    @Override
-    public long toMillis(long d) {
-      return scale(d, MILLISECONDS_PER_DAY);
-    }
-    
-    @Override
-    public long toSeconds(long d) {
-      return scale(d, SECONDS_PER_DAY);
-    }
-    
-    @Override
-    public long toMinutes(long d) {
-      return scale(d, MINUETS_PER_DAY);
-    }
-    
-    @Override
-    public long toHours(long d) {
-      return scale(d, HOURS_PER_DAY);
-    }
-    
-    @Override
-    public long toDays(long d) {
-      return d;
-    }
-    
-    @Override
-    public long convert(long d, TimeUnit u) {
-      return u.toDays(d);
-    }
-    
-    @Override
-    int excessNanos(long d, long m) {
-      return 0;
-    }
-  };
+  NANOSECONDS(1L),
+  MICROSECONDS(1000L),
+  MILLISECONDS(1000000L),
+  SECONDS(1000000000L),
+  MINUTES(60000000000L),
+  HOURS(3600000000000L),
+  DAYS(86400000000000L);
+
+  private static final long NANOSECONDS_PER_MILLISECOND = 1000000L;
+  private static final long NANOSECONDS_PER_SECOND = 1000000000L;
+
+  private final long scale;
+
+  TimeUnit(long scale) {
+    this.scale = scale;
+  }
 
   public long convert(java.time.Duration duration) {
     long secs = duration.getSeconds();
@@ -414,62 +108,63 @@ public enum TimeUnit {
     }
   }
   
-  private static final long NANOSECONDS_PER_MICROSECOND = 1000L;
-  private static final long MICROSECONDS_PER_MILLISECOND = 1000L;
-  private static final long MILLISECONDS_PER_SECOND = 1000L;
-  private static final long SECONDS_PER_MINUTE = 60;
-  private static final long MINUETS_PER_HOUR = 60;
-  private static final long HOURS_PER_DAY = 24;
-  
-  private static final long NANOSECONDS_PER_MILLISECOND = NANOSECONDS_PER_MICROSECOND * MICROSECONDS_PER_MILLISECOND;
-  private static final long NANOSECONDS_PER_SECOND = NANOSECONDS_PER_MILLISECOND * MILLISECONDS_PER_SECOND;
-  private static final long NANOSECONDS_PER_MINUTE = NANOSECONDS_PER_SECOND * SECONDS_PER_MINUTE;
-  private static final long NANOSECONDS_PER_HOUR = NANOSECONDS_PER_MINUTE * MINUETS_PER_HOUR;
-  private static final long NANOSECONDS_PER_DAY = NANOSECONDS_PER_HOUR * HOURS_PER_DAY;
-  
-  private static final long MICROSECONDS_PER_SECOND = MICROSECONDS_PER_MILLISECOND * MILLISECONDS_PER_SECOND;
-  private static final long MICROSECONDS_PER_MINUTE = MICROSECONDS_PER_SECOND * SECONDS_PER_MINUTE;
-  private static final long MICROSECONDS_PER_HOUR = MICROSECONDS_PER_MINUTE * MINUETS_PER_HOUR;
-  private static final long MICROSECONDS_PER_DAY = MICROSECONDS_PER_HOUR * HOURS_PER_DAY;
-  
-  private static final long MILLISECONDS_PER_MINUTE = MILLISECONDS_PER_SECOND * SECONDS_PER_MINUTE;
-  private static final long MILLISECONDS_PER_HOUR = MILLISECONDS_PER_MINUTE * MINUETS_PER_HOUR;
-  private static final long MILLISECONDS_PER_DAY = MILLISECONDS_PER_HOUR * HOURS_PER_DAY;
-  
-  private static final long SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUETS_PER_HOUR;
-  private static final long SECONDS_PER_DAY = SECONDS_PER_HOUR * HOURS_PER_DAY;
-  
-  private static final long MINUETS_PER_DAY = MINUETS_PER_HOUR * HOURS_PER_DAY;
-  
-  private static long scale(long value, long conversion) {
-    long over = Long.MAX_VALUE / conversion;
-    if (value > over) {
+  private long cvt(long d, long targetScale) {
+    if (scale == targetScale) {
+      return d;
+    }
+    if (scale < targetScale) {
+      return d / (targetScale / scale);
+    }
+    long ratio = scale / targetScale;
+    long over = Long.MAX_VALUE / ratio;
+    if (d > over) {
       return Long.MAX_VALUE;
     }
-    if (value < -over) {
+    if (d < -over) {
       return Long.MIN_VALUE;
     }
-    return value * conversion;
+    return d * ratio;
   }
-  
-  public abstract long convert(long sourceDuration, TimeUnit sourceUnit);
-  
-  public abstract long toNanos(long duration);
-  
-  public abstract long toMicros(long duration);
-  
-  public abstract long toMillis(long duration);
-  
-  public abstract long toSeconds(long duration);
-  
-  public abstract long toMinutes(long duration);
-  
-  public abstract long toHours(long duration);
-  
-  public abstract long toDays(long duration);
-  
-  abstract int excessNanos(long d, long m);
-  
+
+  public long convert(long sourceDuration, TimeUnit sourceUnit) {
+    return sourceUnit.cvt(sourceDuration, scale);
+  }
+
+  public long toNanos(long duration) {
+    return cvt(duration, 1L);
+  }
+
+  public long toMicros(long duration) {
+    return cvt(duration, 1000L);
+  }
+
+  public long toMillis(long duration) {
+    return cvt(duration, NANOSECONDS_PER_MILLISECOND);
+  }
+
+  public long toSeconds(long duration) {
+    return cvt(duration, NANOSECONDS_PER_SECOND);
+  }
+
+  public long toMinutes(long duration) {
+    return cvt(duration, 60000000000L);
+  }
+
+  public long toHours(long duration) {
+    return cvt(duration, 3600000000000L);
+  }
+
+  public long toDays(long duration) {
+    return cvt(duration, 86400000000000L);
+  }
+
+  int excessNanos(long d, long m) {
+    if (scale >= NANOSECONDS_PER_MILLISECOND) {
+      return 0;
+    }
+    return (int) ((d * scale) - (m * NANOSECONDS_PER_MILLISECOND));
+  }
+
   public void timedWait(Object obj, long timeout) throws InterruptedException {
     if (timeout > 0) {
       long ms = toMillis(timeout);

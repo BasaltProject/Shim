@@ -458,4 +458,9 @@ public class PriorityQueue<E> extends AbstractQueue<E> implements Serializable {
     heapify();
     return true;
   }
+
+  @Override
+  public void forEach(java.util.function.Consumer<? super E> action) {
+    super.forEach(action);
+  }
 }

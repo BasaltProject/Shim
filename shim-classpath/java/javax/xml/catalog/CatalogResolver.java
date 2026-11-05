@@ -24,7 +24,7 @@ public interface CatalogResolver extends org.xml.sax.EntityResolver, javax.xml.s
   InputStream resolveEntity(String publicId, String systemId, String baseURI, String namespace);
 
   public enum NotFoundAction {
-    CONTINUE("continue"), IGNORE("ignore"), STRICT("strict");
+    CONTINUE("continue") {}, IGNORE("ignore") {}, STRICT("strict") {};
 
     private final String literal;
 

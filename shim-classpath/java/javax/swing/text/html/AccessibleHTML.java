@@ -586,6 +586,40 @@ class AccessibleHTML implements Accessible {
 
       public int getAccessibleColumnExtentAt(int r, int c) { return 1; }
 
+      private final java.util.Map<Integer, TableCellElementInfo> rowHeaders =
+          new java.util.HashMap<Integer, TableCellElementInfo>();
+
+      private String cellText(Element cell) {
+        if (cell == null) {
+          return null;
+        }
+        try {
+          return cell.getDocument().getText(cell.getStartOffset(), cell.getEndOffset() - cell.getStartOffset()).trim();
+        } catch (javax.swing.text.BadLocationException e) {
+          return null;
+        }
+      }
+
+      public void addRowHeader(TableCellElementInfo cell, int rowNumber) {
+        rowHeaders.put(rowNumber, cell);
+      }
+
+      public String getAccessibleRowHeader(int r) {
+        TableCellElementInfo cell = rowHeaders.get(r);
+        return cell == null ? null : cellText(cell.getElement());
+      }
+
+      public String getAccessibleColumnHeader(int c) {
+        if (getElement().getElementCount() == 0) {
+          return null;
+        }
+        Element row = getElement().getElement(0);
+        if (c < 0 || c >= row.getElementCount() || !isTag(row.getElement(c), HTML.Tag.TH)) {
+          return null;
+        }
+        return cellText(row.getElement(c));
+      }
+
       public AccessibleTable getAccessibleRowHeader() { return null; }
 
       public void setAccessibleRowHeader(AccessibleTable table) { }

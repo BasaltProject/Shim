@@ -51,6 +51,8 @@ public final class Pipeline {
       return new java.util.LinkedHashMap<String, byte[]>();
     }
     Gen gen = new Gen(attr, log);
-    return gen.generate(new ArrayList<CSym>(enter.sourceClasses));
+    Map<String, byte[]> out = gen.generate(new ArrayList<CSym>(enter.sourceClasses));
+    gen.generatePackageInfos(units);
+    return out;
   }
 }

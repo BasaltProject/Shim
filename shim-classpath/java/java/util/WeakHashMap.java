@@ -192,4 +192,14 @@ public class WeakHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
       return new MyCell(key, queue, value, next, hash(key));
     }
   }
+
+  @Override
+  public void replaceAll(java.util.function.BiFunction<? super K, ? super V, ? extends V> function) {
+    super.replaceAll(function);
+  }
+
+  @Override
+  public void forEach(java.util.function.BiConsumer<? super K, ? super V> action) {
+    super.forEach(action);
+  }
 }

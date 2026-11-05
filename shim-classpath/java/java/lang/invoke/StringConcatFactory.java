@@ -92,7 +92,7 @@ public final class StringConcatFactory {
             byte[] data = out.toByteArray();
             Class<?> generated = SystemClassLoader.getClass(
                     Classes.defineVMClass(type.loader, data, 0, data.length));
-            return new ConstantCallSite(new MethodHandle(MethodHandle.REF_invokeStatic, type.loader,
+            return new ConstantCallSite(new DirectMethodHandle(MethodHandle.REF_invokeStatic, type.loader,
                     Classes.toVMMethod(generated.getMethod("make", type.parameterArray()))));
         } catch (IOException exception) {
             throw new StringConcatException("Unable to generate concatenation method", exception);

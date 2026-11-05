@@ -127,15 +127,5 @@ public interface MethodTypeDesc extends ConstantDesc, TypeDescriptor.OfMethod<Cl
     return sb.toString();
   }
 
-  @Override
-  default MethodType resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
-    Objects.requireNonNull(lookup, "lookup");
-    Class<?> r = returnType().resolveConstantDesc(lookup);
-    List<ClassDesc> pDescs = parameterList();
-    Class<?>[] pTypes = new Class<?>[pDescs.size()];
-    for (int i = 0; i < pDescs.size(); ++i) {
-      pTypes[i] = pDescs.get(i).resolveConstantDesc(lookup);
-    }
-    return MethodType.methodType(r, pTypes);
-  }
+  MethodType resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException;
 }

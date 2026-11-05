@@ -22,27 +22,21 @@ public interface OperatingSystemMXBean extends java.lang.management.OperatingSys
     return getFreeMemorySize();
   }
 
-  default long getFreeMemorySize() {
-    throw new UnsupportedOperationException();
-  }
+  long getFreeMemorySize();
 
   @Deprecated(since = "14")
   default long getTotalPhysicalMemorySize() {
     return getTotalMemorySize();
   }
 
-  default long getTotalMemorySize() {
-    throw new UnsupportedOperationException();
-  }
+  long getTotalMemorySize();
 
   @Deprecated(since = "14")
   default double getSystemCpuLoad() {
     return getCpuLoad();
   }
 
-  default double getCpuLoad() {
-    throw new UnsupportedOperationException();
-  }
+  double getCpuLoad();
 
   double getProcessCpuLoad();
 }

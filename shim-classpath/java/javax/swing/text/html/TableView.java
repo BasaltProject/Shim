@@ -7,6 +7,7 @@
  */
 package javax.swing.text.html;
 
+import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.Shape;
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.List;
 import javax.swing.SizeRequirements;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.AttributeSet;
+import javax.swing.text.BoxView;
 import javax.swing.text.Element;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.View;
@@ -572,13 +574,72 @@ class TableView extends BlockView implements ViewFactory {
 
   public float getAlignment(int axis) { return axis == X_AXIS ? tableAlignment() : super.getAlignment(axis); }
 
-  class RowView extends BlockView {
+  class RowView extends BoxView {
     final BitSet fill = new BitSet();
     int rowIndex;
     int viewIndex;
+    private AttributeSet rowAttr;
+    private StyleSheet.BoxPainter rowPainter;
 
     RowView(Element elem) {
       super(elem, View.X_AXIS);
+    }
+
+    public void setParent(View parent) {
+      super.setParent(parent);
+      if (parent != null) {
+        setPropertiesFromAttributes();
+      }
+    }
+
+    protected void setPropertiesFromAttributes() {
+      StyleSheet sheet = ((HTMLDocument) getDocument()).getStyleSheet();
+      rowAttr = sheet.getViewAttributes(this);
+      rowPainter = sheet.getBoxPainter(rowAttr);
+      if (rowAttr != null) {
+        setInsets((short) rowPainter.getInset(TOP, this), (short) rowPainter.getInset(LEFT, this),
+            (short) rowPainter.getInset(BOTTOM, this), (short) rowPainter.getInset(RIGHT, this));
+      }
+    }
+
+    public AttributeSet getAttributes() {
+      if (rowAttr == null) {
+        rowAttr = ((HTMLDocument) getDocument()).getStyleSheet().getViewAttributes(this);
+      }
+      return rowAttr;
+    }
+
+    public void paint(Graphics g, Shape allocation) {
+      Rectangle a = (Rectangle) allocation;
+      if (rowPainter != null) {
+        rowPainter.paint(g, a.x, a.y, a.width, a.height, this);
+      }
+      super.paint(g, a);
+    }
+
+    public void changedUpdate(DocumentEvent changes, Shape a, ViewFactory f) {
+      super.changedUpdate(changes, a, f);
+      int pos = changes.getOffset();
+      if (pos <= getStartOffset() && (pos + changes.getLength()) >= getEndOffset()) {
+        setPropertiesFromAttributes();
+      }
+    }
+
+    public float getAlignment(int axis) {
+      switch (axis) {
+        case View.X_AXIS:
+          return 0;
+        case View.Y_AXIS:
+          if (getViewCount() == 0) {
+            return 0;
+          }
+          float span = getPreferredSpan(View.Y_AXIS);
+          View v = getView(0);
+          float above = v.getPreferredSpan(View.Y_AXIS);
+          return (((int) span) != 0) ? (above * v.getAlignment(View.Y_AXIS)) / span : 0;
+        default:
+          throw new IllegalArgumentException("Invalid axis: " + axis);
+      }
     }
 
     public int getResizeWeight(int axis) { return 1; }

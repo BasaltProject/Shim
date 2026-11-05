@@ -227,4 +227,19 @@ public class TreeSet<E> extends AbstractSet<E>
     }
     this.m = tm;
   }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return super.spliterator();
+  }
+
+  @Override
+  public void addFirst(E e) {
+    NavigableSet.super.addFirst(e);
+  }
+
+  @Override
+  public void addLast(E e) {
+    NavigableSet.super.addLast(e);
+  }
 }

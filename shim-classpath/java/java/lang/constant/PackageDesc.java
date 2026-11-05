@@ -33,5 +33,7 @@ public interface PackageDesc {
 
   String internalName();
 
-  String name();
+  default String name() {
+    return internalName().replace('/', '.');
+  }
 }

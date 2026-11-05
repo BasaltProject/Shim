@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ *
+ * Licensed under the MIT License; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
 
 package java.util;
 
@@ -119,5 +127,10 @@ public class HashSet<E> extends AbstractSet<E> implements Set<E>, Cloneable, jav
       E e = (E) s.readObject();
       map.put(e, PRESENT);
     }
+  }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return super.spliterator();
   }
 }

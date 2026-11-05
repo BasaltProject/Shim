@@ -126,7 +126,7 @@ final class TypeOps {
       case Ty.TVAR: {
         for (int i = 0; i < from.size(); i++) {
           if (from.get(i) == t.tv) {
-            return i < to.size() ? to.get(i) : t;
+            return i < to.size() ? boundedWildcard(t.tv, to.get(i)) : t;
           }
         }
         return t;
@@ -190,6 +190,16 @@ final class TypeOps {
       default:
         return t;
     }
+  }
+
+  private static Ty boundedWildcard(TVSym tv, Ty arg) {
+    if (arg.tag == Ty.WILD && arg.wildKind == 0) {
+      List<Ty> bounds = tv.bounds();
+      if (!bounds.isEmpty() && !bounds.get(0).isObject() && !hasTvar(bounds.get(0))) {
+        return Ty.wild(1, bounds.get(0));
+      }
+    }
+    return arg;
   }
 
   static List<Ty> subst(List<Ty> l, List<TVSym> from, List<Ty> to) {

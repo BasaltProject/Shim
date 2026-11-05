@@ -37,7 +37,9 @@ import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.function.Supplier;
 
-public abstract class System {
+public final class System {
+  private System() {}
+
   private static class Static {
     public static Properties properties = makeProperties();
   }

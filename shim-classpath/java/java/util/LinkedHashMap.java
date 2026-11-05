@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ *
+ * Licensed under the MIT License; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
 
 package java.util;
 
@@ -675,5 +683,20 @@ public class LinkedHashMap<K, V> extends HashMap<K, V> implements SequencedMap<K
       current = null;
       expectedModCount = modCount;
     }
+  }
+
+  @Override
+  public java.util.SequencedSet<K> sequencedKeySet() {
+    return SequencedMap.super.sequencedKeySet();
+  }
+
+  @Override
+  public java.util.SequencedCollection<V> sequencedValues() {
+    return SequencedMap.super.sequencedValues();
+  }
+
+  @Override
+  public java.util.SequencedSet<java.util.Map.Entry<K, V>> sequencedEntrySet() {
+    return SequencedMap.super.sequencedEntrySet();
   }
 }

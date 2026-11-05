@@ -29,8 +29,14 @@ public final class StackWalker {
     String getClassName();
     String getMethodName();
     Class<?> getDeclaringClass();
-    MethodType getMethodType();
-    String getDescriptor();
+    default MethodType getMethodType() {
+      throw new UnsupportedOperationException();
+    }
+
+    default String getDescriptor() {
+      throw new UnsupportedOperationException();
+    }
+
     int getByteCodeIndex();
     String getFileName();
     int getLineNumber();

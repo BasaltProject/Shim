@@ -1,5 +1,6 @@
 import java.awt.*;import java.awt.event.*;import javax.swing.*;
 public class AwtInputEventsModern{public static void main(String[] a)throws Exception{
+  java.util.Locale.setDefault(java.util.Locale.ENGLISH);System.setProperty("java.awt.headless","true");
   EvK.main(a);
  JPanel c=new JPanel();
  int[] ids={MouseEvent.MOUSE_PRESSED,MouseEvent.MOUSE_RELEASED,MouseEvent.MOUSE_CLICKED,MouseEvent.MOUSE_MOVED,MouseEvent.MOUSE_DRAGGED,MouseEvent.MOUSE_ENTERED};

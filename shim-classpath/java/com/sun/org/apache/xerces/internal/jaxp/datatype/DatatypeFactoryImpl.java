@@ -6,9 +6,11 @@
  * SPDX-License-Identifier: MIT
  */
 
-package shim.xml.datatype;
+package com.sun.org.apache.xerces.internal.jaxp.datatype;
 
 import java.math.BigDecimal;
+import shim.xml.datatype.DurationImpl;
+import shim.xml.datatype.XMLGregorianCalendarImpl;
 import java.math.BigInteger;
 import java.util.GregorianCalendar;
 import javax.xml.datatype.DatatypeFactory;

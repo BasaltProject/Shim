@@ -80,6 +80,48 @@ final class Gen {
     return out;
   }
 
+  void generatePackageInfos(List<? extends CompilationUnitTree> units) {
+    for (CompilationUnitTree cu : units) {
+      if (cu.getSourceFile() == null || !cu.getSourceFile().getName().endsWith("package-info.java")
+          || cu.getPackageAnnotations() == null || cu.getPackageAnnotations().isEmpty() || cu.getPackageName() == null) {
+        continue;
+      }
+      Env.CuEnv ce = enter.cuEnvs.get(cu);
+      if (ce == null) {
+        continue;
+      }
+      final String internal = cu.getPackageName().toString().replace('.', '/') + "/package-info";
+      CSym pi = new CSym(internal);
+      pi.isSource = true;
+      pi.cu = cu;
+      pi.name = "package-info";
+      pi.flags = Sym.INTERFACE | Sym.ABSTRACT;
+      ClassGen cg = new ClassGen(this, pi);
+      Env env = new Env(null, ce);
+      env.isClassEnv = true;
+      env.cls = pi;
+      env.scopeOwner = pi;
+      final AnnotationGen.Result r = AnnotationGen.build(cg, cu.getPackageAnnotations(), env);
+      if (r.visible.isEmpty() && r.invisible.isEmpty()) {
+        continue;
+      }
+      out.put(internal, cf.build(ClassDesc.ofInternalName(internal), new java.util.function.Consumer<java.lang.classfile.ClassBuilder>() {
+        public void accept(java.lang.classfile.ClassBuilder cb) {
+          cb.withVersion(major, 0);
+          cb.withFlags(0x1600);
+          cb.withSuperclass(ClassDesc.ofInternalName("java/lang/Object"));
+          cb.with(java.lang.classfile.attribute.SourceFileAttribute.of("package-info.java"));
+          if (!r.visible.isEmpty()) {
+            cb.with(java.lang.classfile.attribute.RuntimeVisibleAnnotationsAttribute.of(r.visible));
+          }
+          if (!r.invisible.isEmpty()) {
+            cb.with(java.lang.classfile.attribute.RuntimeInvisibleAnnotationsAttribute.of(r.invisible));
+          }
+        }
+      }));
+    }
+  }
+
   /* ---------- naming helpers ---------- */
 
   static ClassDesc cdInternal(String internal) {

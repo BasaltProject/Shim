@@ -448,4 +448,10 @@ public final class HijrahChronology extends AbstractChronology implements Serial
     }
     return new int[] {MIN_YEAR + low / 12, low % 12 + 1, day - START_EPOCH_MONTHS[low] + 1};
   }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public ChronoLocalDateTime<HijrahDate> localDateTime(java.time.temporal.TemporalAccessor temporal) {
+    return (ChronoLocalDateTime<HijrahDate>) super.localDateTime(temporal);
+  }
 }

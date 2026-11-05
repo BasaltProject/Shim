@@ -16,7 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public class DynamicConstantDesc<T> implements ConstantDesc {
+public abstract class DynamicConstantDesc<T> implements ConstantDesc {
   private final DirectMethodHandleDesc bootstrapMethod;
   private final String constantName;
   private final ClassDesc constantType;
@@ -45,7 +45,7 @@ public class DynamicConstantDesc<T> implements ConstantDesc {
   }
 
   public static <T> DynamicConstantDesc<T> ofNamed(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType, ConstantDesc... bootstrapArgs) {
-    return new DynamicConstantDesc<T>(bootstrapMethod, constantName, constantType, bootstrapArgs);
+    return new AnonymousDynamicConstantDesc<T>(bootstrapMethod, constantName, constantType, bootstrapArgs);
   }
 
   @SuppressWarnings("unchecked")
@@ -165,5 +165,12 @@ public class DynamicConstantDesc<T> implements ConstantDesc {
     }
     sb.append(')').append(constantType.displayName()).append(']');
     return sb.toString();
+  }
+
+  private static final class AnonymousDynamicConstantDesc<T> extends DynamicConstantDesc<T> {
+    AnonymousDynamicConstantDesc(DirectMethodHandleDesc bootstrapMethod, String constantName, ClassDesc constantType,
+        ConstantDesc[] bootstrapArgs) {
+      super(bootstrapMethod, constantName, constantType, bootstrapArgs);
+    }
   }
 }

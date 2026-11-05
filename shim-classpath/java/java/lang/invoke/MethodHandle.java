@@ -34,7 +34,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
-public class MethodHandle implements java.lang.constant.Constable {
+public abstract class MethodHandle implements java.lang.constant.Constable {
   public static final int REF_getField = 1;
   public static final int REF_getStatic = 2;
   public static final int REF_putField = 3;

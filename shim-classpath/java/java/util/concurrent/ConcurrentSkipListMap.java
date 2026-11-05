@@ -1556,4 +1556,49 @@ public class ConcurrentSkipListMap<K, V> extends AbstractMap<K, V>
       put(key, value);
     }
   }
+
+  @Override
+  public void replaceAll(java.util.function.BiFunction<? super K, ? super V, ? extends V> function) {
+    super.replaceAll(function);
+  }
+
+  @Override
+  public void forEach(java.util.function.BiConsumer<? super K, ? super V> action) {
+    super.forEach(action);
+  }
+
+  @Override
+  public V merge(K key, V value, java.util.function.BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+    return super.merge(key, value, remappingFunction);
+  }
+
+  @Override
+  public V compute(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    return super.compute(key, remappingFunction);
+  }
+
+  @Override
+  public V computeIfAbsent(K key, java.util.function.Function<? super K, ? extends V> mappingFunction) {
+    return super.computeIfAbsent(key, mappingFunction);
+  }
+
+  @Override
+  public V computeIfPresent(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    return super.computeIfPresent(key, remappingFunction);
+  }
+
+  @Override
+  public V getOrDefault(Object key, V defaultValue) {
+    return super.getOrDefault(key, defaultValue);
+  }
+
+  @Override
+  public V putFirst(K k, V v) {
+    return ConcurrentNavigableMap.super.putFirst(k, v);
+  }
+
+  @Override
+  public V putLast(K k, V v) {
+    return ConcurrentNavigableMap.super.putLast(k, v);
+  }
 }

@@ -145,4 +145,10 @@ public final class IsoChronology extends AbstractChronology implements Serializa
   public LocalDate resolveDate(Map<TemporalField, Long> fieldValues, ResolverStyle resolverStyle) {
     return IsoResolver.resolveDate(fieldValues, resolverStyle);
   }
+
+  @Override
+  public long epochSecond(int prolepticYear, int month, int dayOfMonth, int hour, int minute, int second,
+      java.time.ZoneOffset zoneOffset) {
+    return super.epochSecond(prolepticYear, month, dayOfMonth, hour, minute, second, zoneOffset);
+  }
 }

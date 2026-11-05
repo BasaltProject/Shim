@@ -74,9 +74,26 @@ public final class Locale implements Cloneable, Serializable {
   }
 
   public enum IsoCountryCode {
-    PART1_ALPHA2,
-    PART1_ALPHA3,
-    PART3
+    PART1_ALPHA2 {
+      @Override
+      Set<String> createCountryCodeSet() {
+        return new HashSet<String>(Arrays.asList(Iso.kCountries));
+      }
+    },
+    PART1_ALPHA3 {
+      @Override
+      Set<String> createCountryCodeSet() {
+        return new HashSet<String>(Iso.kCountry3.values());
+      }
+    },
+    PART3 {
+      @Override
+      Set<String> createCountryCodeSet() {
+        return new HashSet<String>(Arrays.asList(Iso.kPart3));
+      }
+    };
+
+    abstract Set<String> createCountryCodeSet();
   }
 
   public enum FilteringMode {
@@ -299,18 +316,7 @@ public final class Locale implements Cloneable, Serializable {
 
   public static Set<String> getISOCountries(IsoCountryCode type) {
     Objects.requireNonNull(type);
-    Set<String> result = new HashSet<String>();
-    switch (type) {
-    case PART1_ALPHA2:
-      result.addAll(Arrays.asList(Iso.kCountries));
-      break;
-    case PART1_ALPHA3:
-      result.addAll(Iso.kCountry3.values());
-      break;
-    default:
-      result.addAll(Arrays.asList(Iso.kPart3));
-      break;
-    }
+    Set<String> result = type.createCountryCodeSet();
     return Collections.unmodifiableSet(result);
   }
 

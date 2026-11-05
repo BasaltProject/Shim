@@ -43,7 +43,7 @@ import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class ZipFile implements Closeable {
+public class ZipFile implements ZipConstants, Closeable {
   public static final int OPEN_READ = 0x1;
   public static final int OPEN_DELETE = 0x4;
 

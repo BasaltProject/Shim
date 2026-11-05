@@ -1538,4 +1538,59 @@ public class TreeMap<K, V> extends AbstractMap<K, V>
       put(key, value);
     }
   }
+
+  @Override
+  public boolean replace(K key, V oldValue, V newValue) {
+    return super.replace(key, oldValue, newValue);
+  }
+
+  @Override
+  public V replace(K key, V value) {
+    return super.replace(key, value);
+  }
+
+  @Override
+  public void replaceAll(java.util.function.BiFunction<? super K, ? super V, ? extends V> function) {
+    super.replaceAll(function);
+  }
+
+  @Override
+  public void forEach(java.util.function.BiConsumer<? super K, ? super V> action) {
+    super.forEach(action);
+  }
+
+  @Override
+  public V putIfAbsent(K key, V value) {
+    return super.putIfAbsent(key, value);
+  }
+
+  @Override
+  public V merge(K key, V value, java.util.function.BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+    return super.merge(key, value, remappingFunction);
+  }
+
+  @Override
+  public V compute(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    return super.compute(key, remappingFunction);
+  }
+
+  @Override
+  public V computeIfAbsent(K key, java.util.function.Function<? super K, ? extends V> mappingFunction) {
+    return super.computeIfAbsent(key, mappingFunction);
+  }
+
+  @Override
+  public V computeIfPresent(K key, java.util.function.BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    return super.computeIfPresent(key, remappingFunction);
+  }
+
+  @Override
+  public V putFirst(K k, V v) {
+    return NavigableMap.super.putFirst(k, v);
+  }
+
+  @Override
+  public V putLast(K k, V v) {
+    return NavigableMap.super.putLast(k, v);
+  }
 }

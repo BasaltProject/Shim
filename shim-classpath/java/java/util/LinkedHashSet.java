@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ *
+ * Licensed under the MIT License; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
 
 package java.util;
 
@@ -117,5 +125,10 @@ public class LinkedHashSet<E> extends HashSet<E> implements SequencedSet<E>, Clo
     public Iterator<E> iterator() {
       return linked().reversed().keySet().iterator();
     }
+  }
+
+  @Override
+  public java.util.Spliterator<E> spliterator() {
+    return super.spliterator();
   }
 }

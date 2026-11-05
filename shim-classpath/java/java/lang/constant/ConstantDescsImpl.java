@@ -21,7 +21,7 @@ import java.util.Objects;
 final class ConstantDescsImpl {
   private ConstantDescsImpl() {}
 
-  static final class PrimitiveDesc implements ClassDesc {
+  static final class PrimitiveDesc extends AbstractClassDesc {
     private final String descriptor;
 
     PrimitiveDesc(String descriptor) {
@@ -53,7 +53,7 @@ final class ConstantDescsImpl {
     }
   }
 
-  static final class ArrayDesc implements ClassDesc {
+  static final class ArrayDesc extends AbstractClassDesc {
     private final String descriptor;
 
     ArrayDesc(String descriptor) {
@@ -90,7 +90,7 @@ final class ConstantDescsImpl {
     }
   }
 
-  static final class ClassOrInterfaceDesc implements ClassDesc {
+  static final class ClassOrInterfaceDesc extends AbstractClassDesc {
     private final String descriptor;
 
     ClassOrInterfaceDesc(String descriptor) {
@@ -125,6 +125,18 @@ final class ConstantDescsImpl {
   static final class MethodTypeDescImpl implements MethodTypeDesc {
     private final ClassDesc returnType;
     private final List<ClassDesc> params;
+
+    @Override
+    public MethodType resolveConstantDesc(MethodHandles.Lookup lookup) throws ReflectiveOperationException {
+      Objects.requireNonNull(lookup, "lookup");
+      Class<?> r = returnType().resolveConstantDesc(lookup);
+      List<ClassDesc> pDescs = parameterList();
+      Class<?>[] pTypes = new Class<?>[pDescs.size()];
+      for (int i = 0; i < pDescs.size(); ++i) {
+        pTypes[i] = pDescs.get(i).resolveConstantDesc(lookup);
+      }
+      return MethodType.methodType(r, pTypes);
+    }
 
     MethodTypeDescImpl(ClassDesc returnType, List<ClassDesc> params) {
       this.returnType = returnType;

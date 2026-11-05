@@ -277,4 +277,22 @@ public class ThreadImpl implements com.sun.management.ThreadMXBean {
       throw new IllegalArgumentException(e);
     }
   }
+
+  @Override
+  public long[] getThreadCpuTime(long[] ids) {
+    long[] out = new long[ids.length];
+    for (int i = 0; i < ids.length; i++) {
+      out[i] = getThreadCpuTime(ids[i]);
+    }
+    return out;
+  }
+
+  @Override
+  public long[] getThreadUserTime(long[] ids) {
+    long[] out = new long[ids.length];
+    for (int i = 0; i < ids.length; i++) {
+      out[i] = getThreadUserTime(ids[i]);
+    }
+    return out;
+  }
 }

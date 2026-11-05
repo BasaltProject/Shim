@@ -8,7 +8,7 @@
 
 package javax.naming;
 
-public class NamingSecurityException extends NamingException {
+public abstract class NamingSecurityException extends NamingException {
   private static final long serialVersionUID = 26567409268L;
 
   public NamingSecurityException(String explanation) {
