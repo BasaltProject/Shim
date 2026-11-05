@@ -85,9 +85,22 @@ public final class System {
     return (String) Static.properties.remove(key);
   }
 
+  private static String lineSeparator;
+
   public static String lineSeparator() {
-    String sep = getProperty("line.separator");
-    return (sep != null) ? sep : "\n";
+    String sep = lineSeparator;
+    if (sep == null) {
+      sep = "\n";
+      for (String p : getNativeProperties()) {
+        if (p == null) break;
+        if (p.startsWith("line.separator=")) {
+          sep = p.substring(15);
+          break;
+        }
+      }
+      lineSeparator = sep;
+    }
+    return sep;
   }
 
   public static Properties getProperties() {

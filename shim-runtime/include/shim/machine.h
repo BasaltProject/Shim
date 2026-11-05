@@ -1387,7 +1387,7 @@ class Thread {
   uintptr_t* defaultHeap;
   uintptr_t* heap;
   uintptr_t backupHeap[ThreadBackupHeapSizeInWords];
-  static const unsigned MonitorCacheSize = 4;
+  static const unsigned MonitorCacheSize = 64;
   uint64_t monitorCacheEpoch;
   uint64_t monitorCacheObject[MonitorCacheSize];
   uint64_t monitorCacheMonitor[MonitorCacheSize];
@@ -3039,9 +3039,8 @@ inline void monitorRelease(Thread* t, GcMonitor* monitor)
     // thread can acquire ownership. A barrier after the owner store alone
     // does not order those preceding stores on weakly ordered CPUs.
     storeStoreMemoryBarrier();
-    monitor->owner() = 0;
-
-    storeLoadMemoryBarrier();
+    // the exchange is the store-load fence that orders the owner clear before the queue poll
+    __atomic_exchange_n(reinterpret_cast<uintptr_t*>(&monitor->owner()), static_cast<uintptr_t>(0), __ATOMIC_SEQ_CST);
 
     Thread* next = monitorAtomicPollAcquire(t, monitor, false);
 
