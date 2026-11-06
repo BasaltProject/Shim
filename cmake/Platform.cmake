@@ -10,11 +10,11 @@
 # SPDX-License-Identifier: ISC AND MIT
 
 # Target architecture, word size and object format.
-if(WIN32)
-    message(FATAL_ERROR "Shim does not build on Windows")
+if(WIN32 AND (MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
+    message(FATAL_ERROR "Shim builds on Windows with a MinGW-w64 target (clang --target=*-w64-windows-gnu), not with the MSVC ABI")
 endif()
-if(NOT (APPLE OR CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$"))
-    message(FATAL_ERROR "Unsupported platform ${CMAKE_SYSTEM_NAME}; Shim builds on Linux, macOS and FreeBSD")
+if(NOT (APPLE OR WIN32 OR CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$"))
+    message(FATAL_ERROR "Unsupported platform ${CMAKE_SYSTEM_NAME}; Shim builds on Linux, macOS, Windows and FreeBSD")
 endif()
 
 set(_processor "${CMAKE_SYSTEM_PROCESSOR}")
@@ -51,6 +51,13 @@ if(APPLE)
     set(SHIM_TARGET_FORMAT macho)
     set(SHIM_FORMAT_ENUM SHIM_FORMAT_MACHO)
     set(JNI_PLATFORM_DIR darwin)
+elseif(WIN32)
+    set(SHIM_TARGET_FORMAT pe)
+    set(SHIM_FORMAT_ENUM SHIM_FORMAT_PE)
+    set(JNI_PLATFORM_DIR win32)
+    # Windows has no lib prefix on its DLLs, and the VM looks for jvm.dll
+    set(CMAKE_SHARED_LIBRARY_PREFIX "")
+    set(CMAKE_SHARED_MODULE_PREFIX "")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
     set(SHIM_TARGET_FORMAT elf)
     set(SHIM_FORMAT_ENUM SHIM_FORMAT_ELF)
@@ -59,6 +66,13 @@ else()
     set(SHIM_TARGET_FORMAT elf)
     set(SHIM_FORMAT_ENUM SHIM_FORMAT_ELF)
     set(JNI_PLATFORM_DIR linux)
+endif()
+
+# The OS layer the VM and the tools sit on
+if(WIN32)
+    set(SHIM_SYSTEM windows)
+else()
+    set(SHIM_SYSTEM posix)
 endif()
 
 if(NOT SHIM_MODE MATCHES "^(debug|debug-fast|fast|stress|stress-major|small)$")
@@ -92,7 +106,22 @@ if(NOT EXISTS "${_java_home}/include/jni.h")
 endif()
 message(STATUS "Shim: JDK ${_java_home}, ${SHIM_ARCH} ${SHIM_PROCESS} ${SHIM_MODE}")
 
-find_package(ZLIB REQUIRED)
+if(NOT WIN32)
+    find_package(ZLIB REQUIRED)
+else()
+    # Windows has no system zlib, so a release is built from source when none is found.
+    find_package(ZLIB QUIET)
+    if(NOT ZLIB_FOUND)
+        include(FetchContent)
+        set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(zlib
+            URL https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+            URL_HASH SHA256=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23)
+        FetchContent_MakeAvailable(zlib)
+        add_library(ZLIB::ZLIB ALIAS zlibstatic)
+        target_include_directories(zlibstatic PUBLIC "${zlib_SOURCE_DIR}" "${zlib_BINARY_DIR}")
+    endif()
+endif()
 find_package(Threads REQUIRED)
 
 set(SHIM_MODULES shim-runtime shim-codegen shim-system shim-heap shim-util shim-tools)
@@ -101,6 +130,12 @@ set(SHIM_INCLUDES "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/shim-classpath/src"
 foreach(_module ${SHIM_MODULES})
     list(APPEND SHIM_INCLUDES "${CMAKE_SOURCE_DIR}/${_module}/include" "${CMAKE_SOURCE_DIR}/${_module}/src")
 endforeach()
+
+if(WIN32)
+    set(SHIM_EMBED_PREFIX "c:/shim-embedded")
+else()
+    set(SHIM_EMBED_PREFIX "/shim-embedded")
+endif()
 
 # Settings every native target shares, the generator and the VM alike.
 add_library(shim_common INTERFACE)
@@ -112,7 +147,7 @@ target_compile_definitions(shim_common INTERFACE
     SHIM_INFO=""
     USE_ATOMIC_OPERATIONS
     SHIM_JAVA_HOME=""
-    SHIM_EMBED_PREFIX="/shim-embedded"
+    SHIM_EMBED_PREFIX="${SHIM_EMBED_PREFIX}"
     TARGET_BYTES_PER_WORD=${SHIM_POINTER_SIZE}
 )
 target_compile_options(shim_common INTERFACE
@@ -163,6 +198,11 @@ endif()
 if(APPLE)
     target_compile_options(shim_target INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-declarations>)
 endif()
+if(WIN32)
+    # The strict -std mode hides MinGW declarations the Windows backend uses
+    target_compile_options(shim_target INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-U__STRICT_ANSI__>)
+    target_compile_definitions(shim_common INTERFACE _WIN32_WINNT=0x0601)
+endif()
 if(SHIM_ARCH STREQUAL "arm")
     # ARMv6 is assumed because the CPU cannot be probed at run time
     target_compile_options(shim_target INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-marm;-Wno-psabi>)
@@ -177,7 +217,11 @@ endif()
 # Libraries and linker flags for anything that embeds the VM.
 add_library(shim_link INTERFACE)
 target_link_libraries(shim_link INTERFACE ZLIB::ZLIB m Threads::Threads ${CMAKE_DL_LIBS})
-if(APPLE)
+if(WIN32)
+    # Static, so jvm.dll and shim.exe need no MinGW runtime DLLs beside them
+    target_link_libraries(shim_link INTERFACE ws2_32 version uuid iphlpapi mswsock)
+    target_link_options(shim_link INTERFACE -static -mconsole)
+elseif(APPLE)
     target_link_libraries(shim_link INTERFACE
         "-framework CoreFoundation" "-framework Foundation" "-framework CoreServices"
         "-framework SystemConfiguration" "-framework Security")

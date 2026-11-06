@@ -17,32 +17,46 @@ set(SHIM_CLASSPATH_JAR "${CMAKE_BINARY_DIR}/classpath.jar")
 set(SHIM_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${SHIM_GENERATED_DIR}")
 
-# Turns a file into an object that exposes it between two symbols.
+set(SHIM_HOST_TOOLS_DIR "" CACHE PATH "Folder with the binaryToObject and generator built for the build machine (cross builds only)")
 set(_tools "${CMAKE_SOURCE_DIR}/shim-tools/src")
-file(GLOB _object_writer_sources CONFIGURE_DEPENDS "${_tools}/object-writer/*.cpp")
-file(GLOB _binary_to_object_sources CONFIGURE_DEPENDS "${_tools}/binary-to-object/*.cpp")
-add_executable(shim_binary_to_object ${_object_writer_sources} ${_binary_to_object_sources})
-set_target_properties(shim_binary_to_object PROPERTIES OUTPUT_NAME binaryToObject)
-target_include_directories(shim_binary_to_object PRIVATE ${SHIM_INCLUDES})
-target_compile_definitions(shim_binary_to_object PRIVATE
-    __STDC_CONSTANT_MACROS SHIM_TARGET_ARCH=SHIM_ARCH_UNKNOWN SHIM_TARGET_FORMAT=SHIM_FORMAT_UNKNOWN)
-target_compile_options(shim_binary_to_object PRIVATE
-    -Wall -Wextra -Wunused-parameter -Winit-self -Wno-non-virtual-dtor -fno-rtti -fno-exceptions -g
-    $<$<BOOL:${SHIM_WERROR}>:-Werror>)
-
-# Reads the class library and writes the C++ that describes the VM's own types.
 set(_system_dir "${CMAKE_SOURCE_DIR}/shim-system/src")
-file(GLOB _system_sources CONFIGURE_DEPENDS "${_system_dir}/posix/*.cpp")
-add_executable(shim_type_generator
-    "${_tools}/type-generator/main.cpp"
-    "${_system_dir}/posix.cpp"
-    ${_system_sources}
-    "${CMAKE_SOURCE_DIR}/shim-runtime/src/finder.cpp"
-    "${CMAKE_SOURCE_DIR}/shim-util/src/arg-parser.cpp")
-set_target_properties(shim_type_generator PROPERTIES OUTPUT_NAME generator)
-target_compile_definitions(shim_type_generator PRIVATE POINTER_SIZE=${SHIM_POINTER_SIZE})
-target_compile_options(shim_type_generator PRIVATE -O0 -g3)
-target_link_libraries(shim_type_generator PRIVATE shim_common shim_link)
+
+if(CMAKE_CROSSCOMPILING)
+    # The tools run while building, so they must be built for the build machine first.
+    # The generator bakes in the pointer size, so it has to match the target's.
+    if(NOT SHIM_HOST_TOOLS_DIR)
+        message(FATAL_ERROR "Cross builds need -DSHIM_HOST_TOOLS_DIR=<folder with binaryToObject and generator>")
+    endif()
+    add_executable(shim_binary_to_object IMPORTED)
+    set_target_properties(shim_binary_to_object PROPERTIES IMPORTED_LOCATION "${SHIM_HOST_TOOLS_DIR}/binaryToObject")
+    add_executable(shim_type_generator IMPORTED)
+    set_target_properties(shim_type_generator PROPERTIES IMPORTED_LOCATION "${SHIM_HOST_TOOLS_DIR}/generator")
+else()
+    # Turns a file into an object that exposes it between two symbols.
+    file(GLOB _object_writer_sources CONFIGURE_DEPENDS "${_tools}/object-writer/*.cpp")
+    file(GLOB _binary_to_object_sources CONFIGURE_DEPENDS "${_tools}/binary-to-object/*.cpp")
+    add_executable(shim_binary_to_object ${_object_writer_sources} ${_binary_to_object_sources})
+    set_target_properties(shim_binary_to_object PROPERTIES OUTPUT_NAME binaryToObject)
+    target_include_directories(shim_binary_to_object PRIVATE ${SHIM_INCLUDES})
+    target_compile_definitions(shim_binary_to_object PRIVATE
+        __STDC_CONSTANT_MACROS SHIM_TARGET_ARCH=SHIM_ARCH_UNKNOWN SHIM_TARGET_FORMAT=SHIM_FORMAT_UNKNOWN)
+    target_compile_options(shim_binary_to_object PRIVATE
+        -Wall -Wextra -Wunused-parameter -Winit-self -Wno-non-virtual-dtor -fno-rtti -fno-exceptions -g
+        $<$<BOOL:${SHIM_WERROR}>:-Werror>)
+
+    # Reads the class library and writes the C++ that describes the VM's own types.
+    file(GLOB _system_sources CONFIGURE_DEPENDS "${_system_dir}/${SHIM_SYSTEM}/*.cpp")
+    add_executable(shim_type_generator
+        "${_tools}/type-generator/main.cpp"
+        "${_system_dir}/${SHIM_SYSTEM}.cpp"
+        ${_system_sources}
+        "${CMAKE_SOURCE_DIR}/shim-runtime/src/finder.cpp"
+        "${CMAKE_SOURCE_DIR}/shim-util/src/arg-parser.cpp")
+    set_target_properties(shim_type_generator PROPERTIES OUTPUT_NAME generator)
+    target_compile_definitions(shim_type_generator PRIVATE POINTER_SIZE=${SHIM_POINTER_SIZE})
+    target_compile_options(shim_type_generator PRIVATE -O0 -g3)
+    target_link_libraries(shim_type_generator PRIVATE shim_common shim_link)
+endif()
 
 # Class library.
 file(GLOB_RECURSE _classpath_sources CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/shim-classpath/java/*.java")
