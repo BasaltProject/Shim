@@ -98,10 +98,6 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
-      - name: Probe the JIT
-        if: always() && matrix.target == 'Linux-arm64'
-        run: build/shim -cp build/test ArmProbe || true
-
       - name: Check the architecture
         if: matrix.arch == 'x86_64'
         run: file build/shim | grep -q x86_64

@@ -1,9 +1,14 @@
-public class ArmProbe {
+// An int constant or call result must keep its sign when widened to a long.
+public class Widening {
   static int f;
   static int neg() { return -1; }
   static int big() { return 0x80000000; }
   static long id(long v) { return v; }
-  static void check(String name, boolean ok) { System.out.println((ok ? "ok   " : "FAIL ") + name); }
+  static void check(String name, boolean ok) {
+    if (!ok) {
+      throw new RuntimeException(name);
+    }
+  }
 
   public static void main(String[] args) {
     check("i2l call", ((long) neg()) == -1);

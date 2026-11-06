@@ -62,7 +62,7 @@ add_custom_target(shim_test_classes ALL DEPENDS "${CMAKE_BINARY_DIR}/test.stamp"
 
 # Java programs that run to completion on the built VM and exit 0
 foreach(_name Hello ArraysTest Strings Exceptions Collections Floats Integers Longs Misc Enums FormatStrings
-        Dates Files Proxies Reflection Zip Threads GC InvokeDynamic Initializers Subroutine Trace)
+        Dates Files Proxies Reflection Zip Threads GC InvokeDynamic Initializers Subroutine Trace Widening)
     add_test(NAME shim_java_${_name} COMMAND shim_exe -cp "${SHIM_TEST_CLASSES_DIR}" ${_name})
     set_tests_properties(shim_java_${_name} PROPERTIES TIMEOUT 120 WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
 endforeach()
