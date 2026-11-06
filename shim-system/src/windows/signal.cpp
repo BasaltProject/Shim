@@ -23,6 +23,9 @@
 
 #include "windows.h"
 #include "sys/timeb.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef _MSC_VER
 #define FTIME _ftime_s
@@ -302,6 +305,8 @@ LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
         logException(e, SignalRegistrar::Data::instance->crashDumpDirectory);
       }
     }
+  } else if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && getenv("SHIM_CRASH_STACK")) {
+    printStackWords(e);
   }
 
   return EXCEPTION_CONTINUE_SEARCH;
