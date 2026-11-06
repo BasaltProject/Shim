@@ -128,7 +128,7 @@ jobs:
             msystem: CLANGARM64
             prefix: mingw-w64-clang-aarch64
             java: microsoft
-            process: interpret
+            process: compile
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
