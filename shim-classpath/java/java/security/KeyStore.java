@@ -619,19 +619,31 @@ public class KeyStore {
     }
     KeyStore keystore = null;
     try (DataInputStream dataStream = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
-      for (String type : new String[] {"PKCS12", "JKS", "JCEKS"}) {
-        try {
-          dataStream.mark(1 << 20);
-          KeyStore ks = KeyStore.getInstance(type);
-          if (hasPassword) {
-            ks.load(dataStream, password);
-          } else {
-            ks.load(param);
+      search:
+      for (Provider p : Security.getProviders()) {
+        for (Provider.Service s : p.getServices()) {
+          if (!"KeyStore".equals(s.getType())) {
+            continue;
           }
-          keystore = ks;
-          break;
-        } catch (Exception e) {
-          dataStream.reset();
+          try {
+            KeyStoreSpi spi = (KeyStoreSpi) s.newInstance(null);
+            dataStream.mark(Integer.MAX_VALUE);
+            boolean ok = spi.engineProbe(dataStream);
+            dataStream.reset();
+            if (!ok) {
+              continue;
+            }
+            KeyStore ks = new KeyStore(spi, p, s.getAlgorithm());
+            if (hasPassword) {
+              ks.load(dataStream, password);
+            } else {
+              ks.load(param);
+            }
+            keystore = ks;
+            break search;
+          } catch (NoSuchAlgorithmException | IllegalArgumentException e) {
+            dataStream.reset();
+          }
         }
       }
     }

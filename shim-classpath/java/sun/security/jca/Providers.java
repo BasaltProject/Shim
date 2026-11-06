@@ -21,6 +21,13 @@ public final class Providers {
     "sun.security.ec.SunEC",
     "sun.security.ssl.SunJSSE",
     "com.sun.crypto.provider.SunJCE",
+    "shim.security.SunJGSSProvider",
+    "shim.security.SunSASLProvider",
+    "shim.security.XMLDSigProvider",
+    "shim.security.SunPCSCProvider",
+    "shim.security.JdkLDAPProvider",
+    "shim.security.JdkSASLProvider",
+    "shim.security.SunPKCS11Provider",
   };
 
   static {

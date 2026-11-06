@@ -393,10 +393,19 @@ public final class Runtime {
   }
 
   public Process exec(String[] command, String[] envp, File dir) throws IOException {
-    return exec(command);
+    ProcessBuilder b = new ProcessBuilder(command);
+    if (envp != null) {
+      b.environment(envp);
+    }
+    return b.directory(dir).start();
   }
 
   public Process exec(final String[] command) throws IOException {
+    return spawn(command, null, null, new int[] {0, 0, 0}, new String[3], -1);
+  }
+
+  static Process spawn(final String[] command, final String[] env, final String dir, final int[] modes,
+                       final String[] files, final int stdinFd) throws IOException {
     final MyProcess[] process = new MyProcess[1];
     final Throwable[] exception = new Throwable[1];
 
@@ -405,8 +414,13 @@ public final class Runtime {
           public void run() {
             synchronized (process) {
               try {
-                long[] info = new long[5];
-                exec(command, info);
+                long[] info = new long[6];
+                info[5] = stdinFd;
+                try {
+                  exec2(command, env, dir, modes, files, info);
+                } catch (UnsatisfiedLinkError missing) {
+                  exec(command, info);
+                }
                 process[0] = new MyProcess
                   (info[0], info[1], (int) info[2], (int) info[3],
                    (int) info[4]);
@@ -419,16 +433,15 @@ public final class Runtime {
 
             MyProcess p = process[0];
             if (p != null) {
+              int code = -1;
+              if (p.pid != 0) {
+                code = Runtime.waitFor(p.pid, p.tid);
+              }
               synchronized (p) {
-                try {
-                  if (p.pid != 0) {
-                    p.exitCode = Runtime.waitFor(p.pid, p.tid);
-                    p.pid = 0;
-                    p.tid = 0;
-                  }
-                } finally {
-                  p.notifyAll();
-                }
+                p.exitCode = code;
+                p.pid = 0;
+                p.tid = 0;
+                p.notifyAll();
               }
             }
           }
@@ -447,7 +460,8 @@ public final class Runtime {
 
     if (exception[0] != null) {
       if (exception[0] instanceof IOException) {
-        String message = "Failed to run \"" + command[0] + "\": " + exception[0].getMessage();
+        String message = "Cannot run program \"" + command[0] + "\""
+            + (dir != null ? " (in directory \"" + dir + "\")" : "") + ": " + exception[0].getMessage();
         throw new IOException(message);
       } else {
         throw new RuntimeException(exception[0]);
@@ -473,6 +487,15 @@ public final class Runtime {
   private static native void exec(String[] command, long[] process)
     throws IOException;
 
+  private static native void exec2(String[] command, String[] env, String dir, int[] modes, String[] files,
+                                   long[] process) throws IOException;
+
+  static native void signal(long pid, int signal);
+
+  static int takeStdout(Process p) {
+    return p instanceof MyProcess ? ((MyProcess) p).takeStdoutFd() : -1;
+  }
+
   private static native int waitFor(long pid, long tid);
 
   private static native void kill(long pid);
@@ -496,35 +519,39 @@ public final class Runtime {
   }
 
   private static class MyProcess extends Process {
-    private long pid;
+    private volatile long pid;
     private long tid;
-    private final int in;
+    private int in;
     private final int out;
     private final int err;
     private int exitCode;
 
     public MyProcess(long pid, long tid, int in, int out, int err) {
       this.pid = pid;
+      this.origPid = pid;
       this.tid = tid;
       this.in = in;
       this.out = out;
       this.err = err;
     }
 
+    private final long origPid;
+
     public void destroy() {
-			if (pid != 0) {
-      	kill(pid);
-			}
+      long p = pid;
+      if (p != 0) {
+        kill(p);
+      }
     }
 
     @Override
     public long pid() {
-      return pid;
+      return origPid;
     }
 
     @Override
     public ProcessHandle toHandle() {
-      return ProcessHandle.of(pid).orElseGet(() -> new ProcessHandleImpl(pid));
+      return new ProcessHandleImpl(origPid);
     }
 
     @Override
@@ -534,7 +561,10 @@ public final class Runtime {
 
     @Override
     public Process destroyForcibly() {
-      destroy();
+      long p = pid;
+      if (p != 0) {
+        signal(p, 9);
+      }
       return this;
     }
 
@@ -543,16 +573,35 @@ public final class Runtime {
       return true;
     }
 
+    private volatile InputStream inStream;
+    private volatile OutputStream outStream;
+    private volatile InputStream errStream;
+
     public InputStream getInputStream() {
-      return new FileInputStream(new FileDescriptor(in));
+      if (inStream == null) {
+        inStream = in < 0 ? InputStream.nullInputStream() : new FileInputStream(new FileDescriptor(in));
+      }
+      return inStream;
     }
 
     public OutputStream getOutputStream() {
-      return new FileOutputStream(new FileDescriptor(out));
+      if (outStream == null) {
+        outStream = out < 0 ? OutputStream.nullOutputStream() : new FileOutputStream(new FileDescriptor(out));
+      }
+      return outStream;
     }
 
     public InputStream getErrorStream() {
-      return new FileInputStream(new FileDescriptor(err));
+      if (errStream == null) {
+        errStream = err < 0 ? InputStream.nullInputStream() : new FileInputStream(new FileDescriptor(err));
+      }
+      return errStream;
+    }
+
+    int takeStdoutFd() {
+      int fd = in;
+      in = -1;
+      return fd;
     }
 
     public synchronized int exitValue() {

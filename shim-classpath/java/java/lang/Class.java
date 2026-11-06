@@ -357,6 +357,10 @@ public final class Class <T>
     if (name == null) throw new NullPointerException();
     int index = Classes.findField(vmClass, name);
     if (index < 0) {
+      Field hidden = shim.HiddenFields.find(this, vmClass, name);
+      if (hidden != null) {
+        return hidden;
+      }
       throw new NoSuchFieldException(name);
     } else {
       return new Field(vmClass.fieldTable[index]);
@@ -770,7 +774,7 @@ public final class Class <T>
       if (index >= 0) {
         return vmClass.loader.getPackage(name.substring(0, index));
       } else {
-        return null;
+        return vmClass.loader == null ? null : vmClass.loader.getPackage("");
       }
     }
   }
@@ -1077,7 +1081,7 @@ public final class Class <T>
     }
     ClassLoader loader = getClassLoader();
     if (loader == null) {
-      return Module.JAVA_BASE;
+      return Module.ownerOfBootPackage(getPackageName());
     }
     return loader.getUnnamedModule();
   }

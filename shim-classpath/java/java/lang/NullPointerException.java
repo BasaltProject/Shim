@@ -26,9 +26,29 @@ package java.lang;
 public class NullPointerException extends RuntimeException {
   private static final long serialVersionUID = 5162710183389028792L;
 
+  private boolean userCreated;
+  private boolean extendedComputed;
+  private String extendedMessage;
+
   public NullPointerException(String message, Throwable cause) {
     super(message, cause);
+    userCreated = true;
   }
+
+  @Override
+  public String getMessage() {
+    String m = super.getMessage();
+    if (m == null && !userCreated) {
+      if (!extendedComputed) {
+        extendedMessage = getExtendedNPEMessage();
+        extendedComputed = true;
+      }
+      return extendedMessage;
+    }
+    return m;
+  }
+
+  private native String getExtendedNPEMessage();
 
   public NullPointerException(String message) {
     this(message, null);

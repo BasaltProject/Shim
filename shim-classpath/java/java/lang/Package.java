@@ -134,8 +134,20 @@ public final class Package implements java.lang.reflect.AnnotatedElement {
       }
     }
     ClassLoader boot = shim.SystemClassLoader.bootLoader();
-    return boot == null ? null : boot.getDefinedPackage(name);
+    Package bp = boot == null ? null : boot.getDefinedPackage(name);
+    if (bp == null && Module.isBootPackage(name)) {
+      synchronized (bootPackages) {
+        bp = bootPackages.get(name);
+        if (bp == null) {
+          bp = new Package(name, null, null, null, null, null, null, null, null);
+          bootPackages.put(name, bp);
+        }
+      }
+    }
+    return bp;
   }
+
+  private static final java.util.Map<String, Package> bootPackages = new java.util.HashMap<String, Package>();
 
   @Deprecated(since = "9")
   public static Package[] getPackages() {

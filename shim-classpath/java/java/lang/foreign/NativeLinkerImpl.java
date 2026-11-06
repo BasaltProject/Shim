@@ -21,19 +21,56 @@ final class NativeLinkerImpl implements Linker {
       MemoryLayout.paddingLayout(4L)
   );
 
+  static native long dlopen0(long path);
+
+  static native long dlsym0(long handle, long name);
+
+  static native long supported0();
+
+  static native void call0(long function, long buffer, long kind);
+
+  static native long stubAlloc0();
+
+  static native long entry0();
+
+  static void upcall(long id, long frame) {
+    UpcallSupport.upcall(id, frame);
+  }
+
+  static Optional<MemorySegment> lookup(long handle, String name) {
+    Objects.requireNonNull(name, "name");
+    sun.misc.Unsafe u = sun.misc.Unsafe.getUnsafe();
+    long cs = cstring(name);
+    try {
+      long addr = dlsym0(handle, cs);
+      return addr == 0L ? Optional.empty() : Optional.of(MemorySegment.ofAddress(addr));
+    } finally {
+      u.freeMemory(cs);
+    }
+  }
+
+  static long cstring(String s) {
+    byte[] b = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    sun.misc.Unsafe u = sun.misc.Unsafe.getUnsafe();
+    long p = u.allocateMemory(b.length + 1L);
+    for (int i = 0; i < b.length; i++) {
+      u.putByte(p + i, b[i]);
+    }
+    u.putByte(p + b.length, (byte) 0);
+    return p;
+  }
+
   static final SymbolLookup LOADER_LOOKUP = new SymbolLookup() {
     @Override
     public Optional<MemorySegment> find(String name) {
-      Objects.requireNonNull(name, "name");
-      return Optional.empty();
+      return lookup(0L, name);
     }
   };
 
   private static final SymbolLookup DEFAULT_LOOKUP = new SymbolLookup() {
     @Override
     public Optional<MemorySegment> find(String name) {
-      Objects.requireNonNull(name, "name");
-      return Optional.empty();
+      return lookup(0L, name);
     }
   };
 
@@ -71,13 +108,13 @@ final class NativeLinkerImpl implements Linker {
   public MethodHandle downcallHandle(MemorySegment address, FunctionDescriptor function, Linker.Option... options) {
     Objects.requireNonNull(address, "address");
     Objects.requireNonNull(function, "function");
-    throw new UnsupportedOperationException("Native downcall handles are not implemented in this environment");
+    return new DowncallHandle(address, function, options);
   }
 
   @Override
   public MethodHandle downcallHandle(FunctionDescriptor function, Linker.Option... options) {
     Objects.requireNonNull(function, "function");
-    throw new UnsupportedOperationException("Native downcall handles are not implemented in this environment");
+    return new DowncallHandle(null, function, options);
   }
 
   @Override
@@ -85,7 +122,7 @@ final class NativeLinkerImpl implements Linker {
     Objects.requireNonNull(target, "target");
     Objects.requireNonNull(function, "function");
     Objects.requireNonNull(arena, "arena");
-    throw new UnsupportedOperationException("Native upcall stubs are not implemented in this environment");
+    return UpcallSupport.create(target, function);
   }
 
   @Override
@@ -101,15 +138,21 @@ final class NativeLinkerImpl implements Linker {
   static SymbolLookup libraryLookup(String name, Arena arena) {
     Objects.requireNonNull(name, "name");
     Objects.requireNonNull(arena, "arena");
+    long cs = cstring(name);
+    long handle;
     try {
-      System.loadLibrary(name);
-    } catch (Throwable ignored) {
+      handle = dlopen0(cs);
+    } finally {
+      sun.misc.Unsafe.getUnsafe().freeMemory(cs);
     }
+    if (handle == 0L) {
+      throw new IllegalArgumentException("Cannot open library: " + name);
+    }
+    final long h = handle;
     return new SymbolLookup() {
       @Override
       public Optional<MemorySegment> find(String sym) {
-        Objects.requireNonNull(sym, "sym");
-        return Optional.empty();
+        return lookup(h, sym);
       }
     };
   }

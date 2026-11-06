@@ -184,6 +184,15 @@ public abstract class ClassLoader {
     if (offset < 0 || length < 0 || offset > b.length || length > b.length - offset) {
       throw new ArrayIndexOutOfBoundsException();
     }
+    if (shim.Agents.isActive() && name != null) {
+      byte[] copy = java.util.Arrays.copyOfRange(b, offset, offset + length);
+      byte[] changed = shim.Agents.transform(this, name.replace('.', '/'), null, null, copy);
+      if (changed != null) {
+        b = changed;
+        offset = 0;
+        length = changed.length;
+      }
+    }
     return shim.SystemClassLoader.getClass
       (shim.Classes.defineNamedVMClass(this, name, b, offset, length));
   }

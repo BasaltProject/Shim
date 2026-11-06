@@ -65,7 +65,92 @@ public abstract class AccessibleObject implements AnnotatedElement {
   }
 
   public boolean trySetAccessible() {
-    setAccessible(true);
+    try {
+      setAccessible(true);
+    } catch (InaccessibleObjectException e) {
+      return false;
+    }
     return true;
+  }
+
+  private static volatile java.util.Set<String> addedOpens;
+
+  private static java.util.Set<String> addedOpens() {
+    java.util.Set<String> set = addedOpens;
+    if (set == null) {
+      set = new java.util.HashSet<String>();
+      String prop = System.getProperty("shim.add-opens");
+      if (prop != null) {
+        for (String e : prop.split(",")) {
+          int slash = e.indexOf('/');
+          int eq = e.indexOf('=');
+          if (slash > 0) {
+            set.add(e.substring(slash + 1, eq > slash ? eq : e.length()));
+          }
+        }
+      }
+      addedOpens = set;
+    }
+    return set;
+  }
+
+  static void checkCanSetAccessible(AccessibleObject target, Class<?> declaring, int modifiers) {
+    Class<?> caller = null;
+    for (Class<?> c : StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+        .walk(f -> f.map(StackWalker.StackFrame::getDeclaringClass).toList())) {
+      if (c == AccessibleObject.class || c == Field.class || c == Method.class || c == Constructor.class
+          || c == StackWalker.class) {
+        continue;
+      }
+      caller = c;
+      break;
+    }
+    if (caller == null || caller.getClassLoader() == null || declaring.getClassLoader() != null) {
+      return;
+    }
+    String pkg = declaring.getPackageName();
+    if (pkg.startsWith("shim") || addedOpens().contains(pkg)) {
+      return;
+    }
+    Module dm = declaring.getModule();
+    Module cm = caller.getModule();
+    if (dm == cm || dm.isOpen(pkg, cm)) {
+      return;
+    }
+    boolean publicMember = Modifier.isPublic(modifiers) && Modifier.isPublic(declaring.getModifiers());
+    if (publicMember && dm.isExported(pkg, cm)) {
+      return;
+    }
+    String kind = target instanceof Field ? "field " : target instanceof Method ? "method " : "constructor ";
+    throw new InaccessibleObjectException("Unable to make " + kind + target + " accessible: module "
+        + dm.getName() + " does not \"" + (publicMember ? "exports" : "opens") + " " + pkg + "\" to " + cm);
+  }
+
+  static void checkInvoke(AccessibleObject target, Class<?> declaring) throws IllegalAccessException {
+    if (declaring.getClassLoader() != null || !declaring.getPackageName().startsWith("jdk.internal.")) {
+      return;
+    }
+    Class<?> caller = null;
+    for (Class<?> c : StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE)
+        .walk(f -> f.map(StackWalker.StackFrame::getDeclaringClass).toList())) {
+      if (c == AccessibleObject.class || c == Field.class || c == Method.class || c == Constructor.class
+          || c == StackWalker.class) {
+        continue;
+      }
+      caller = c;
+      break;
+    }
+    if (caller == null || caller.getClassLoader() == null) {
+      return;
+    }
+    String pkg = declaring.getPackageName();
+    Module dm = declaring.getModule();
+    Module cm = caller.getModule();
+    if (dm == cm || addedOpens().contains(pkg) || dm.isExported(pkg, cm)) {
+      return;
+    }
+    throw new IllegalAccessException("class " + caller.getName() + " cannot access class " + declaring.getName()
+        + " (in module " + dm.getName() + ") because module " + dm.getName() + " does not export " + pkg + " to "
+        + cm);
   }
 }

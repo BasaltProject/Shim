@@ -47,6 +47,11 @@ public class Thread implements Runnable {
   private ThreadGroup group;
 
   private static native long nextThreadId();
+  private static int nameCounter;
+
+  private static synchronized int nextNameNumber() {
+    return nameCounter++;
+  }
   private final long tid;
   private final boolean isVirtual;
 
@@ -67,7 +72,7 @@ public class Thread implements Runnable {
     this.tid = nextThreadId();
     this.group = group == null && current != null ? current.group : group;
     this.task = task;
-    this.name = name != null ? name : (isVirtual ? "" : "Thread-" + tid);
+    this.name = name != null ? name : (isVirtual ? "" : "Thread-" + nextNameNumber());
     this.daemon = isVirtual || (current != null && current.isDaemon());
     this.priority = (byte) (isVirtual || current == null ? NORM_PRIORITY : current.getPriority());
 
@@ -230,7 +235,7 @@ public class Thread implements Runnable {
 
   public void interrupt() {
     long p = peer;
-    if (p != 0 && state == (byte) State.RUNNABLE.ordinal()) {
+    if (p != 0 && state != (byte) State.NEW.ordinal() && state != (byte) State.TERMINATED.ordinal()) {
       interrupt(p);
     } else {
       interrupted = true;
@@ -289,7 +294,7 @@ public class Thread implements Runnable {
   
   public String getName() {
     String n = name;
-    return n != null ? n : (tid == 1 ? "main" : "Thread-" + tid);
+    return n != null ? n : (tid == 3 ? "main" : "Thread-" + tid);
   }
 
   public void setName(String name) {

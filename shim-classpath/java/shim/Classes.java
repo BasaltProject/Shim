@@ -470,6 +470,18 @@ public class Classes {
     try {
       vmc = resolveNamedVMClass(loader, name);
     } catch (ClassNotFoundException e) {
+      byte[] extra = loader instanceof SystemClassLoader ? Agents.readAppended(name) : null;
+      if (extra != null) {
+        byte[] changed = Agents.isActive() ? Agents.transform(loader, name.replace('.', '/'), null, null, extra) : null;
+        if (changed != null) {
+          extra = changed;
+        }
+        VMClass defined = defineNamedVMClass(loader, name, extra, 0, extra.length);
+        if (initialize) {
+          initialize(defined);
+        }
+        return SystemClassLoader.getClass(defined);
+      }
       String message = e.getMessage();
       if (message != null && message.indexOf('/') >= 0) {
         ClassNotFoundException fixed = new ClassNotFoundException(name);

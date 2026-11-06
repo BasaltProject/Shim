@@ -18,9 +18,13 @@ import java.util.Set;
 public final class Module implements java.lang.reflect.AnnotatedElement {
   private final String name;
   private final ClassLoader loader;
-  private final ModuleDescriptor descriptor;
+  private volatile ModuleDescriptor descriptor;
   private final ModuleLayer layer;
-  private final Set<String> packages;
+  private volatile Set<String> packages;
+  private boolean platform;
+  private static volatile boolean platformLoaded;
+  private static boolean platformLoading;
+  private static java.util.Map<String, Module> packageOwners;
   private java.lang.module.ResolvedModule resolved;
   private final Set<Module> extraReads = new HashSet<Module>();
   private final java.util.Map<String, Set<Module>> extraExports = new java.util.HashMap<String, Set<Module>>();
@@ -31,7 +35,97 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   }
 
   private boolean defined() {
-    return resolved != null;
+    return resolved != null || platform;
+  }
+
+  private void ensure() {
+    if (platform && !platformLoaded) {
+      loadPlatform();
+    }
+  }
+
+  static synchronized void loadPlatform() {
+    if (platformLoaded || platformLoading) {
+      return;
+    }
+    platformLoading = true;
+    ModuleLayer boot = ModuleLayer.boot();
+    java.util.Map<String, Module> owners = new java.util.HashMap<String, Module>();
+    Set<Module> all = new HashSet<Module>();
+    for (String line : PlatformData.get().split("\n")) {
+      if (line.isEmpty()) {
+        continue;
+      }
+      String[] f = line.split("\\|", -1);
+      ModuleDescriptor.Builder b = ModuleDescriptor.newModule(f[0]);
+      for (String r : f[1].split(",")) {
+        if (r.isEmpty()) {
+          continue;
+        }
+        char c = r.charAt(0);
+        if (c == '+') {
+          b.requires(Set.of(ModuleDescriptor.Requires.Modifier.TRANSITIVE), r.substring(1));
+        } else if (c == '?') {
+          b.requires(Set.of(ModuleDescriptor.Requires.Modifier.STATIC), r.substring(1));
+        } else {
+          b.requires(r);
+        }
+      }
+      for (String e : f[2].split(",")) {
+        if (e.isEmpty()) {
+          continue;
+        }
+        int gt = e.indexOf('>');
+        if (gt < 0) {
+          b.exports(e);
+        } else {
+          b.exports(e.substring(0, gt), Set.of(e.substring(gt + 1).split("\\+")));
+        }
+      }
+      Set<String> pk = new HashSet<String>();
+      for (String q : f[3].split(",")) {
+        if (!q.isEmpty()) {
+          pk.add(q);
+        }
+      }
+      if (f[0].equals("jdk.unsupported")) {
+        b.opens("sun.misc");
+        b.opens("sun.reflect");
+      }
+      b.packages(pk);
+      ModuleDescriptor d = b.build();
+      Module m = f[0].equals("java.base") ? JAVA_BASE : new Module(f[0], null, d, boot, pk);
+      if (m == JAVA_BASE) {
+        m.descriptor = d;
+        m.packages = Collections.unmodifiableSet(pk);
+      } else {
+        m.platform = true;
+      }
+      for (String q : pk) {
+        owners.put(q, m);
+      }
+      all.add(m);
+    }
+    packageOwners = owners;
+    boot.setModules(all);
+    platformLoaded = true;
+  }
+
+  static boolean isBootPackage(String pn) {
+    loadPlatform();
+    return packageOwners != null && packageOwners.containsKey(pn);
+  }
+
+  static Module ownerOfBootPackage(String pn) {
+    loadPlatform();
+    Module m = packageOwners == null ? null : packageOwners.get(pn);
+    return m != null ? m : JAVA_BASE;
+  }
+
+  private static final class PlatformData {
+    static String get() {
+      return shim.module.PlatformModules.data();
+    }
   }
 
   public static final Module JAVA_BASE;
@@ -48,6 +142,7 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
         .build();
     ModuleLayer bootLayer = new ModuleLayer(Collections.<Module>emptySet());
     JAVA_BASE = new Module("java.base", null, desc, bootLayer, basePackages);
+    JAVA_BASE.platform = true;
     bootLayer.setModules(Collections.singleton(JAVA_BASE));
     ModuleLayer.setBoot(bootLayer);
   }
@@ -77,6 +172,7 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   }
 
   public ModuleDescriptor getDescriptor() {
+    ensure();
     return descriptor;
   }
 
@@ -85,6 +181,7 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   }
 
   public boolean canRead(Module other) {
+    ensure();
     Objects.requireNonNull(other);
     if (!defined() || other == this || !other.isNamed()) {
       return true;
@@ -136,6 +233,7 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   private static final Module ALL_UNNAMED_MODULE = new Module(null);
 
   public boolean isExported(String pn, Module other) {
+    ensure();
     Objects.requireNonNull(pn);
     Objects.requireNonNull(other);
     if (!defined() || other == this) {
@@ -145,10 +243,30 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
       return false;
     }
     return exportedTo(descriptor, pn, other, false) || addedFor(extraExports, pn, other)
-        || addedFor(extraOpens, pn, other) || exportedTo(descriptor, pn, other, true);
+        || addedFor(extraOpens, pn, other) || exportedTo(descriptor, pn, other, true)
+        || commandLineExport(pn, other);
+  }
+
+  private boolean commandLineExport(String pn, Module other) {
+    String prop = System.getProperty("shim.add-exports");
+    if (prop == null) {
+      return false;
+    }
+    String key = name + "/" + pn + "=";
+    for (String e : prop.split(",")) {
+      if (e.startsWith(key)) {
+        for (String target : e.substring(key.length()).split(",")) {
+          if (target.equals("ALL-UNNAMED") ? !other.isNamed() : target.equals(other.getName())) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   public boolean isExported(String pn) {
+    ensure();
     Objects.requireNonNull(pn);
     if (!defined()) {
       return true;
@@ -185,6 +303,7 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   }
 
   public boolean isOpen(String pn, Module other) {
+    ensure();
     Objects.requireNonNull(pn);
     Objects.requireNonNull(other);
     if (!defined() || other == this) {
@@ -194,6 +313,7 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   }
 
   public boolean isOpen(String pn) {
+    ensure();
     Objects.requireNonNull(pn);
     if (!defined()) {
       return true;
@@ -235,6 +355,7 @@ public final class Module implements java.lang.reflect.AnnotatedElement {
   }
 
   public Set<String> getPackages() {
+    ensure();
     return packages;
   }
 

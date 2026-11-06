@@ -9,6 +9,7 @@ package jdk.internal.random;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.random.RandomGenerator;
+import jdk.internal.util.random.RandomSupport;
 
 public final class Xoroshiro128PlusPlus implements RandomGenerator.LeapableGenerator {
   private static final AtomicLong defaultGen =
@@ -44,22 +45,11 @@ public final class Xoroshiro128PlusPlus implements RandomGenerator.LeapableGener
   }
 
   public Xoroshiro128PlusPlus(byte[] seed) {
-    Objects.requireNonNull(seed, "seed");
-    long s0 = 0L;
-    long s1 = 0L;
-    for (int i = 0; i < seed.length; i++) {
-      if (i < 8) {
-        s0 = (s0 << 8) | (seed[i] & 0xFFL);
-      } else {
-        s1 = (s1 << 8) | (seed[i] & 0xFFL);
-      }
-    }
-    this.x0 = s0;
-    this.x1 = s1;
-    if ((this.x0 | this.x1) == 0L) {
-      this.x0 = -7046029254386353131L;
-      this.x1 = 7640891576956012809L;
-    }
+    this(RandomSupport.convertSeedBytesToLongs(java.util.Objects.requireNonNull(seed, "seed"), 2, 2));
+  }
+
+  private Xoroshiro128PlusPlus(long[] l) {
+    this(l[0], l[1]);
   }
 
   private static long mixStafford13(long z) {

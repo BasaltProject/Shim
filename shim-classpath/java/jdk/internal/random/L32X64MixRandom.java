@@ -52,27 +52,11 @@ public final class L32X64MixRandom implements RandomGenerator.SplittableGenerato
 
   public L32X64MixRandom(byte[] seed) {
     Objects.requireNonNull(seed, "seed");
-    long s0 = 0L;
-    long s1 = 0L;
-    for (int i = 0; i < seed.length; i++) {
-      if (i < 8) {
-        s0 = (s0 << 8) | (seed[i] & 0xFFL);
-      } else {
-        s1 = (s1 << 8) | (seed[i] & 0xFFL);
-      }
-    }
-    long z = (s0 ^ s1) ^ 7640891576956012809L;
-    int high = (int) (z >>> 32);
-    int low = (int) z;
-    this.a = mixMurmur32(high) | 1;
-    this.s = 1;
-    this.x0 = mixLea32(low);
-    this.x1 = mixLea32(low - 1640531527);
-    if ((this.x0 | this.x1) == 0) {
-      int v = this.s;
-      this.x0 = mixMurmur32(v - 1640531527);
-      this.x1 = mixMurmur32(v - 1640531527 - 1640531527);
-    }
+    int[] l = jdk.internal.util.random.RandomSupport.convertSeedBytesToInts(seed, 4, 2);
+    this.a = l[0] | 1;
+    this.s = l[1];
+    this.x0 = l[2];
+    this.x1 = l[3];
   }
 
   private static int mixMurmur32(int z) {
@@ -109,12 +93,13 @@ public final class L32X64MixRandom implements RandomGenerator.SplittableGenerato
 
   @Override
   public RandomGenerator.SplittableGenerator split() {
-    return new L32X64MixRandom(nextInt(), nextInt(), nextInt(), nextInt());
+    return split(this);
   }
 
   @Override
   public RandomGenerator.SplittableGenerator split(RandomGenerator.SplittableGenerator source) {
     Objects.requireNonNull(source, "source");
-    return new L32X64MixRandom(source.nextInt(), source.nextInt(), source.nextInt(), source.nextInt());
+    long brine = source.nextLong();
+    return new L32X64MixRandom((int) brine << 1, source.nextInt(), source.nextInt(), source.nextInt());
   }
 }

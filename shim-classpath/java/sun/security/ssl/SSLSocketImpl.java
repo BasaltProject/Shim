@@ -306,6 +306,19 @@ final class SSLSocketImpl extends SSLSocket {
     }
   }
 
+  private void surfaceAlert(SocketException cause) throws IOException {
+    try {
+      while (conn.failure == null && readRecord()) {
+      }
+    } catch (IOException alert) {
+      throw alert;
+    }
+    if (conn.failure != null) {
+      throw conn.failure;
+    }
+    throw cause;
+  }
+
   private final class SSLOutputStream extends OutputStream {
     @Override
     public void write(int b) throws IOException {
@@ -324,6 +337,7 @@ final class SSLSocketImpl extends SSLSocket {
         throw new SocketException("Socket closed");
       }
       startHandshake();
+      try {
       synchronized (writeLock) {
         if (conn.failure != null) {
           throw conn.failure;
@@ -335,6 +349,9 @@ final class SSLSocketImpl extends SSLSocket {
           done += n;
         }
         rawOut.flush();
+      }
+      } catch (SocketException e) {
+        surfaceAlert(e);
       }
     }
 

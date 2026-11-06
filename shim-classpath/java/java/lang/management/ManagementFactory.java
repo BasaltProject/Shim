@@ -109,20 +109,34 @@ public class ManagementFactory {
   public static synchronized List<MemoryPoolMXBean> getMemoryPoolMXBeans() {
     if (pools == null) {
       List<MemoryPoolMXBean> list = new ArrayList<MemoryPoolMXBean>();
-      list.add(new MemoryPoolImpl());
+      String[] gc = {"G1 Young Generation", "G1 Old Generation"};
+      list.add(new MemoryPoolImpl("CodeHeap 'non-nmethods'", MemoryType.NON_HEAP, "CodeCacheManager"));
+      list.add(new MemoryPoolImpl("Metaspace", MemoryType.NON_HEAP, "Metaspace Manager"));
+      list.add(new MemoryPoolImpl("CodeHeap 'profiled nmethods'", MemoryType.NON_HEAP, "CodeCacheManager"));
+      list.add(new MemoryPoolImpl("Compressed Class Space", MemoryType.NON_HEAP, "Metaspace Manager"));
+      list.add(new MemoryPoolImpl("G1 Eden Space", MemoryType.HEAP, gc));
+      list.add(new MemoryPoolImpl("G1 Old Gen", MemoryType.HEAP, "G1 Young Generation", "G1 Concurrent GC", "G1 Old Generation"));
+      list.add(new MemoryPoolImpl("G1 Survivor Space", MemoryType.HEAP, gc));
+      list.add(new MemoryPoolImpl("CodeHeap 'non-profiled nmethods'", MemoryType.NON_HEAP, "CodeCacheManager"));
       pools = Collections.unmodifiableList(list);
     }
     return pools;
   }
 
   public static List<MemoryManagerMXBean> getMemoryManagerMXBeans() {
-    return new ArrayList<MemoryManagerMXBean>(getGarbageCollectorMXBeans());
+    List<MemoryManagerMXBean> list = new ArrayList<MemoryManagerMXBean>();
+    list.add(new sun.management.MemoryManagerImpl("CodeCacheManager", "CodeHeap 'non-nmethods'",
+        "CodeHeap 'profiled nmethods'", "CodeHeap 'non-profiled nmethods'"));
+    list.add(new sun.management.MemoryManagerImpl("Metaspace Manager", "Metaspace", "Compressed Class Space"));
+    list.addAll(getGarbageCollectorMXBeans());
+    return list;
   }
 
   public static synchronized List<GarbageCollectorMXBean> getGarbageCollectorMXBeans() {
     if (collectors == null) {
       List<GarbageCollectorMXBean> list = new ArrayList<GarbageCollectorMXBean>();
-      list.add(new GarbageCollectorImpl());
+      list.add(new GarbageCollectorImpl("G1 Young Generation", 0));
+      list.add(new GarbageCollectorImpl("G1 Old Generation", 1));
       collectors = Collections.unmodifiableList(list);
     }
     return collectors;

@@ -315,19 +315,61 @@ final class ProcessHandleImpl implements ProcessHandle {
       return Optional.empty();
     }
 
+    private String[] statFields() {
+      try (BufferedReader reader = new BufferedReader(
+          new InputStreamReader(new FileInputStream("/proc/" + pid + "/stat"), StandardCharsets.UTF_8))) {
+        String line = reader.readLine();
+        int close = line == null ? -1 : line.lastIndexOf(')');
+        if (close > 0) {
+          return line.substring(close + 2).split(" ");
+        }
+      } catch (Throwable ignored) {
+      }
+      return null;
+    }
+
     @Override
     public Optional<Instant> startInstant() {
+      String[] f = statFields();
+      if (f == null || f.length < 20) {
+        return Optional.empty();
+      }
+      try (BufferedReader reader = new BufferedReader(
+          new InputStreamReader(new FileInputStream("/proc/stat"), StandardCharsets.UTF_8))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          if (line.startsWith("btime ")) {
+            long boot = Long.parseLong(line.substring(6).trim());
+            long ticks = Long.parseLong(f[19]);
+            return Optional.of(Instant.ofEpochMilli(boot * 1000L + ticks * 10L));
+          }
+        }
+      } catch (Throwable ignored) {
+      }
       return Optional.empty();
     }
 
     @Override
     public Optional<Duration> totalCpuDuration() {
-      return Optional.empty();
+      String[] f = statFields();
+      if (f == null || f.length < 13) {
+        return Optional.empty();
+      }
+      try {
+        long ticks = Long.parseLong(f[11]) + Long.parseLong(f[12]);
+        return Optional.of(Duration.ofNanos(ticks * 10_000_000L));
+      } catch (NumberFormatException e) {
+        return Optional.empty();
+      }
     }
 
     @Override
     public Optional<String> user() {
-      return Optional.empty();
+      try {
+        return Optional.of(java.nio.file.Files.getOwner(java.nio.file.Path.of("/proc/" + pid)).getName());
+      } catch (Throwable e) {
+        return Optional.empty();
+      }
     }
   }
 

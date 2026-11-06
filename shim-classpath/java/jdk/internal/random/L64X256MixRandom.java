@@ -9,6 +9,7 @@ package jdk.internal.random;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.random.RandomGenerator;
+import jdk.internal.util.random.RandomSupport;
 
 public final class L64X256MixRandom implements RandomGenerator.SplittableGenerator {
   private static final long kGolden = 0x9e3779b97f4a7c15L;
@@ -48,7 +49,11 @@ public final class L64X256MixRandom implements RandomGenerator.SplittableGenerat
   }
 
   public L64X256MixRandom(byte[] seed) {
-    this(fold(seed));
+    this(RandomSupport.convertSeedBytesToLongs(java.util.Objects.requireNonNull(seed, "seed"), 6, 4));
+  }
+
+  private L64X256MixRandom(long[] l) {
+    this(l[0], l[1], l[2], l[3], l[4], l[5]);
   }
 
   private static long fold(byte[] seed) {

@@ -51,6 +51,9 @@ public final class Method extends Executable {
   }
 
   public void setAccessible(boolean v) {
+    if (v) {
+      checkCanSetAccessible(this, getDeclaringClass(), getModifiers());
+    }
     accessible = v;
   }
 
@@ -97,6 +100,9 @@ public final class Method extends Executable {
         throw new IllegalArgumentException("object of type " + instance.getClass().getName()
                                            + " is not an instance of " + getDeclaringClass().getName());
       }
+    }
+    if (!accessible) {
+      checkInvoke(this, getDeclaringClass());
     }
     arguments = checkArguments(arguments);
     Classes.initialize(vmMethod.class_);

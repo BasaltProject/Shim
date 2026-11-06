@@ -170,6 +170,13 @@ public final class SunJCE extends Provider {
     add("AlgorithmParameters", "GCM", "com.sun.crypto.provider.GCMParameters", new String[] {}, new String[] {});
     add("Cipher", "AES/CTR/NoPadding", "com.sun.crypto.provider.AESCipher$AES_CTR_NoPadding", new String[] {},
         new String[] {"SupportedKeyFormats", "RAW"});
+    add("KeyAgreement", "DiffieHellman", "com.sun.crypto.provider.DHKeyAgreement", new String[] {"OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1", "DH"},
+        new String[] {"SupportedKeyClasses", "javax.crypto.interfaces.DHPublicKey|javax.crypto.interfaces.DHPrivateKey"});
+    add("AlgorithmParameterGenerator", "DiffieHellman", "com.sun.crypto.provider.DHParameterGenerator", new String[] {"OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1", "DH"},
+        new String[] {});
+    add("KeyFactory", "DiffieHellman", "com.sun.crypto.provider.DHKeyFactory", new String[] {"OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1", "DH"}, new String[] {});
+    add("AlgorithmParameters", "DiffieHellman", "com.sun.crypto.provider.DHParameters", new String[] {"OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1", "DH"}, new String[] {});
+    add("KeyPairGenerator", "DiffieHellman", "com.sun.crypto.provider.DHKeyPairGenerator", new String[] {"OID.1.2.840.113549.1.3.1", "1.2.840.113549.1.3.1", "DH"}, new String[] {});
     add("KEM", "DHKEM", "com.sun.crypto.provider.DHKEM", new String[] {}, new String[] {"SupportedKeyClasses",
         "java.security.interfaces.ECKey|java.security.interfaces.XECKey"});
     add("KDF", "HKDF-SHA256", "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA256", new String[] {}, new String[] {});

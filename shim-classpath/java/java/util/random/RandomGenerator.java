@@ -163,25 +163,18 @@ public interface RandomGenerator {
   }
 
   default double nextGaussian() {
-    double v1, v2, s;
-    do {
-      v1 = 2 * nextDouble() - 1;
-      v2 = 2 * nextDouble() - 1;
-      s = v1 * v1 + v2 * v2;
-    } while (s >= 1 || s == 0);
-    double multiplier = Math.sqrt(-2 * Math.log(s) / s);
-    return v1 * multiplier;
+    return jdk.internal.util.random.RandomSupport.computeNextGaussian(this);
   }
 
   default double nextGaussian(double mean, double stddev) {
     if (stddev < 0.0) {
       throw new IllegalArgumentException("stddev must be non-negative: " + stddev);
     }
-    return mean + stddev * nextGaussian();
+    return mean + stddev * jdk.internal.util.random.RandomSupport.computeNextGaussian(this);
   }
 
   default double nextExponential() {
-    return -Math.log(1.0 - nextDouble());
+    return jdk.internal.util.random.RandomSupport.computeNextExponential(this);
   }
 
   default java.util.stream.DoubleStream equiDoubles(double left, double right, boolean isLeftIncluded,
