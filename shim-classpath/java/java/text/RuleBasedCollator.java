@@ -23,6 +23,14 @@ public class RuleBasedCollator extends Collator {
     return defaultInstance;
   }
 
+  static RuleBasedCollator forLocale(java.util.Locale locale) {
+    CollationTable t = CollationTable.forLanguage(
+        locale.getLanguage().equals("zh") && (locale.getCountry().equals("TW") || locale.getCountry().equals("HK")
+            || locale.getCountry().equals("MO")) ? "zh_TW" : locale.getLanguage());
+    return t == CollationTable.defaultTable() ? (RuleBasedCollator) defaultCollator().clone()
+                                              : new RuleBasedCollator(t, "");
+  }
+
   private RuleBasedCollator(CollationTable table, String rules) {
     this.table = table;
     this.rules = rules;
@@ -66,12 +74,12 @@ public class RuleBasedCollator extends Collator {
     }
     int[] a = table.elementsOf(prepare(source), null, null);
     int[] b = table.elementsOf(prepare(target), null, null);
-    int result = compareLevel(a, b, 0);
+    int result = compareLevel(a, b, 0, false);
     if (result == 0 && getStrength() >= SECONDARY) {
-      result = compareLevel(a, b, 1);
+      result = compareLevel(a, b, 1, table.frenchSecondary());
     }
     if (result == 0 && getStrength() >= TERTIARY) {
-      result = compareLevel(a, b, 2);
+      result = compareLevel(a, b, 2, false);
     }
     if (result == 0 && getStrength() == IDENTICAL) {
       int c = prepare(source).compareTo(prepare(target));
@@ -80,7 +88,21 @@ public class RuleBasedCollator extends Collator {
     return result;
   }
 
-  private static int compareLevel(int[] a, int[] b, int level) {
+  private static int compareLevel(int[] a, int[] b, int level, boolean backward) {
+    if (backward) {
+      int i = a.length - 3;
+      int j = b.length - 3;
+      while (i >= 0 && j >= 0) {
+        int x = a[i + level];
+        int y = b[j + level];
+        if (x != y) {
+          return x < y ? -1 : 1;
+        }
+        i -= 3;
+        j -= 3;
+      }
+      return i == j ? 0 : i >= 0 ? 1 : -1;
+    }
     int i = 0;
     int j = 0;
     while (true) {
@@ -131,6 +153,9 @@ public class RuleBasedCollator extends Collator {
           tertiary.append((char) (e[i + 2] + 2));
         }
       }
+    }
+    if (table.frenchSecondary()) {
+      secondary.reverse();
     }
     StringBuilder key = new StringBuilder(primary);
     key.append((char) 0);

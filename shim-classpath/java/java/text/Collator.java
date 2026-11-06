@@ -29,7 +29,7 @@ public abstract class Collator implements Comparator<Object>, Cloneable {
 
   public static Collator getInstance(Locale desiredLocale) {
     java.util.Objects.requireNonNull(desiredLocale);
-    return (Collator) RuleBasedCollator.defaultCollator().clone();
+    return RuleBasedCollator.forLocale(desiredLocale);
   }
 
   public abstract int compare(String source, String target);

@@ -31,7 +31,31 @@ public final class BreakRules {
   private static boolean isExtend(int cp) {
     int t = Character.getType(cp);
     return t == Character.NON_SPACING_MARK || t == Character.ENCLOSING_MARK || t == Character.COMBINING_SPACING_MARK
-        || cp == 0x200c || cp == 0x200d;
+        || cp == 0x200c || cp == 0x200d || (cp >= 0x1f3fb && cp <= 0x1f3ff) || (cp >= 0xe0020 && cp <= 0xe007f);
+  }
+
+  private static boolean isRegional(int cp) {
+    return cp >= 0x1f1e6 && cp <= 0x1f1ff;
+  }
+
+  private static boolean isPictographic(int cp) {
+    return (cp >= 0x1f300 && cp <= 0x1faff && !(cp >= 0x1f3fb && cp <= 0x1f3ff)) || (cp >= 0x2600 && cp <= 0x27bf)
+        || (cp >= 0x2b00 && cp <= 0x2bff) || (cp >= 0x231a && cp <= 0x23ff) || (cp >= 0x25aa && cp <= 0x25fe)
+        || cp == 0xa9 || cp == 0xae || cp == 0x203c || cp == 0x2049 || cp == 0x2122 || cp == 0x2139 || cp == 0x24c2
+        || cp == 0x2934 || cp == 0x2935 || cp == 0x3030 || cp == 0x303d || cp == 0x3297 || cp == 0x3299
+        || (cp >= 0x2190 && cp <= 0x21ff && cp != 0x21af);
+  }
+
+  private static boolean isLinker(int cp) {
+    return cp == 0x94d || cp == 0x9cd || cp == 0xacd || cp == 0xb4d || cp == 0xc4d || cp == 0xd4d;
+  }
+
+  private static boolean isIndicConsonant(int cp) {
+    return (cp >= 0x915 && cp <= 0x939) || (cp >= 0x958 && cp <= 0x95f) || (cp >= 0x978 && cp <= 0x97f)
+        || (cp >= 0x995 && cp <= 0x9b9 && cp != 0x9a9 && cp != 0x9b1 && cp != 0x9b3 && cp != 0x9b4 && cp != 0x9b5)
+        || (cp >= 0x9dc && cp <= 0x9df) || cp == 0x9f0 || cp == 0x9f1 || (cp >= 0xa95 && cp <= 0xab9) || cp == 0xaf9
+        || (cp >= 0xb15 && cp <= 0xb39) || (cp >= 0xb5c && cp <= 0xb5f) || cp == 0xb71 || (cp >= 0xc15 && cp <= 0xc39)
+        || (cp >= 0xd15 && cp <= 0xd3a);
   }
 
   private static int hangulKind(int cp) {
@@ -63,10 +87,24 @@ public final class BreakRules {
       return j;
     }
     int prev = hangulKind(cp);
+    int conj = isIndicConsonant(cp) ? 1 : 0;
+    boolean pict = isPictographic(cp);
+    boolean zwjAfterPict = false;
+    int regionals = isRegional(cp) ? 1 : 0;
+    int last = cp;
     while (j < n) {
       int next = s.codePointAt(j);
       int nk = hangulKind(next);
       boolean join = isExtend(next);
+      if (!join && zwjAfterPict && isPictographic(next)) {
+        join = true;
+      }
+      if (!join && regionals == 1 && isRegional(next)) {
+        join = true;
+      }
+      if (!join && conj == 2 && isIndicConsonant(next)) {
+        join = true;
+      }
       if (!join && prev != 0 && nk != 0) {
         join = (prev == 1 && (nk == 1 || nk == 2 || nk == 4 || nk == 5))
             || ((prev == 2 || prev == 4) && (nk == 2 || nk == 3))
@@ -77,6 +115,27 @@ public final class BreakRules {
       }
       if (nk != 0) {
         prev = nk;
+      }
+      if (isLinker(next)) {
+        conj = conj != 0 ? 2 : 0;
+      } else if (isIndicConsonant(next)) {
+        conj = 1;
+      } else if (!isExtend(next)) {
+        conj = 0;
+      }
+      if (isRegional(next)) {
+        regionals++;
+      }
+      if (next == 0x200d) {
+        zwjAfterPict = pict;
+      } else if (isPictographic(next)) {
+        pict = true;
+        zwjAfterPict = false;
+      } else if (!isExtend(next)) {
+        pict = false;
+        zwjAfterPict = false;
+      } else {
+        zwjAfterPict = false;
       }
       j += Character.charCount(next);
     }

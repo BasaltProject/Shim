@@ -44,7 +44,47 @@ public final class CollationTable {
     return kDefault;
   }
 
+  private static final Map<String, CollationTable> kLocale = new HashMap<String, CollationTable>();
+  private boolean frenchSecondary;
+  private boolean thaiPrefixVowels;
+
+  public boolean frenchSecondary() {
+    return frenchSecondary;
+  }
+
+  public static synchronized CollationTable forLanguage(String language) {
+    String rules = CollationRules.forLanguage(language);
+    if (rules == null) {
+      String full = CollationRulesCjk.forLanguage(language);
+      if (full != null) {
+        CollationTable t = kLocale.get(full);
+        if (t == null) {
+          try {
+            t = parse(full, true);
+          } catch (ParseException e) {
+            throw new IllegalStateException(e);
+          }
+          kLocale.put(full, t);
+        }
+        return t;
+      }
+    }
+    if (rules == null) {
+      return kDefault;
+    }
+    CollationTable t = kLocale.get(rules);
+    if (t == null) {
+      t = buildDefault(rules);
+      kLocale.put(rules, t);
+    }
+    return t;
+  }
+
   private static CollationTable buildDefault() {
+    return buildDefault("");
+  }
+
+  private static CollationTable buildDefault(String delta) {
     CollationTable t = new CollationTable(true);
     List<Entry> list = new ArrayList<Entry>();
     String markChars = CollationData.decode(CollationData.MARK_CHARS);
@@ -55,16 +95,44 @@ public final class CollationTable {
     for (int i = 0; i < baseChars.length(); i++) {
       list.add(new Entry(String.valueOf(baseChars.charAt(i)), level(CollationData.BASE_LEVELS.charAt(i)), null));
     }
+    for (boolean flags = true; flags;) {
+      if (delta.startsWith("@")) {
+        t.frenchSecondary = true;
+        delta = delta.substring(1);
+      } else if (delta.startsWith("!")) {
+        t.thaiPrefixVowels = true;
+        delta = delta.substring(1);
+      } else {
+        flags = false;
+      }
+    }
+    java.util.Set<String> overridden = new java.util.HashSet<String>();
+    if (!delta.trim().isEmpty()) {
+      try {
+        applyRules(list, delta, new ArrayList<String>(), true);
+      } catch (ParseException e) {
+        throw new IllegalStateException(e);
+      }
+      for (Entry e : list) {
+        overridden.add(e.key);
+      }
+    }
     t.assign(list);
     String[][] ligatures = {{"\u00e6", "a", "e", "2"}, {"\u00c6", "a", "e", "3"}, {"\u00fe", "t", "h", "2"},
         {"\u00de", "t", "h", "3"}, {"\u0153", "o", "e", "2"}, {"\u0152", "o", "e", "3"}, {"\u00df", "s", "s", "2"}};
     for (String[] l : ligatures) {
+      if (overridden.contains(l[0])) {
+        continue;
+      }
       int[] first = t.elements.get(l[1]);
       int[] second = t.elements.get(l[2]);
       t.elements.put(l[0], new int[] {first[0], first[1], Integer.parseInt(l[3]), second[0], second[1], 1});
     }
     String ignorable = CollationData.decode(CollationData.IGNORABLE);
     for (int i = 0; i < ignorable.length(); i++) {
+      if (overridden.contains(String.valueOf(ignorable.charAt(i)))) {
+        continue;
+      }
       t.elements.put(String.valueOf(ignorable.charAt(i)), new int[0]);
     }
     return t;
@@ -75,9 +143,30 @@ public final class CollationTable {
   }
 
   public static CollationTable parse(String rules) throws ParseException {
-    CollationTable t = new CollationTable(false);
+    return parse(rules, false);
+  }
+
+  private static CollationTable parse(String rules, boolean decomposeComposed) throws ParseException {
+    CollationTable t = new CollationTable(decomposeComposed);
     List<Entry> list = new ArrayList<Entry>();
     List<String> implicit = new ArrayList<String>();
+    boolean haveAny = applyRules(list, rules, implicit, false);
+    if (!haveAny && list.isEmpty()) {
+      throw new ParseException("Build rules empty.", 0);
+    }
+    List<Entry> all = new ArrayList<Entry>();
+    for (String s : implicit) {
+      if (indexOf(list, s) < 0) {
+        all.add(new Entry(s, 1, null));
+      }
+    }
+    all.addAll(list);
+    t.assign(all);
+    return t;
+  }
+
+  private static boolean applyRules(List<Entry> list, String rules, List<String> implicit, boolean replace)
+      throws ParseException {
     int n = rules.length();
     int i = 0;
     int cursor = -1;
@@ -108,6 +197,16 @@ public final class CollationTable {
       String key = text.toString();
       if (c == '&') {
         cursor = indexOf(list, key);
+        if (cursor < 0 && key.length() > 1 && replace) {
+          int last = indexOf(list, key.substring(key.length() - 1));
+          if (last >= 0) {
+            while (last + 1 < list.size() && list.get(last + 1).level > 1) {
+              last++;
+            }
+            list.add(last + 1, new Entry(key, 1, null));
+            cursor = last + 1;
+          }
+        }
         if (cursor < 0) {
           list.add(new Entry(key, 1, null));
           cursor = list.size() - 1;
@@ -119,6 +218,15 @@ public final class CollationTable {
       }
       int lv = c == '<' ? 1 : c == ';' ? 2 : c == ',' ? 3 : 0;
       Entry e = new Entry(key, lv, expansion);
+      if (replace) {
+        int old = indexOf(list, key);
+        if (old >= 0) {
+          list.remove(old);
+          if (old <= cursor) {
+            cursor--;
+          }
+        }
+      }
       if (cursor >= 0) {
         list.add(cursor + 1, e);
         cursor++;
@@ -135,18 +243,7 @@ public final class CollationTable {
       }
       haveAny = true;
     }
-    if (!haveAny && list.isEmpty()) {
-      throw new ParseException("Build rules empty.", 0);
-    }
-    List<Entry> all = new ArrayList<Entry>();
-    for (String s : implicit) {
-      if (indexOf(list, s) < 0) {
-        all.add(new Entry(s, 1, null));
-      }
-    }
-    all.addAll(list);
-    t.assign(all);
-    return t;
+    return haveAny;
   }
 
   private static int indexOf(List<Entry> list, String key) {
@@ -162,8 +259,12 @@ public final class CollationTable {
     return c == '<' || c == ';' || c == ',' || c == '=' || c == '&';
   }
 
+  private static boolean isRuleSpace(char c) {
+    return c == ' ' || (c >= 0x09 && c <= 0x0d);
+  }
+
   private static int skip(String s, int i) {
-    while (i < s.length() && Character.isWhitespace(s.charAt(i))) {
+    while (i < s.length() && isRuleSpace(s.charAt(i))) {
       i++;
     }
     return i;
@@ -173,6 +274,11 @@ public final class CollationTable {
     int n = s.length();
     while (i < n) {
       char c = s.charAt(i);
+      if (c == '\'' && i + 2 < n && s.charAt(i + 1) == '\'' && s.charAt(i + 2) == '\'') {
+        out.append('\'');
+        i += 3;
+        continue;
+      }
       if (c == '\'') {
         i++;
         while (i < n) {
@@ -191,7 +297,7 @@ public final class CollationTable {
         }
         continue;
       }
-      if (Character.isWhitespace(c) || isRelation(c) || c == '/') {
+      if (isRuleSpace(c) || isRelation(c) || c == '/') {
         break;
       }
       out.append(c);
@@ -239,7 +345,31 @@ public final class CollationTable {
     unmappedBase = maxP + 1;
   }
 
+  private static boolean isPrefixVowel(char c) {
+    return (c >= 0x0e40 && c <= 0x0e44) || (c >= 0x0ec0 && c <= 0x0ec4);
+  }
+
+  private static boolean isBaseConsonant(char c) {
+    return (c >= 0x0e01 && c <= 0x0e2e) || (c >= 0x0e81 && c <= 0x0eae);
+  }
+
+  private static String swapPrefixVowels(String text) {
+    char[] a = text.toCharArray();
+    for (int i = 0; i + 1 < a.length; i++) {
+      if (isPrefixVowel(a[i]) && isBaseConsonant(a[i + 1])) {
+        char c = a[i];
+        a[i] = a[i + 1];
+        a[i + 1] = c;
+        i++;
+      }
+    }
+    return new String(a);
+  }
+
   public int[] elementsOf(String text, int[] offsets, int[] count) {
+    if (thaiPrefixVowels) {
+      text = swapPrefixVowels(text);
+    }
     int n = text.length();
     int[] out = new int[(n + 2) * 6];
     int[] src = new int[out.length / 3];
@@ -305,7 +435,7 @@ public final class CollationTable {
     }
     if (key.length() == 1) {
       char c = key.charAt(0);
-      if (decomposeComposed && isDecomposable(c)) {
+      if (decomposeComposed && isDecomposable(c) && !(c == '\u00c5' && elements.containsKey("\u212b"))) {
         String d = java.text.Normalizer.normalize(key, java.text.Normalizer.Form.NFD);
         if (!d.equals(key)) {
           return elementsOf(d, null, null);

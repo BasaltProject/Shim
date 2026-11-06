@@ -199,7 +199,27 @@ public abstract class NumberFormat extends Format {
   }
 
   private static String pattern(Locale locale, String key, String fallback) {
+    if ("POSIX".equals(locale.getVariant()) && "en".equals(locale.getLanguage())) {
+      switch (key) {
+      case "NP":
+        return "#0.######";
+      case "CP":
+        return "\u00a4\u00a0#0.00";
+      case "PP":
+        return "#0%";
+      case "IP":
+        return "#0";
+      default:
+        break;
+      }
+    }
     String found = shim.LocaleDb.get(locale, key);
+    if ("CP".equals(key)) {
+      String nu = locale.getUnicodeLocaleType("nu");
+      if (nu != null && !nu.equals("latn") && found != null && found.startsWith("\u00a4#")) {
+        return "\u00a4\u00a0" + found.substring(1);
+      }
+    }
     return found == null ? fallback : found;
   }
 
