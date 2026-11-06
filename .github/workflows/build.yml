@@ -285,6 +285,7 @@ jobs:
               -DCMAKE_SYSTEM_NAME=FreeBSD -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
               -DCMAKE_C_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
               -DCMAKE_CXX_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
+              -DCMAKE_ASM_COMPILER=clang-19 -DCMAKE_ASM_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
               "-DCMAKE_SYSROOT=$root" \
               "-DCMAKE_CXX_FLAGS=-nostdinc++ -isystem $root/usr/include/c++/v1" \
               "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
