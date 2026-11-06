@@ -151,6 +151,15 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+      - name: Debug the crashes
+        if: failure()
+        run: |
+          pacman -S --noconfirm mingw-w64-clang-x86_64-lldb || true
+          for t in Floats Integers GC Threads; do
+              echo "=== $t"
+              lldb -b -o run -o bt -o "register read rip" -o "image lookup -a \$rip" -- build/shim.exe -cp build/test $t 2>&1 | tail -40
+          done
+
       - name: Package
         run: .github/scripts/package.sh "${{ needs.plan.outputs.version }}" Windows-x64 build
 
