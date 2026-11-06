@@ -221,8 +221,6 @@ jobs:
         include:
           - arch: x86_64
             target: FreeBSD-x64
-          - arch: aarch64
-            target: FreeBSD-arm64
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -252,6 +250,77 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: shim-${{ matrix.target }}
+          path: dist/
+
+  freebsd-arm64:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install the cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-19 lld-19 ninja-build
+
+      - name: Extract the FreeBSD arm64 sysroot
+        run: .github/scripts/setup-freebsd-sysroot.sh
+
+      - name: Build the host tools
+        run: |
+          cmake -S . -B build-host -G Ninja -DCMAKE_BUILD_TYPE=
+          cmake --build build-host --target shim_binary_to_object shim_type_generator
+
+      - name: Cross-build for FreeBSD arm64
+        run: |
+          root="$PWD/build/freebsd-sysroot"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON \
+              -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 \
+              -DCMAKE_SYSTEM_NAME=FreeBSD -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+              -DCMAKE_C_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
+              -DCMAKE_CXX_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
+              "-DCMAKE_SYSROOT=$root" \
+              "-DCMAKE_CXX_FLAGS=-nostdinc++ -isystem $root/usr/include/c++/v1" \
+              "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
+              "-DCMAKE_SHARED_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
+              "-DCMAKE_CXX_STANDARD_LIBRARIES=$root/usr/lib/libc++.a $root/usr/lib/libcxxrt.a -lpthread" \
+              -DCMAKE_TRY_COMPILE_PLATFORM_VARIABLES=CMAKE_CXX_STANDARD_LIBRARIES \
+              -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+              -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+              "-DSHIM_HOST_TOOLS_DIR=$PWD/build-host" \
+              "-DSHIM_VERSION_STRING=${{ needs.plan.outputs.version }}"
+          cmake --build build
+          readelf -h build/shim | grep -F AArch64
+          readelf -l build/shim | grep -F /libexec/ld-elf.so.1
+
+      - name: Run the tests on FreeBSD arm64
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.5'
+          arch: aarch64
+          cpu: 4
+          mem: 8192
+          run: |
+            set -eu
+            cd build
+            for program in Hello Strings Exceptions Collections Floats Integers Longs Widening Misc Enums Reflection Threads GC InvokeDynamic; do
+                echo "== $program"
+                ./shim -cp test $program
+            done
+
+      - name: Package
+        run: bash .github/scripts/package.sh "${{ needs.plan.outputs.version }}" FreeBSD-arm64 build
+
+      - name: Upload the archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: shim-FreeBSD-arm64
           path: dist/
 
   android:
@@ -338,7 +407,7 @@ jobs:
 
   release:
     if: ${{ github.event_name == 'push' }}
-    needs: [plan, build, windows, musl, freebsd, android]
+    needs: [plan, build, windows, musl, freebsd, freebsd-arm64, android]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
