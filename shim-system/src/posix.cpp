@@ -47,6 +47,8 @@ typedef struct ucontext {
 #include "ucontext.h"
 #endif
 
+#include <limits.h>
+
 #include "sys/mman.h"
 
 #include "sys/stat.h"
