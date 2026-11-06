@@ -88,7 +88,7 @@ public final class MethodType implements java.io.Serializable, TypeDescriptor.Of
     int slots = 0;
     for (Class ptype : ptypes) {
       if (ptype == null) throw new NullPointerException();
-      if (ptype == void.class) throw new IllegalArgumentException("void parameter");
+      if (ptype == void.class) throw new IllegalArgumentException("parameter type cannot be void");
       slots += ptype == long.class || ptype == double.class ? 2 : 1;
       if (slots > 255) throw new IllegalArgumentException("too many parameter slots");
     }
@@ -398,7 +398,7 @@ public final class MethodType implements java.io.Serializable, TypeDescriptor.Of
     if ("ZBCSIFJD".indexOf(code) >= 0 || (code == 'V' && allowVoid && index == start)) {
       return index + 1;
     }
-    throw new IllegalArgumentException("Invalid descriptor type");
+    throw new IllegalArgumentException("not basic type char: " + code);
   }
 
   private static Class descriptorClass(String descriptor, ClassLoader loader) {

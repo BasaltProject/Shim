@@ -16,6 +16,26 @@ public final class ScopedValue<T> {
 
   private ScopedValue() {}
 
+  public static final class Snapshots {
+    private Snapshots() {}
+
+    public static Object capture() {
+      return CURRENT_BINDINGS.get();
+    }
+
+    public static Runnable bind(Object snapshot, Runnable task) {
+      return () -> {
+        BindingNode prev = CURRENT_BINDINGS.get();
+        CURRENT_BINDINGS.set((BindingNode) snapshot);
+        try {
+          task.run();
+        } finally {
+          CURRENT_BINDINGS.set(prev);
+        }
+      };
+    }
+  }
+
   public static <T> ScopedValue<T> newInstance() {
     return new ScopedValue<T>();
   }

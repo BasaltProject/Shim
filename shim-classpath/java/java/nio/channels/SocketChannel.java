@@ -31,7 +31,8 @@ public abstract class SocketChannel extends AbstractSelectableChannel implements
   }
 
   public static SocketChannel open(SocketAddress remote) throws IOException {
-    SocketChannel sc = open();
+    SocketChannel sc = remote instanceof java.net.UnixDomainSocketAddress
+        ? open(java.net.StandardProtocolFamily.UNIX) : open();
     try {
       sc.connect(remote);
     } catch (Throwable x) {

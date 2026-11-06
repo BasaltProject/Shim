@@ -62,7 +62,7 @@ public final class Agent {
 
   private static native int[] lineTable(Class<?> c, String name, String desc);
 
-  private static native Object[] allClasses(ClassLoader loader);
+  public static native Object[] allClasses(ClassLoader loader);
 
   private final Map<Long, Object> objects = new HashMap<Long, Object>();
   private final Map<Object, Long> ids = new IdentityHashMap<Object, Long>();

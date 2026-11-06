@@ -24,6 +24,10 @@
 package java.lang.reflect;
 
 import shim.Classes;
+import sun.reflect.generics.reflectiveObjects.GenericArrayTypeImpl;
+import sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl;
+import sun.reflect.generics.reflectiveObjects.TypeVariableImpl;
+import sun.reflect.generics.reflectiveObjects.WildcardTypeImpl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -253,144 +257,19 @@ public class SignatureParser {
   }
 
   private static WildcardType makeWildcardType(final Type[] upperBounds, final Type[] lowerBounds) {
-    return new WildcardType() {
-      @Override
-      public Type[] getUpperBounds() {
-        return upperBounds.clone();
-      }
-
-      @Override
-      public Type[] getLowerBounds() {
-        return lowerBounds.clone();
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (o instanceof WildcardType) {
-          WildcardType that = (WildcardType) o;
-          return Arrays.equals(this.getLowerBounds(), that.getLowerBounds())
-              && Arrays.equals(this.getUpperBounds(), that.getUpperBounds());
-        }
-        return false;
-      }
-
-      @Override
-      public int hashCode() {
-        return Arrays.hashCode(getLowerBounds()) ^ Arrays.hashCode(getUpperBounds());
-      }
-
-      @Override
-      public String toString() {
-        Type[] lower = getLowerBounds();
-        Type[] bounds = lower;
-        StringBuilder sb = new StringBuilder();
-        if (lower.length > 0) {
-          sb.append("? super ");
-        } else {
-          Type[] upper = getUpperBounds();
-          if (upper.length > 0 && !Object.class.equals(upper[0])) {
-            bounds = upper;
-            sb.append("? extends ");
-          } else {
-            return "?";
-          }
-        }
-        for (int i = 0; i < bounds.length; i++) {
-          if (i > 0) sb.append(" & ");
-          sb.append(typeName(bounds[i]));
-        }
-        return sb.toString();
-      }
-    };
+    return new WildcardTypeImpl(upperBounds, lowerBounds);
   }
 
   private static GenericArrayType makeGenericArrayType(final Type component) {
-    return new GenericArrayType() {
-      @Override
-      public Type getGenericComponentType() {
-        return component;
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (o instanceof GenericArrayType) {
-          GenericArrayType that = (GenericArrayType) o;
-          return Objects.equals(component, that.getGenericComponentType());
-        }
-        return false;
-      }
-
-      @Override
-      public int hashCode() {
-        return Objects.hashCode(component);
-      }
-
-      @Override
-      public String toString() {
-        return typeName(component) + "[]";
-      }
-    };
+    return new GenericArrayTypeImpl(component);
   }
 
   private static String typeName(Type type) {
-    if (type == null) {
-      return "null";
-    }
-    if (type instanceof Class) {
-      Class<?> clazz = (Class<?>) type;
-      return clazz.getTypeName();
-    }
-    return type.toString();
+    return ParameterizedTypeImpl.typeName(type);
   }
 
   private static ParameterizedType makeType(final Type[] args, final Type owner, final Type raw) {
-    return new ParameterizedType() {
-      @Override
-      public Type getRawType() {
-        return raw;
-      }
-
-      @Override
-      public Type getOwnerType() {
-        return owner;
-      }
-
-      @Override
-      public Type[] getActualTypeArguments() {
-        return args;
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (o instanceof ParameterizedType) {
-          ParameterizedType that = (ParameterizedType) o;
-          if (this == that) return true;
-          return Objects.equals(owner, that.getOwnerType())
-              && Objects.equals(raw, that.getRawType())
-              && Arrays.equals(args, that.getActualTypeArguments());
-        }
-        return false;
-      }
-
-      @Override
-      public int hashCode() {
-        return Arrays.hashCode(args) ^ Objects.hashCode(owner) ^ Objects.hashCode(raw);
-      }
-
-      @Override
-      public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append(typeName(raw));
-        builder.append('<');
-        String sep = "";
-        for (Type t : args) {
-          builder.append(sep).append(typeName(t));
-          sep = ", ";
-        }
-        builder.append('>');
-        return builder.toString();
-      }
-    };
+    return new ParameterizedTypeImpl(args, owner, raw);
   }
   
   private static int skipTypeSignature(String sig, int i) {
@@ -492,104 +371,5 @@ public class SignatureParser {
       cur = cur.getDeclaringClass();
     };
     return varsMap;
-  } 
-
-  private static class TypeVariableImpl implements TypeVariable {
-    private String name;
-    private Type baseType;
-    private TypeVariableImpl[] vars;
-    private GenericDeclaration owner;
-
-    private Type[] bounds;
-
-    public Type[] getBounds() {
-      return bounds != null ? bounds.clone() : new Type[] { baseType };
-    }
-
-    void setBounds(Type[] bounds) {
-      this.bounds = bounds;
-      this.baseType = bounds[0];
-    }
-
-    void setOwner(GenericDeclaration owner) {
-      this.owner = owner;
-    }
-
-    public GenericDeclaration getGenericDeclaration() {
-      if (owner != null) {
-        return owner;
-      }
-      return new GenericDeclaration() {
-        public TypeVariable<?>[] getTypeParameters() {
-          return vars;
-        }
-
-        public <T extends java.lang.annotation.Annotation> T getAnnotation(Class<T> annotationClass) {
-          return null;
-        }
-
-        public java.lang.annotation.Annotation[] getAnnotations() {
-          return new java.lang.annotation.Annotation[0];
-        }
-
-        public java.lang.annotation.Annotation[] getDeclaredAnnotations() {
-          return new java.lang.annotation.Annotation[0];
-        }
-      };
-    }
-    
-    public String getName() {
-      return name;
-    }
-    
-    TypeVariableImpl(String name, Type baseType) {
-      this.name = name;
-      this.baseType = baseType;
-    }
-    
-    void setVars(List<TypeVariableImpl> vars) {
-      this.vars = new TypeVariableImpl[vars.size()];
-      vars.toArray(this.vars);
-    }
-    
-    @Override
-    public String toString() {
-      return name;
-    }
-
-    @Override
-    public java.lang.annotation.Annotation[] getAnnotations() {
-      return new java.lang.annotation.Annotation[0];
-    }
-
-    @Override
-    public java.lang.annotation.Annotation[] getDeclaredAnnotations() {
-      return new java.lang.annotation.Annotation[0];
-    }
-
-    @Override
-    public boolean isAnnotationPresent(Class<? extends java.lang.annotation.Annotation> annotationClass) {
-      return false;
-    }
-
-    @Override
-    public <T extends java.lang.annotation.Annotation> T getAnnotation(Class<T> annotationClass) {
-      return null;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (o instanceof TypeVariable) {
-        TypeVariable<?> that = (TypeVariable<?>) o;
-        return Objects.equals(name, that.getName())
-            && (owner == null || that.getGenericDeclaration() == null || owner.equals(that.getGenericDeclaration()));
-      }
-      return false;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hashCode(name);
-    }
   }
 }

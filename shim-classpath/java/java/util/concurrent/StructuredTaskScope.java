@@ -40,7 +40,7 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
   }
 
   static <T> StructuredTaskScope<T, Void> open() {
-    return open(Joiner.<T>awaitAll(), null);
+    return open(Joiner.<T>awaitAllSuccessfulOrThrow(), null);
   }
 
   <U extends T> Subtask<U> fork(Callable<? extends U> task);
@@ -317,7 +317,8 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
         latch.countDown();
       }
 
-      threadFactory.newThread(() -> {
+      Object snapshot = ScopedValue.Snapshots.capture();
+      threadFactory.newThread(ScopedValue.Snapshots.bind(snapshot, () -> {
         try {
           if (!cancelled.get()) {
             subtask.execute();
@@ -332,7 +333,7 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
             latch.countDown();
           }
         }
-      }).start();
+      })).start();
 
       return subtask;
     }
@@ -357,8 +358,6 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
       joined = true;
       try {
         return joiner.result();
-      } catch (RuntimeException | Error e) {
-        throw e;
       } catch (Throwable t) {
         throw new FailedException(t);
       }
@@ -446,12 +445,17 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
 
     @Override
     @SuppressWarnings("unchecked")
+    public boolean onFork(Subtask<? extends T> subtask) {
+      results.add((Subtask<T>) subtask);
+      return false;
+    }
+
+    @Override
     public boolean onComplete(Subtask<? extends T> subtask) {
       if (subtask.state() == Subtask.State.FAILED) {
         firstException.compareAndSet(null, subtask.exception());
         return true;
       }
-      results.add((Subtask<T>) subtask);
       return false;
     }
 

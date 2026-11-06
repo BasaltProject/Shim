@@ -46,7 +46,7 @@ public final class MethodHandles {
   public static VarHandle arrayElementVarHandle(Class<?> arrayClass) {
     Objects.requireNonNull(arrayClass);
     if (!arrayClass.isArray()) {
-      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+      throw new IllegalArgumentException("not an array: " + arrayClass);
     }
     return VarHandle.makeArrayHandle(arrayClass);
   }
@@ -348,12 +348,42 @@ public final class MethodHandles {
 
   public static MethodHandle constant(Class<?> type, Object value) {
     Objects.requireNonNull(type);
+    if (type == void.class) {
+      return new MethodHandle.ConstantMethodHandle(type, null);
+    }
+    value = convertValue(type, value);
     return new MethodHandle.ConstantMethodHandle(type, value);
+  }
+
+  private static Object convertValue(Class<?> type, Object value) {
+    if (type.isPrimitive()) {
+      Class<?> w = type == int.class ? Integer.class : type == long.class ? Long.class : type == boolean.class
+          ? Boolean.class : type == byte.class ? Byte.class : type == short.class ? Short.class
+          : type == char.class ? Character.class : type == float.class ? Float.class : Double.class;
+      if (value == null) {
+        throw new NullPointerException();
+      }
+      if (w.isInstance(value)) {
+        return value;
+      }
+      if (value instanceof Number && type != boolean.class && type != char.class) {
+        Number n = (Number) value;
+        return type == int.class ? (Object) n.intValue() : type == long.class ? (Object) n.longValue()
+            : type == byte.class ? (Object) n.byteValue() : type == short.class ? (Object) n.shortValue()
+            : type == float.class ? (Object) n.floatValue() : (Object) n.doubleValue();
+      }
+      throw new ClassCastException(w + " is not compatible with " + value.getClass());
+    }
+    return type.cast(value);
   }
 
   public static MethodHandle dropArguments(MethodHandle target, int pos, List<Class<?>> valueTypes) {
     Objects.requireNonNull(target);
     Objects.requireNonNull(valueTypes);
+    if (pos < 0 || pos > target.type().parameterCount()) {
+      throw new IllegalArgumentException("no argument type to remove" + java.util.Arrays.asList(target.type(), pos,
+          valueTypes.toArray(new Class<?>[0]), 1, 0));
+    }
     return new MethodHandle.DropArgumentsMethodHandle(target, pos, valueTypes);
   }
 
@@ -370,6 +400,14 @@ public final class MethodHandles {
   public static MethodHandle insertArguments(MethodHandle target, int pos, Object... values) {
     Objects.requireNonNull(target);
     Objects.requireNonNull(values);
+    java.util.List<Class<?>> ptypes = target.type().parameterList();
+    if (pos < 0 || pos + values.length > ptypes.size()) {
+      throw new IllegalArgumentException("too many values to insert");
+    }
+    values = values.clone();
+    for (int i = 0; i < values.length; i++) {
+      values[i] = convertValue(ptypes.get(pos + i), values[i]);
+    }
     return new MethodHandle.InsertArgumentsMethodHandle(target, pos, values);
   }
 
@@ -489,6 +527,27 @@ public final class MethodHandles {
     return new MethodHandle.DoWhileLoopMethodHandle(type, init, body, pred, varType);
   }
 
+  private static MethodType countedLoopType(Class<?> varType, MethodHandle body, MethodHandle init,
+      MethodHandle... bounds) {
+    java.util.List<Class<?>> longest = new java.util.ArrayList<>();
+    int skip = varType == void.class ? 1 : 2;
+    java.util.List<Class<?>> bodyParams = body.type().parameterList();
+    if (bodyParams.size() > skip) {
+      longest.addAll(bodyParams.subList(skip, bodyParams.size()));
+    }
+    java.util.List<MethodHandle> others = new java.util.ArrayList<>(java.util.Arrays.asList(bounds));
+    if (init != null) {
+      others.add(init);
+    }
+    for (MethodHandle h : others) {
+      java.util.List<Class<?>> ps = h.type().parameterList();
+      if (ps.size() > longest.size()) {
+        longest = new java.util.ArrayList<>(ps);
+      }
+    }
+    return MethodType.methodType(varType, longest);
+  }
+
   public static MethodHandle countedLoop(MethodHandle iterations, MethodHandle init, MethodHandle body) {
     Objects.requireNonNull(iterations, "iterations");
     Objects.requireNonNull(body, "body");
@@ -496,7 +555,7 @@ public final class MethodHandles {
       throw new IllegalArgumentException("iterations must return int: " + iterations.type());
     }
     Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
-    MethodType type = (init != null) ? init.type() : iterations.type().changeReturnType(varType);
+    MethodType type = countedLoopType(varType, body, init, iterations);
     return new MethodHandle.CountedLoopMethodHandle(type, null, iterations, init, body, varType);
   }
 
@@ -508,7 +567,7 @@ public final class MethodHandles {
       throw new IllegalArgumentException("start and end must return int");
     }
     Class<?> varType = (init != null) ? init.type().returnType() : body.type().returnType();
-    MethodType type = (init != null) ? init.type() : start.type().changeReturnType(varType);
+    MethodType type = countedLoopType(varType, body, init, start, end);
     return new MethodHandle.CountedLoopMethodHandle(type, start, end, init, body, varType);
   }
 
@@ -638,7 +697,7 @@ public final class MethodHandles {
   public static MethodHandle arrayConstructor(Class<?> arrayClass) {
     Objects.requireNonNull(arrayClass);
     if (!arrayClass.isArray()) {
-      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+      throw new IllegalArgumentException("not an array: " + arrayClass);
     }
     return new MethodHandle.ArrayConstructorMethodHandle(arrayClass);
   }
@@ -646,7 +705,7 @@ public final class MethodHandles {
   public static MethodHandle arrayLength(Class<?> arrayClass) {
     Objects.requireNonNull(arrayClass);
     if (!arrayClass.isArray()) {
-      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+      throw new IllegalArgumentException("not an array: " + arrayClass);
     }
     return new MethodHandle.ArrayLengthMethodHandle(arrayClass);
   }
@@ -654,7 +713,7 @@ public final class MethodHandles {
   public static MethodHandle arrayElementGetter(Class<?> arrayClass) {
     Objects.requireNonNull(arrayClass);
     if (!arrayClass.isArray()) {
-      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+      throw new IllegalArgumentException("not an array: " + arrayClass);
     }
     return new MethodHandle.ArrayElementGetterMethodHandle(arrayClass);
   }
@@ -662,7 +721,7 @@ public final class MethodHandles {
   public static MethodHandle arrayElementSetter(Class<?> arrayClass) {
     Objects.requireNonNull(arrayClass);
     if (!arrayClass.isArray()) {
-      throw new IllegalArgumentException("Not an array class: " + arrayClass);
+      throw new IllegalArgumentException("not an array: " + arrayClass);
     }
     return new MethodHandle.ArrayElementSetterMethodHandle(arrayClass);
   }
@@ -848,6 +907,31 @@ public final class MethodHandles {
       return refc.getMethod(name, parameters);
     }
 
+    private Method findMethodChecked(Class<?> refc, String name, MethodType type, String kind)
+        throws NoSuchMethodException {
+      Method m = null;
+      try {
+        m = findMethod(refc, name, type.parameterArray());
+      } catch (NoSuchMethodException e) {
+        m = null;
+      }
+      if (m == null || !m.getReturnType().equals(type.returnType())) {
+        throw new NoSuchMethodException("no such method: " + refc.getName() + "." + name + type + "/" + kind);
+      }
+      return m;
+    }
+
+    private NoSuchFieldException noField(Class<?> refc, String name, Class<?> type, String kind) {
+      return new NoSuchFieldException("no such field: " + refc.getName() + "." + name + "/" + type.getName() + "/" + kind);
+    }
+
+    private IllegalAccessException staticMismatch(Class<?> refc, String name, Class<?> type, String kind,
+        boolean wantStatic) {
+      return new IllegalAccessException("expected a " + (wantStatic ? "static" : "non-static") + " field: "
+          + refc.getName() + "." + name + "/" + type.getName() + "/" + kind + ", from " + lookupClass() + " ("
+          + lookupClass().getModule() + ")");
+    }
+
     private Field findField(Class<?> refc, String name) throws NoSuchFieldException {
       for (Class<?> c = refc; c != null; c = c.getSuperclass()) {
         try {
@@ -866,12 +950,9 @@ public final class MethodHandles {
       if (name.startsWith("<")) {
         throw new NoSuchMethodException(name);
       }
-      Method m = findMethod(refc, name, type.parameterArray());
-      if (!m.getReturnType().equals(type.returnType())) {
-        throw new NoSuchMethodException(name);
-      }
+      Method m = findMethodChecked(refc, name, type, "invokeVirtual");
       if ((m.getModifiers() & Modifier.STATIC) != 0) {
-        throw new IllegalAccessException("Method is static: " + name);
+        throw new IllegalAccessException("no such method: " + refc.getName() + "." + name + type + "/invokeVirtual");
       }
       checkAccess(refc, m.getDeclaringClass(), m.getModifiers(), name);
       int kind = refc.isInterface() ? MethodHandle.REF_invokeInterface : MethodHandle.REF_invokeVirtual;
@@ -886,10 +967,7 @@ public final class MethodHandles {
       if (name.startsWith("<")) {
         throw new NoSuchMethodException(name);
       }
-      Method m = findMethod(refc, name, type.parameterArray());
-      if (!m.getReturnType().equals(type.returnType())) {
-        throw new NoSuchMethodException(name);
-      }
+      Method m = findMethodChecked(refc, name, type, "invokeStatic");
       if ((m.getModifiers() & Modifier.STATIC) == 0) {
         throw new IllegalAccessException("Method is not static: " + name);
       }
@@ -920,7 +998,13 @@ public final class MethodHandles {
       if (type.returnType() != void.class) {
         throw new NoSuchMethodException("Constructor must return void");
       }
-      Constructor<?> c = refc.getDeclaredConstructor(type.parameterArray());
+      Constructor<?> c;
+      try {
+        c = refc.getDeclaredConstructor(type.parameterArray());
+      } catch (NoSuchMethodException e) {
+        throw new NoSuchMethodException("no such constructor: " + refc.getName() + ".<init>" + type
+            + "/newInvokeSpecial");
+      }
       checkAccess(refc, refc, c.getModifiers(), "<init>");
       return varargsAware(new DirectMethodHandle(MethodHandle.REF_newInvokeSpecial, refc.getClassLoader(), c.method.vmMethod));
     }
@@ -949,9 +1033,17 @@ public final class MethodHandles {
 
     public MethodHandle findGetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = findField(refc, name);
-      if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) != 0) {
-        throw new NoSuchFieldException(name);
+      Field f;
+      try {
+        f = findField(refc, name);
+      } catch (NoSuchFieldException e) {
+        throw noField(refc, name, type, "getField");
+      }
+      if (!f.getType().equals(type)) {
+        throw noField(refc, name, type, "getField");
+      }
+      if ((f.getModifiers() & Modifier.STATIC) != 0) {
+        throw staticMismatch(refc, name, type, "getStatic", false);
       }
       checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_getField, f);
@@ -959,9 +1051,17 @@ public final class MethodHandles {
 
     public MethodHandle findSetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = findField(refc, name);
-      if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) != 0) {
-        throw new NoSuchFieldException(name);
+      Field f;
+      try {
+        f = findField(refc, name);
+      } catch (NoSuchFieldException e) {
+        throw noField(refc, name, type, "putField");
+      }
+      if (!f.getType().equals(type)) {
+        throw noField(refc, name, type, "putField");
+      }
+      if ((f.getModifiers() & Modifier.STATIC) != 0) {
+        throw staticMismatch(refc, name, type, "putStatic", false);
       }
       checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_putField, f);
@@ -969,9 +1069,17 @@ public final class MethodHandles {
 
     public MethodHandle findStaticGetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = findField(refc, name);
-      if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) == 0) {
-        throw new NoSuchFieldException(name);
+      Field f;
+      try {
+        f = findField(refc, name);
+      } catch (NoSuchFieldException e) {
+        throw noField(refc, name, type, "getStatic");
+      }
+      if (!f.getType().equals(type)) {
+        throw noField(refc, name, type, "getStatic");
+      }
+      if ((f.getModifiers() & Modifier.STATIC) == 0) {
+        throw staticMismatch(refc, name, type, "getField", true);
       }
       checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_getStatic, f);
@@ -979,9 +1087,17 @@ public final class MethodHandles {
 
     public MethodHandle findStaticSetter(Class<?> refc, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = findField(refc, name);
-      if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) == 0) {
-        throw new NoSuchFieldException(name);
+      Field f;
+      try {
+        f = findField(refc, name);
+      } catch (NoSuchFieldException e) {
+        throw noField(refc, name, type, "putStatic");
+      }
+      if (!f.getType().equals(type)) {
+        throw noField(refc, name, type, "putStatic");
+      }
+      if ((f.getModifiers() & Modifier.STATIC) == 0) {
+        throw staticMismatch(refc, name, type, "putField", true);
       }
       checkAccess(refc, f.getDeclaringClass(), f.getModifiers(), name);
       return MethodHandle.makeFieldHandle(MethodHandle.REF_putStatic, f);
@@ -1007,9 +1123,17 @@ public final class MethodHandles {
 
     public VarHandle findVarHandle(Class<?> recv, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = findField(recv, name);
-      if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) != 0) {
-        throw new NoSuchFieldException(name);
+      Field f;
+      try {
+        f = findField(recv, name);
+      } catch (NoSuchFieldException e) {
+        throw noField(recv, name, type, "getField");
+      }
+      if (!f.getType().equals(type)) {
+        throw noField(recv, name, type, "getField");
+      }
+      if ((f.getModifiers() & Modifier.STATIC) != 0) {
+        throw staticMismatch(recv, name, type, "getStatic", false);
       }
       checkAccess(recv, f.getDeclaringClass(), f.getModifiers(), name);
       f.setAccessible(true);
@@ -1018,9 +1142,17 @@ public final class MethodHandles {
 
     public VarHandle findStaticVarHandle(Class<?> decl, String name, Class<?> type)
         throws NoSuchFieldException, IllegalAccessException {
-      Field f = findField(decl, name);
-      if (!f.getType().equals(type) || (f.getModifiers() & Modifier.STATIC) == 0) {
-        throw new NoSuchFieldException(name);
+      Field f;
+      try {
+        f = findField(decl, name);
+      } catch (NoSuchFieldException e) {
+        throw noField(decl, name, type, "getStatic");
+      }
+      if (!f.getType().equals(type)) {
+        throw noField(decl, name, type, "getStatic");
+      }
+      if ((f.getModifiers() & Modifier.STATIC) == 0) {
+        throw staticMismatch(decl, name, type, "getField", true);
       }
       checkAccess(decl, f.getDeclaringClass(), f.getModifiers(), name);
       f.setAccessible(true);

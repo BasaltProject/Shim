@@ -649,6 +649,7 @@ public class LogManager {
         return;
       }
       final int oldState = globalHandlersState;
+      readPrimordialConfiguration = true;
       globalHandlersState = kStateReadingConfig;
       try {
         reset();

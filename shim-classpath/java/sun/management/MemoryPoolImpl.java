@@ -14,19 +14,33 @@ import java.lang.management.MemoryUsage;
 import javax.management.ObjectName;
 
 public class MemoryPoolImpl implements MemoryPoolMXBean {
+  private final String name;
+  private final MemoryType type;
+  private final String[] managers;
+
+  public MemoryPoolImpl() {
+    this("G1 Eden Space", MemoryType.HEAP, "G1 Young Generation", "G1 Old Generation");
+  }
+
+  public MemoryPoolImpl(String name, MemoryType type, String... managers) {
+    this.name = name;
+    this.type = type;
+    this.managers = managers;
+  }
+
   @Override
   public String getName() {
-    return "Shim Heap";
+    return name;
   }
 
   @Override
   public MemoryType getType() {
-    return MemoryType.HEAP;
+    return type;
   }
 
   @Override
   public MemoryUsage getUsage() {
-    return new MemoryImpl().getHeapMemoryUsage();
+    return type == MemoryType.HEAP ? new MemoryImpl().getHeapMemoryUsage() : new MemoryImpl().getNonHeapMemoryUsage();
   }
 
   @Override
@@ -45,7 +59,7 @@ public class MemoryPoolImpl implements MemoryPoolMXBean {
 
   @Override
   public String[] getMemoryManagerNames() {
-    return new String[] {"Shim Collector"};
+    return managers.clone();
   }
 
   @Override
@@ -106,7 +120,7 @@ public class MemoryPoolImpl implements MemoryPoolMXBean {
   @Override
   public ObjectName getObjectName() {
     try {
-      return new ObjectName("java.lang:type=MemoryPool,name=Shim Heap");
+      return new ObjectName("java.lang:type=MemoryPool,name=" + ObjectName.quote(name).replace("\"", ""));
     } catch (javax.management.MalformedObjectNameException e) {
       throw new IllegalArgumentException(e);
     }

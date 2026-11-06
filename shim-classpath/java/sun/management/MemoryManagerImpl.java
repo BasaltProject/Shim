@@ -14,8 +14,11 @@ import javax.management.ObjectName;
 public class MemoryManagerImpl implements MemoryManagerMXBean {
   private final String name;
 
-  MemoryManagerImpl(String name) {
+  private final String[] pools;
+
+  public MemoryManagerImpl(String name, String... pools) {
     this.name = name;
+    this.pools = pools;
   }
 
   @Override
@@ -30,7 +33,7 @@ public class MemoryManagerImpl implements MemoryManagerMXBean {
 
   @Override
   public String[] getMemoryPoolNames() {
-    return new String[] {"Shim Heap"};
+    return pools.clone();
   }
 
   @Override

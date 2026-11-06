@@ -16,7 +16,11 @@ import java.util.SplittableRandom;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import jdk.internal.random.L128X1024MixRandom;
+import jdk.internal.random.L128X128MixRandom;
+import jdk.internal.random.L128X256MixRandom;
 import jdk.internal.random.L32X64MixRandom;
+import jdk.internal.random.L64X1024MixRandom;
 import jdk.internal.random.L64X128MixRandom;
 import jdk.internal.random.L64X128StarStarRandom;
 import jdk.internal.random.L64X256MixRandom;
@@ -167,10 +171,90 @@ public final class RandomGeneratorFactory<T extends RandomGenerator> {
         L64X256MixRandom::new));
 
     register(new RandomGeneratorFactory<>(
+        "L64X1024MixRandom",
+        "LXM",
+        1088,
+        16,
+        BigInteger.ONE.shiftLeft(1024).subtract(BigInteger.ONE).shiftLeft(64),
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        L64X1024MixRandom.class,
+        L64X1024MixRandom::new,
+        L64X1024MixRandom::new,
+        L64X1024MixRandom::new));
+
+    register(new RandomGeneratorFactory<>(
+        "L128X128MixRandom",
+        "LXM",
+        256,
+        1,
+        BigInteger.ONE.shiftLeft(128).subtract(BigInteger.ONE).shiftLeft(128),
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        L128X128MixRandom.class,
+        L128X128MixRandom::new,
+        L128X128MixRandom::new,
+        L128X128MixRandom::new));
+
+    register(new RandomGeneratorFactory<>(
+        "L128X256MixRandom",
+        "LXM",
+        384,
+        1,
+        BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE).shiftLeft(128),
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        L128X256MixRandom.class,
+        L128X256MixRandom::new,
+        L128X256MixRandom::new,
+        L128X256MixRandom::new));
+
+    register(new RandomGeneratorFactory<>(
+        "L128X1024MixRandom",
+        "LXM",
+        1152,
+        1,
+        BigInteger.ONE.shiftLeft(1024).subtract(BigInteger.ONE).shiftLeft(128),
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        L128X1024MixRandom.class,
+        L128X1024MixRandom::new,
+        L128X1024MixRandom::new,
+        L128X1024MixRandom::new));
+
+    register(new RandomGeneratorFactory<>(
         "Xoshiro256PlusPlus",
         "Xoshiro",
         256,
-        4,
+        3,
         BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE),
         true,
         false,
@@ -224,13 +308,15 @@ public final class RandomGeneratorFactory<T extends RandomGenerator> {
         SplittableRandom.class,
         SplittableRandom::new,
         SplittableRandom::new,
-        bytes -> new SplittableRandom(bytesToLong(bytes))));
+        bytes -> {
+          throw new UnsupportedOperationException();
+        }));
 
     register(new RandomGeneratorFactory<>(
         "Random",
         "Legacy",
         48,
-        1,
+        0,
         BigInteger.ONE.shiftLeft(48),
         true,
         false,
@@ -239,12 +325,38 @@ public final class RandomGeneratorFactory<T extends RandomGenerator> {
         false,
         false,
         false,
-        true,
+        false,
         false,
         Random.class,
         Random::new,
         Random::new,
-        bytes -> new Random(bytesToLong(bytes))));
+        bytes -> {
+          throw new UnsupportedOperationException();
+        }));
+
+    register(new RandomGeneratorFactory<>(
+        "SecureRandom",
+        "Legacy",
+        Integer.MAX_VALUE,
+        Integer.MAX_VALUE,
+        BigInteger.ZERO,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        java.security.SecureRandom.class,
+        java.security.SecureRandom::new,
+        seed -> {
+          java.security.SecureRandom r = new java.security.SecureRandom();
+          r.setSeed(seed);
+          return r;
+        },
+        bytes -> new java.security.SecureRandom(bytes)));
   }
 
   private static void register(RandomGeneratorFactory<? extends RandomGenerator> factory) {

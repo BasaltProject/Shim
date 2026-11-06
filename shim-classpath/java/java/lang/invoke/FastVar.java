@@ -23,11 +23,23 @@ final class FastVar {
   }
 
   private static int toInt(Object value) {
-    return value instanceof Character ? ((Character) value).charValue() : ((Number) value).intValue();
+    if (value instanceof Character) {
+      return ((Character) value).charValue();
+    }
+    if (!(value instanceof Number) || value instanceof Long || value instanceof Float || value instanceof Double) {
+      throw new WrongMethodTypeException("cannot convert " + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+    return ((Number) value).intValue();
   }
 
   private static long toLong(Object value) {
-    return value instanceof Character ? ((Character) value).charValue() : ((Number) value).longValue();
+    if (value instanceof Character) {
+      return ((Character) value).charValue();
+    }
+    if (!(value instanceof Number) || value instanceof Float || value instanceof Double) {
+      throw new WrongMethodTypeException("cannot convert " + (value == null ? "null" : value.getClass().getName()) + " to long");
+    }
+    return ((Number) value).longValue();
   }
 
   static Object get(char kind, Object base, long offset) {

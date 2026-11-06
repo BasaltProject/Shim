@@ -56,6 +56,9 @@ public final class Field extends AccessibleObject implements Member {
   private boolean overridden;
 
   public void setAccessible(boolean v) {
+    if (v) {
+      checkCanSetAccessible(this, getDeclaringClass(), getModifiers());
+    }
     accessible = v;
     overridden = v;
   }
@@ -108,6 +111,9 @@ public final class Field extends AccessibleObject implements Member {
   }
 
   private Object target(Object instance, boolean setting) {
+    if (vmField.nativeID == shim.HiddenFields.kHidden) {
+      shim.HiddenFields.<RuntimeException>deny(describe());
+    }
     if ((vmField.flags & Modifier.STATIC) != 0) {
       Classes.initialize(vmField.class_);
       return vmField.class_.staticTable;

@@ -41,9 +41,22 @@ public class SystemClassLoader extends ClassLoader {
     throws ClassNotFoundException;
 
   protected Class findClass(String name) throws ClassNotFoundException {
+    if (Agents.isActive() && !name.startsWith("shim.") && !name.startsWith("java.")) {
+      byte[] original = Agents.readClass(this, name);
+      if (original != null) {
+        byte[] changed = Agents.transform(this, name.replace('.', '/'), null, null, original);
+        if (changed != null) {
+          return getClass(Classes.defineNamedVMClass(this, name, changed, 0, changed.length));
+        }
+      }
+    }
     try {
       return getClass(findVMClass(name));
     } catch (ClassNotFoundException e) {
+      byte[] extra = Agents.readAppended(name);
+      if (extra != null) {
+        return getClass(Classes.defineNamedVMClass(this, name, extra, 0, extra.length));
+      }
       String message = e.getMessage();
       if (message != null && message.indexOf('/') >= 0 && name.indexOf('/') < 0) {
         throw new ClassNotFoundException(name);

@@ -432,8 +432,21 @@ public final class Pattern implements Serializable {
     return c == '*' || c == '+' || c == '?' || c == '{';
   }
 
+  private Frag quotedHead;
+
   private Frag atomWithQuantifier() {
+    quotedHead = null;
     Frag atom = atom();
+    Frag head = quotedHead;
+    quotedHead = null;
+    if (head != null) {
+      Frag tail = quantifiedTail(atom);
+      return concat(head, tail);
+    }
+    return quantifiedTail(atom);
+  }
+
+  private Frag quantifiedTail(Frag atom) {
     skipComments();
     int c = peek();
     if (c != '*' && c != '+' && c != '?' && c != '{') {
@@ -985,8 +998,8 @@ public final class Pattern implements Serializable {
         if (isQuantifierStart(cursor) && cps.length > 1) {
           int[] head = Arrays.copyOf(cps, cps.length - 1);
           Frag h = literal(head);
-          Frag lastChar = literalChar(cps[cps.length - 1]);
-          return concat(h, lastChar);
+          quotedHead = h;
+          return literalChar(cps[cps.length - 1]);
         }
         return cps.length == 1 ? literalChar(cps[0]) : literal(cps);
       }
@@ -1157,7 +1170,14 @@ public final class Pattern implements Serializable {
           throw errorAt("Unmatched { in character name", pattern.length());
         }
         String name = pattern.substring(cursor + 1, close);
-        throw errorAt("Unknown character name [" + name + "]", close);
+        int named;
+        try {
+          named = Character.codePointOf(name);
+        } catch (IllegalArgumentException e) {
+          throw errorAt("Unknown character name [" + name + "]", close);
+        }
+        cursor = close + 1;
+        return named;
       }
       default:
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {

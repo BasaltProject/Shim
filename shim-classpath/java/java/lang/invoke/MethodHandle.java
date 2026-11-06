@@ -49,6 +49,7 @@ public abstract class MethodHandle implements java.lang.constant.Constable {
   private final ClassLoader loader;
   final shim.VMMethod method;
   protected volatile MethodType type;
+  shim.VMClass symbolicOwner;
 
   public MethodHandle(int kind, ClassLoader loader, shim.VMMethod method) {
     this.kind = kind;
@@ -114,6 +115,9 @@ public abstract class MethodHandle implements java.lang.constant.Constable {
             throw new IllegalArgumentException("Missing receiver instance");
           }
           Object instance = arguments[0];
+          if (instance == null) {
+            throw new NullPointerException();
+          }
           Object[] rest = new Object[arguments.length - 1];
           System.arraycopy(arguments, 1, rest, 0, rest.length);
           return new Method(method).invoke(instance, rest);

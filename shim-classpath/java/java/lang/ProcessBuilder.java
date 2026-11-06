@@ -158,7 +158,55 @@ public final class ProcessBuilder {
         throw new NullPointerException("command element is null");
       }
     }
-    return Runtime.getRuntime().exec(cmd);
+    return start(cmd, -1, false);
+  }
+
+  private Process start(String[] cmd, int stdinFd, boolean pipeOut) throws IOException {
+    Redirect[] r = redirects();
+    int[] modes = new int[3];
+    String[] files = new String[3];
+    for (int i = 0; i < 3; i++) {
+      Redirect x = r[i];
+      if (x == Redirect.DISCARD) {
+        modes[i] = 3;
+        files[i] = "/dev/null";
+        continue;
+      }
+      switch (x.type()) {
+        case INHERIT:
+          modes[i] = 1;
+          break;
+        case READ:
+          modes[i] = 2;
+          files[i] = x.file().getPath();
+          break;
+        case WRITE:
+          modes[i] = 3;
+          files[i] = x.file().getPath();
+          break;
+        case APPEND:
+          modes[i] = 4;
+          files[i] = x.file().getPath();
+          break;
+        default:
+          modes[i] = 0;
+      }
+    }
+    if (stdinFd >= 0) {
+      modes[0] = 6;
+    }
+    if (redirectErrorStream) {
+      modes[2] = 5;
+    }
+    String[] env = null;
+    if (environment != null) {
+      env = new String[environment.size()];
+      int n = 0;
+      for (Map.Entry<String, String> e : environment.entrySet()) {
+        env[n++] = e.getKey() + "=" + e.getValue();
+      }
+    }
+    return Runtime.spawn(cmd, env, directory == null ? null : directory.getPath(), modes, files, stdinFd);
   }
 
   public static List<Process> startPipeline(List<ProcessBuilder> builders) throws IOException {
@@ -167,8 +215,23 @@ public final class ProcessBuilder {
       throw new IllegalArgumentException("empty pipeline");
     }
     List<Process> processes = new ArrayList<Process>(builders.size());
-    for (ProcessBuilder b : builders) {
-      processes.add(b.start());
+    int previousFd = -1;
+    try {
+      for (int i = 0; i < builders.size(); i++) {
+        ProcessBuilder b = builders.get(i);
+        String[] cmd = b.command.toArray(new String[0]);
+        Process p = b.start(cmd, previousFd, false);
+        previousFd = -1;
+        if (i + 1 < builders.size()) {
+          previousFd = ((Object) p) instanceof Process ? Runtime.takeStdout(p) : -1;
+        }
+        processes.add(p);
+      }
+    } catch (IOException e) {
+      for (Process p : processes) {
+        p.destroyForcibly();
+      }
+      throw e;
     }
     return processes;
   }

@@ -168,6 +168,9 @@ public final class ModuleLayer {
   }
 
   public Set<Module> modules() {
+    if (this == bootLayer) {
+      Module.loadPlatform();
+    }
     return modules;
   }
 
@@ -177,6 +180,9 @@ public final class ModuleLayer {
 
   public Optional<Module> findModule(String name) {
     Objects.requireNonNull(name);
+    if (this == bootLayer) {
+      Module.loadPlatform();
+    }
     for (Module m : modules) {
       if (name.equals(m.getName())) {
         return Optional.of(m);

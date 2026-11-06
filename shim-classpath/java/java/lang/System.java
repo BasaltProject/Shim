@@ -207,7 +207,8 @@ public final class System {
     putIfAbsent(p, "stdout.encoding", encoding);
     putIfAbsent(p, "stderr.encoding", encoding);
     putIfAbsent(p, "sun.jnu.encoding", encoding);
-    putIfAbsent(p, "user.country", (String) p.get("user.region"));
+    String region = (String) p.get("user.region");
+    putIfAbsent(p, "user.country", region == null || region.isEmpty() ? null : region);
     String user = getenv("USER");
     if (user == null) {
       user = getenv("LOGNAME");
