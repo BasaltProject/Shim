@@ -267,7 +267,7 @@ jobs:
       - name: Install the cross-compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang-19 lld-19 ninja-build
+          sudo apt-get install -y --no-install-recommends clang-19 lld-19 llvm-19 ninja-build
 
       - name: Extract the FreeBSD arm64 sysroot
         run: .github/scripts/setup-freebsd-sysroot.sh
@@ -286,6 +286,7 @@ jobs:
               -DCMAKE_C_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
               -DCMAKE_CXX_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
               -DCMAKE_ASM_COMPILER=clang-19 -DCMAKE_ASM_COMPILER_TARGET=aarch64-unknown-freebsd14.5 \
+              -DCMAKE_STRIP=/usr/bin/llvm-strip-19 \
               "-DCMAKE_SYSROOT=$root" \
               "-DCMAKE_CXX_FLAGS=-nostdinc++ -isystem $root/usr/include/c++/v1" \
               "-DCMAKE_EXE_LINKER_FLAGS=-nostdlib++ -fuse-ld=lld" \
