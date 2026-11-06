@@ -163,10 +163,14 @@ jobs:
       - name: Debug the crashes
         if: failure()
         run: |
-          pacman -S --noconfirm mingw-w64-clang-x86_64-lldb || true
-          for t in Floats Integers GC; do
+          for t in Floats GC; do
               echo "=== $t"
-              lldb -b -o run -o "script exec(open('.github/scripts/crash-stack.py').read())" -- build/shim.exe -cp build/test $t 2>&1 | tail -60
+              SHIM_CRASH_STACK=1 build/shim.exe -cp build/test $t 2>&1 | head -40 > crash.txt || true
+              cat crash.txt
+              grep -o 'shim.exe+0x[0-9a-f]*' crash.txt | head -25 | while read -r frame; do
+                  llvm-addr2line -f -C -e build/shim.exe "$(printf '0x%x' $((0x140000000 + ${frame#*+})))" | tr '\n' ' '
+                  echo
+              done
           done
 
       - name: Package
