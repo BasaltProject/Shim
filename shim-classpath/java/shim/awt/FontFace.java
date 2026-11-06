@@ -68,7 +68,7 @@ public abstract class FontFace {
       return fractional ? size : Math.round(size);
     }
     if (fractional) {
-      return advance(cp) * size;
+      return advancePixels(advance(cp), size);
     }
     if (hinted) {
       int h = hintedAdvance(cp, size);
@@ -80,6 +80,97 @@ public abstract class FontFace {
   }
 
   public boolean styled() {
+    return false;
+  }
+
+  public int glyphCode(int cp) {
+    return cp;
+  }
+
+  public int codePointOf(int glyph) {
+    return glyph;
+  }
+
+  public float pixels(float emFraction, float size) {
+    return emFraction * size;
+  }
+
+  public float advancePixels(float emFraction, float size) {
+    return pixels(emFraction, size);
+  }
+
+  public float[] styleMetrics(float size, float ascentPixels) {
+    float thickness = size / 12f;
+    return new float[] {-ascentPixels / 2.5f, thickness, thickness / 1.5f, thickness};
+  }
+
+  public int unitsPerEm() {
+    return 0;
+  }
+
+  public java.awt.Shape scaledOutline(int cp, float size) {
+    int upem = unitsPerEm();
+    if (upem <= 0) {
+      return null;
+    }
+    java.awt.Shape em = outline(cp, false, false);
+    long scale = TrueTypeHinter.divFix(Math.round(size * 64f), upem);
+    java.awt.geom.Path2D.Float out = new java.awt.geom.Path2D.Float(java.awt.geom.Path2D.WIND_NON_ZERO);
+    java.awt.geom.PathIterator it = em.getPathIterator(null);
+    float[] c = new float[6];
+    float sx = 0;
+    float sy = 0;
+    float cx = 0;
+    float cy = 0;
+    while (!it.isDone()) {
+      int type = it.currentSegment(c);
+      int n = type == java.awt.geom.PathIterator.SEG_CLOSE ? 0
+          : type == java.awt.geom.PathIterator.SEG_QUADTO ? 4
+          : type == java.awt.geom.PathIterator.SEG_CUBICTO ? 6 : 2;
+      for (int i = 0; i < n; i++) {
+        c[i] = TrueTypeHinter.mulFix(Math.round(c[i] * upem), scale) / 64f;
+      }
+      switch (type) {
+      case java.awt.geom.PathIterator.SEG_MOVETO:
+        out.moveTo(c[0], c[1]);
+        sx = cx = c[0];
+        sy = cy = c[1];
+        break;
+      case java.awt.geom.PathIterator.SEG_LINETO:
+        out.lineTo(c[0], c[1]);
+        cx = c[0];
+        cy = c[1];
+        break;
+      case java.awt.geom.PathIterator.SEG_QUADTO:
+        out.quadTo(c[0], c[1], c[2], c[3]);
+        cx = c[2];
+        cy = c[3];
+        break;
+      case java.awt.geom.PathIterator.SEG_CUBICTO:
+        out.curveTo(c[0], c[1], c[2], c[3], c[4], c[5]);
+        cx = c[4];
+        cy = c[5];
+        break;
+      default:
+        if (cx != sx || cy != sy) {
+          out.lineTo(sx, sy);
+        }
+        out.closePath();
+      }
+      it.next();
+    }
+    return out;
+  }
+
+  public java.awt.Shape hintedGlyph(int cp, float size) {
+    return null;
+  }
+
+  public float lineHeight() {
+    return ascent() + descent() + leading();
+  }
+
+  public boolean leadingFromHeight() {
     return false;
   }
 

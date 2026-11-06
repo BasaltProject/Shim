@@ -717,8 +717,7 @@ public final class SoftwareGraphics2D extends Graphics2D {
     if (str.isEmpty()) {
       return;
     }
-    GlyphVector gv = font.createGlyphVector(getFontRenderContext(), str);
-    drawTextShape(gv.getOutline(x, y));
+    drawRun(str, x, y);
   }
 
   public void drawString(AttributedCharacterIterator it, int x, int y) {
@@ -729,18 +728,136 @@ public final class SoftwareGraphics2D extends Graphics2D {
     if (it == null) {
       throw new NullPointerException("AttributedCharacterIterator is null");
     }
-    StringBuilder sb = new StringBuilder();
-    for (char c = it.first(); c != java.text.CharacterIterator.DONE; c = it.next()) {
-      sb.append(c);
-    }
     Font saved = font;
-    Object f = it.getAttribute(java.awt.font.TextAttribute.FONT);
-    Font ff = null;
-    if (((ff = f instanceof Font ? (Font) f : null) != null)) {
-      font = ff;
+    Paint savedPaint = paint;
+    float cx = x;
+    try {
+      for (char c = it.first(); c != java.text.CharacterIterator.DONE; ) {
+        int end = it.getRunLimit();
+        StringBuilder sb = new StringBuilder();
+        for (int i = it.getIndex(); i < end; i++) {
+          sb.append(it.setIndex(i));
+        }
+        java.util.Map<java.text.AttributedCharacterIterator.Attribute, Object> attrs = it.getAttributes();
+        Object f = attrs.get(java.awt.font.TextAttribute.FONT);
+        if (f instanceof Font) {
+          font = (Font) f;
+        } else if (!attrs.isEmpty()) {
+          font = savedFont(saved, attrs);
+        }
+        Object fg = attrs.get(java.awt.font.TextAttribute.FOREGROUND);
+        if (fg instanceof Paint) {
+          paint = (Paint) fg;
+        }
+        cx += drawRun(sb.toString(), cx, y);
+        font = saved;
+        paint = savedPaint;
+        c = it.setIndex(end);
+      }
+    } finally {
+      font = saved;
+      paint = savedPaint;
     }
-    drawString(sb.toString(), x, y);
-    font = saved;
+  }
+
+  private static Font savedFont(Font base, java.util.Map<java.text.AttributedCharacterIterator.Attribute, Object> attrs) {
+    java.util.HashMap<java.awt.font.TextAttribute, Object> m = new java.util.HashMap<>();
+    for (java.util.Map.Entry<java.text.AttributedCharacterIterator.Attribute, Object> e : attrs.entrySet()) {
+      if (e.getKey() instanceof java.awt.font.TextAttribute) {
+        m.put((java.awt.font.TextAttribute) e.getKey(), e.getValue());
+      }
+    }
+    return base.deriveFont(m);
+  }
+
+  private float drawRun(String str, float x, float y) {
+    GlyphVector gv = font.createGlyphVector(getFontRenderContext(), str);
+    Shape hinted = hintedText(str, gv, x, y);
+    if (hinted != null) {
+      fillExactDevice(hinted, true);
+    } else {
+      drawTextShape(gv.getOutline(x, y));
+    }
+    float adv = (float) gv.getLogicalBounds().getWidth();
+    if (font.hasLayoutAttributes()) {
+      drawDecorations(font, str, x, y, adv);
+    }
+    return adv;
+  }
+
+  private void fillExactDevice(Shape s, boolean glyph) {
+    if (clipBounds.isEmpty()) {
+      return;
+    }
+    Fill sink = new Fill(paint, mask(), clipBounds, s.getBounds2D());
+    Rasterizer.fillExact(s.getPathIterator(tx), clipBounds.x, clipBounds.y, clipBounds.x + clipBounds.width,
+        clipBounds.y + clipBounds.height, glyph, sink);
+    if (sink.pctx != null) {
+      sink.pctx.dispose();
+    }
+  }
+
+  private Shape hintedText(String str, GlyphVector gv, float x, float y) {
+    if (font.isTransformed() || font.isBold() || font.isItalic() || !textAa()
+        || (tx.getType() & ~AffineTransform.TYPE_TRANSLATION) != 0) {
+      return null;
+    }
+    FontFace f = Fonts.face(font.getName(), font.getStyle());
+    Path2D.Float all = new Path2D.Float(Path2D.WIND_NON_ZERO);
+    int[] cps = str.codePoints().toArray();
+    for (int i = 0; i < cps.length; i++) {
+      Shape g = f.hintedGlyph(cps[i], font.getSize2D());
+      if (g == null) {
+        return null;
+      }
+      java.awt.geom.Point2D p = gv.getGlyphPosition(i);
+      double ox = Math.floor(tx.getTranslateX() + (x + p.getX()) + 0.5);
+      double oy = Math.floor(tx.getTranslateY() + (y + p.getY()) + 0.5);
+      all.append(new java.awt.geom.FlatteningPathIterator(
+          g.getPathIterator(AffineTransform.getTranslateInstance(ox - tx.getTranslateX(), oy - tx.getTranslateY())),
+          0.005, 16), false);
+    }
+    return all;
+  }
+
+  private void drawDecorations(Font f, String str, float x, float y, float adv) {
+    java.awt.font.LineMetrics lm = f.getLineMetrics(str, getFontRenderContext());
+    java.util.Map<java.awt.font.TextAttribute, ?> at = f.getAttributes();
+    float x1 = (float) Math.floor(x) + 0.5f;
+    Object u = at.get(java.awt.font.TextAttribute.UNDERLINE);
+    if (u instanceof Integer && (Integer) u != -1) {
+      int mode = (Integer) u;
+      if (mode == java.awt.font.TextAttribute.UNDERLINE_ON.intValue()) {
+        decorationLine(x1, y + lm.getUnderlineOffset(), adv, lm.getUnderlineThickness(), 0, 0);
+      } else if (mode == java.awt.font.TextAttribute.UNDERLINE_LOW_ONE_PIXEL.intValue()) {
+        decorationLine(x1, y + 1f, adv, 1f, 0, 0);
+      } else if (mode == java.awt.font.TextAttribute.UNDERLINE_LOW_TWO_PIXEL.intValue()) {
+        decorationLine(x1, y + 1f, adv, 2f, 0, 0);
+      } else if (mode == java.awt.font.TextAttribute.UNDERLINE_LOW_DOTTED.intValue()) {
+        decorationLine(x1, y + 1f, adv, 1f, 1f, 1f);
+      } else if (mode == java.awt.font.TextAttribute.UNDERLINE_LOW_DASHED.intValue()) {
+        decorationLine(x1, y + 1f, adv, 1f, 4f, 4f);
+      } else {
+        decorationLine(x1, y, adv, 1f, 1f, 1f);
+        decorationLine(x1 + 1f, y + 1f, adv - 2f, 1f, 1f, 1f);
+      }
+    }
+    if (Boolean.TRUE.equals(at.get(java.awt.font.TextAttribute.STRIKETHROUGH))) {
+      decorationLine(x1, y + lm.getStrikethroughOffset(), adv, lm.getStrikethroughThickness(), 0, 0);
+    }
+  }
+
+  private void decorationLine(float x, float yOff, float len, float thick, float on, float off) {
+    float cy = (float) Math.floor(yOff) + 0.5f;
+    Path2D.Float p = new Path2D.Float(Path2D.WIND_NON_ZERO);
+    if (on <= 0f) {
+      p.append(new java.awt.geom.Rectangle2D.Float(x, cy - thick / 2f, len, thick), false);
+    } else {
+      for (float d = 0f; d < len; d += on + off) {
+        p.append(new java.awt.geom.Rectangle2D.Float(x + d, cy - thick / 2f, Math.min(on, len - d), thick), false);
+      }
+    }
+    fillExactDevice(p, false);
   }
 
   public void drawGlyphVector(GlyphVector g, float x, float y) {

@@ -33,13 +33,10 @@ public final class HeadlessGraphicsEnvironment extends GraphicsEnvironment {
   }
 
   public Font[] getAllFonts() {
-    String[] families = getAvailableFontFamilyNames();
-    Font[] out = new Font[families.length * 4];
-    int k = 0;
-    for (String f : families) {
-      for (int style = 0; style < 4; style++) {
-        out[k++] = new Font(f, style, 1);
-      }
+    String[] names = Fonts.allFaceNames();
+    Font[] out = new Font[names.length];
+    for (int i = 0; i < names.length; i++) {
+      out[i] = new Font(names[i], Font.PLAIN, 1);
     }
     return out;
   }
@@ -56,6 +53,6 @@ public final class HeadlessGraphicsEnvironment extends GraphicsEnvironment {
     if (font == null) {
       throw new NullPointerException("font cannot be null.");
     }
-    return Fonts.isKnown(font.getName());
+    return !Fonts.isKnown(font.getName());
   }
 }

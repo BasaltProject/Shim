@@ -129,7 +129,7 @@ public class PSStreamPrintService extends StreamPrintService {
 
   static MediaSizeName defaultMedia() {
     String country = Locale.getDefault().getCountry();
-    return "US".equals(country) || "CA".equals(country) ? MediaSizeName.NA_LETTER : MediaSizeName.ISO_A4;
+    return country.isEmpty() || "US".equals(country) || "CA".equals(country) ? MediaSizeName.NA_LETTER : MediaSizeName.ISO_A4;
   }
 
   public Object getDefaultAttributeValue(Class<? extends Attribute> category) {

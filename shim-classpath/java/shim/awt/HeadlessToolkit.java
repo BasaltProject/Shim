@@ -137,7 +137,10 @@ public final class HeadlessToolkit extends Toolkit {
     return false;
   }
 
-  public void beep() { }
+  public void beep() {
+    System.out.write(0x07);
+    System.out.flush();
+  }
 
   public Clipboard getSystemClipboard() throws HeadlessException {
     throw new HeadlessException();

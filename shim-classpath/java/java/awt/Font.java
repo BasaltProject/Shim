@@ -114,7 +114,7 @@ public class Font implements java.io.Serializable {
         if (e.getKey() instanceof TextAttribute && e.getKey() != TextAttribute.FONT && e.getKey() != TextAttribute.FAMILY
             && e.getKey() != TextAttribute.WEIGHT && e.getKey() != TextAttribute.POSTURE
             && e.getKey() != TextAttribute.SIZE && e.getKey() != TextAttribute.TRANSFORM
-            && e.getKey() != TextAttribute.SUPERSCRIPT && e.getKey() != TextAttribute.WIDTH && e.getValue() != null) {
+            && e.getValue() != null) {
           if (extra == null) {
             extra = new HashMap<>();
           }
@@ -167,11 +167,34 @@ public class Font implements java.io.Serializable {
     if (fontFormat != TRUETYPE_FONT && fontFormat != TYPE1_FONT) {
       throw new IllegalArgumentException("font format not recognized");
     }
-    byte[] data = fontStream.readAllBytes();
-    shim.awt.TrueTypeFace face = shim.awt.TrueTypeFace.parse(data, 0);
+    return createFont(fontFormat, fontStream.readAllBytes(), null);
+  }
+
+  private static Font createFont(int fontFormat, byte[] data, String path) throws FontFormatException {
+    shim.awt.FontFace face;
+    int style;
+    if (fontFormat == TYPE1_FONT) {
+      shim.awt.Type1Face t1 = shim.awt.Type1Face.parse(data);
+      face = t1;
+      style = t1.fontStyle();
+    } else {
+      if (data.length == 0) {
+        throw new FontFormatException("java.nio.BufferUnderflowException");
+      }
+      shim.awt.TrueTypeFace tt;
+      try {
+        tt = shim.awt.TrueTypeFace.parse(data, 0);
+      } catch (FontFormatException e) {
+        String where = path != null ? path : System.getProperty("java.io.tmpdir") + "/+~JF"
+            + Long.toString(System.nanoTime() & 0xffffffffL) + ".tmp";
+        throw new FontFormatException("Unsupported sfnt " + where);
+      }
+      face = tt;
+      style = tt.fontStyle();
+    }
     String key = face.fullName() != null ? face.fullName() : face.family();
     Fonts.register(key, face);
-    return new Font(key, face.fontStyle(), 1f);
+    return new Font(key, style, 1f);
   }
 
   public static Font[] createFonts(InputStream fontStream) throws FontFormatException, IOException {
@@ -182,9 +205,13 @@ public class Font implements java.io.Serializable {
     if (fontFormat != TRUETYPE_FONT && fontFormat != TYPE1_FONT) {
       throw new IllegalArgumentException("font format not recognized");
     }
+    byte[] data;
     try (java.io.FileInputStream in = new java.io.FileInputStream(fontFile)) {
-      return createFont(fontFormat, in);
+      data = in.readAllBytes();
+    } catch (java.io.FileNotFoundException e) {
+      throw new IOException("Can't read " + fontFile);
     }
+    return createFont(fontFormat, data, fontFile.getPath());
   }
 
   public static Font[] createFonts(File fontFile) throws FontFormatException, IOException {
@@ -192,7 +219,33 @@ public class Font implements java.io.Serializable {
   }
 
   public boolean hasLayoutAttributes() {
-    return false;
+    if (extra == null) {
+      return false;
+    }
+    Object u = extra.get(TextAttribute.UNDERLINE);
+    Object st = extra.get(TextAttribute.STRIKETHROUGH);
+    Object tr = extra.get(TextAttribute.TRACKING);
+    Object k = extra.get(TextAttribute.KERNING);
+    Object l = extra.get(TextAttribute.LIGATURES);
+    return u instanceof Integer && (Integer) u != -1 || Boolean.TRUE.equals(st) || superscript() != 0
+        || tr instanceof Number && ((Number) tr).floatValue() != 0f
+        || k instanceof Integer && (Integer) k != 0 || l instanceof Integer && (Integer) l != 0;
+  }
+
+  public boolean decorated() {
+    Object u = extra == null ? null : extra.get(TextAttribute.UNDERLINE);
+    Object st = extra == null ? null : extra.get(TextAttribute.STRIKETHROUGH);
+    return u instanceof Integer && (Integer) u != -1 || Boolean.TRUE.equals(st);
+  }
+
+  public float tracking() {
+    Object tr = extra == null ? null : extra.get(TextAttribute.TRACKING);
+    return tr instanceof Number ? ((Number) tr).floatValue() : 0f;
+  }
+
+  public boolean kerning() {
+    Object k = extra == null ? null : extra.get(TextAttribute.KERNING);
+    return k instanceof Integer && (Integer) k != 0;
   }
 
   public static Font getFont(Map<? extends AttributedCharacterIterator.Attribute, ?> attributes) {
@@ -305,7 +358,8 @@ public class Font implements java.io.Serializable {
   }
 
   private String styleName() {
-    return isBold() ? (isItalic() ? "bolditalic" : "bold") : (isItalic() ? "italic" : "plain");
+    int st = style | Fonts.logicalSuffixStyle(name);
+    return (st & 1) != 0 ? ((st & 2) != 0 ? "bolditalic" : "bold") : ((st & 2) != 0 ? "italic" : "plain");
   }
 
   public String getPSName() {
@@ -342,13 +396,49 @@ public class Font implements java.io.Serializable {
     return (style & ITALIC) != 0;
   }
 
+  private int superscript() {
+    Object v = extra == null ? null : extra.get(TextAttribute.SUPERSCRIPT);
+    return v instanceof Integer ? (Integer) v : 0;
+  }
+
+  private float widthFactor() {
+    Object v = extra == null ? null : extra.get(TextAttribute.WIDTH);
+    return v instanceof Number ? ((Number) v).floatValue() : 1f;
+  }
+
+  public float superscriptScale() {
+    int ss = Math.abs(superscript());
+    return ss == 0 ? 1f : (float) Math.pow(2.0 / 3.0, Math.min(ss, 2));
+  }
+
+  public float superscriptShiftUp() {
+    int ss = superscript();
+    float m = Math.abs(ss) == 1 ? 0.375f : Math.abs(ss) >= 2 ? 0.625f : 0f;
+    return Math.signum(ss) * m * pointSize;
+  }
+
+  private AffineTransform effectiveTransform() {
+    int ss = Math.min(Math.abs(superscript()), 2);
+    double s = Math.pow(2.0 / 3.0, ss);
+    float w = widthFactor();
+    if (ss == 0 && w == 1f) {
+      return fontTransform;
+    }
+    AffineTransform t = new AffineTransform(w * s, 0, 0, s, 0, -superscriptShiftUp());
+    if (fontTransform != null) {
+      t.concatenate(fontTransform);
+    }
+    return t;
+  }
+
   public boolean isTransformed() {
-    return fontTransform != null;
+    return effectiveTransform() != null;
   }
 
   public AffineTransform getTransform() {
-    if (fontTransform != null) {
-      return new AffineTransform(fontTransform);
+    AffineTransform eff = effectiveTransform();
+    if (eff != null) {
+      return new AffineTransform(eff);
     }
     return new AffineTransform();
   }
@@ -514,32 +604,39 @@ public class Font implements java.io.Serializable {
   }
 
   public LineMetrics getLineMetrics(String str, FontRenderContext frc) {
-    return new SimpleLineMetrics(face(), pointSize, str.length());
+    return new SimpleLineMetrics(face(), pointSize, str.length(), superscriptScale(), superscriptShiftUp());
   }
 
   public LineMetrics getLineMetrics(String str, int beginIndex, int limit, FontRenderContext frc) {
-    return new SimpleLineMetrics(face(), pointSize, limit - beginIndex);
+    return new SimpleLineMetrics(face(), pointSize, limit - beginIndex, superscriptScale(), superscriptShiftUp());
   }
 
   public LineMetrics getLineMetrics(char[] chars, int beginIndex, int limit, FontRenderContext frc) {
-    return new SimpleLineMetrics(face(), pointSize, limit - beginIndex);
+    return new SimpleLineMetrics(face(), pointSize, limit - beginIndex, superscriptScale(), superscriptShiftUp());
   }
 
   public LineMetrics getLineMetrics(CharacterIterator ci, int beginIndex, int limit, FontRenderContext frc) {
-    return new SimpleLineMetrics(face(), pointSize, limit - beginIndex);
+    return new SimpleLineMetrics(face(), pointSize, limit - beginIndex, superscriptScale(), superscriptShiftUp());
   }
 
   private Rectangle2D bounds(String s, FontRenderContext frc) {
     FontFace f = face();
     boolean fm = frc != null && frc.usesFractionalMetrics();
     float width = 0;
+    int count = 0;
     for (int i = 0; i < s.length();) {
       int cp = s.codePointAt(i);
       width += f.pixelAdvance(cp, pointSize, fm, frc == null || !frc.isAntiAliased());
+      count++;
+      if (kerning() && i + Character.charCount(cp) < s.length()) {
+        width += f.pixels(f.kerning(cp, s.codePointAt(i + Character.charCount(cp))), pointSize);
+      }
       i += Character.charCount(cp);
     }
-    float asc = f.ascent() * pointSize;
-    return new Rectangle2D.Float(0, -asc, width, asc + (f.descent() + f.leading()) * pointSize);
+    width += count * (tracking() * pointSize);
+    float asc = f.pixels(f.ascent(), pointSize);
+    float sy = superscriptScale();
+    return new Rectangle2D.Float(0, -asc * sy, width * widthFactor() * sy, f.pixels(f.lineHeight(), pointSize) * sy);
   }
 
   public Rectangle2D getStringBounds(String str, FontRenderContext frc) {
@@ -595,7 +692,8 @@ public class Font implements java.io.Serializable {
   }
 
   public Rectangle2D getMaxCharBounds(FontRenderContext frc) {
-    return bounds("W", frc);
+    Rectangle2D b = bounds("W", frc);
+    return new Rectangle2D.Float(0, (float) b.getY(), face().maxAdvancePixels(pointSize), (float) b.getHeight());
   }
 
   public GlyphVector createGlyphVector(FontRenderContext frc, String str) {
@@ -619,10 +717,13 @@ public class Font implements java.io.Serializable {
 
   public GlyphVector createGlyphVector(FontRenderContext frc, int[] glyphCodes) {
     int[] idx = new int[glyphCodes.length];
+    int[] cps = new int[glyphCodes.length];
+    shim.awt.FontFace face = Fonts.face(getName(), getStyle());
     for (int i = 0; i < idx.length; i++) {
       idx[i] = i;
+      cps[i] = face.codePointOf(glyphCodes[i]);
     }
-    return new SimpleGlyphVector(this, frc, glyphCodes.clone(), idx);
+    return new SimpleGlyphVector(this, frc, cps, idx);
   }
 
   public GlyphVector createGlyphVector(FontRenderContext frc, char[] chars) {

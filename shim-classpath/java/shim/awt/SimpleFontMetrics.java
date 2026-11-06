@@ -26,11 +26,11 @@ public final class SimpleFontMetrics extends FontMetrics {
 
   public FontRenderContext getFontRenderContext() { return frc; }
 
-  public int getAscent() { return (int) Math.ceil(face.ascent() * size - 0.05); }
+  public int getAscent() { return (int) Math.ceil(face.pixels(face.ascent(), size) - 0.05); }
 
-  public int getDescent() { return (int) Math.ceil(face.descent() * size - 0.05); }
+  public int getDescent() { return (int) Math.ceil(face.pixels(face.descent(), size) - 0.05); }
 
-  public int getLeading() { return (int) Math.ceil(face.leading() * size - 0.05); }
+  public int getLeading() { return (int) Math.ceil(face.pixels(face.leading(), size) - 0.05); }
 
   public int getMaxAscent() { return getAscent(); }
 
@@ -47,6 +47,9 @@ public final class SimpleFontMetrics extends FontMetrics {
   }
 
   public int stringWidth(String str) {
+    if (getFont().tracking() != 0f) {
+      return (int) Math.round(getFont().getStringBounds(str, frc).getWidth());
+    }
     if (frc != null && frc.usesFractionalMetrics()) {
       float total = 0f;
       for (int i = 0; i < str.length();) {
