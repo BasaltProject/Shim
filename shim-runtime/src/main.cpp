@@ -21,6 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
+#include <locale.h>
 #include "stdlib.h"
 #include "stdio.h"
 #include "string.h"
@@ -153,6 +154,9 @@ void usageAndExit(const char* name)
 
 int main(int ac, const char** av)
 {
+#ifdef LC_MESSAGES
+  setlocale(LC_MESSAGES, "");
+#endif
   JavaVMInitArgs vmArgs;
   vmArgs.version = JNI_VERSION_1_2;
   vmArgs.nOptions = 1;
@@ -164,6 +168,10 @@ int main(int ac, const char** av)
   const char** argv = 0;
   const char* classpath = ".";
   const char* jdwpOptions = 0;
+  const char* agents[16];
+  int agentCount = 0;
+  int addOpensCount = 0;
+  int addExportsCount = 0;
 
   for (int i = 1; i < ac; ++i) {
     if (strncmp(av[i], "-agentlib:jdwp", 14) == 0 or strncmp(av[i], "-Xrunjdwp:", 10) == 0) {
@@ -184,6 +192,41 @@ int main(int ac, const char** av)
       ++vmArgs.nOptions;
     } else if (strcmp(av[i], "--enable-preview") == 0) {
       ++vmArgs.nOptions;
+    } else if (strcmp(av[i], "--add-opens") == 0) {
+      if (i + 1 == ac)
+        usageAndExit(av[0]);
+      ++i;
+      if (addOpensCount == 0) {
+        ++vmArgs.nOptions;
+      }
+      ++addOpensCount;
+    } else if (strcmp(av[i], "--add-exports") == 0) {
+      if (i + 1 == ac)
+        usageAndExit(av[0]);
+      ++i;
+      if (addExportsCount == 0) {
+        ++vmArgs.nOptions;
+      }
+      ++addExportsCount;
+    } else if (strcmp(av[i], "--add-reads") == 0 or strcmp(av[i], "--add-modules") == 0
+               or strcmp(av[i], "--limit-modules") == 0 or strcmp(av[i], "--patch-module") == 0
+               or strcmp(av[i], "--module-path") == 0 or strcmp(av[i], "-p") == 0 or strcmp(av[i], "--upgrade-module-path") == 0) {
+      if (i + 1 == ac)
+        usageAndExit(av[0]);
+      ++i;
+    } else if (strncmp(av[i], "--", 2) == 0 and strchr(av[i], '=') != 0) {
+      // ignore --option=value launcher flags
+    } else if (strcmp(av[i], "-ea") == 0 or strcmp(av[i], "-da") == 0 or strcmp(av[i], "-esa") == 0
+               or strcmp(av[i], "-dsa") == 0 or strncmp(av[i], "-enableassertions", 17) == 0
+               or strncmp(av[i], "-disableassertions", 18) == 0 or strncmp(av[i], "-ea:", 4) == 0
+               or strncmp(av[i], "-da:", 4) == 0 or strcmp(av[i], "-Xshare:auto") == 0) {
+      // ignore
+    } else if (strncmp(av[i], "-javaagent:", 11) == 0) {
+      if (agentCount < 16) {
+        agents[agentCount++] = av[i] + 11;
+      }
+    } else if (strncmp(av[i], "-agentpath:", 11) == 0) {
+      fprintf(stderr, "Shim: %s is not supported and is ignored\n", av[i]);
     } else if (strcmp(av[i], "-client") == 0 or strcmp(av[i], "-server") == 0) {
       // ignore
     } else if (strcmp(av[i], "-version") == 0) {
@@ -249,6 +292,23 @@ int main(int ac, const char** av)
 
 #define CLASSPATH_PROPERTY "-Djava.class.path="
 
+  if (agentCount > 0) {
+    size_t total = strlen(classpath) + 1;
+    for (int k = 0; k < agentCount; ++k) {
+      total += strlen(agents[k]) + 1;
+    }
+    char* extended = static_cast<char*>(malloc(total + 1));
+    strcpy(extended, classpath);
+    for (int k = 0; k < agentCount; ++k) {
+      const char* eq = strchr(agents[k], '=');
+      size_t n = strlen(extended);
+      extended[n] = ':';
+      size_t len = eq ? static_cast<size_t>(eq - agents[k]) : strlen(agents[k]);
+      memcpy(extended + n + 1, agents[k], len);
+      extended[n + 1 + len] = 0;
+    }
+    classpath = extended;
+  }
   size_t classpathSize = strlen(classpath);
   size_t classpathPropertyBufferSize = sizeof(CLASSPATH_PROPERTY)
                                          + classpathSize;
@@ -264,6 +324,50 @@ int main(int ac, const char** av)
 
   vmArgs.options[optionIndex++].optionString
       = RUNTIME_ARRAY_BODY(classpathPropertyBuffer);
+
+  if (addOpensCount > 0) {
+    size_t total = sizeof("-Dshim.add-opens=");
+    for (int i = 1; i + 1 < ac; ++i) {
+      if (strcmp(av[i], "--add-opens") == 0) {
+        total += strlen(av[i + 1]) + 1;
+      }
+    }
+    char* prop = static_cast<char*>(malloc(total + 1));
+    strcpy(prop, "-Dshim.add-opens=");
+    bool firstOpen = true;
+    for (int i = 1; i + 1 < ac; ++i) {
+      if (strcmp(av[i], "--add-opens") == 0) {
+        if (not firstOpen) {
+          strcat(prop, ",");
+        }
+        firstOpen = false;
+        strcat(prop, av[i + 1]);
+      }
+    }
+    vmArgs.options[optionIndex++].optionString = prop;
+  }
+
+  if (addExportsCount > 0) {
+    size_t total = sizeof("-Dshim.add-exports=");
+    for (int i = 1; i + 1 < ac; ++i) {
+      if (strcmp(av[i], "--add-exports") == 0) {
+        total += strlen(av[i + 1]) + 1;
+      }
+    }
+    char* prop = static_cast<char*>(malloc(total + 1));
+    strcpy(prop, "-Dshim.add-exports=");
+    bool firstExport = true;
+    for (int i = 1; i + 1 < ac; ++i) {
+      if (strcmp(av[i], "--add-exports") == 0) {
+        if (not firstExport) {
+          strcat(prop, ",");
+        }
+        firstExport = false;
+        strcat(prop, av[i + 1]);
+      }
+    }
+    vmArgs.options[optionIndex++].optionString = prop;
+  }
 
   for (int i = 1; i < ac; ++i) {
     if (strncmp(av[i], "-Xrunjdwp:", 10) == 0) {
@@ -296,6 +400,26 @@ int main(int ac, const char** av)
     if (e->ExceptionCheck()) {
       e->ExceptionDescribe();
       e->ExceptionClear();
+    }
+  }
+
+  for (int k = 0; k < agentCount and not e->ExceptionCheck(); ++k) {
+    jclass cls = e->FindClass("shim/Agents");
+    if (not e->ExceptionCheck()) {
+      jmethodID start = e->GetStaticMethodID(cls, "start", "(Ljava/lang/String;)V");
+      if (not e->ExceptionCheck()) {
+        e->CallStaticVoidMethod(cls, start, e->NewStringUTF(agents[k]));
+      }
+    }
+  }
+
+  if (jar and not e->ExceptionCheck()) {
+    jclass cls = e->FindClass("shim/Agents");
+    if (not e->ExceptionCheck()) {
+      jmethodID start = e->GetStaticMethodID(cls, "launcher", "(Ljava/lang/String;)V");
+      if (not e->ExceptionCheck()) {
+        e->CallStaticVoidMethod(cls, start, e->NewStringUTF(jar));
+      }
     }
   }
 

@@ -24,6 +24,7 @@
 #include "shim/machine.h"
 #include "shim/classpath-common.h"
 #include "shim/process.h"
+#include "shim/npe-message.h"
 
 #include <shim/util/runtime-array.h>
 #ifndef PLATFORM_WINDOWS
@@ -582,6 +583,13 @@ extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_Throwable_trace(Thread* t, object, uintptr_t* arguments)
 {
   return reinterpret_cast<int64_t>(getTrace(t, arguments[0]));
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_java_lang_NullPointerException_getExtendedNPEMessage(Thread* t, object, uintptr_t* arguments)
+{
+  return reinterpret_cast<int64_t>(
+      extendedNullPointerMessage(t, cast<GcThrowable>(t, reinterpret_cast<object>(arguments[0]))));
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL

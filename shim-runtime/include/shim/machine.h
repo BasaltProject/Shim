@@ -1689,6 +1689,15 @@ inline object allocateSmall(Thread* t, unsigned sizeInBytes)
 
 void NO_RETURN throwOutOfMemory(Thread* t);
 
+void NO_RETURN throwArrayLimit(Thread* t);
+
+inline void checkArrayLength(Thread* t, int32_t length)
+{
+  if (UNLIKELY(length >= 0x7ffffffe)) {
+    throwArrayLimit(t);
+  }
+}
+
 inline object allocate(Thread* t, size_t requestedSizeInBytes, bool objectMask)
 {
   if (UNLIKELY(requestedSizeInBytes > 0x7fffffffu)) {
@@ -3008,6 +3017,32 @@ inline void monitorAwaitQueued(Thread* t, GcMonitor* monitor)
   ++monitor->depth();
 }
 
+extern int64_t gcStats[4];
+
+class JavaThreadState {
+ public:
+  JavaThreadState(Thread* t, uint8_t state) : t(t), saved(0), active(false)
+  {
+    if (t->javaThread) {
+      saved = t->javaThread->state();
+      t->javaThread->state() = state;
+      active = true;
+    }
+  }
+
+  ~JavaThreadState()
+  {
+    if (active and t->javaThread) {
+      t->javaThread->state() = saved;
+    }
+  }
+
+ private:
+  Thread* t;
+  uint8_t saved;
+  bool active;
+};
+
 inline void monitorAcquire(Thread* t,
                            GcMonitor* monitor,
                            GcMonitorNode* node = 0)
@@ -3015,6 +3050,8 @@ inline void monitorAcquire(Thread* t,
   if (not monitorTryAcquire(t, monitor) and not monitorSpinAcquire(t, monitor)) {
     PROTECT(t, monitor);
     PROTECT(t, node);
+
+    JavaThreadState blocked(t, 2);
 
     ACQUIRE(t, t->lock);
 
@@ -3319,6 +3356,7 @@ inline void wait(Thread* t, object o, int64_t milliseconds)
   if (m and m->owner() == t) {
     PROTECT(t, m);
 
+    JavaThreadState waiting(t, milliseconds > 0 ? 4 : 3);
     bool interrupted = monitorWait(t, m, milliseconds);
 
     if (interrupted) {
@@ -3678,7 +3716,8 @@ inline object resolve(
         storeStoreMemoryBarrier();
 
         if (objectClass(t, o) == type(t, GcMethod::Type)) {
-          o = makeMethodHandle(t, reference->kind(), loader, cast<GcMethod>(t, o), 0);
+          o = makeMethodHandle(t, reference->kind(), loader, cast<GcMethod>(t, o), 0,
+                                  cast<GcClass>(t, reinterpret_cast<object>(reference->class_())));
         }
 
         pool->setBodyElement(t, index, reinterpret_cast<uintptr_t>(o));

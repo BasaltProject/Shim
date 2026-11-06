@@ -49,6 +49,7 @@
 #include <shim/util/fixed-allocator.h>
 
 #include "debug-util.h"
+#include "shim/npe-message.h"
 
 using namespace vm;
 
@@ -2500,6 +2501,12 @@ uintptr_t methodAddress(Thread* t, GcMethod* method)
   }
 }
 
+bool classNeedsInitInCode(Thread*, GcClass* c)
+{
+  // compiled code is shared by every thread, so keep the guard while any thread is initializing the class
+  return (c->vmFlags() & NeedInitFlag) != 0;
+}
+
 void tryInitClass(MyThread* t, GcClass* class_)
 {
   initClass(t, class_);
@@ -2626,7 +2633,7 @@ unsigned debugLiveVars(GcMethod* method, unsigned ip, unsigned* slots, unsigned*
 {
   GcLineNumberTable* lvt = method->code()->localVars();
   unsigned n = 0;
-  for (unsigned i = 0; lvt and i < lvt->length(); ++i) {
+  for (unsigned i = 0; lvt and i < lvt->length(); i += 2) {
     uint64_t e = lvt->body()[i];
     unsigned start = e & 0xffff;
     unsigned span = (e >> 16) & 0xffff;
@@ -2987,6 +2994,7 @@ int64_t moduloInt(MyThread* t, int32_t b, int32_t a)
 uint64_t makeBlankObjectArray(MyThread* t, GcClass* class_, int32_t length)
 {
   if (length >= 0) {
+    checkArrayLength(t, length);
     return reinterpret_cast<uint64_t>(makeObjectArray(t, class_, length));
   } else {
     throwNew(t, GcNegativeArraySizeException::Type, "%d", length);
@@ -3006,6 +3014,7 @@ uint64_t makeBlankObjectArrayFromReference(MyThread* t,
 uint64_t makeBlankArray(MyThread* t, unsigned type, int32_t length)
 {
   if (length >= 0) {
+    checkArrayLength(t, length);
     switch (type) {
     case T_BOOLEAN:
       return reinterpret_cast<uintptr_t>(makeBooleanArray(t, length));
@@ -3832,7 +3841,7 @@ bool inlineTrivial(MyThread* t, Frame* frame, GcMethod* target, bool allowInstan
   GcCode* code = target->code();
   if (code == 0 or code->length() == 0 or code->length() > kInlineMaxCodeLength or code->exceptionHandlerTable() != 0) return false;
   if (code->maxLocals() > kInlineMaxSlots or code->maxStack() > kInlineMaxSlots) return false;
-  if (isStatic and classNeedsInit(t, target->class_())) return false;
+  if (isStatic and classNeedsInitInCode(t, target->class_())) return false;
 
   bool sawGetfield = false;
   for (unsigned i = 0; i < code->length(); i += inlineOpLength(code->body()[i])) {
@@ -4021,14 +4030,14 @@ bool compileDirectInvoke(MyThread* t,
 
   // don't bother calling an empty method unless calling it might
   // cause the class to be initialized, which may have side effects
-  if (emptyMethod(t, target) and (not classNeedsInit(t, target->class_()))) {
+  if (emptyMethod(t, target) and (not classNeedsInitInCode(t, target->class_()))) {
     frame->popFootprint(target->parameterFootprint());
     tailCall = false;
   } else {
     BootContext* bc = frame->context->bootContext;
     if (bc) {
       if ((target->class_() == frame->context->method->class_()
-           or (not classNeedsInit(t, target->class_())))
+           or (not classNeedsInitInCode(t, target->class_())))
           and (not(shim::codegen::TailCalls and tailCall
                    and (target->flags() & ACC_NATIVE)))) {
         shim::codegen::Promise* p = new (bc->zone)
@@ -4043,7 +4052,7 @@ bool compileDirectInvoke(MyThread* t,
         compileDirectInvoke(t, frame, target, tailCall, true, 0);
       }
     } else if (unresolved(t, methodAddress(t, target))
-               or classNeedsInit(t, target->class_())) {
+               or classNeedsInitInCode(t, target->class_())) {
       compileDirectInvoke(t, frame, target, tailCall, true, 0);
     } else {
       compileDirectInvoke(t, frame, target, tailCall, false, 0);
@@ -5505,7 +5514,7 @@ loop:
 
           PROTECT(t, field);
 
-          if (classNeedsInit(t, field->class_())) {
+          if (classNeedsInitInCode(t, field->class_())) {
             c->nativeCall(
                 c->constant(getThunk(t, tryInitClassThunk), ir::Type::iptr()),
                 0,
@@ -6973,7 +6982,7 @@ loop:
         if (instruction == putstatic) {
           checkField(t, field, true);
 
-          if (classNeedsInit(t, field->class_())) {
+          if (classNeedsInitInCode(t, field->class_())) {
             PROTECT(t, field);
 
             c->nativeCall(
@@ -7681,6 +7690,42 @@ GcLineNumberTable* translateLineNumberTable(MyThread* t,
   }
 }
 
+GcLineNumberTable* translateBciTable(MyThread* t, Context* context, intptr_t start)
+{
+  unsigned count = 0;
+  {
+    GcCode* code = context->method->code();
+    const uint8_t* body = code->body().begin();
+    for (unsigned pc = 0; pc < code->length(); pc += npeInstructionLength(body, code->length(), pc)) {
+      if (npeCapableOpcode(body[pc]) and context->visitTable[pc]) {
+        ++count;
+      }
+    }
+  }
+  if (count == 0) {
+    return 0;
+  }
+  GcLineNumberTable* table = makeLineNumberTable(t, count);
+  GcCode* code = context->method->code();
+  const uint8_t* body = code->body().begin();
+  unsigned n = 0;
+  for (unsigned pc = 0; pc < code->length() and n < count; pc += npeInstructionLength(body, code->length(), pc)) {
+    if (npeCapableOpcode(body[pc]) and context->visitTable[pc]) {
+      table->body()[n++] = lineNumber(context->compiler->machineIp(pc)->value() - start, pc);
+    }
+  }
+  for (unsigned i = 1; i < n; ++i) {
+    uint64_t v = table->body()[i];
+    unsigned j = i;
+    while (j > 0 and lineNumberIp(table->body()[j - 1]) > lineNumberIp(v)) {
+      table->body()[j] = table->body()[j - 1];
+      --j;
+    }
+    table->body()[j] = v;
+  }
+  return table;
+}
+
 void printSet(uintptr_t* m, unsigned limit)
 {
   if (limit) {
@@ -8143,8 +8188,13 @@ void finish(MyThread* t, FixedAllocator* allocator, Context* context)
 
     GcLineNumberTable* newLineNumberTable = translateLineNumberTable(
         t, context, reinterpret_cast<intptr_t>(start));
+    PROTECT(t, newLineNumberTable);
+
+    GcLineNumberTable* bciTable = translateBciTable(t, context, reinterpret_cast<intptr_t>(start));
+    PROTECT(t, bciTable);
 
     GcCode* code = context->method->code();
+    PROTECT(t, code);
 
     code = makeCode(t,
                     0,
@@ -8153,6 +8203,8 @@ void finish(MyThread* t, FixedAllocator* allocator, Context* context)
                     newExceptionHandlerTable,
                     newLineNumberTable,
                     0,
+                    code,
+                    bciTable,
                     reinterpret_cast<uintptr_t>(start),
                     codeSize,
                     code->maxStack(),
@@ -9641,6 +9693,22 @@ class SignalHandler : public SignalRegistrar::Handler {
               owner ? reinterpret_cast<const char*>(owner->spec()->body().begin()) : "");
     }
 
+    if (not t) {
+      fprintf(stderr, "fatal signal on a non-VM thread, ip=%p\n", *ip);
+#ifdef SHIM_NATIVE_BACKTRACE
+      void* native[48];
+      int nativeCount = backtrace(native, 48);
+      for (int i = 0; i < nativeCount; ++i) {
+        Dl_info info;
+        if (dladdr(native[i], &info) && info.dli_fname) {
+          fprintf(stderr, "fatal signal: native %s+0x%lx %s\n", info.dli_fname,
+                  static_cast<unsigned long>(static_cast<char*>(native[i]) - static_cast<char*>(info.dli_fbase)),
+                  info.dli_sname ? info.dli_sname : "?");
+        }
+      }
+#endif
+    }
+
     return false;
   }
 
@@ -9977,6 +10045,7 @@ class MyProcessor : public Processor {
 
     if (t == t->m->rootThread) {
       v->visit(&roots);
+      v->flush();
     }
 
     for (MyThread::CallTrace* trace = t->trace; trace; trace = trace->next) {

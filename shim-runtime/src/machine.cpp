@@ -40,6 +40,10 @@
 #endif
 
 using namespace vm;
+
+namespace vm {
+int64_t gcStats[4];
+}
 using namespace shim::util;
 
 namespace {
@@ -2435,7 +2439,7 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
             length);
   }
 
-  GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
+  GcCode* code = makeCode(t, pool, 0, 0, 0, 0, 0, 0, 0, 0, 0, maxStack, maxLocals, length);
   s.read(code->body().begin(), length);
   PROTECT(t, code);
   unsigned ehtLength = s.read2();
@@ -2493,11 +2497,11 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
       if (length < 2) throwNew(t, GcClassFormatError::Type, "Truncated LocalVariableTable");
       unsigned lvtLength = s.read2();
       if (length != 2 + 10 * lvtLength) throwNew(t, GcClassFormatError::Type, "Invalid LocalVariableTable length");
-      GcLineNumberTable* lvt = makeLineNumberTable(t, lvtLength);
+      GcLineNumberTable* lvt = makeLineNumberTable(t, lvtLength * 2);
       for (unsigned i = 0; i < lvtLength; ++i) {
         uint64_t start = s.read2();
         uint64_t span = s.read2();
-        s.read2();
+        lvt->body()[i * 2 + 1] = s.read2();
         unsigned descriptorIndex = s.read2();
         uint64_t slot = s.read2();
         uint64_t kind = 0;
@@ -2513,7 +2517,7 @@ GcCode* parseCode(Thread* t, Stream& s, GcSingleton* pool, GcByteArray* tags, un
           default: kind = 1; break;
           }
         }
-        lvt->body()[i] = start | (span << 16) | (slot << 32) | (kind << 48);
+        lvt->body()[i * 2] = start | (span << 16) | (slot << 32) | (kind << 48);
       }
       code->setLocalVars(t, lvt);
     } else s.skip(length);
@@ -3903,7 +3907,7 @@ void boot(Thread* t)
   m->processor->boot(t, 0, 0);
 
   {
-    GcCode* bootCode = makeCode(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
+    GcCode* bootCode = makeCode(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1);
     bootCode->body()[0] = impdep1;
     object bootMethod
         = makeMethod(t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, bootCode);
@@ -3927,6 +3931,11 @@ class HeapClient : public Heap::Client {
     ::visitRoots(m, v);
 
     postVisit(m->rootThread, v);
+  }
+
+  virtual void visitRootsOnly(Heap::Visitor* v)
+  {
+    ::visitRoots(m, v);
   }
 
   virtual void collect(void* context, Heap::CollectionType type)
@@ -4059,12 +4068,15 @@ void doCollect(Thread* t, Heap::CollectionType type, int pendingAllocation)
 
   Machine* m = t->m;
 
+  int64_t gcStart = m->system->now();
   m->unsafe = true;
   m->heap->collect(
       type,
       footprint(m->rootThread),
       pendingAllocation - (t->m->heapPoolIndex * ThreadHeapSizeInWords));
   m->unsafe = false;
+  gcStats[type == Heap::MajorCollection ? 2 : 0] += 1;
+  gcStats[type == Heap::MajorCollection ? 3 : 1] += m->system->now() - gcStart;
   ++m->gcEpoch;
 
   postCollect(m->rootThread);
@@ -4274,7 +4286,7 @@ Machine::Machine(System* system,
       heapLock(0),
       classLock(0),
       hiddenClassSequence(0),
-      threadIdSequence(0),
+      threadIdSequence(2),
       referenceLock(0),
       monitorMapLock(0),
       shutdownLock(0),
@@ -4880,6 +4892,11 @@ void enter(Thread* t, Thread::State s)
   default:
     abort(t);
   }
+}
+
+void NO_RETURN throwArrayLimit(Thread* t)
+{
+  throwNew(t, GcOutOfMemoryError::Type, "Requested array size exceeds VM limit");
 }
 
 void NO_RETURN throwOutOfMemory(Thread* t)
@@ -6102,7 +6119,7 @@ bool classAccessible(Thread* t, GcClass* accessor, GcClass* c)
 {
   if (accessor == 0 || accessor->loader() == roots(t)->bootLoader()) return true;
   while (c->arrayDimensions() && c->arrayElementClass()) c = c->arrayElementClass();
-  if (c->arrayDimensions() || c->vmFlags() & PrimitiveFlag) return true;
+  if (c->arrayDimensions() || c->vmFlags() & (PrimitiveFlag | BootstrapFlag)) return true;
   return (c->flags() & ACC_PUBLIC) || c == accessor || samePackage(accessor, c);
 }
 
