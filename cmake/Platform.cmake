@@ -125,6 +125,15 @@ endif()
 find_package(Threads REQUIRED)
 
 set(SHIM_MODULES shim-runtime shim-codegen shim-system shim-heap shim-util shim-tools)
+# A cross build only has the build machine's JDK, whose jni_md.h is for the build machine
+if(NOT EXISTS "${_java_home}/include/${JNI_PLATFORM_DIR}/jni_md.h")
+    foreach(_dir linux darwin win32)
+        if(EXISTS "${_java_home}/include/${_dir}/jni_md.h")
+            set(JNI_PLATFORM_DIR ${_dir})
+            break()
+        endif()
+    endforeach()
+endif()
 set(SHIM_INCLUDES "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/shim-classpath/src"
     "${_java_home}/include" "${_java_home}/include/${JNI_PLATFORM_DIR}" "${CMAKE_BINARY_DIR}/generated")
 foreach(_module ${SHIM_MODULES})
