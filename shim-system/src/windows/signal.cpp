@@ -305,12 +305,28 @@ LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
         logException(e, SignalRegistrar::Data::instance->crashDumpDirectory);
       }
     }
-  } else if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && getenv("SHIM_CRASH_STACK")) {
-    printStackWords(e);
   }
 
   return EXCEPTION_CONTINUE_SEARCH;
 }
+
+LONG CALLBACK printCrashStack(LPEXCEPTION_POINTERS e)
+{
+  if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+    printStackWords(e);
+  }
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// The interpreter registers no handlers of its own, so this one is installed on load
+struct CrashStackInstaller {
+  CrashStackInstaller()
+  {
+    if (getenv("SHIM_CRASH_STACK")) {
+      AddVectoredExceptionHandler(0, printCrashStack);
+    }
+  }
+} crashStackInstaller;
 
 }  // namespace windows
 

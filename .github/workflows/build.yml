@@ -167,7 +167,7 @@ jobs:
               echo "=== $t"
               SHIM_CRASH_STACK=1 build/shim.exe -cp build/test $t 2>&1 | head -40 > crash.txt || true
               cat crash.txt
-              grep -o 'shim.exe+0x[0-9a-f]*' crash.txt | head -25 | while read -r frame; do
+              (grep -o 'shim.exe+0x[0-9a-f]*' crash.txt || true) | head -25 | while read -r frame; do
                   llvm-addr2line -f -C -e build/shim.exe "$(printf '0x%x' $((0x140000000 + ${frame#*+})))" | tr '\n' ' '
                   echo
               done
