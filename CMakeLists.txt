@@ -12,7 +12,7 @@
 cmake_minimum_required(VERSION 3.28)
 project(shim VERSION 1.3.0 LANGUAGES C CXX ASM)
 
-set(SHIM_VERSION_STRING "1.3.0-SNAPSHOT")
+set(SHIM_VERSION_STRING "1.3.0-dev" CACHE STRING "Version stamped into the VM")
 
 set(SHIM_MODE "fast" CACHE STRING "Optimization mode: debug, debug-fast, fast, stress, stress-major or small")
 set_property(CACHE SHIM_MODE PROPERTY STRINGS debug debug-fast fast stress stress-major small)

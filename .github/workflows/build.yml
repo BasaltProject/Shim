@@ -1,0 +1,131 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  pull_request:
+    paths-ignore: ['**.md']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Plan the version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+              .github/scripts/plan-version.sh release
+          else
+              .github/scripts/plan-version.sh ci
+          fi
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: Linux-x64
+          - os: ubuntu-24.04-arm
+            target: Linux-arm64
+          - os: macos-15
+            target: macOS-arm64
+          - os: macos-15
+            target: macOS-x64
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: lukka/get-cmake@latest
+
+      - name: Install ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          max-size: 300M
+          key: ${{ matrix.target }}
+
+      - name: Install the Linux toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang ninja-build zlib1g-dev
+          echo "CC=clang" >>"$GITHUB_ENV"
+          echo "CXX=clang++" >>"$GITHUB_ENV"
+          echo "SHIM_EXTRA_ARGS=-DSHIM_FRAME_POINTER=ON" >>"$GITHUB_ENV"
+
+      - name: Install the macOS toolchain
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja
+          args="-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0"
+          if [ -n "${{ matrix.arch }}" ]; then args="$args -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}"; fi
+          echo "SHIM_EXTRA_ARGS=$args" >>"$GITHUB_ENV"
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              "-DSHIM_VERSION_STRING=${{ needs.plan.outputs.version }}" $SHIM_EXTRA_ARGS
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check the architecture
+        if: matrix.arch == 'x86_64'
+        run: file build/shim | grep -q x86_64
+
+      - name: Package
+        run: .github/scripts/package.sh "${{ needs.plan.outputs.version }}" "${{ matrix.target }}" build
+
+      - name: Upload the archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: shim-${{ matrix.target }}
+          path: dist/
+
+  release:
+    if: ${{ github.event_name == 'push' }}
+    needs: [plan, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: shim-*
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/publish-release.sh "${{ needs.plan.outputs.version }}" "$GITHUB_SHA" artifacts
