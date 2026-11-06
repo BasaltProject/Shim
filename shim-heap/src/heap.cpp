@@ -1744,8 +1744,11 @@ inline void* copyTo(Context* c, Segment* s, void* o, unsigned size)
   assertT(c, s->remaining() >= size);
   void* dst = s->allocate(size);
   if (dst == 0) {
-    fprintf(stderr, "DIAG copyTo: size=%u capacity=%u position=%u limit=%llu count=%llu\n", size, s->capacity(), s->position(),
-            static_cast<unsigned long long>(c->limit), static_cast<unsigned long long>(c->count));
+    fprintf(stderr, "DIAG copyTo: which=%d size=%u capacity=%u position=%u limit=%llu count=%llu gen1pos=%u gen1cap=%u tenure=%u incoming=%u pad=%u mode=%d inPlace=%d\n",
+            s == &c->nextGen1 ? 1 : s == &c->nextGen2 ? 2 : s == &c->gen2 ? 3 : 0, size, s->capacity(), s->position(),
+            static_cast<unsigned long long>(c->limit), static_cast<unsigned long long>(c->count), c->gen1.position(),
+            c->gen1.capacity(), static_cast<unsigned>(c->tenureFootprint), static_cast<unsigned>(c->incomingFootprint),
+            static_cast<unsigned>(c->gen1Padding), static_cast<int>(c->mode), static_cast<int>(c->inPlace));
   }
   c->client->copy(o, dst);
   return dst;
