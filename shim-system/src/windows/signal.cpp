@@ -51,6 +51,9 @@
 namespace shim {
 namespace system {
 
+// Set by the heap, which backs its reservation with memory committed on first touch
+extern "C" bool (*shimLazyCommitHook)(uintptr_t) = 0;
+
 namespace windows {
 
 const unsigned HandlerCount = 2;
@@ -245,6 +248,12 @@ void printStackWords(LPEXCEPTION_POINTERS e)
 
 LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
 {
+  if (shimLazyCommitHook and e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION
+      and e->ExceptionRecord->NumberParameters >= 2
+      and shimLazyCommitHook(static_cast<uintptr_t>(e->ExceptionRecord->ExceptionInformation[1]))) {
+    return EXCEPTION_CONTINUE_EXECUTION;
+  }
+
   SignalRegistrar::Handler* handler = 0;
   if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
     handler

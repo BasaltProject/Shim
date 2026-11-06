@@ -53,6 +53,7 @@
 #elif defined(_WIN32)
 #include <windows.h>
 #define SHIM_HEAP_RESERVE 1
+extern "C" bool (*shimLazyCommitHook)(uintptr_t);
 #endif
 
 using namespace vm;
@@ -1085,13 +1086,8 @@ struct ReservedRange {
 
 ReservedRange reservedRanges[MaxReservations];
 
-LONG CALLBACK commitOnTouch(PEXCEPTION_POINTERS e)
+bool commitReserved(uintptr_t address)
 {
-  if (e->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION
-      or e->ExceptionRecord->NumberParameters < 2) {
-    return EXCEPTION_CONTINUE_SEARCH;
-  }
-  uintptr_t address = static_cast<uintptr_t>(e->ExceptionRecord->ExceptionInformation[1]);
   for (unsigned i = 0; i < MaxReservations; ++i) {
     uintptr_t begin = reservedRanges[i].begin;
     uintptr_t end = reservedRanges[i].end;
@@ -1104,11 +1100,18 @@ LONG CALLBACK commitOnTouch(PEXCEPTION_POINTERS e)
       if (to > end) {
         to = end;
       }
-      if (VirtualAlloc(reinterpret_cast<void*>(from), to - from, MEM_COMMIT, PAGE_READWRITE)) {
-        return EXCEPTION_CONTINUE_EXECUTION;
-      }
-      break;
+      return VirtualAlloc(reinterpret_cast<void*>(from), to - from, MEM_COMMIT, PAGE_READWRITE) != 0;
     }
+  }
+  return false;
+}
+
+LONG CALLBACK commitOnTouch(PEXCEPTION_POINTERS e)
+{
+  if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION
+      and e->ExceptionRecord->NumberParameters >= 2
+      and commitReserved(static_cast<uintptr_t>(e->ExceptionRecord->ExceptionInformation[1]))) {
+    return EXCEPTION_CONTINUE_EXECUTION;
   }
   return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -1117,6 +1120,8 @@ void* mapZeroed(size_t bytes)
 {
   static bool installed = false;
   if (not installed) {
+    // The VM's own fault handler asks the hook first, so it never mistakes a lazy commit for a crash
+    shimLazyCommitHook = commitReserved;
     AddVectoredExceptionHandler(1, commitOnTouch);
     installed = true;
   }
