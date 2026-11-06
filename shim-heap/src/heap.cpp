@@ -50,6 +50,9 @@
 #if defined(__LP64__) || defined(_LP64)
 #define SHIM_HEAP_PARALLEL 1
 #endif
+#elif defined(_WIN32)
+#include <windows.h>
+#define SHIM_HEAP_RESERVE 1
 #endif
 
 using namespace vm;
@@ -1069,6 +1072,441 @@ inline void initNextGen2(Context* c)
 
 
 #ifdef SHIM_HEAP_RESERVE
+#ifdef _WIN32
+// Windows has no lazily backed mapping, so the range is only reserved and a handler commits
+// each piece the first time it is touched. A piece comes back zeroed, as a fresh mmap does.
+const size_t CommitChunk = 256 * 1024;
+const unsigned MaxReservations = 16;
+
+struct ReservedRange {
+  volatile uintptr_t begin;
+  volatile uintptr_t end;
+};
+
+ReservedRange reservedRanges[MaxReservations];
+
+LONG CALLBACK commitOnTouch(PEXCEPTION_POINTERS e)
+{
+  if (e->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION
+      or e->ExceptionRecord->NumberParameters < 2) {
+    return EXCEPTION_CONTINUE_SEARCH;
+  }
+  uintptr_t address = static_cast<uintptr_t>(e->ExceptionRecord->ExceptionInformation[1]);
+  for (unsigned i = 0; i < MaxReservations; ++i) {
+    uintptr_t begin = reservedRanges[i].begin;
+    uintptr_t end = reservedRanges[i].end;
+    if (address >= begin and address < end) {
+      uintptr_t from = address & ~(CommitChunk - 1);
+      if (from < begin) {
+        from = begin;
+      }
+      uintptr_t to = from + CommitChunk;
+      if (to > end) {
+        to = end;
+      }
+      if (VirtualAlloc(reinterpret_cast<void*>(from), to - from, MEM_COMMIT, PAGE_READWRITE)) {
+        return EXCEPTION_CONTINUE_EXECUTION;
+      }
+      break;
+    }
+  }
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void* mapZeroed(size_t bytes)
+{
+  static bool installed = false;
+  if (not installed) {
+    AddVectoredExceptionHandler(1, commitOnTouch);
+    installed = true;
+  }
+  void* p = VirtualAlloc(0, bytes, MEM_RESERVE, PAGE_READWRITE);
+  if (p) {
+    for (unsigned i = 0; i < MaxReservations; ++i) {
+      if (reservedRanges[i].begin == 0) {
+        reservedRanges[i].end = reinterpret_cast<uintptr_t>(p) + bytes;
+        reservedRanges[i].begin = reinterpret_cast<uintptr_t>(p);
+        return p;
+      }
+    }
+    VirtualFree(p, 0, MEM_RELEASE);
+    return 0;
+  }
+  return 0;
+}
+
+void releaseMemory(void* p, size_t bytes)
+{
+  VirtualFree(p, bytes, MEM_DECOMMIT);
+}
+
+void unmapMemory(void* p, size_t)
+{
+  for (unsigned i = 0; i < MaxReservations; ++i) {
+    if (reservedRanges[i].begin == reinterpret_cast<uintptr_t>(p)) {
+      reservedRanges[i].begin = 0;
+      reservedRanges[i].end = 0;
+    }
+  }
+  VirtualFree(p, 0, MEM_RELEASE);
+}
+
+uintptr_t osPageSize()
+{
+  SYSTEM_INFO info;
+  GetSystemInfo(&info);
+  return info.dwPageSize;
+}
+#else
+void* mapZeroed(size_t bytes)
+{
+  void* p = mmap(0,
+                 bytes,
+                 PROT_READ | PROT_WRITE,
+                 MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
+                 -1,
+                 0);
+  return p == MAP_FAILED ? 0 : p;
+}
+
+void releaseMemory(void* p, size_t bytes)
+{
+#ifdef __linux__
+  madvise(p, bytes, MADV_DONTNEED);
+#else
+  madvise(p, bytes, MADV_FREE);
+#endif
+}
+
+void unmapMemory(void* p, size_t bytes)
+{
+  munmap(p, bytes);
+}
+
+uintptr_t osPageSize()
+{
+  const long page = sysconf(_SC_PAGESIZE);
+  return page > 0 ? static_cast<uintptr_t>(page) : 0;
+}
+#endif
+#endif
+
+bool reserveGen2(Context* c);
+void releaseGen2(Context* c);
+
+struct Span {
+  unsigned start;
+  unsigned length;
+};
+
+class Context {
+ public:
+  Context(System* system, unsigned limit)
+      : system(system),
+        client(0),
+        count(0),
+        limit(limit),
+        lock(0),
+        immortalHeapStart(0),
+        immortalHeapEnd(0),
+        ageMap(&gen1, max(1, log(TenureThreshold)), 1, 0, false),
+        gen1(this, &ageMap, 0, 0),
+        nextAgeMap(&nextGen1, max(1, log(TenureThreshold)), 1, 0, false),
+        nextGen1(this, &nextAgeMap, 0, 0),
+        pointerMap(&gen2, 1, 1, 0, true),
+        pageMap(&gen2,
+                1,
+                LikelyPageSizeInBytes / BytesPerWord,
+                &pointerMap,
+                true),
+        heapMap(&gen2, 1, pageMap.scale * 1024, &pageMap, true),
+        gen2(this, &heapMap, 0, 0),
+        nextPointerMap(&nextGen2, 1, 1, 0, true),
+        nextPageMap(&nextGen2,
+                    1,
+                    LikelyPageSizeInBytes / BytesPerWord,
+                    &nextPointerMap,
+                    true),
+        nextHeapMap(&nextGen2, 1, nextPageMap.scale * 1024, &nextPageMap, true),
+        nextGen2(this, &nextHeapMap, 0, 0),
+        gen2Base(0),
+        incomingFootprint(0),
+        pendingAllocation(0),
+        tenureFootprint(0),
+        gen1Padding(0),
+        tenurePadding(0),
+        gen2Padding(0),
+        fixieTenureFootprint(0),
+        untenuredFixieFootprint(0),
+        tenuredFixieFootprint(0),
+        tenuredFixieCeiling(InitialTenuredFixieCeilingInBytes),
+        mode(Heap::MinorCollection),
+        fixies(0),
+        tenuredFixies(0),
+        dirtyTenuredFixies(0),
+        markedFixies(0),
+        visitedFixies(0),
+        lastCollectionTime(system->now()),
+        totalCollectionTime(0),
+        totalTime(0),
+        limitWasExceeded(false),
+        inPlace(false),
+        reservation(0),
+        reservationBytes(0),
+        markBits(0),
+        freshBits(0),
+        markBitsBytes(0),
+        spans(0),
+        spanCount(0),
+        spanCapacity(0),
+        spanCursor(0),
+        freeWords(0),
+        markStack(0),
+        markStackCount(0),
+        markStackCapacity(0),
+        freshCopies(0),
+        freshCopyCount(0),
+        freshCopyCapacity(0),
+        gen2Threshold(max(InitialGen2CapacityInBytes, limit / 16) / BytesPerWord),
+        logMajor(getenv("SHIM_GC_STATS") != 0),
+        tagged(false),
+        parMajor(getenv("SHIM_GC_PARMAJOR") != 0),
+        verify(getenv("SHIM_GC_VERIFY") != 0),
+        poison(getenv("SHIM_GC_POISON") != 0),
+        par(0),
+        statObjects(0),
+        statWords(0),
+        statUpdates(0),
+        headroomPercent(getenv("SHIM_GC_HEADROOM_PERCENT") ? atoi(getenv("SHIM_GC_HEADROOM_PERCENT")) : 100),
+        compactNext(false),
+        retiredMemory(0),
+        retiredBytes(0)
+  {
+    if (not system->success(system->make(&lock))) {
+      system->abort();
+    }
+    if (not getenv("SHIM_GC_COPYING")) {
+      inPlace = reserveGen2(this);
+    }
+#ifdef SHIM_HEAP_PARALLEL
+    if (inPlace and TenureThreshold == 0 and not getenv("SHIM_GC_OLD")) {
+      par = makeParGcForContext(this);
+    }
+#endif
+  }
+
+  void dispose()
+  {
+#ifdef SHIM_HEAP_PARALLEL
+    disposeParGc(this);
+#endif
+    releaseGen2(this);
+    gen1.dispose();
+    nextGen1.dispose();
+    gen2.dispose();
+    nextGen2.dispose();
+    lock->dispose();
+  }
+
+  void disposeFixies()
+  {
+    free(this, &tenuredFixies, true);
+    free(this, &dirtyTenuredFixies, true);
+    free(this, &fixies, true);
+  }
+
+  System* system;
+  Heap::Client* client;
+
+  unsigned count;
+  unsigned limit;
+
+  System::Mutex* lock;
+
+  uintptr_t* immortalHeapStart;
+  uintptr_t* immortalHeapEnd;
+
+  Segment::Map ageMap;
+  Segment gen1;
+
+  Segment::Map nextAgeMap;
+  Segment nextGen1;
+
+  Segment::Map pointerMap;
+  Segment::Map pageMap;
+  Segment::Map heapMap;
+  Segment gen2;
+
+  Segment::Map nextPointerMap;
+  Segment::Map nextPageMap;
+  Segment::Map nextHeapMap;
+  Segment nextGen2;
+
+  unsigned gen2Base;
+
+  unsigned incomingFootprint;
+  int pendingAllocation;
+  unsigned tenureFootprint;
+  unsigned gen1Padding;
+  unsigned tenurePadding;
+  unsigned gen2Padding;
+
+  unsigned fixieTenureFootprint;
+  unsigned untenuredFixieFootprint;
+  unsigned tenuredFixieFootprint;
+  unsigned tenuredFixieCeiling;
+
+  Heap::CollectionType mode;
+
+  Fixie* fixies;
+  Fixie* tenuredFixies;
+  Fixie* dirtyTenuredFixies;
+  Fixie* markedFixies;
+  Fixie* visitedFixies;
+
+  int64_t lastCollectionTime;
+  int64_t totalCollectionTime;
+  int64_t totalTime;
+
+  bool limitWasExceeded;
+
+  bool inPlace;
+  void* reservation;
+  size_t reservationBytes;
+  uintptr_t* markBits;
+  uintptr_t* freshBits;
+  size_t markBitsBytes;
+  Span* spans;
+  unsigned spanCount;
+  unsigned spanCapacity;
+  unsigned spanCursor;
+  unsigned freeWords;
+  void** markStack;
+  unsigned markStackCount;
+  unsigned markStackCapacity;
+  unsigned* freshCopies;
+  unsigned freshCopyCount;
+  unsigned freshCopyCapacity;
+  unsigned gen2Threshold;
+  bool logMajor;
+  bool tagged;
+  bool parMajor;
+  bool verify;
+  bool poison;
+  struct ParGc* par;
+  uint64_t statObjects;
+  uint64_t statWords;
+  uint64_t statUpdates;
+  uint64_t statParallelRounds = 0;
+  uint64_t statParallelDeferred = 0;
+  int64_t statParallelNs = 0;
+  bool deferDrain = false;
+  GcWorker* parWorker = 0;
+  int64_t statT[4];
+  unsigned headroomPercent;
+  bool compactNext;
+  void* retiredMemory;
+  size_t retiredBytes;
+};
+
+const char* segment(Context* c, void* p)
+{
+  if (c->gen1.contains(p)) {
+    return "gen1";
+  } else if (c->nextGen1.contains(p)) {
+    return "nextGen1";
+  } else if (c->gen2.contains(p)) {
+    return "gen2";
+  } else if (c->nextGen2.contains(p)) {
+    return "nextGen2";
+  } else {
+    return "none";
+  }
+}
+
+inline Aborter* getAborter(Context* c)
+{
+  return c->system;
+}
+
+inline unsigned minimumNextGen1Capacity(Context* c)
+{
+  return c->gen1.position() - c->tenureFootprint + c->incomingFootprint
+         + c->gen1Padding;
+}
+
+inline unsigned minimumNextGen2Capacity(Context* c)
+{
+  return c->gen2.position() + c->tenureFootprint + c->tenurePadding
+         + c->gen2Padding;
+}
+
+inline bool oversizedGen2(Context* c)
+{
+  return c->gen2.capacity() > (InitialGen2CapacityInBytes / BytesPerWord)
+         and c->gen2.position() < (c->gen2.capacity() / 4);
+}
+
+inline void initNextGen1(Context* c)
+{
+  new (&(c->nextAgeMap))
+      Segment::Map(&(c->nextGen1), max(1, log(TenureThreshold)), 1, 0, false);
+
+  unsigned minimum = minimumNextGen1Capacity(c);
+  unsigned desired = minimum;
+
+  new (&(c->nextGen1)) Segment(c, &(c->nextAgeMap), desired, minimum);
+
+  if (Verbose2) {
+    fprintf(stderr,
+            "init nextGen1 to %d bytes\n",
+            c->nextGen1.capacity() * BytesPerWord);
+  }
+}
+
+inline void initNextGen2(Context* c)
+{
+  new (&(c->nextPointerMap)) Segment::Map(&(c->nextGen2), 1, 1, 0, true);
+
+  new (&(c->nextPageMap)) Segment::Map(&(c->nextGen2),
+                                       1,
+                                       LikelyPageSizeInBytes / BytesPerWord,
+                                       &(c->nextPointerMap),
+                                       true);
+
+  new (&(c->nextHeapMap)) Segment::Map(
+      &(c->nextGen2), 1, c->pageMap.scale * 1024, &(c->nextPageMap), true);
+
+  unsigned minimum = minimumNextGen2Capacity(c);
+  unsigned desired = minimum;
+
+  if (not oversizedGen2(c)) {
+    desired += max(minimum / 4, MinimumGen2HeadroomInBytes / BytesPerWord);
+  }
+
+  if (desired < InitialGen2CapacityInBytes / BytesPerWord) {
+    desired = InitialGen2CapacityInBytes / BytesPerWord;
+  }
+
+  new (&(c->nextGen2)) Segment(
+      c,
+      &(c->nextHeapMap),
+      desired,
+      minimum,
+      static_cast<int64_t>(c->limit / BytesPerWord)
+      - (static_cast<int64_t>(c->count / BytesPerWord)
+         - c->gen2.footprint(c->gen2.capacity())
+         - c->gen1.footprint(c->gen1.capacity()) + c->pendingAllocation));
+
+  if (Verbose2) {
+    fprintf(stderr,
+            "init nextGen2 to %d bytes\n",
+            c->nextGen2.capacity() * BytesPerWord);
+  }
+}
+
+
+#ifdef SHIM_HEAP_RESERVE
 void* mapZeroed(size_t bytes)
 {
   void* p = mmap(0,
@@ -1123,11 +1561,11 @@ bool reserveGen2(Context* c)
     }
     void* bits = mapZeroed(markBytes * 2);
     if (bits == 0) {
-      munmap(memory, total);
+      unmapMemory(memory, total);
       continue;
     }
 
-#ifdef MADV_NOHUGEPAGE
+#if defined(MADV_NOHUGEPAGE) && !defined(_WIN32)
     if (getenv("SHIM_GC_NOHUGEPAGE")) {
       madvise(memory, total, MADV_NOHUGEPAGE);
       madvise(bits, markBytes * 2, MADV_NOHUGEPAGE);
@@ -1159,8 +1597,8 @@ void releaseGen2(Context* c)
 {
 #ifdef SHIM_HEAP_RESERVE
   if (c->reservation) {
-    munmap(c->reservation, c->reservationBytes);
-    munmap(c->markBits, c->markBitsBytes);
+    unmapMemory(c->reservation, c->reservationBytes);
+    unmapMemory(c->markBits, c->markBitsBytes);
     c->reservation = 0;
     c->markBits = 0;
     c->freshBits = 0;
@@ -1517,8 +1955,7 @@ void sweepGen2(Context* c)
   // madvise operates on OS pages, not the logical 4 KiB GC map granule.
   // Apple Silicon uses 16 KiB pages: advising a partial last page can discard
   // a live neighbour outside the free span when the kernel rounds the range.
-  const long nativePage = sysconf(_SC_PAGESIZE);
-  const uintptr_t page = nativePage > 0 ? static_cast<uintptr_t>(nativePage) : 0;
+  const uintptr_t page = osPageSize();
   const unsigned minimumWords = ReleaseSpanInBytes / BytesPerWord;
 
   for (unsigned i = 0; i < c->spanCount; ++i) {
@@ -1588,8 +2025,8 @@ void releaseRetired(Context* c)
 {
 #ifdef SHIM_HEAP_RESERVE
   if (c->retiredMemory) {
-    munmap(c->retiredMemory, c->retiredBytes);
-    munmap(c->markBits, c->markBitsBytes);
+    unmapMemory(c->retiredMemory, c->retiredBytes);
+    unmapMemory(c->markBits, c->markBitsBytes);
     c->retiredMemory = 0;
     c->markBits = 0;
     c->freshBits = 0;
@@ -1743,13 +2180,6 @@ inline void* copyTo(Context* c, Segment* s, void* o, unsigned size)
 {
   assertT(c, s->remaining() >= size);
   void* dst = s->allocate(size);
-  if (dst == 0) {
-    fprintf(stderr, "DIAG copyTo: which=%d size=%u capacity=%u position=%u limit=%llu count=%llu gen1pos=%u gen1cap=%u tenure=%u incoming=%u pad=%u mode=%d inPlace=%d\n",
-            s == &c->nextGen1 ? 1 : s == &c->nextGen2 ? 2 : s == &c->gen2 ? 3 : 0, size, s->capacity(), s->position(),
-            static_cast<unsigned long long>(c->limit), static_cast<unsigned long long>(c->count), c->gen1.position(),
-            c->gen1.capacity(), static_cast<unsigned>(c->tenureFootprint), static_cast<unsigned>(c->incomingFootprint),
-            static_cast<unsigned>(c->gen1Padding), static_cast<int>(c->mode), static_cast<int>(c->inPlace));
-  }
   c->client->copy(o, dst);
   return dst;
 }
