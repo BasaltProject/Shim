@@ -508,6 +508,12 @@ extern "C" SHIM_EXPORT void JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_sun_management_GarbageCollectorImpl_stat(Thread*, object, uintptr_t* arguments)
+{
+  return gcStats[arguments[0] & 3];
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_java_lang_Runtime_freeMemory(Thread* t, object, uintptr_t*)
 {
   return t->m->heap->remaining();
@@ -1247,6 +1253,7 @@ extern "C" SHIM_EXPORT void JNICALL
     time = (time / (1000 * 1000)) + 1;
   }
 
+  JavaThreadState waiting(t, time > 0 ? 4 : 3);
   monitorAcquire(t, cast<GcMonitor>(t, interruptLock(t, t->javaThread)));
   bool interrupted = false;
   while (time >= 0

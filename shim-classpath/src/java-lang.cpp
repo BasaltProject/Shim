@@ -788,6 +788,185 @@ extern "C" JNIEXPORT void JNICALL
   fcntl(err[0], F_SETFD, FD_CLOEXEC);
 }
 
+#ifdef __APPLE__
+#include <crt_externs.h>
+#define environ (*_NSGetEnviron())
+#else
+extern "C" char** environ;
+#endif
+
+extern "C" JNIEXPORT void JNICALL
+    Java_java_lang_Runtime_exec2(JNIEnv* e,
+                                 jclass,
+                                 jobjectArray command,
+                                 jobjectArray env,
+                                 jstring dir,
+                                 jintArray modesArray,
+                                 jobjectArray files,
+                                 jlongArray process)
+{
+  jint modes[3];
+  e->GetIntArrayRegion(modesArray, 0, 3, modes);
+  jlong stdinFd = -1;
+  e->GetLongArrayRegion(process, 5, 1, &stdinFd);
+
+  int argc = e->GetArrayLength(command);
+  char** argv = static_cast<char**>(malloc((argc + 1) * sizeof(char*)));
+  for (int i = 0; i < argc; i++) {
+    argv[i] = const_cast<char*>(
+        e->GetStringUTFChars((jstring)e->GetObjectArrayElement(command, i), 0));
+  }
+  argv[argc] = 0;
+
+  char** envp = 0;
+  if (env) {
+    int n = e->GetArrayLength(env);
+    envp = static_cast<char**>(malloc((n + 1) * sizeof(char*)));
+    for (int i = 0; i < n; i++) {
+      envp[i] = const_cast<char*>(
+          e->GetStringUTFChars((jstring)e->GetObjectArrayElement(env, i), 0));
+    }
+    envp[n] = 0;
+  }
+
+  const char* cwd = dir ? e->GetStringUTFChars(dir, 0) : 0;
+  const char* paths[3] = {0, 0, 0};
+  for (int i = 0; i < 3; i++) {
+    jstring f = (jstring)e->GetObjectArrayElement(files, i);
+    if (f) {
+      paths[i] = e->GetStringUTFChars(f, 0);
+    }
+  }
+
+  int pipes[3][2] = {{-1, -1}, {-1, -1}, {-1, -1}};
+  int msg[] = {-1, -1};
+  for (int i = 0; i < 3; i++) {
+    if (modes[i] == 0) {
+      makePipe(e, pipes[i]);
+      if (e->ExceptionCheck())
+        return;
+    }
+  }
+  makePipe(e, msg);
+  if (e->ExceptionCheck())
+    return;
+  fcntl(msg[1], F_SETFD, FD_CLOEXEC);
+
+  pid_t pid = fork();
+  switch (pid) {
+  case -1:
+    throwNewErrno(e, "java/io/IOException");
+    return;
+  case 0: {
+    int fail = 0;
+    for (int i = 0; i < 3 && !fail; i++) {
+      int fd = -1;
+      switch (modes[i]) {
+      case 0:
+        fd = i == 0 ? pipes[i][0] : pipes[i][1];
+        break;
+      case 2:
+        fd = open(paths[i], O_RDONLY);
+        break;
+      case 6:
+        fd = static_cast<int>(stdinFd);
+        break;
+      case 3:
+        fd = open(paths[i], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        break;
+      case 4:
+        fd = open(paths[i], O_WRONLY | O_CREAT | O_APPEND, 0666);
+        break;
+      default:
+        break;
+      }
+      if (fd >= 0) {
+        if (fd != i) {
+          dup2(fd, i);
+        }
+      } else if (modes[i] == 0 || (modes[i] >= 2 && modes[i] <= 4) || modes[i] == 6) {
+        fail = errno;
+      }
+    }
+    if (!fail && modes[2] == 5) {
+      dup2(1, 2);
+    }
+    if (!fail && cwd && chdir(cwd) != 0) {
+      fail = errno;
+    }
+    if (!fail) {
+      for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 2; j++) {
+          if (pipes[i][j] > 2) {
+            close(pipes[i][j]);
+          }
+        }
+      }
+      close(msg[0]);
+      for (int fd = 3; fd < 1024; fd++) {
+        if (fd != msg[1]) {
+          close(fd);
+        }
+      }
+      if (envp) {
+        environ = envp;
+      }
+      execvp(argv[0], argv);
+      fail = errno;
+    }
+    ssize_t rv UNUSED = write(msg[1], &fail, sizeof(fail));
+    _exit(127);
+  } break;
+
+  default: {
+    jlong value = static_cast<jlong>(pid);
+    e->SetLongArrayRegion(process, 0, 1, &value);
+    safeClose(pipes[0][0]);
+    safeClose(pipes[1][1]);
+    safeClose(pipes[2][1]);
+    safeClose(msg[1]);
+    if (modes[0] == 6 && stdinFd >= 0) {
+      close(static_cast<int>(stdinFd));
+    }
+
+    int val;
+    int r = read(msg[0], &val, sizeof(val));
+    safeClose(msg[0]);
+    if (r == -1) {
+      throwNewErrno(e, "java/io/IOException");
+      return;
+    } else if (r) {
+      waitpid(pid, 0, 0);
+      safeClose(pipes[0][1]);
+      safeClose(pipes[1][0]);
+      safeClose(pipes[2][0]);
+      char text[256];
+      snprintf(text, sizeof(text), "Exec failed, error: %d (%s) ", val, strerror(val));
+      jclass c = e->FindClass("java/io/IOException");
+      e->ThrowNew(c, text);
+      return;
+    }
+  } break;
+  }
+
+  jlong descriptors[3] = {static_cast<jlong>(pipes[1][0]),
+                          static_cast<jlong>(pipes[0][1]),
+                          static_cast<jlong>(pipes[2][0])};
+  e->SetLongArrayRegion(process, 2, 3, descriptors);
+  for (int i = 0; i < 3; i++) {
+    int fd = i == 0 ? pipes[0][1] : pipes[i][0];
+    if (fd >= 0) {
+      fcntl(fd, F_SETFD, FD_CLOEXEC);
+    }
+  }
+}
+
+extern "C" JNIEXPORT void JNICALL
+    Java_java_lang_Runtime_signal(JNIEnv*, jclass, jlong pid, jint signal)
+{
+  kill((pid_t)pid, signal);
+}
+
 extern "C" JNIEXPORT jint JNICALL
     Java_java_lang_Runtime_waitFor(JNIEnv*, jclass, jlong pid, jlong)
 {
@@ -801,7 +980,7 @@ extern "C" JNIEXPORT jint JNICALL
       exitCode = WEXITSTATUS(status);
     } else if (WIFSIGNALED(status)) {
       finished = true;
-      exitCode = -1;
+      exitCode = 128 + WTERMSIG(status);
     }
   }
 
@@ -821,8 +1000,8 @@ Locale getLocale()
   const char* LANG = getenv("LC_ALL");
   if (!LANG || !*LANG)
     LANG = getenv("LANG");
-  if (!LANG || strcmp(LANG, "C") == 0)
-    return fallback;
+  if (!LANG || strcmp(LANG, "C") == 0 || strcmp(LANG, "POSIX") == 0)
+    return Locale("en", "US");
 
   int len = strlen(LANG);
   char buf[len + 1];  // + 1 for the '\0' char

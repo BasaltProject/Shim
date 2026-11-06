@@ -22,6 +22,10 @@
    details. */
 
 #include <stdio.h>
+#include <unistd.h>
+#ifdef __GLIBC__
+#include <execinfo.h>
+#endif
 #include "signal.h"
 #include "sys/types.h"
 #ifdef __APPLE__
@@ -100,9 +104,23 @@ namespace posix {
 
 using namespace vm;
 
+thread_local int signalDepth = 0;
+
 void handleSignal(int signal, siginfo_t* info, void* context)
 {
   ucontext_t* c = static_cast<ucontext_t*>(context);
+
+  if (signalDepth++ > 0) {
+    static const char message[] = "fatal signal inside the signal handler\n";
+    ssize_t ignored = write(2, message, sizeof message - 1);
+    (void) ignored;
+#ifdef __GLIBC__
+    void* frames[48];
+    int count = backtrace(frames, 48);
+    backtrace_symbols_fd(frames, count, 2);
+#endif
+    _exit(139);
+  }
 
   void* ip = reinterpret_cast<void*>(IP_REGISTER(c));
   void* stack = reinterpret_cast<void*>(STACK_REGISTER(c));
@@ -138,6 +156,8 @@ void handleSignal(int signal, siginfo_t* info, void* context)
 
     bool jump = SignalRegistrar::Data::instance->handlers[index]->handleSignal(
         &ip, &frame, &stack, &thread);
+
+    --signalDepth;
 
     if (jump) {
       // I'd like to use setcontext here (and get rid of the
@@ -183,7 +203,7 @@ bool SignalRegistrar::Data::registerHandler(Handler* handler, int index)
     struct sigaction sa;
     memset(&sa, 0, sizeof(struct sigaction));
     sigemptyset(&(sa.sa_mask));
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER;
     sa.sa_sigaction = posix::handleSignal;
 
     return sigaction(posix::signals[index], &sa, oldHandlers + index) == 0;

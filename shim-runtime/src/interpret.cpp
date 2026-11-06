@@ -923,6 +923,7 @@ loop:
 
       GcClass* class_ = resolveClassInPool(t, frameMethod(t, frame), index - 1);
 
+      checkArrayLength(t, count);
       pushObject(t, makeObjectArray(t, class_, count));
     } else {
       exception
@@ -2647,6 +2648,7 @@ loop:
     if (LIKELY(count >= 0)) {
       uint8_t type = code->body()[ip++];
 
+      checkArrayLength(t, count);
       object array;
 
       switch (type) {

@@ -1315,6 +1315,8 @@ vm-sources = \
 	$(runtime-src)/$(process).cpp \
 	$(runtime-src)/classpath-$(classpath).cpp \
 	$(runtime-src)/builtin.cpp \
+	$(runtime-src)/foreign-call.cpp \
+	$(runtime-src)/npe-message.cpp \
 	$(runtime-src)/jnienv.cpp \
 	$(runtime-src)/process.cpp \
 	$(runtime-src)/heapdump.cpp
