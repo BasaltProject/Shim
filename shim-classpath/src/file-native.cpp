@@ -778,3 +778,21 @@ extern "C" JNIEXPORT jboolean JNICALL Java_shim_FileNative_setEcho(JNIEnv*, jcla
   return was;
 #endif
 }
+
+#ifdef PLATFORM_WINDOWS
+extern "C" BOOLEAN NTAPI SystemFunction036(PVOID buffer, ULONG length);
+
+extern "C" JNIEXPORT jboolean JNICALL
+    Java_sun_security_provider_NativeSeed_random0(JNIEnv* e, jclass, jbyteArray out, jint off, jint len)
+{
+  if (len < 0) {
+    return JNI_FALSE;
+  }
+  ByteBuffer buffer(static_cast<size_t>(len));
+  if (buffer.data == 0 || !SystemFunction036(buffer.data, static_cast<ULONG>(len))) {
+    return JNI_FALSE;
+  }
+  e->SetByteArrayRegion(out, off, len, buffer.data);
+  return JNI_TRUE;
+}
+#endif
