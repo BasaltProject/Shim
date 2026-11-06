@@ -145,14 +145,26 @@ public class TIFFImageMetadata extends IIOMetadata {
       IIOMetadataNode n = new IIOMetadataNode("ColorSpaceType");
       n.setAttribute("name", cs);
       chroma.appendChild(n);
+      n = new IIOMetadataNode("BlackIsZero");
+      n.setAttribute("value", v == 0 ? "FALSE" : "TRUE");
+      chroma.appendChild(n);
       n = new IIOMetadataNode("NumChannels");
-      n.setAttribute("value", Long.toString(intField(BaselineTIFFTagSet.TAG_SAMPLES_PER_PIXEL,
+      n.setAttribute("value", Long.toString(v == 3 ? 3 : intField(BaselineTIFFTagSet.TAG_SAMPLES_PER_PIXEL,
           cs.equals("GRAY") ? 1 : cs.equals("CMYK") ? 4 : 3)));
       chroma.appendChild(n);
-      if (v == 0 || v == 1) {
-        n = new IIOMetadataNode("BlackIsZero");
-        n.setAttribute("value", v == 1 ? "TRUE" : "FALSE");
-        chroma.appendChild(n);
+      TIFFField map = root.getTIFFField(BaselineTIFFTagSet.TAG_COLOR_MAP);
+      if (v == 3 && map != null) {
+        int size = map.getCount() / 3;
+        IIOMetadataNode palette = new IIOMetadataNode("Palette");
+        for (int i = 0; i < size; i++) {
+          IIOMetadataNode e = new IIOMetadataNode("PaletteEntry");
+          e.setAttribute("index", Integer.toString(i));
+          e.setAttribute("red", Integer.toString(map.getAsInt(i) * 255 / 65535));
+          e.setAttribute("green", Integer.toString(map.getAsInt(size + i) * 255 / 65535));
+          e.setAttribute("blue", Integer.toString(map.getAsInt(2 * size + i) * 255 / 65535));
+          palette.appendChild(e);
+        }
+        chroma.appendChild(palette);
       }
     }
     return chroma;
@@ -221,9 +233,10 @@ public class TIFFImageMetadata extends IIOMetadata {
     TIFFField bps = root.getTIFFField(BaselineTIFFTagSet.TAG_BITS_PER_SAMPLE);
     StringBuilder bits = new StringBuilder();
     StringBuilder msb = new StringBuilder();
-    int count = bps == null ? 1 : bps.getCount();
+    int count = intField(BaselineTIFFTagSet.TAG_PHOTOMETRIC_INTERPRETATION, 1) == 3 ? 3
+        : bps == null ? 1 : bps.getCount();
     for (int i = 0; i < count; i++) {
-      int b = bps == null ? 1 : bps.getAsInt(i);
+      int b = bps == null ? 1 : bps.getAsInt(Math.min(i, bps.getCount() - 1));
       if (i > 0) {
         bits.append(' ');
         msb.append(' ');
@@ -231,6 +244,10 @@ public class TIFFImageMetadata extends IIOMetadata {
       bits.append(b);
       msb.append(((b + 7) / 8) * 8 - 1);
     }
+    n = new IIOMetadataNode("SampleFormat");
+    n.setAttribute("value", intField(339, 1) == 3 ? "Real" : intField(339, 1) == 2 ? "SignedIntegral"
+        : intField(262, 1) == 3 ? "Index" : "UnsignedIntegral");
+    data.appendChild(n);
     n = new IIOMetadataNode("BitsPerSample");
     n.setAttribute("value", bits.toString());
     data.appendChild(n);
@@ -240,7 +257,13 @@ public class TIFFImageMetadata extends IIOMetadata {
     return data;
   }
 
-  protected IIOMetadataNode getStandardDimensionNode() { return new IIOMetadataNode("Dimension"); }
+  protected IIOMetadataNode getStandardDimensionNode() {
+    IIOMetadataNode dim = new IIOMetadataNode("Dimension");
+    IIOMetadataNode n = new IIOMetadataNode("PixelAspectRatio");
+    n.setAttribute("value", "1.0");
+    dim.appendChild(n);
+    return dim;
+  }
 
   protected IIOMetadataNode getStandardDocumentNode() {
     IIOMetadataNode document = new IIOMetadataNode("Document");
@@ -250,10 +273,31 @@ public class TIFFImageMetadata extends IIOMetadata {
     return document;
   }
 
+  protected IIOMetadataNode getStandardTextNode() {
+    IIOMetadataNode text = null;
+    for (int tag : new int[] {269, 270, 271, 272, 285, 305, 306, 315, 316, 33432}) {
+      TIFFField f = root.getTIFFField(tag);
+      if (f == null || f.getType() != 2) {
+        continue;
+      }
+      for (int i = 0; i < f.getCount(); i++) {
+        if (text == null) {
+          text = new IIOMetadataNode("Text");
+        }
+        IIOMetadataNode e = new IIOMetadataNode("TextEntry");
+        e.setAttribute("keyword", f.getTag().getName());
+        e.setAttribute("value", f.getAsString(i));
+        text.appendChild(e);
+      }
+    }
+    return text;
+  }
+
   protected IIOMetadataNode getStandardTransparencyNode() {
     IIOMetadataNode transparency = new IIOMetadataNode("Transparency");
     IIOMetadataNode n = new IIOMetadataNode("Alpha");
-    n.setAttribute("value", "none");
+    long extra = intField(338, -1);
+    n.setAttribute("value", extra == 1 ? "premultiplied" : extra == 2 ? "nonpremultiplied" : "none");
     transparency.appendChild(n);
     return transparency;
   }

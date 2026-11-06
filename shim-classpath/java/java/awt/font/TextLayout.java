@@ -85,6 +85,9 @@ public final class TextLayout implements Cloneable {
     this.font = font;
     this.frc = frc;
     this.gv = font.createGlyphVector(frc, string);
+    if (font.kerning() && gv instanceof shim.awt.SimpleGlyphVector) {
+      ((shim.awt.SimpleGlyphVector) gv).applyKerning();
+    }
     this.lm = font.getLineMetrics(string, frc);
   }
 
@@ -100,7 +103,7 @@ public final class TextLayout implements Cloneable {
 
   public float[] getBaselineOffsets() { return lm.getBaselineOffsets(); }
 
-  public float getAdvance() { return (float) gv.getLogicalBounds().getWidth(); }
+  public float getAdvance() { return (float) font.getStringBounds(text, frc).getWidth(); }
 
   public float getVisibleAdvance() {
     int end = text.length();
@@ -110,13 +113,20 @@ public final class TextLayout implements Cloneable {
     return end == 0 ? 0 : gv.getGlyphPosition(end).getX() == 0 ? getAdvance() : (float) gv.getGlyphPosition(end).getX();
   }
 
-  public float getAscent() { return lm.getAscent(); }
+  public float getAscent() { return Math.max(0f, lm.getAscent()); }
 
-  public float getDescent() { return lm.getDescent(); }
+  public float getDescent() { return Math.max(0f, lm.getDescent()); }
 
   public float getLeading() { return lm.getLeading(); }
 
-  public Rectangle2D getBounds() { return gv.getVisualBounds(); }
+  public Rectangle2D getBounds() {
+    Rectangle2D b = gv.getVisualBounds();
+    if (font.hasLayoutAttributes() && font.decorated()) {
+      Rectangle2D.Float adv = new Rectangle2D.Float(0, 0, getAdvance(), 0);
+      b = b.createUnion(adv);
+    }
+    return b;
+  }
 
   public Rectangle getPixelBounds(FontRenderContext frc, float x, float y) {
     return gv.getPixelBounds(frc, x, y);

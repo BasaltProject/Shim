@@ -299,6 +299,127 @@ final class TrueTypeHinter {
     }
   }
 
+  synchronized java.awt.geom.Path2D.Float hintedOutline(int glyph, float size) {
+    if (!valid || size < 1f || size > 400f) {
+      return null;
+    }
+    try {
+      Sized s = sized(Math.round(size), size);
+      if (s == null) {
+        return null;
+      }
+      sz = s;
+      cvt = s.cvt;
+      twilight = s.twilight;
+      xScale = s.scale;
+      inPrep = false;
+      Loaded l = load(glyph, 0, (s.gs.instructControl & 1) == 0);
+      java.awt.geom.Path2D.Float path = new java.awt.geom.Path2D.Float(java.awt.geom.Path2D.WIND_NON_ZERO);
+      int start = 0;
+      for (int c : l.contours) {
+        contour(path, l, start, c);
+        start = c + 1;
+      }
+      return path;
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  private static void contour(java.awt.geom.Path2D.Float path, Loaded l, int first, int last) {
+    int n = last - first + 1;
+    if (n < 1) {
+      return;
+    }
+    int[] px = new int[n];
+    int[] py = new int[n];
+    boolean[] on = new boolean[n];
+    for (int i = 0; i < n; i++) {
+      px[i] = l.x[first + i];
+      py[i] = -l.y[first + i];
+      on[i] = (l.tags[first + i] & kOn) != 0;
+    }
+    int s = 0;
+    int sx;
+    int sy;
+    if (on[0]) {
+      sx = px[0];
+      sy = py[0];
+      s = 1;
+    } else if (on[n - 1]) {
+      sx = px[n - 1];
+      sy = py[n - 1];
+      n--;
+    } else {
+      sx = (px[0] + px[n - 1]) / 2;
+      sy = (py[0] + py[n - 1]) / 2;
+    }
+    path.moveTo(sx / 64f, sy / 64f);
+    float[] cur = {sx / 64f, sy / 64f};
+    boolean haveCtl = false;
+    int cx = 0;
+    int cy = 0;
+    for (int i = s; i < n; i++) {
+      if (on[i]) {
+        if (haveCtl) {
+          conic(path, cur, cx / 64f, cy / 64f, px[i] / 64f, py[i] / 64f);
+          haveCtl = false;
+        } else {
+          path.lineTo(px[i] / 64f, py[i] / 64f);
+          cur[0] = px[i] / 64f;
+          cur[1] = py[i] / 64f;
+        }
+      } else {
+        if (haveCtl) {
+          conic(path, cur, cx / 64f, cy / 64f, ((cx + px[i]) / 2) / 64f, ((cy + py[i]) / 2) / 64f);
+        }
+        cx = px[i];
+        cy = py[i];
+        haveCtl = true;
+      }
+    }
+    if (haveCtl) {
+      conic(path, cur, cx / 64f, cy / 64f, sx / 64f, sy / 64f);
+    }
+    path.closePath();
+  }
+
+  private static void conic(java.awt.geom.Path2D.Float path, float[] cur, float cx, float cy, float ex, float ey) {
+    int x0 = Math.round(cur[0] * 256f);
+    int y0 = Math.round(cur[1] * 256f);
+    int x1 = Math.round(cx * 256f);
+    int y1 = Math.round(cy * 256f);
+    int x2 = Math.round(ex * 256f);
+    int y2 = Math.round(ey * 256f);
+    int dx = Math.max(Math.abs(x0 + x2 - 2 * x1), Math.abs(y0 + y2 - 2 * y1));
+    int level = 0;
+    if (dx >= 64) {
+      do {
+        dx >>= 2;
+        level++;
+      } while (dx > 64);
+    }
+    splitConic(path, x0, y0, x1, y1, x2, y2, level);
+    cur[0] = ex;
+    cur[1] = ey;
+  }
+
+  private static void splitConic(java.awt.geom.Path2D.Float path, int x0, int y0, int x1, int y1, int x2, int y2,
+      int level) {
+    if (level == 0) {
+      path.lineTo(x2 / 256f, y2 / 256f);
+      return;
+    }
+    int ax = x0 + x1;
+    int bx = x1 + x2;
+    int ay = y0 + y1;
+    int by = y1 + y2;
+    int mx = (ax + bx) >> 2;
+    int my = (ay + by) >> 2;
+    splitConic(path, x0, y0, ax >> 1, ay >> 1, mx, my, level - 1);
+    splitConic(path, mx, my, bx >> 1, by >> 1, x2, y2, level - 1);
+  }
+
   private Sized sized(int ppem, float size) {
     int key = ppem * 4096 + (integerPpem ? 0 : Math.round(size * 64) & 4095);
     Sized s = sizes.get(key);

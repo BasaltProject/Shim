@@ -340,10 +340,11 @@ public class AudioSystem {
 
   private static AudioFileFormat readFormat(InputStream in) throws UnsupportedAudioFileException, IOException {
     AudioInputStream ais = open(in);
-    return new AudioFileFormat(typeOf(in, ais), ais.getFormat(), (int) ais.getFrameLength());
+    return new AudioFileFormat(typeOf(in, ais), lastByteLength, ais.getFormat(), (int) ais.getFrameLength());
   }
 
   private static AudioFileFormat.Type lastType;
+  private static int lastByteLength = AudioSystem.NOT_SPECIFIED;
 
   private static AudioFileFormat.Type typeOf(InputStream in, AudioInputStream ais) {
     return lastType;
@@ -368,6 +369,7 @@ public class AudioSystem {
     if (n >= 12 && head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F' && head[8] == 'W'
         && head[9] == 'A' && head[10] == 'V' && head[11] == 'E') {
       lastType = AudioFileFormat.Type.WAVE;
+      lastByteLength = le32(head, 4) + 8;
       AudioFormat fmt = null;
       while (true) {
         byte[] ch = new byte[8];
@@ -395,6 +397,7 @@ public class AudioSystem {
             break;
           case 3:
             enc = Encoding.PCM_FLOAT;
+            lastByteLength = AudioSystem.NOT_SPECIFIED;
             break;
           case 6:
             enc = Encoding.ALAW;
@@ -417,8 +420,44 @@ public class AudioSystem {
         }
       }
     }
+    if (n >= 12 && head[0] == 'F' && head[1] == 'O' && head[2] == 'R' && head[3] == 'M' && head[8] == 'A'
+        && head[9] == 'I' && head[10] == 'F' && head[11] == 'F') {
+      lastType = AudioFileFormat.Type.AIFF;
+      lastByteLength = be32(head, 4) + 8;
+      AudioFormat fmt = null;
+      while (true) {
+        byte[] ch = new byte[8];
+        if (din.readNBytes(ch, 0, 8) < 8) {
+          throw new UnsupportedAudioFileException("Not a valid AIFF file");
+        }
+        int size = be32(ch, 4);
+        if (ch[0] == 'C' && ch[1] == 'O' && ch[2] == 'M' && ch[3] == 'M') {
+          byte[] f = new byte[size];
+          din.readFully(f);
+          if ((size & 1) != 0) {
+            din.skipBytes(1);
+          }
+          int channels = ((f[0] & 0xff) << 8) | (f[1] & 0xff);
+          int bits = ((f[6] & 0xff) << 8) | (f[7] & 0xff);
+          float rate = (float) extendedToDouble(f, 8);
+          fmt = new AudioFormat(Encoding.PCM_SIGNED, rate, bits, channels, ((bits + 7) / 8) * channels, rate, true);
+        } else if (ch[0] == 'S' && ch[1] == 'S' && ch[2] == 'N' && ch[3] == 'D') {
+          if (fmt == null) {
+            throw new UnsupportedAudioFileException("SSND chunk before COMM chunk");
+          }
+          byte[] hdr = new byte[8];
+          din.readFully(hdr);
+          din.skipBytes(be32(hdr, 0));
+          long frames = (size - 8 - be32(hdr, 0)) / Math.max(1, fmt.getFrameSize());
+          return new AudioInputStream(in, fmt, frames);
+        } else {
+          din.skipBytes(size + (size & 1));
+        }
+      }
+    }
     if (n >= 4 && head[0] == '.' && head[1] == 's' && head[2] == 'n' && head[3] == 'd') {
       lastType = AudioFileFormat.Type.AU;
+      lastByteLength = be32(head, 8) == -1 ? AudioSystem.NOT_SPECIFIED : be32(head, 4) + be32(head, 8);
       byte[] rest = new byte[12];
       din.readFully(rest);
       int off = be32(head, 4);
@@ -447,6 +486,12 @@ public class AudioSystem {
       case 27:
         f = new AudioFormat(Encoding.ALAW, rate, 8, ch, ch, rate, true);
         break;
+      case 6:
+        f = new AudioFormat(Encoding.PCM_FLOAT, rate, 32, ch, 4 * ch, rate, true);
+        break;
+      case 7:
+        f = new AudioFormat(Encoding.PCM_FLOAT, rate, 64, ch, 8 * ch, rate, true);
+        break;
       default:
         throw new UnsupportedAudioFileException("Unsupported AU encoding " + enc);
       }
@@ -457,15 +502,23 @@ public class AudioSystem {
   }
 
   public static AudioFileFormat.Type[] getAudioFileTypes() {
-    return new AudioFileFormat.Type[] {AudioFileFormat.Type.WAVE, AudioFileFormat.Type.AU};
+    return new AudioFileFormat.Type[] {AudioFileFormat.Type.WAVE, AudioFileFormat.Type.AU, AudioFileFormat.Type.AIFF};
   }
 
   public static boolean isFileTypeSupported(AudioFileFormat.Type fileType) {
-    return AudioFileFormat.Type.WAVE.equals(fileType) || AudioFileFormat.Type.AU.equals(fileType);
+    return AudioFileFormat.Type.WAVE.equals(fileType) || AudioFileFormat.Type.AU.equals(fileType)
+        || AudioFileFormat.Type.AIFF.equals(fileType);
   }
 
   public static AudioFileFormat.Type[] getAudioFileTypes(AudioInputStream stream) {
     Encoding e = stream.getFormat().getEncoding();
+    if (Encoding.PCM_SIGNED.equals(e) || Encoding.PCM_UNSIGNED.equals(e) || Encoding.ULAW.equals(e)
+        || Encoding.ALAW.equals(e)) {
+      return getAudioFileTypes();
+    }
+    if (Encoding.PCM_FLOAT.equals(e)) {
+      return new AudioFileFormat.Type[] {AudioFileFormat.Type.WAVE, AudioFileFormat.Type.AU};
+    }
     if (Encoding.PCM_SIGNED.equals(e) || Encoding.PCM_UNSIGNED.equals(e) || Encoding.ULAW.equals(e)
         || Encoding.ALAW.equals(e)) {
       return getAudioFileTypes();
@@ -488,14 +541,31 @@ public class AudioSystem {
     }
     AudioFormat f = stream.getFormat();
     byte[] data = stream.readAllBytes();
+    if (Encoding.PCM_UNSIGNED.equals(f.getEncoding()) && f.getSampleSizeInBits() > 8
+        && (!f.isBigEndian() || f.getSampleSizeInBits() > 16)) {
+      int bytes = (f.getSampleSizeInBits() + 7) / 8;
+      for (int i = 0; i + bytes <= data.length; i += bytes) {
+        data[i + (f.isBigEndian() ? 0 : bytes - 1)] ^= (byte) 0x80;
+      }
+      f = new AudioFormat(Encoding.PCM_SIGNED, f.getSampleRate(), f.getSampleSizeInBits(), f.getChannels(),
+          f.getFrameSize(), f.getFrameRate(), f.isBigEndian());
+    }
     ByteArrayOutputStream bo = new ByteArrayOutputStream();
     if (AudioFileFormat.Type.WAVE.equals(fileType)) {
       int tag;
       int bits = f.getSampleSizeInBits();
+      boolean extFmt = false;
       if (Encoding.ULAW.equals(f.getEncoding())) {
         tag = 7;
+        extFmt = true;
       } else if (Encoding.ALAW.equals(f.getEncoding())) {
         tag = 6;
+        extFmt = true;
+      } else if (Encoding.PCM_FLOAT.equals(f.getEncoding())) {
+        tag = 3;
+        if (f.isBigEndian()) {
+          swapBytes(data, bits / 8);
+        }
       } else {
         tag = 1;
         if (Encoding.PCM_SIGNED.equals(f.getEncoding()) && bits == 8) {
@@ -518,17 +588,66 @@ public class AudioSystem {
       int rate = (int) f.getSampleRate();
       int blockAlign = f.getFrameSize();
       writeLe(bo, "RIFF".getBytes());
-      writeLe32(bo, 36 + data.length);
+      writeLe32(bo, 36 + (extFmt ? 2 : 0) + data.length);
       writeLe(bo, "WAVEfmt ".getBytes());
-      writeLe32(bo, 16);
+      writeLe32(bo, extFmt ? 18 : 16);
       writeLe16(bo, tag);
       writeLe16(bo, channels);
       writeLe32(bo, rate);
       writeLe32(bo, rate * blockAlign);
       writeLe16(bo, blockAlign);
       writeLe16(bo, bits);
+      if (extFmt) {
+        writeLe16(bo, 0);
+      }
       writeLe(bo, "data".getBytes());
       writeLe32(bo, data.length);
+      bo.write(data);
+    } else if (AudioFileFormat.Type.AIFF.equals(fileType)) {
+      if (Encoding.ULAW.equals(f.getEncoding()) || Encoding.ALAW.equals(f.getEncoding())) {
+        boolean u = Encoding.ULAW.equals(f.getEncoding());
+        byte[] pcm = new byte[data.length * 2];
+        for (int i = 0; i < data.length; i++) {
+          int v = u ? ulaw(data[i]) : alaw(data[i]);
+          pcm[2 * i] = (byte) (v >> 8);
+          pcm[2 * i + 1] = (byte) v;
+        }
+        data = pcm;
+        f = new AudioFormat(Encoding.PCM_SIGNED, f.getSampleRate(), 16, f.getChannels(), 2 * f.getChannels(),
+            f.getFrameRate(), true);
+      }
+      int bits = f.getSampleSizeInBits();
+      int bytes = (bits + 7) / 8;
+      if (bytes > 1 && !f.isBigEndian()) {
+        for (int i = 0; i + bytes <= data.length; i += bytes) {
+          for (int a = 0, b = bytes - 1; a < b; a++, b--) {
+            byte t = data[i + a];
+            data[i + a] = data[i + b];
+            data[i + b] = t;
+          }
+        }
+      }
+      if (bytes == 1 && Encoding.PCM_UNSIGNED.equals(f.getEncoding())) {
+        for (int i = 0; i < data.length; i++) {
+          data[i] -= 128;
+        }
+      }
+      int frames = data.length / Math.max(1, f.getFrameSize());
+      bo.write(new byte[] {'F', 'O', 'R', 'M'});
+      writeBe32(bo, 46 + data.length);
+      bo.write(new byte[] {'A', 'I', 'F', 'F', 'C', 'O', 'M', 'M'});
+      writeBe32(bo, 18);
+      bo.write(f.getChannels() >> 8);
+      bo.write(f.getChannels());
+      writeBe32(bo, frames);
+      bo.write(bits >> 8);
+      bo.write(bits);
+      byte[] ext = extended(f.getSampleRate());
+      bo.write(ext, 0, 10);
+      bo.write(new byte[] {'S', 'S', 'N', 'D'});
+      writeBe32(bo, data.length + 8);
+      writeBe32(bo, 0);
+      writeBe32(bo, 0);
       bo.write(data);
     } else {
       int enc;
@@ -537,6 +656,11 @@ public class AudioSystem {
         enc = 1;
       } else if (Encoding.ALAW.equals(f.getEncoding())) {
         enc = 27;
+      } else if (Encoding.PCM_FLOAT.equals(f.getEncoding())) {
+        enc = bits == 64 ? 7 : 6;
+        if (!f.isBigEndian()) {
+          swapBytes(data, bits / 8);
+        }
       } else {
         enc = bits == 8 ? 2 : bits == 16 ? 3 : bits == 24 ? 4 : 5;
         if (bits > 8 && !f.isBigEndian()) {
@@ -573,6 +697,46 @@ public class AudioSystem {
     try (FileOutputStream fos = new FileOutputStream(out)) {
       return write(stream, fileType, fos);
     }
+  }
+
+  private static void swapBytes(byte[] data, int bytes) {
+    for (int i = 0; i + bytes <= data.length; i += bytes) {
+      for (int a = 0, b = bytes - 1; a < b; a++, b--) {
+        byte t = data[i + a];
+        data[i + a] = data[i + b];
+        data[i + b] = t;
+      }
+    }
+  }
+
+  private static byte[] extended(float rate) {
+    byte[] out = new byte[10];
+    double v = rate;
+    if (v == 0) {
+      return out;
+    }
+    int exp = Math.getExponent(v);
+    long mant = (Double.doubleToLongBits(v) & 0xfffffffffffffL) | (1L << 52);
+    long m64 = mant << 11;
+    int e = exp + 16383;
+    out[0] = (byte) (e >> 8);
+    out[1] = (byte) e;
+    for (int i = 0; i < 8; i++) {
+      out[2 + i] = (byte) (m64 >>> (56 - 8 * i));
+    }
+    return out;
+  }
+
+  private static double extendedToDouble(byte[] b, int o) {
+    int e = ((b[o] & 0x7f) << 8) | (b[o + 1] & 0xff);
+    long m = 0;
+    for (int i = 0; i < 8; i++) {
+      m = (m << 8) | (b[o + 2 + i] & 0xff);
+    }
+    if (e == 0 && m == 0) {
+      return 0;
+    }
+    return (double) (m >>> 11) * Math.pow(2, e - 16383 - 52);
   }
 
   private static void writeLe(ByteArrayOutputStream o, byte[] b) throws IOException {

@@ -19,7 +19,9 @@ public final class Rasterizer {
     void row(int y, int xStart, int xEnd, float[] cov, int base);
   }
 
-  private static final int kSamples = 4;
+  private static final int kSamples = 8;
+  private static final int kSubX = 256;
+  private static final int kMaxCoverage = kSamples * kSubX;
 
   private Rasterizer() { }
 
@@ -79,6 +81,9 @@ public final class Rasterizer {
   public static void fill(Shape shape, AffineTransform at, int cx0, int cy0, int cx1, int cy1, boolean aa,
       RowSink sink) {
     if (cx1 <= cx0 || cy1 <= cy0) {
+      return;
+    }
+    if (aa && shape instanceof java.awt.geom.Rectangle2D && fillBox((java.awt.geom.Rectangle2D) shape, at, cx0, cy0, cx1, cy1, sink)) {
       return;
     }
     PathIterator pi = new FlatteningPathIterator(shape.getPathIterator(at), 0.1, 12);
@@ -220,13 +225,13 @@ public final class Rasterizer {
     }
     int width = cx1 - cx0;
     float[] cov = new float[width];
+    int[] icov = new int[aa ? width : 0];
     int[] active = new int[n];
     int activeCount = 0;
     int next = 0;
     double[] xs = new double[n];
     int[] ds = new int[n];
     int ss = aa ? kSamples : 1;
-    float weight = 1f / ss;
     for (int y = yStart; y < yEnd; y++) {
       int rowMin = Integer.MAX_VALUE;
       int rowMax = Integer.MIN_VALUE;
@@ -269,19 +274,18 @@ public final class Rasterizer {
               if (b <= cx0 || a >= cx1) {
                 continue;
               }
-              a = Math.max(a, cx0);
-              b = Math.min(b, cx1);
-              int pa = (int) Math.floor(a);
-              int pb = (int) Math.floor(b);
-              if (pa == pb) {
-                cov[pa - cx0] += (float) (b - a) * weight;
-              } else {
-                cov[pa - cx0] += (float) (pa + 1 - a) * weight;
-                for (int p = pa + 1; p < pb; p++) {
-                  cov[p - cx0] += weight;
-                }
-                if (pb < cx1) {
-                  cov[pb - cx0] += (float) (b - pb) * weight;
+              long qa = (long) Math.ceil(Math.max(a, cx0) * kSubX);
+              long qb = (long) Math.ceil(Math.min(b, cx1) * kSubX);
+              if (qb <= qa) {
+                continue;
+              }
+              int pa = (int) (qa / kSubX);
+              int pb = (int) (qb / kSubX);
+              for (int p = pa; p <= pb && p < cx1; p++) {
+                long lo = Math.max(qa, (long) p * kSubX);
+                long hi = Math.min(qb, (long) (p + 1) * kSubX);
+                if (hi > lo) {
+                  icov[p - cx0] += (int) (hi - lo);
                 }
               }
               rowMin = Math.min(rowMin, pa);
@@ -303,8 +307,206 @@ public final class Rasterizer {
         }
       }
       if (rowMin <= rowMax) {
+        if (aa) {
+          for (int p = rowMin - cx0; p <= rowMax - cx0; p++) {
+            cov[p] = (float) ((icov[p] * 255L) / kMaxCoverage) / 255f;
+            icov[p] = 0;
+          }
+        }
         sink.row(y, rowMin, rowMax + 1, cov, cx0);
         Arrays.fill(cov, rowMin - cx0, rowMax + 1 - cx0, 0f);
+      }
+    }
+  }
+
+  private static boolean fillBox(java.awt.geom.Rectangle2D r, AffineTransform at, int cx0, int cy0, int cx1, int cy1,
+      RowSink sink) {
+    final int kScaleOnly = AffineTransform.TYPE_TRANSLATION | AffineTransform.TYPE_UNIFORM_SCALE
+        | AffineTransform.TYPE_GENERAL_SCALE | AffineTransform.TYPE_FLIP;
+    if (at != null && (at.getType() & ~kScaleOnly) != 0) {
+      return false;
+    }
+    double[] p = {r.getMinX(), r.getMinY(), r.getMaxX(), r.getMaxY()};
+    if (at != null) {
+      at.transform(p, 0, p, 0, 2);
+    }
+    double x0 = Math.min(p[0], p[2]);
+    double x1 = Math.max(p[0], p[2]);
+    double y0 = Math.min(p[1], p[3]);
+    double y1 = Math.max(p[1], p[3]);
+    int px0 = Math.max(cx0, (int) Math.floor(x0));
+    int px1 = Math.min(cx1, (int) Math.ceil(x1));
+    int py0 = Math.max(cy0, (int) Math.floor(y0));
+    int py1 = Math.min(cy1, (int) Math.ceil(y1));
+    if (px0 >= px1 || py0 >= py1) {
+      return true;
+    }
+    float[] cov = new float[cx1 - cx0];
+    for (int y = py0; y < py1; y++) {
+      double yc = Math.min(y + 1, y1) - Math.max(y, y0);
+      for (int x = px0; x < px1; x++) {
+        double xc = Math.min(x + 1, x1) - Math.max(x, x0);
+        cov[x - cx0] = (float) ((int) (xc * yc * 255 + 0.5)) / 255f;
+      }
+      sink.row(y, px0, px1, cov, cx0);
+    }
+    return true;
+  }
+
+  public static void fillExact(PathIterator pi, int cx0, int cy0, int cx1, int cy1, boolean glyph, RowSink sink) {
+    java.util.ArrayList<double[]> edges = new java.util.ArrayList<>();
+    double[] c = new double[6];
+    double mx = 0;
+    double my = 0;
+    double px = 0;
+    double py = 0;
+    double minX = Double.MAX_VALUE;
+    double maxX = -Double.MAX_VALUE;
+    double minY = Double.MAX_VALUE;
+    double maxY = -Double.MAX_VALUE;
+    while (!pi.isDone()) {
+      int t = pi.currentSegment(c);
+      double nx = px;
+      double ny = py;
+      boolean edge = false;
+      if (t == PathIterator.SEG_MOVETO) {
+        if (px != mx || py != my) {
+          edges.add(new double[] {px, py, mx, my});
+        }
+        mx = px = c[0];
+        my = py = c[1];
+      } else if (t == PathIterator.SEG_LINETO) {
+        nx = c[0];
+        ny = c[1];
+        edge = true;
+      } else if (t == PathIterator.SEG_CLOSE) {
+        nx = mx;
+        ny = my;
+        edge = px != mx || py != my;
+      }
+      if (edge) {
+        edges.add(new double[] {px, py, nx, ny});
+        px = nx;
+        py = ny;
+      }
+      pi.next();
+    }
+    if (px != mx || py != my) {
+      edges.add(new double[] {px, py, mx, my});
+    }
+    for (double[] e : edges) {
+      minX = Math.min(minX, Math.min(e[0], e[2]));
+      maxX = Math.max(maxX, Math.max(e[0], e[2]));
+      minY = Math.min(minY, Math.min(e[1], e[3]));
+      maxY = Math.max(maxY, Math.max(e[1], e[3]));
+    }
+    if (edges.isEmpty()) {
+      return;
+    }
+    int bx0 = Math.max(cx0, (int) Math.floor(minX));
+    int bx1 = Math.min(cx1, (int) Math.ceil(maxX) + 1);
+    int by0 = Math.max(cy0, (int) Math.floor(minY));
+    int by1 = Math.min(cy1, (int) Math.ceil(maxY));
+    if (bx0 >= bx1 || by0 >= by1) {
+      return;
+    }
+    int w = bx1 - bx0;
+    int stride = w + 3;
+    float[] acc = new float[(by1 - by0) * stride];
+    for (double[] e : edges) {
+      accumulate(acc, stride, bx0, by0, w, by1 - by0, e[0], e[1], e[2], e[3]);
+    }
+    float[] cov = new float[w];
+    for (int y = by0; y < by1; y++) {
+      double sum = 0;
+      int rowMin = Integer.MAX_VALUE;
+      int rowMax = Integer.MIN_VALUE;
+      int base = (y - by0) * stride;
+      for (int x = 0; x < w; x++) {
+        sum += acc[base + x];
+        double a = Math.min(Math.abs(sum), 1.0);
+        int v = Math.min(255, (int) Math.floor(a * (glyph ? 256.0 : 255.0) + 1e-6));
+        if (v > 0) {
+          cov[x] = v / 255f;
+          rowMin = Math.min(rowMin, x);
+          rowMax = x;
+        }
+      }
+      if (rowMin <= rowMax) {
+        sink.row(y, bx0 + rowMin, bx0 + rowMax + 1, cov, bx0);
+        Arrays.fill(cov, 0, w, 0f);
+      }
+    }
+  }
+
+  private static void accumulate(float[] a, int stride, int bx, int by, int w, int h, double x0, double y0, double x1,
+      double y1) {
+    if (y0 == y1) {
+      return;
+    }
+    double ox = x0;
+    double oy = y0;
+    double odx = x1 - x0;
+    double ody = y1 - y0;
+    double dir = 1;
+    if (y0 > y1) {
+      dir = -1;
+      double t = x0;
+      x0 = x1;
+      x1 = t;
+      t = y0;
+      y0 = y1;
+      y1 = t;
+    }
+    double dxdy = (x1 - x0) / (y1 - y0);
+    double x = x0;
+    int yStart = (int) Math.floor(y0);
+    if (y0 < by) {
+      x += dxdy * (by - y0);
+      y0 = by;
+      yStart = by;
+    }
+    int yEnd = (int) Math.min(Math.ceil(y1), by + h);
+    for (int y = yStart; y < yEnd; y++) {
+      double dy = Math.min(y + 1, y1) - Math.max(y, y0);
+      double xn = x + dxdy * dy;
+      if (y + 1 < y1 && y + 1 > y0) {
+        xn = ox + Math.floor((y + 1 - oy) * 256.0 * (odx * 256.0) / (ody * 256.0)) / 256.0;
+      }
+      double d = dy * dir;
+      double xa = Math.min(x, xn);
+      double xb = Math.max(x, xn);
+      x = xn;
+      xa = Math.min(Math.max(xa - bx, 0), w);
+      xb = Math.min(Math.max(xb - bx, 0), w);
+      int row = (y - by) * stride;
+      double x0f = Math.floor(xa);
+      int x0i = (int) x0f;
+      double x1c = Math.ceil(xb);
+      int x1i = (int) x1c;
+      if (x1i <= x0i + 1) {
+        double xmf = 0.5 * (xa + xb) - x0f;
+        a[row + x0i] += (float) (d - d * xmf);
+        a[row + x0i + 1] += (float) (d * xmf);
+      } else {
+        double s = 1.0 / (xb - xa);
+        double xf = xa - x0f;
+        double a0 = 0.5 * s * (1 - xf) * (1 - xf);
+        double x1f = xb - x1c + 1;
+        double am = 0.5 * s * x1f * x1f;
+        a[row + x0i] += (float) (d * a0);
+        if (x1i == x0i + 2) {
+          a[row + x0i + 1] += (float) (d * (1 - a0 - am));
+        } else {
+          double a1 = s * (1.5 - xf);
+          a[row + x0i + 1] += (float) (d * (a1 - a0));
+          for (int xi = x0i + 2; xi < x1i - 1; xi++) {
+            a[row + xi] += (float) (d * s);
+          }
+          double a2 = a1 + (x1i - x0i - 3) * s;
+          a[row + x1i - 1] += (float) (d * (1 - a2 - am));
+        }
+        a[row + x1i] += (float) (d * am);
       }
     }
   }

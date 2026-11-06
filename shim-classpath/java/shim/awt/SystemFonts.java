@@ -55,6 +55,24 @@ final class SystemFonts {
         continue;
       }
       String n = f.getName().toLowerCase(Locale.ROOT);
+      if (n.endsWith(".pfb") || n.endsWith(".pfa")) {
+        try {
+          Type1Face t = Type1Face.parse(java.nio.file.Files.readAllBytes(f.toPath()));
+          Entry e = new Entry();
+          e.family = t.family();
+          e.full = t.fullName();
+          e.ps = t.postScriptName();
+          e.file = f;
+          e.style = t.fontStyle();
+          e.sub = "Regular";
+          if (e.family != null) {
+            out.add(e);
+          }
+        } catch (IOException | java.awt.FontFormatException | RuntimeException ex) {
+          continue;
+        }
+        continue;
+      }
       if (n.endsWith(".ttf") || n.endsWith(".otf")) {
         try {
           Entry e = read(f);
@@ -144,6 +162,10 @@ final class SystemFonts {
     return (u16(b, o) << 16) | u16(b, o + 2);
   }
 
+  static java.util.List<Entry> entries() {
+    return all();
+  }
+
   static Entry find(String name, int style) {
     if (name == null) {
       return null;
@@ -152,9 +174,21 @@ final class SystemFonts {
     Entry plain = null;
     Entry any = null;
     for (Entry e : all()) {
+      if (e.full.toLowerCase(Locale.ROOT).equals(lower) && !e.full.equalsIgnoreCase(e.family)) {
+        return e;
+      }
+    }
+    Entry styled = null;
+    for (Entry e : all()) {
       if (e.family.toLowerCase(Locale.ROOT).equals(lower)) {
         if (e.style == (style & 3)) {
-          return e;
+          if (e.full.equalsIgnoreCase(e.family)) {
+            return e;
+          }
+          if (styled == null) {
+            styled = e;
+          }
+          continue;
         }
         if (e.style == 0 && plain == null) {
           plain = e;
@@ -163,6 +197,9 @@ final class SystemFonts {
           any = e;
         }
       }
+    }
+    if (styled != null) {
+      return styled;
     }
     if (plain != null || any != null) {
       return plain != null ? plain : any;

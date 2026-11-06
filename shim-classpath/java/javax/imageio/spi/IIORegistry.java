@@ -55,6 +55,10 @@ public final class IIORegistry extends ServiceRegistry {
     registerServiceProvider(new shim.imageio.BmpSpi.Writer());
     registerServiceProvider(new shim.imageio.GifSpi.Reader());
     registerServiceProvider(new shim.imageio.GifSpi.Writer());
+    registerServiceProvider(new shim.imageio.TiffSpi.Reader());
+    registerServiceProvider(new shim.imageio.TiffSpi.Writer());
+    registerServiceProvider(new shim.imageio.WbmpSpi.Reader());
+    registerServiceProvider(new shim.imageio.WbmpSpi.Writer());
     registerServiceProvider(new shim.imageio.JpegSpi.Reader());
     registerServiceProvider(new shim.imageio.JpegSpi.Writer());
   }

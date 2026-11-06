@@ -35,7 +35,37 @@ public final class Fonts {
     if (lower.equals("default")) {
       return "Dialog";
     }
+    int dot = lower.lastIndexOf('.');
+    if (dot > 0 && suffixStyle(lower.substring(dot + 1)) >= 0) {
+      return logicalFamily(name.substring(0, dot));
+    }
     return null;
+  }
+
+  private static int suffixStyle(String s) {
+    switch (s) {
+    case "plain":
+      return 0;
+    case "bold":
+      return 1;
+    case "italic":
+      return 2;
+    case "bolditalic":
+      return 3;
+    default:
+      return -1;
+    }
+  }
+
+  public static int logicalSuffixStyle(String name) {
+    if (name == null) {
+      return 0;
+    }
+    int dot = name.lastIndexOf('.');
+    if (dot <= 0 || logicalFamily(name) == null || logicalFamily(name.substring(0, dot)) == null) {
+      return 0;
+    }
+    return Math.max(0, suffixStyle(name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT)));
   }
 
   public static FontFace face(String name) {
@@ -43,7 +73,7 @@ public final class Fonts {
   }
 
   public static synchronized FontFace face(String name, int style) {
-    style &= 3;
+    style = (style | logicalSuffixStyle(name)) & 3;
     String fam = logicalFamily(name);
     if (fam == null) {
       FontFace registered = kFaces.get(name.toLowerCase(java.util.Locale.ROOT));
@@ -99,14 +129,30 @@ public final class Fonts {
     FontFace f = kFaces.get(key);
     if (f == null) {
       try {
-        f = new NamedFace(e.family, TrueTypeFace.parse(java.nio.file.Files.readAllBytes(e.file.toPath()), 0),
-            e.style != 0, false);
+        byte[] bytes = java.nio.file.Files.readAllBytes(e.file.toPath());
+        String fn = e.file.getName().toLowerCase(java.util.Locale.ROOT);
+        FontFace parsed = fn.endsWith(".pfb") || fn.endsWith(".pfa") ? Type1Face.parse(bytes)
+            : TrueTypeFace.parse(bytes, 0);
+        f = new NamedFace(e.family, parsed, e.style != 0, false);
       } catch (Exception | LinkageError ex) {
         return null;
       }
       kFaces.put(key, f);
     }
     return f;
+  }
+
+  public static synchronized String[] allFaceNames() {
+    java.util.TreeSet<String> names = new java.util.TreeSet<>();
+    for (String l : kLogical) {
+      for (String s : new String[] {"plain", "bold", "italic", "bolditalic"}) {
+        names.add(l + "." + s);
+      }
+    }
+    for (SystemFonts.Entry e : SystemFonts.entries()) {
+      names.add(e.full);
+    }
+    return names.toArray(new String[0]);
   }
 
   public static synchronized String fullName(String name, int style) {
@@ -255,6 +301,32 @@ public final class Fonts {
     public int numGlyphs() { return delegate.numGlyphs(); }
 
     public int missingGlyph() { return delegate.missingGlyph(); }
+
+    public int glyphCode(int cp) { return delegate.glyphCode(cp); }
+
+    public int codePointOf(int glyph) { return delegate.codePointOf(glyph); }
+
+    public float pixels(float em, float size) { return delegate.pixels(em, size); }
+
+    public float advancePixels(float em, float size) { return delegate.advancePixels(em, size); }
+
+    public float[] styleMetrics(float size, float ascent) { return delegate.styleMetrics(size, ascent); }
+
+    public java.awt.Shape hintedGlyph(int cp, float size) {
+      FontFace f = fallback(cp);
+      return (f != null ? f : delegate).hintedGlyph(cp, size);
+    }
+
+    public int unitsPerEm() { return delegate.unitsPerEm(); }
+
+    public java.awt.Shape scaledOutline(int cp, float size) {
+      FontFace f = fallback(cp);
+      return (f != null ? f : delegate).scaledOutline(cp, size);
+    }
+
+    public float lineHeight() { return delegate.lineHeight(); }
+
+    public boolean leadingFromHeight() { return delegate.leadingFromHeight(); }
 
     public float kerning(int a, int b) { return delegate.kerning(a, b); }
 

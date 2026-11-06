@@ -250,7 +250,86 @@ public final class TrueTypeFace extends FontFace {
 
   public boolean canDisplay(int cp) { return glyphFor(cp) != 0; }
 
+  public float[] styleMetrics(float size, float ascentPixels) {
+    float[] m = super.styleMetrics(size, ascentPixels);
+    int[] os2 = tables.get("OS/2");
+    int[] post = tables.get("post");
+    if (os2 != null && os2[1] >= 30) {
+      int ySize = s16(os2[0] + 26);
+      int yPos = s16(os2[0] + 28);
+      if (ySize != 0 || yPos != 0) {
+        m[0] = -yPos * size / unitsPerEm;
+        m[1] = ySize * size / unitsPerEm;
+      }
+    }
+    if (post != null && post[1] >= 12) {
+      int pos = s16(post[0] + 8);
+      int thick = s16(post[0] + 10);
+      if (pos != 0 || thick != 0) {
+        m[2] = -pos * size / unitsPerEm;
+        m[3] = thick * size / unitsPerEm;
+      }
+    }
+    return m;
+  }
+
+  public int unitsPerEm() { return unitsPerEm; }
+
   public int numGlyphs() { return numGlyphs; }
+
+  public int glyphCode(int cp) { return glyphFor(cp); }
+
+  public synchronized Shape hintedGlyph(int cp, float size) {
+    if (hintedAdvance(cp, size) < 0 || hinter == null) {
+      return null;
+    }
+    return hinter.hintedOutline(glyphFor(cp), size);
+  }
+
+  private java.util.HashMap<Long, Integer> kernPairs;
+
+  public float kerning(int a, int b) {
+    if (kernPairs == null) {
+      kernPairs = new java.util.HashMap<>();
+      int[] kern = tables.get("kern");
+      if (kern != null && kern[1] >= 4 && u16(kern[0]) == 0) {
+        int o = kern[0] + 4;
+        int n = u16(kern[0] + 2);
+        for (int t = 0; t < n && o + 6 <= kern[0] + kern[1]; t++) {
+          int len = u16(o + 2);
+          int cov = u16(o + 4);
+          if ((cov >> 8) == 0 && (cov & 1) != 0) {
+            int pairs = u16(o + 6);
+            for (int i = 0; i < pairs; i++) {
+              int p = o + 14 + i * 6;
+              kernPairs.putIfAbsent(((long) u16(p) << 16) | u16(p + 2), s16(p + 4));
+            }
+          }
+          o += len;
+        }
+      }
+    }
+    Integer v = kernPairs.get(((long) glyphFor(a) << 16) | glyphFor(b));
+    return v == null ? 0f : (float) v / unitsPerEm;
+  }
+
+  public int codePointOf(int glyph) {
+    synchronized (cache) {
+      if (reverse == null) {
+        reverse = new HashMap<>();
+        for (int cp = 0; cp < 0x10000; cp++) {
+          int g = glyphFor(cp);
+          if (g != 0) {
+            reverse.putIfAbsent(g, cp);
+          }
+        }
+      }
+      Integer cp = reverse.get(glyph);
+      return cp == null ? 0 : cp;
+    }
+  }
+
+  private Map<Integer, Integer> reverse;
 
   public float advance(int cp) {
     int g = glyphFor(cp);

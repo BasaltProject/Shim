@@ -106,6 +106,26 @@ public class ColorConvertOp implements BufferedImageOp, RasterOp {
       scs = CSList[0];
       dcs = CSList[1];
     }
+    if (dcs.getType() == ColorSpace.TYPE_GRAY && dcs.getNumComponents() == 1
+        && out.getColorModel().getNumComponents() == 1) {
+      ColorModel dm = out.getColorModel();
+      float[] lin = new float[256];
+      for (int i = 0; i < 256; i++) {
+        float c = i / 255f;
+        lin[i] = c <= 0.04045f ? c / 12.92f : (float) Math.pow((c + 0.055) / 1.055, 2.4);
+      }
+      float[] norm = new float[1];
+      for (int y = 0; y < src.getHeight(); y++) {
+        for (int x = 0; x < src.getWidth(); x++) {
+          int p = src.getRGB(x, y);
+          double lum = 0.2225045 * lin[(p >> 16) & 0xff] + 0.7168786 * lin[(p >> 8) & 0xff]
+              + 0.0606169 * lin[p & 0xff];
+          norm[0] = (float) Math.min(1.0, lum);
+          out.getRaster().setDataElements(x, y, dm.getDataElements(norm, 0, null));
+        }
+      }
+      return out;
+    }
     for (int y = 0; y < src.getHeight(); y++) {
       for (int x = 0; x < src.getWidth(); x++) {
         out.setRGB(x, y, src.getRGB(x, y));
