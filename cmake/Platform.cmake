@@ -13,8 +13,8 @@
 if(WIN32 AND (MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
     message(FATAL_ERROR "Shim builds on Windows with a MinGW-w64 target (clang --target=*-w64-windows-gnu), not with the MSVC ABI")
 endif()
-if(NOT (APPLE OR WIN32 OR CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$"))
-    message(FATAL_ERROR "Unsupported platform ${CMAKE_SYSTEM_NAME}; Shim builds on Linux, macOS, Windows and FreeBSD")
+if(NOT (APPLE OR WIN32 OR CMAKE_SYSTEM_NAME MATCHES "^(Linux|Android|FreeBSD)$"))
+    message(FATAL_ERROR "Unsupported platform ${CMAKE_SYSTEM_NAME}; Shim builds on Linux, Android, macOS, Windows and FreeBSD")
 endif()
 
 set(_processor "${CMAKE_SYSTEM_PROCESSOR}")
