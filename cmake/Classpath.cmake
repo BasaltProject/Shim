@@ -62,7 +62,7 @@ endif()
 file(GLOB_RECURSE _classpath_sources CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/shim-classpath/java/*.java")
 # javac reads one quoted path per line, so folders with spaces survive
 set(_quoted_sources ${_classpath_sources})
-list(TRANSFORM _quoted_sources REPLACE "^(.*)$" "\"\\1\"")
+list(TRANSFORM _quoted_sources REPLACE "^(.+)$" "\"\\1\"")
 list(JOIN _quoted_sources "\n" _classpath_args)
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/classpath-sources.args" CONTENT "${_classpath_args}\n")
 add_custom_command(

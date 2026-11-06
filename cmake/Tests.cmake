@@ -39,7 +39,7 @@ target_link_libraries(shim_test_library PRIVATE shim_target shim_link)
 # javac reads one quoted path per line, so folders with spaces survive
 foreach(_list _test_all_sources _test_extra)
     set(_quoted ${${_list}})
-    list(TRANSFORM _quoted REPLACE "^(.*)$" "\"\\1\"")
+    list(TRANSFORM _quoted REPLACE "^(.+)$" "\"\\1\"")
     list(JOIN _quoted "\n" ${_list}_args)
 endforeach()
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/test-sources.args" CONTENT "${_test_all_sources_args}\n")
