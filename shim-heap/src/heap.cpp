@@ -57,6 +57,12 @@ using namespace shim::util;
 
 namespace {
 
+// __builtin_ctzl takes a 32 bit long on Windows, so a mark word needs the width of the pointer
+inline unsigned countTrailingZeros(uintptr_t v)
+{
+  return sizeof(uintptr_t) == 8 ? __builtin_ctzll(v) : __builtin_ctz(static_cast<unsigned>(v));
+}
+
 namespace local {
 
 const unsigned Top = ~static_cast<unsigned>(0);
@@ -1383,7 +1389,7 @@ void sweepChunk(SweepJob* j, unsigned chunk)
   for (unsigned w = lo; w < hi; ++w) {
     uintptr_t bits = c->markBits[w];
     while (bits) {
-      unsigned bit = __builtin_ctzl(bits);
+      unsigned bit = countTrailingZeros(bits);
       bits &= bits - 1;
       unsigned start = indexOf(w, bit);
       if (not part->any) {
@@ -1489,7 +1495,7 @@ void sweepGen2(Context* c)
     for (unsigned w = 0; w < markWords; ++w) {
       uintptr_t bits = c->markBits[w];
       while (bits) {
-        unsigned bit = __builtin_ctzl(bits);
+        unsigned bit = countTrailingZeros(bits);
         bits &= bits - 1;
         unsigned start = indexOf(w, bit);
         if (start > previousEnd and start - previousEnd >= MinimumSpanInWords) {

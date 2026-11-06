@@ -73,6 +73,11 @@ public class File implements Serializable, Comparable<File> {
   private static String normalize(String pathname) {
     if (WINDOWS) {
       pathname = pathname.replace('\\', '/');
+      // /C:/dir names the same file as C:/dir
+      if (pathname.length() >= 3 && pathname.charAt(0) == '/' && pathname.charAt(2) == ':'
+          && Character.isLetter(pathname.charAt(1))) {
+        pathname = pathname.substring(1);
+      }
     }
     int n = pathname.length();
     char prev = 0;

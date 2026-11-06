@@ -166,7 +166,7 @@ jobs:
           pacman -S --noconfirm mingw-w64-clang-x86_64-lldb || true
           for t in Floats Integers GC; do
               echo "=== $t"
-              lldb -b -o run -o "script exec(open('.github/scripts/crash-stack.py').read())" -- build/shim.exe -cp build/test $t 2>&1 | grep -E "stack\[|stop reason" | head -40
+              lldb -b -o run -o "script exec(open('.github/scripts/crash-stack.py').read())" -- build/shim.exe -cp build/test $t 2>&1 | tail -60
           done
 
       - name: Package
