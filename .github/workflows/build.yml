@@ -113,7 +113,23 @@ jobs:
 
   windows:
     needs: plan
-    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            target: Windows-x64
+            msystem: CLANG64
+            prefix: mingw-w64-clang-x86_64
+            java: temurin
+            process: compile
+          - os: windows-11-arm
+            target: Windows-arm64
+            msystem: CLANGARM64
+            prefix: mingw-w64-clang-aarch64
+            java: microsoft
+            process: interpret
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
       run:
@@ -123,26 +139,27 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: ${{ matrix.java }}
           java-version: '17'
 
       - name: Install the MinGW toolchain
         uses: msys2/setup-msys2@v2
         with:
-          msystem: CLANG64
+          msystem: ${{ matrix.msystem }}
           path-type: inherit
           update: false
           install: >-
-            mingw-w64-clang-x86_64-clang
-            mingw-w64-clang-x86_64-cmake
-            mingw-w64-clang-x86_64-ninja
-            mingw-w64-clang-x86_64-zlib
-            mingw-w64-clang-x86_64-lld
+            ${{ matrix.prefix }}-clang
+            ${{ matrix.prefix }}-cmake
+            ${{ matrix.prefix }}-ninja
+            ${{ matrix.prefix }}-zlib
+            ${{ matrix.prefix }}-lld
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON \
               "-DSHIM_JAVA_HOME=$(cygpath -m "$JAVA_HOME")" \
+              "-DSHIM_PROCESS=${{ matrix.process }}" \
               "-DSHIM_VERSION_STRING=${{ needs.plan.outputs.version }}"
 
       - name: Build
@@ -152,12 +169,12 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
       - name: Package
-        run: .github/scripts/package.sh "${{ needs.plan.outputs.version }}" Windows-x64 build
+        run: .github/scripts/package.sh "${{ needs.plan.outputs.version }}" "${{ matrix.target }}" build
 
       - name: Upload the archive
         uses: actions/upload-artifact@v4
         with:
-          name: shim-Windows-x64
+          name: shim-${{ matrix.target }}
           path: dist/
 
   musl:
