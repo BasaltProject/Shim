@@ -198,6 +198,10 @@ endif()
 if(APPLE)
     target_compile_options(shim_target INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-declarations>)
 endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The strict -std mode hides PATH_MAX and friends from musl unless the GNU interfaces are asked for
+    target_compile_definitions(shim_common INTERFACE _GNU_SOURCE)
+endif()
 if(WIN32)
     # The strict -std mode hides MinGW declarations the Windows backend uses
     target_compile_options(shim_target INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-U__STRICT_ANSI__>)
