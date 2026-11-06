@@ -192,6 +192,11 @@ void logException(LPEXCEPTION_POINTERS e, const char* directory)
     void* base = reinterpret_cast<void*>(e->ContextRecord->Rbp);
     void* stack = reinterpret_cast<void*>(e->ContextRecord->Rsp);
     void* thread = reinterpret_cast<void*>(e->ContextRecord->Rbx);
+#elif defined ARCH_arm64
+    void* ip = reinterpret_cast<void*>(e->ContextRecord->Pc);
+    void* base = reinterpret_cast<void*>(e->ContextRecord->Fp);
+    void* stack = reinterpret_cast<void*>(e->ContextRecord->Sp);
+    void* thread = reinterpret_cast<void*>(e->ContextRecord->X19);
 #endif
 
     HMODULE module;
@@ -275,6 +280,11 @@ LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
     void* base = reinterpret_cast<void*>(e->ContextRecord->Rbp);
     void* stack = reinterpret_cast<void*>(e->ContextRecord->Rsp);
     void* thread = reinterpret_cast<void*>(e->ContextRecord->Rbx);
+#elif defined ARCH_arm64
+    void* ip = reinterpret_cast<void*>(e->ContextRecord->Pc);
+    void* base = reinterpret_cast<void*>(e->ContextRecord->Fp);
+    void* stack = reinterpret_cast<void*>(e->ContextRecord->Sp);
+    void* thread = reinterpret_cast<void*>(e->ContextRecord->X19);
 #endif
 
     bool jump = handler->handleSignal(&ip, &base, &stack, &thread);
@@ -290,6 +300,11 @@ LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
       e->ContextRecord->Rbp = reinterpret_cast<DWORD64>(base);
       e->ContextRecord->Rsp = reinterpret_cast<DWORD64>(stack);
       e->ContextRecord->Rbx = reinterpret_cast<DWORD64>(thread);
+#elif defined ARCH_arm64
+      e->ContextRecord->Pc = reinterpret_cast<DWORD64>(ip);
+      e->ContextRecord->Fp = reinterpret_cast<DWORD64>(base);
+      e->ContextRecord->Sp = reinterpret_cast<DWORD64>(stack);
+      e->ContextRecord->X19 = reinterpret_cast<DWORD64>(thread);
 #endif
 
       return EXCEPTION_CONTINUE_EXECUTION;
