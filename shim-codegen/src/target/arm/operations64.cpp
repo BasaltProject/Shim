@@ -711,10 +711,11 @@ void moveCR2(Context* c,
 void moveCR(Context* c,
             unsigned size,
             lir::Constant* src,
-            unsigned,
+            unsigned dstSize,
             lir::RegisterPair* dst)
 {
-  moveCR2(c, size, src, dst, 0);
+  // A negative int widened to a long must fill the whole register, not just its low half
+  moveCR2(c, dstSize > size ? dstSize : size, src, dst, 0);
 }
 
 void addR(Context* c,
