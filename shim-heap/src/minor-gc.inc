@@ -71,6 +71,9 @@ struct GcWorker {
   uint64_t objects;
   uint64_t words;
   uint64_t updates;
+  uintptr_t* deferred;
+  unsigned deferredCount;
+  unsigned deferredCapacity;
   pthread_t thread;
 };
 
@@ -92,6 +95,7 @@ struct ParGc {
   bool started;
   int active;
   int helpersIn;
+  bool major;
 };
 
 inline uintptr_t loadHeader(void* o)
@@ -351,8 +355,71 @@ class FixieWalker : public Heap::Walker {
   Fixie* f;
 };
 
+class MajorWalker : public Heap::Walker {
+ public:
+  MajorWalker(Context* c, GcWorker* w, void* object) : c(c), w(w), object(object)
+  {
+  }
+
+  virtual bool visit(unsigned offset)
+  {
+    void** p = getp(object, offset);
+    void* o = maskAlignedPointer(*p);
+    if (o == 0) {
+      return true;
+    }
+    if (c->gen2.contains(o)) {
+      unsigned i = gen2Index(c, o);
+      uintptr_t bit = static_cast<uintptr_t>(1) << bitOf(i);
+      uintptr_t* word = c->markBits + wordOf(i);
+      if (not(__atomic_load_n(word, __ATOMIC_RELAXED) & bit)
+          and not(__atomic_fetch_or(word, bit, __ATOMIC_RELAXED) & bit)) {
+        __builtin_prefetch(o);
+        pushItem(c, w, reinterpret_cast<uintptr_t>(o));
+      }
+      return true;
+    }
+    if (immortalHeapContains(c, o)) {
+      return true;
+    }
+    if (w->deferredCount + 3 > w->deferredCapacity) {
+      grow(c, &w->deferred, &w->deferredCapacity, w->deferredCount + 3);
+    }
+    uintptr_t* d = w->deferred + w->deferredCount;
+    d[0] = reinterpret_cast<uintptr_t>(p);
+    d[1] = reinterpret_cast<uintptr_t>(object);
+    d[2] = offset;
+    w->deferredCount += 3;
+    return true;
+  }
+
+  Context* c;
+  GcWorker* w;
+  void* object;
+};
+
+class PrefetchWalker : public Heap::Walker {
+ public:
+  PrefetchWalker(void* object) : object(object)
+  {
+  }
+
+  virtual bool visit(unsigned offset)
+  {
+    __builtin_prefetch(maskAlignedPointer(*getp(object, offset)));
+    return true;
+  }
+
+  void* object;
+};
+
 void scanItem(Context* c, GcWorker* w, uintptr_t item)
 {
+  if (w->par->major) {
+    MajorWalker walker(c, w, reinterpret_cast<void*>(item));
+    c->client->walk(walker.object, &walker);
+    return;
+  }
   if (item & 1) {
     Fixie* f = fixie(reinterpret_cast<void*>(item & ~static_cast<uintptr_t>(1)));
     FixieWalker walker(c, w, f);
@@ -361,6 +428,8 @@ void scanItem(Context* c, GcWorker* w, uintptr_t item)
     f->move(c, &(c->visitedFixies));
     w->par->lock.unlock();
   } else {
+    PrefetchWalker pre(reinterpret_cast<void*>(item));
+    c->client->walk(pre.object, &pre);
     ScanWalker walker(c, w, reinterpret_cast<void*>(item));
     c->client->walk(walker.object, &walker);
     w->updates += walker.updates;
@@ -404,6 +473,15 @@ void drainLocal(Context* c, GcWorker* w)
         and __atomic_load_n(&g->poolCount, __ATOMIC_RELAXED) < g->workerCount - 1) {
       donate(c, w);
     }
+  }
+}
+
+inline void maybeDonate(Context* c, GcWorker* w)
+{
+  ParGc* g = w->par;
+  while (w->count >= DonateThreshold and g->workerCount > 1
+         and __atomic_load_n(&g->poolCount, __ATOMIC_RELAXED) < g->workerCount - 1) {
+    donate(c, w);
   }
 }
 
@@ -656,6 +734,9 @@ void disposeParGc(Context* c)
     if (g->workers[i]->stack) {
       c->system->free(g->workers[i]->stack);
     }
+    if (g->workers[i]->deferred) {
+      c->system->free(g->workers[i]->deferred);
+    }
     c->system->free(g->workers[i]);
   }
   c->system->free(g);
@@ -718,7 +799,7 @@ void visitDirtyFixiesParallel(Context* c, GcWorker* w)
           if (getBit(mask, index)) {
             clearBit(mask, index);
             updateFixieSlot(c, w, f, index);
-            quiesce(c, w);
+            maybeDonate(c, w);
 
             if (getBit(mask, index)) {
               clean = false;
@@ -747,6 +828,15 @@ class ParallelVisitor : public Heap::Visitor {
   {
     void** slot = static_cast<void**>(p);
     updateSlot(c, w, slot, c->gen2.contains(slot));
+    if (c->deferDrain) {
+      maybeDonate(c, w);
+    } else {
+      quiesce(c, w);
+    }
+  }
+
+  virtual void flush()
+  {
     quiesce(c, w);
   }
 
@@ -773,10 +863,14 @@ void collectMinorParallel(Context* c)
   int64_t t1 = c->logMajor ? nowNs() : 0;
 
   visitDirtyFixiesParallel(c, w);
+  quiesce(c, w);
   int64_t t2 = c->logMajor ? nowNs() : 0;
 
   ParallelVisitor v(c, w);
+  c->deferDrain = true;
+  c->parWorker = w;
   c->client->visitRoots(&v);
+  c->deferDrain = false;
   quiesce(c, w);
 
   endRegion(c, g);
@@ -787,6 +881,34 @@ void collectMinorParallel(Context* c)
     c->statT[1] = t2 - t1;
     c->statT[2] = t3 - t2;
   }
+}
+
+void drainMarkStackParallel(Context* c)
+{
+  ParGc* g = c->par;
+  GcWorker* w0 = g->workers[0];
+
+  int64_t tp0 = c->logMajor ? nowNs() : 0;
+  g->major = true;
+  beginRegion(g);
+  while (c->markStackCount) {
+    pushItem(c, w0, reinterpret_cast<uintptr_t>(c->markStack[--c->markStackCount]));
+  }
+  quiesce(c, w0);
+  endRegion(c, g);
+  g->major = false;
+  if (c->logMajor) c->statParallelNs += nowNs() - tp0;
+
+  for (unsigned i = 0; i < g->workerCount; ++i) {
+    GcWorker* w = g->workers[i];
+    for (unsigned j = 0; j < w->deferredCount; j += 3) {
+      uintptr_t* d = w->deferred + j;
+      local::collect(c, reinterpret_cast<void**>(d[0]), reinterpret_cast<void*>(d[1]), static_cast<unsigned>(d[2]));
+    }
+    c->statParallelDeferred += w->deferredCount / 3;
+    w->deferredCount = 0;
+  }
+  ++c->statParallelRounds;
 }
 
 #endif  // SHIM_HEAP_PARALLEL

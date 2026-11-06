@@ -44,6 +44,7 @@ class Heap : public shim::util::Allocator {
   class Visitor {
    public:
     virtual void visit(void*) = 0;
+    virtual void flush() {}
   };
 
   class Walker {
@@ -55,6 +56,7 @@ class Heap : public shim::util::Allocator {
    public:
     virtual void collect(void* context, CollectionType type) = 0;
     virtual void visitRoots(Visitor*) = 0;
+    virtual void visitRootsOnly(Visitor* v) { visitRoots(v); }
     virtual bool isFixed(void*) = 0;
     virtual unsigned sizeInWords(void*) = 0;
     virtual unsigned copiedSizeInWords(void*) = 0;

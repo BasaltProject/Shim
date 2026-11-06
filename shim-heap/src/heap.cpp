@@ -34,6 +34,9 @@
 
 #include <stdlib.h>
 #include <time.h>
+#ifdef __GLIBC__
+#include <execinfo.h>
+#endif
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <sys/mman.h>
@@ -105,6 +108,7 @@ class MutexLock {
 
 class Context;
 struct ParGc;
+struct GcWorker;
 ParGc* makeParGcForContext(Context* c);
 void disposeParGc(Context* c);
 
@@ -139,9 +143,9 @@ inline void** getp(void* o, unsigned offsetInWords)
 
 inline void set(void** o, void* value)
 {
-  *o = reinterpret_cast<void*>(
-      reinterpret_cast<uintptr_t>(value)
-      | (reinterpret_cast<uintptr_t>(*o) & (~PointerMask)));
+  uintptr_t old = reinterpret_cast<uintptr_t>(*o);
+  uintptr_t updated = reinterpret_cast<uintptr_t>(value) | (old & (~PointerMask));
+  if (updated != old) *o = reinterpret_cast<void*>(updated);
 }
 
 inline void set(void* o, unsigned offsetInWords, void* value)
@@ -822,6 +826,9 @@ class Context {
         gen2Threshold(max(InitialGen2CapacityInBytes, limit / 16) / BytesPerWord),
         logMajor(getenv("SHIM_GC_STATS") != 0),
         tagged(false),
+        parMajor(getenv("SHIM_GC_PARMAJOR") != 0),
+        verify(getenv("SHIM_GC_VERIFY") != 0),
+        poison(getenv("SHIM_GC_POISON") != 0),
         par(0),
         statObjects(0),
         statWords(0),
@@ -939,10 +946,18 @@ class Context {
   unsigned gen2Threshold;
   bool logMajor;
   bool tagged;
+  bool parMajor;
+  bool verify;
+  bool poison;
   struct ParGc* par;
   uint64_t statObjects;
   uint64_t statWords;
   uint64_t statUpdates;
+  uint64_t statParallelRounds = 0;
+  uint64_t statParallelDeferred = 0;
+  int64_t statParallelNs = 0;
+  bool deferDrain = false;
+  GcWorker* parWorker = 0;
   int64_t statT[4];
   unsigned headroomPercent;
   bool compactNext;
@@ -1279,9 +1294,15 @@ void clearFreshCopies(Context* c)
   c->freshCopyCount = 0;
 }
 
+#ifdef SHIM_HEAP_PARALLEL
+const unsigned ParallelMarkMin = 256;
+void drainMarkStackParallel(Context* c);
+#endif
+
 void markInPlace(Context* c, void* o)
 {
   setGen2Mark(c, o);
+  __builtin_prefetch(o);
   grow(c, &c->markStack, &c->markStackCapacity, c->markStackCount + 1);
   c->markStack[c->markStackCount++] = o;
 }
@@ -1307,6 +1328,12 @@ void drainMarkStack(Context* c)
   };
 
   while (c->markStackCount) {
+#ifdef SHIM_HEAP_PARALLEL
+    if (c->par and c->mode == Heap::MajorCollection and c->markStackCount >= ParallelMarkMin and c->parMajor) {
+      drainMarkStackParallel(c);
+      continue;
+    }
+#endif
     void* o = c->markStack[--c->markStackCount];
     Walker w(c, o);
     c->client->walk(o, &w);
@@ -1324,6 +1351,124 @@ void clearMapPrefix(Segment::Map* map, unsigned words)
   }
 }
 
+#ifdef SHIM_HEAP_PARALLEL
+const unsigned ParallelSweepMinWords = 1 << 16;
+const unsigned SweepChunkWords = 1 << 13;
+
+struct SweepPart {
+  bool any;
+  unsigned firstStart;
+  unsigned lastEnd;
+  unsigned freeWords;
+  unsigned count;
+  unsigned capacity;
+  Span* spans;
+};
+
+struct SweepJob {
+  Context* c;
+  unsigned markWords;
+  unsigned chunks;
+  unsigned next;
+  SweepPart* parts;
+};
+
+void sweepChunk(SweepJob* j, unsigned chunk)
+{
+  Context* c = j->c;
+  SweepPart* part = j->parts + chunk;
+  unsigned lo = chunk * SweepChunkWords;
+  unsigned hi = min(lo + SweepChunkWords, j->markWords);
+  unsigned previousEnd = 0;
+  for (unsigned w = lo; w < hi; ++w) {
+    uintptr_t bits = c->markBits[w];
+    while (bits) {
+      unsigned bit = __builtin_ctzl(bits);
+      bits &= bits - 1;
+      unsigned start = indexOf(w, bit);
+      if (not part->any) {
+        part->any = true;
+        part->firstStart = start;
+      } else if (start > previousEnd and start - previousEnd >= MinimumSpanInWords) {
+        if (part->count == part->capacity) {
+          part->capacity = part->capacity ? part->capacity * 2 : 256;
+          part->spans = static_cast<Span*>(::realloc(part->spans, part->capacity * sizeof(Span)));
+        }
+        part->spans[part->count].start = previousEnd;
+        part->spans[part->count].length = start - previousEnd;
+        ++part->count;
+        part->freeWords += start - previousEnd;
+      }
+      previousEnd = start + c->client->sizeInWords(c->gen2.data + start);
+    }
+  }
+  part->lastEnd = previousEnd;
+}
+
+void* sweepMain(void* arg)
+{
+  SweepJob* j = static_cast<SweepJob*>(arg);
+  for (;;) {
+    unsigned chunk = __atomic_fetch_add(&j->next, 1, __ATOMIC_RELAXED);
+    if (chunk >= j->chunks) {
+      return 0;
+    }
+    sweepChunk(j, chunk);
+  }
+}
+
+bool sweepSpansParallel(Context* c, unsigned markWords, unsigned* previousEndOut)
+{
+  const unsigned maxThreads = 4;
+  SweepJob job;
+  job.c = c;
+  job.markWords = markWords;
+  job.chunks = ceilingDivide(markWords, SweepChunkWords);
+  job.next = 0;
+  job.parts = static_cast<SweepPart*>(::calloc(job.chunks, sizeof(SweepPart)));
+  if (job.parts == 0) {
+    return false;
+  }
+
+  pthread_t threads[maxThreads - 1];
+  unsigned started = 0;
+  for (; started < maxThreads - 1; ++started) {
+    if (pthread_create(threads + started, 0, sweepMain, &job) != 0) {
+      break;
+    }
+  }
+  sweepMain(&job);
+  for (unsigned i = 0; i < started; ++i) {
+    pthread_join(threads[i], 0);
+  }
+
+  unsigned previousEnd = 0;
+  for (unsigned i = 0; i < job.chunks; ++i) {
+    SweepPart* part = job.parts + i;
+    if (part->any) {
+      if (part->firstStart > previousEnd and part->firstStart - previousEnd >= MinimumSpanInWords) {
+        grow(c, &c->spans, &c->spanCapacity, c->spanCount + 1);
+        c->spans[c->spanCount].start = previousEnd;
+        c->spans[c->spanCount].length = part->firstStart - previousEnd;
+        ++c->spanCount;
+        c->freeWords += part->firstStart - previousEnd;
+      }
+      if (part->count) {
+        grow(c, &c->spans, &c->spanCapacity, c->spanCount + part->count);
+        memcpy(c->spans + c->spanCount, part->spans, part->count * sizeof(Span));
+        c->spanCount += part->count;
+        c->freeWords += part->freeWords;
+      }
+      previousEnd = part->lastEnd;
+    }
+    ::free(part->spans);
+  }
+  ::free(job.parts);
+  *previousEndOut = previousEnd;
+  return true;
+}
+#endif
+
 void sweepGen2(Context* c)
 {
   unsigned oldPosition = c->gen2.position();
@@ -1336,21 +1481,27 @@ void sweepGen2(Context* c)
   unsigned previousEnd = 0;
   unsigned markWords = ceilingDivide(oldPosition, BitsPerWord);
 
-  for (unsigned w = 0; w < markWords; ++w) {
-    uintptr_t bits = c->markBits[w];
-    while (bits) {
-      unsigned bit = __builtin_ctzl(bits);
-      bits &= bits - 1;
-      unsigned start = indexOf(w, bit);
-      if (start > previousEnd and start - previousEnd >= MinimumSpanInWords) {
-        grow(c, &c->spans, &c->spanCapacity, c->spanCount + 1);
-        c->spans[c->spanCount].start = previousEnd;
-        c->spans[c->spanCount].length = start - previousEnd;
-        ++c->spanCount;
-        c->freeWords += start - previousEnd;
+#ifdef SHIM_HEAP_PARALLEL
+  if (markWords >= ParallelSweepMinWords and sweepSpansParallel(c, markWords, &previousEnd)) {
+  } else
+#endif
+  {
+    for (unsigned w = 0; w < markWords; ++w) {
+      uintptr_t bits = c->markBits[w];
+      while (bits) {
+        unsigned bit = __builtin_ctzl(bits);
+        bits &= bits - 1;
+        unsigned start = indexOf(w, bit);
+        if (start > previousEnd and start - previousEnd >= MinimumSpanInWords) {
+          grow(c, &c->spans, &c->spanCapacity, c->spanCount + 1);
+          c->spans[c->spanCount].start = previousEnd;
+          c->spans[c->spanCount].length = start - previousEnd;
+          ++c->spanCount;
+          c->freeWords += start - previousEnd;
+        }
+        unsigned size = c->client->sizeInWords(c->gen2.data + start);
+        previousEnd = start + size;
       }
-      unsigned size = c->client->sizeInWords(c->gen2.data + start);
-      previousEnd = start + size;
     }
   }
 
@@ -1801,6 +1952,16 @@ void* update(Context* c,
   }
 
   ++c->statUpdates;
+  if (c->mode == Heap::MajorCollection and c->inPlace) {
+    void* o = maskAlignedPointer(*p);
+    if (c->gen2.contains(o)) {
+      if (not gen2Marked(c, o)) {
+        markInPlace(c, o);
+      }
+      *needsVisit = false;
+      return o;
+    }
+  }
   void* result = update2(c, maskAlignedPointer(*p), needsVisit);
 
   if (result) {
@@ -2349,13 +2510,29 @@ void collect2(Context* c)
     virtual void visit(void* p)
     {
       local::collect(c, static_cast<void**>(p));
-      drainAll(c);
+      if (not c->deferDrain) {
+        drainAll(c);
+      }
+    }
+
+    virtual void flush()
+    {
+      if (c->deferDrain) {
+        drainAll(c);
+      }
     }
 
     Context* c;
   } v(c);
 
+#ifdef SHIM_HEAP_PARALLEL
+  c->deferDrain = c->par and c->inPlace and c->mode == Heap::MajorCollection;
+#endif
   c->client->visitRoots(&v);
+  if (c->deferDrain) {
+    c->deferDrain = false;
+    drainAll(c);
+  }
   if (c->logMajor) {
     int64_t t3 = nowNs();
     c->statT[0] = t1 - t0;
@@ -2383,6 +2560,170 @@ bool limitExceeded(Context* c, int pendingAllocation)
   }
 
   return count > c->limit;
+}
+
+#ifdef __GLIBC__
+int trimRunning = 0;
+
+void* trimMain(void*)
+{
+  malloc_trim(0);
+  __atomic_store_n(&trimRunning, 0, __ATOMIC_RELEASE);
+  return 0;
+}
+
+void trimAsync()
+{
+  if (__atomic_exchange_n(&trimRunning, 1, __ATOMIC_ACQUIRE)) {
+    return;
+  }
+  pthread_t t;
+  if (pthread_create(&t, 0, trimMain, 0) == 0) {
+    pthread_detach(t);
+  } else {
+    malloc_trim(0);
+    __atomic_store_n(&trimRunning, 0, __ATOMIC_RELEASE);
+  }
+}
+#endif
+
+void verifyFail(Context* c, void* owner, void* o, const char* what)
+{
+  fprintf(stderr, "heap verify: %s: object %p (%s) referenced from %p (%s)\n", what, o, segment(c, o), owner,
+          owner ? segment(c, owner) : "root");
+  if (o) {
+    uintptr_t h = *static_cast<uintptr_t*>(o);
+    void* k = maskAlignedPointer(reinterpret_cast<void*>(h));
+    fprintf(stderr, "  header %p class %p (%s)\n", reinterpret_cast<void*>(h), k, segment(c, k));
+  }
+#ifdef __GLIBC__
+  void* frames[48];
+  backtrace_symbols_fd(frames, backtrace(frames, 48), 2);
+#endif
+  abort();
+}
+
+bool verifyOk(Context* c, void* owner, void* o)
+{
+  if (o == 0) {
+    return false;
+  }
+  bool fixed = c->client->isFixed(o);
+  if (not(c->gen2.contains(o) or immortalHeapContains(c, o) or fixed)) {
+    verifyFail(c, owner, o, "reference outside the live generations");
+  }
+  uintptr_t h = *static_cast<uintptr_t*>(o);
+  if ((h & ~PointerMask) == ForwardTag) {
+    verifyFail(c, owner, o, "forwarding tag left in header");
+  }
+  void* k = maskAlignedPointer(reinterpret_cast<void*>(h));
+  if (k == 0 or not(c->gen2.contains(k) or immortalHeapContains(c, k) or c->client->isFixed(k))) {
+    verifyFail(c, owner, o, "invalid class pointer");
+  }
+  if (c->gen2.contains(o) and not fixed) {
+    if (c->nextGen1.contains(o) or c->gen1.contains(o)) {
+      verifyFail(c, owner, o, "object in the nursery");
+    }
+  }
+  return true;
+}
+
+struct VerifyEdge {
+  void* owner;
+  void* o;
+};
+
+struct VerifyState {
+  VerifyEdge* work = 0;
+  size_t count = 0;
+  size_t capacity = 0;
+  void** table = 0;
+  size_t tableSize = 0;
+  size_t tableUsed = 0;
+
+  void push(void* owner, void* o)
+  {
+    if (count == capacity) {
+      capacity = capacity ? capacity * 2 : 4096;
+      work = static_cast<VerifyEdge*>(::realloc(work, capacity * sizeof(VerifyEdge)));
+    }
+    work[count++] = {owner, o};
+  }
+
+  bool insert(void* o)
+  {
+    if (tableUsed * 2 >= tableSize) {
+      size_t n = tableSize ? tableSize * 2 : 1 << 16;
+      void** t = static_cast<void**>(::calloc(n, sizeof(void*)));
+      for (size_t i = 0; i < tableSize; ++i) {
+        if (table[i]) {
+          size_t j = (reinterpret_cast<uintptr_t>(table[i]) >> 3) * 0x9E3779B97F4A7C15ull & (n - 1);
+          while (t[j]) j = (j + 1) & (n - 1);
+          t[j] = table[i];
+        }
+      }
+      ::free(table);
+      table = t;
+      tableSize = n;
+    }
+    size_t j = (reinterpret_cast<uintptr_t>(o) >> 3) * 0x9E3779B97F4A7C15ull & (tableSize - 1);
+    while (table[j]) {
+      if (table[j] == o) return false;
+      j = (j + 1) & (tableSize - 1);
+    }
+    table[j] = o;
+    ++tableUsed;
+    return true;
+  }
+};
+
+void verifyHeap(Context* c)
+{
+  VerifyState st;
+
+  class RootVisitor : public Heap::Visitor {
+   public:
+    RootVisitor(VerifyState* st) : st(st) {}
+    virtual void visit(void* p)
+    {
+      void* o = maskAlignedPointer(*static_cast<void**>(p));
+      if (o) {
+        st->push(0, o);
+      }
+    }
+    VerifyState* st;
+  } rv(&st);
+  c->client->visitRootsOnly(&rv);
+
+  class ChildWalker : public Heap::Walker {
+   public:
+    ChildWalker(void* object, VerifyState* st) : object(object), st(st) {}
+    virtual bool visit(unsigned offset)
+    {
+      void* o = maskAlignedPointer(get(object, offset));
+      if (o) {
+        st->push(object, o);
+      }
+      return true;
+    }
+    void* object;
+    VerifyState* st;
+  };
+
+  uint64_t count = 0;
+  while (st.count) {
+    VerifyEdge e = st.work[--st.count];
+    if (not st.insert(e.o)) {
+      continue;
+    }
+    verifyOk(c, e.owner, e.o);
+    ++count;
+    ChildWalker w(e.o, &st);
+    c->client->walk(e.o, &w);
+  }
+  ::free(st.work);
+  ::free(st.table);
+  fprintf(stderr, "heap verify: %llu objects ok\n", static_cast<unsigned long long>(count));
 }
 
 void collect(Context* c)
@@ -2438,8 +2779,16 @@ void collect(Context* c)
     }
   }
 
+  int64_t tm0 = c->logMajor ? nowNs() : 0;
   collect2(c);
+  int64_t tm1 = c->logMajor ? nowNs() : 0;
 
+  if (c->poison) {
+    uintptr_t* d = c->gen1.data;
+    for (unsigned i = 0; i < c->gen1.position(); ++i) {
+      d[i] = static_cast<uintptr_t>(0xDEADBEEFDEADBEE8ull);
+    }
+  }
   c->gen1.replaceWith(&(c->nextGen1));
   if (c->mode == Heap::MajorCollection) {
     if (c->inPlace) {
@@ -2456,8 +2805,17 @@ void collect(Context* c)
     clearFreshCopies(c);
   }
 
+  int64_t tm2 = c->logMajor ? nowNs() : 0;
   sweepFixies(c);
+  int64_t tm3 = c->logMajor ? nowNs() : 0;
 
+  if (c->logMajor and c->mode == Heap::MajorCollection) {
+    fprintf(stderr, "gc major phases: mark %.1f ms, sweep %.1f ms, fixies %.1f ms, parallel rounds %llu deferred %llu in-parallel %.1f ms\n",
+            (tm1 - tm0) / 1e6, (tm2 - tm1) / 1e6, (tm3 - tm2) / 1e6,
+            static_cast<unsigned long long>(c->statParallelRounds), static_cast<unsigned long long>(c->statParallelDeferred), c->statParallelNs / 1e6);
+    c->statParallelNs = 0;
+    c->statParallelRounds = c->statParallelDeferred = 0;
+  }
   if (c->logMajor and c->mode == Heap::MinorCollection) {
     fprintf(stderr,
             "gc minor detail: remset %.1f ms, dirty fixies %.1f ms, roots+copy %.1f ms, copied %llu objects %llu KB, "
@@ -2472,9 +2830,14 @@ void collect(Context* c)
 
 #ifdef __GLIBC__
   if (c->mode == Heap::MajorCollection) {
-    malloc_trim(0);
+    trimAsync();
   }
 #endif
+
+  if (c->verify) {
+    c->tagged = false;
+    verifyHeap(c);
+  }
 
   if (Verbose) {
     int64_t now = c->system->now();
@@ -2800,6 +3163,15 @@ class MyHeap : public Heap {
 
   virtual void postVisit()
   {
+    if (c.deferDrain) {
+      c.deferDrain = false;
+#ifdef SHIM_HEAP_PARALLEL
+      if (c.tagged) {
+        quiesce(&c, c.parWorker);
+      } else
+#endif
+        drainAll(&c);
+    }
     killFixies(&c);
   }
 
