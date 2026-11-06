@@ -121,7 +121,14 @@ bool toPath(JNIEnv* e, jstring s, FsString& out)
   if (chars == 0) {
     return false;
   }
-  bool ok = out.assign(reinterpret_cast<const wchar_t*>(chars), e->GetStringLength(s));
+  const wchar_t* w = reinterpret_cast<const wchar_t*>(chars);
+  size_t n = static_cast<size_t>(e->GetStringLength(s));
+  // The Java side writes drive paths as /C:/dir as well as C:/dir
+  if (n >= 3 && w[0] == L'/' && w[2] == L':' && ((w[1] >= L'A' && w[1] <= L'Z') || (w[1] >= L'a' && w[1] <= L'z'))) {
+    ++w;
+    --n;
+  }
+  bool ok = out.assign(w, n);
   e->ReleaseStringChars(s, chars);
   return ok;
 #else
@@ -133,10 +140,27 @@ bool toPath(JNIEnv* e, jstring s, FsString& out)
 #endif
 }
 
+#ifdef PLATFORM_WINDOWS
+// Java sees Windows paths with forward slashes only
+jstring newWindowsPath(JNIEnv* e, const wchar_t* chars, size_t n)
+{
+  jchar* copy = static_cast<jchar*>(malloc((n + 1) * sizeof(jchar)));
+  if (copy == 0) {
+    return 0;
+  }
+  for (size_t i = 0; i < n; ++i) {
+    copy[i] = chars[i] == L'\\' ? L'/' : static_cast<jchar>(chars[i]);
+  }
+  jstring result = e->NewString(copy, static_cast<jsize>(n));
+  free(copy);
+  return result;
+}
+#endif
+
 jstring fromPath(JNIEnv* e, const FsString& s)
 {
 #ifdef PLATFORM_WINDOWS
-  return e->NewString(reinterpret_cast<const jchar*>(s.c_str()), static_cast<jsize>(s.length));
+  return newWindowsPath(e, s.c_str(), s.length);
 #else
   return shimutf8::fromUtf8(e, s.c_str());
 #endif
@@ -709,7 +733,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_shim_FileNative_cwd(JNIEnv* e, jclass)
   if (_wgetcwd(buffer, MAX_PATH * 4) == 0) {
     return 0;
   }
-  return e->NewString(reinterpret_cast<const jchar*>(buffer), static_cast<jsize>(wcslen(buffer)));
+  return newWindowsPath(e, buffer, wcslen(buffer));
 #else
   char buffer[PATH_MAX + 1];
   if (getcwd(buffer, sizeof(buffer)) == 0) {

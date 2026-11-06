@@ -113,6 +113,14 @@ jobs:
 
   windows:
     needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - process: compile
+            target: Windows-x64
+          - process: interpret
+            target: Windows-x64-interpret
     runs-on: windows-2025
     timeout-minutes: 60
     defaults:
@@ -143,6 +151,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON \
               "-DSHIM_JAVA_HOME=$(cygpath -m "$JAVA_HOME")" \
+              "-DSHIM_PROCESS=${{ matrix.process }}" \
               "-DSHIM_VERSION_STRING=${{ needs.plan.outputs.version }}"
 
       - name: Build
@@ -161,12 +170,12 @@ jobs:
           done
 
       - name: Package
-        run: .github/scripts/package.sh "${{ needs.plan.outputs.version }}" Windows-x64 build
+        run: .github/scripts/package.sh "${{ needs.plan.outputs.version }}" "${{ matrix.target }}" build
 
       - name: Upload the archive
         uses: actions/upload-artifact@v4
         with:
-          name: shim-Windows-x64
+          name: shim-${{ matrix.target }}
           path: dist/
 
   release:

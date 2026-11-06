@@ -49,15 +49,31 @@ public class File implements Serializable, Comparable<File> {
   private static final int kPermissionWrite = 02;
   private static final int kPermissionExecute = 01;
 
+  private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
+
   private final String path;
 
   private transient int prefixLength;
+
+  // 1 for a leading slash, 3 for a Windows drive such as C:/, 0 for a relative path
+  private static int prefixOf(String p) {
+    if (p.startsWith("/")) {
+      return 1;
+    }
+    if (WINDOWS && p.length() >= 3 && p.charAt(1) == ':' && p.charAt(2) == '/' && Character.isLetter(p.charAt(0))) {
+      return 3;
+    }
+    return 0;
+  }
 
   int getPrefixLength() {
     return prefixLength;
   }
 
   private static String normalize(String pathname) {
+    if (WINDOWS) {
+      pathname = pathname.replace('\\', '/');
+    }
     int n = pathname.length();
     char prev = 0;
     for (int i = 0; i < n; i++) {
@@ -84,6 +100,9 @@ public class File implements Serializable, Comparable<File> {
     if (n == 0) {
       return "/";
     }
+    if (n == 2 && prefixOf(pathname.substring(0, 2) + "/") == 3) {
+      n = 3;
+    }
     StringBuilder sb = new StringBuilder(pathname.length());
     if (off > 0) {
       sb.append(pathname, 0, off);
@@ -104,16 +123,11 @@ public class File implements Serializable, Comparable<File> {
     if (child.isEmpty()) {
       return parent;
     }
+    boolean rooted = parent.endsWith("/");
     if (child.charAt(0) == '/') {
-      if (parent.equals("/")) {
-        return child;
-      }
-      return parent + child;
+      return rooted ? parent + child.substring(1) : parent + child;
     }
-    if (parent.equals("/")) {
-      return parent + child;
-    }
-    return parent + '/' + child;
+    return rooted ? parent + child : parent + '/' + child;
   }
 
   private File(String pathname, int prefixLength) {
@@ -126,7 +140,7 @@ public class File implements Serializable, Comparable<File> {
       throw new NullPointerException();
     }
     this.path = normalize(pathname);
-    this.prefixLength = path.startsWith("/") ? 1 : 0;
+    this.prefixLength = prefixOf(path);
   }
 
   public File(String parent, String child) {
@@ -142,7 +156,7 @@ public class File implements Serializable, Comparable<File> {
     } else {
       this.path = normalize(child);
     }
-    this.prefixLength = path.startsWith("/") ? 1 : 0;
+    this.prefixLength = prefixOf(path);
   }
 
   public File(File parent, String child) {
@@ -158,7 +172,7 @@ public class File implements Serializable, Comparable<File> {
     } else {
       this.path = normalize(child);
     }
-    this.prefixLength = path.startsWith("/") ? 1 : 0;
+    this.prefixLength = prefixOf(path);
   }
 
   public File(URI uri) {
@@ -186,11 +200,14 @@ public class File implements Serializable, Comparable<File> {
     if (p.isEmpty()) {
       throw new IllegalArgumentException("URI path component is empty");
     }
+    if (WINDOWS && p.length() >= 3 && p.charAt(0) == '/' && p.charAt(2) == ':') {
+      p = p.substring(1);
+    }
     if (p.endsWith("/") && p.length() > 1) {
       p = p.substring(0, p.length() - 1);
     }
     this.path = normalize(p);
-    this.prefixLength = path.startsWith("/") ? 1 : 0;
+    this.prefixLength = prefixOf(path);
   }
 
   public String getName() {
@@ -241,7 +258,7 @@ public class File implements Serializable, Comparable<File> {
 
   public File getAbsoluteFile() {
     String absPath = getAbsolutePath();
-    return new File(absPath, absPath.startsWith("/") ? 1 : 0);
+    return new File(absPath, prefixOf(absPath));
   }
 
   public String getCanonicalPath() throws IOException {
@@ -253,7 +270,7 @@ public class File implements Serializable, Comparable<File> {
 
   public File getCanonicalFile() throws IOException {
     String canonPath = getCanonicalPath();
-    return new File(canonPath, canonPath.startsWith("/") ? 1 : 0);
+    return new File(canonPath, prefixOf(canonPath));
   }
 
   private static String canonicalize(String abs) {
@@ -273,17 +290,26 @@ public class File implements Serializable, Comparable<File> {
         break;
       }
       tail = p.substring(slash) + tail;
-      if (slash == 0) {
-        resolved = "";
+      if (slash == prefixOf(p) - 1) {
+        // up to the root, which is empty on Unix and C: on Windows
+        resolved = p.substring(0, slash);
         break;
       }
       p = p.substring(0, slash);
     }
-    String combined = (resolved.equals("/") ? "" : resolved) + tail;
+    if (resolved.endsWith("/")) {
+      resolved = resolved.substring(0, resolved.length() - 1);
+    }
+    String combined = resolved + tail;
     return collapse(combined.isEmpty() ? "/" : combined);
   }
 
   private static String collapse(String path) {
+    String drive = "";
+    if (prefixOf(path) == 3) {
+      drive = path.substring(0, 2);
+      path = path.substring(2);
+    }
     String[] parts = path.split("/");
     List<String> stack = new ArrayList<String>();
     for (String part : parts) {
@@ -299,9 +325,9 @@ public class File implements Serializable, Comparable<File> {
       stack.add(part);
     }
     if (stack.isEmpty()) {
-      return "/";
+      return drive + "/";
     }
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder(drive);
     for (String part : stack) {
       sb.append('/').append(part);
     }
@@ -728,6 +754,6 @@ public class File implements Serializable, Comparable<File> {
     } catch (ReflectiveOperationException e) {
       throw new InternalError(e);
     }
-    prefixLength = normalized.startsWith("/") ? 1 : 0;
+    prefixLength = prefixOf(normalized);
   }
 }
