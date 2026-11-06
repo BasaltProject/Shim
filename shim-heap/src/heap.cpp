@@ -1743,6 +1743,10 @@ inline void* copyTo(Context* c, Segment* s, void* o, unsigned size)
 {
   assertT(c, s->remaining() >= size);
   void* dst = s->allocate(size);
+  if (dst == 0) {
+    fprintf(stderr, "DIAG copyTo: size=%u capacity=%u position=%u limit=%llu count=%llu\n", size, s->capacity(), s->position(),
+            static_cast<unsigned long long>(c->limit), static_cast<unsigned long long>(c->count));
+  }
   c->client->copy(o, dst);
   return dst;
 }
