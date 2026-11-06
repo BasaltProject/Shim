@@ -160,9 +160,76 @@ jobs:
           name: shim-Windows-x64
           path: dist/
 
+  musl:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: Linux-musl-x64
+          - os: ubuntu-24.04-arm
+            target: Linux-musl-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test on Alpine
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          docker run --rm -e VERSION -e TARGET -v "$PWD:/src" -w /src alpine:3.22 sh -ec '
+            apk add --no-cache bash build-base clang cmake ninja openjdk17-jdk zlib-dev linux-headers file tar coreutils
+            export JAVA_HOME=/usr/lib/jvm/default-jvm
+            CC=clang CXX=clang++ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON \
+                -DSHIM_FRAME_POINTER=ON "-DSHIM_VERSION_STRING=$VERSION"
+            cmake --build build
+            ctest --test-dir build --output-on-failure
+            bash .github/scripts/package.sh "$VERSION" "$TARGET" build
+          '
+
+      - name: Upload the archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: shim-${{ matrix.target }}
+          path: dist/
+
+  freebsd:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        with:
+          release: '14.5'
+          envs: VERSION
+          cpu: 4
+          mem: 8192
+          prepare: pkg install -y bash cmake ninja openjdk17
+          run: |
+            set -eu
+            export JAVA_HOME=/usr/local/openjdk17
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON "-DSHIM_VERSION_STRING=$VERSION"
+            cmake --build build
+            ctest --test-dir build --output-on-failure
+            bash .github/scripts/package.sh "$VERSION" FreeBSD-x64 build
+
+      - name: Upload the archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: shim-FreeBSD-x64
+          path: dist/
+
   release:
     if: ${{ github.event_name == 'push' }}
-    needs: [plan, build, windows]
+    needs: [plan, build, windows, musl, freebsd]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
