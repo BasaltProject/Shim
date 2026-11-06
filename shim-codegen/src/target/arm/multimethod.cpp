@@ -106,7 +106,7 @@ void populateTables(ArchitectureContext* con)
 
   bo[index(con, lir::MoveZ, R, R)] = CAST2(moveZRR);
   bo[index(con, lir::MoveZ, M, R)] = CAST2(moveZMR);
-  bo[index(con, lir::MoveZ, C, R)] = CAST2(moveCR);
+  bo[index(con, lir::MoveZ, C, R)] = CAST2(moveZCR);
 
   bo[index(con, lir::Negate, R, R)] = CAST2(negateRR);
 

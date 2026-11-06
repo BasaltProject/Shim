@@ -152,6 +152,12 @@ void moveCR(Context* con,
             unsigned,
             lir::RegisterPair* dst);
 
+void moveZCR(Context* con,
+             unsigned size,
+             lir::Constant* src,
+             unsigned dstSize,
+             lir::RegisterPair* dst);
+
 void moveCR2(Context* con,
              unsigned size,
              lir::Constant* src,

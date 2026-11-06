@@ -708,14 +708,48 @@ void moveCR2(Context* c,
   }
 }
 
+// Loads a constant that was written with `size` bytes into a register of `dstSize` bytes.
+// A Move widens it with its sign and a MoveZ with zeros, so the bits above `size` must follow.
+static void moveWidenedCR(Context* c,
+                          unsigned size,
+                          lir::Constant* src,
+                          unsigned dstSize,
+                          lir::RegisterPair* dst,
+                          bool signExtend)
+{
+  unsigned width = dstSize > size ? dstSize : size;
+  if (size < 8 and src->value->resolved()) {
+    int64_t v = src->value->value();
+    int64_t widened;
+    switch (size) {
+    case 1: widened = signExtend ? static_cast<int64_t>(static_cast<int8_t>(v)) : static_cast<int64_t>(static_cast<uint8_t>(v)); break;
+    case 2: widened = signExtend ? static_cast<int64_t>(static_cast<int16_t>(v)) : static_cast<int64_t>(static_cast<uint16_t>(v)); break;
+    default: widened = signExtend ? static_cast<int64_t>(static_cast<int32_t>(v)) : static_cast<int64_t>(static_cast<uint32_t>(v)); break;
+    }
+    ResolvedPromise promise(widened);
+    lir::Constant constant(&promise);
+    moveCR2(c, width, &constant, dst, 0);
+    return;
+  }
+  moveCR2(c, width, src, dst, 0);
+}
+
 void moveCR(Context* c,
             unsigned size,
             lir::Constant* src,
             unsigned dstSize,
             lir::RegisterPair* dst)
 {
-  // A negative int widened to a long must fill the whole register, not just its low half
-  moveCR2(c, dstSize > size ? dstSize : size, src, dst, 0);
+  moveWidenedCR(c, size, src, dstSize, dst, true);
+}
+
+void moveZCR(Context* c,
+             unsigned size,
+             lir::Constant* src,
+             unsigned dstSize,
+             lir::RegisterPair* dst)
+{
+  moveWidenedCR(c, size, src, dstSize, dst, false);
 }
 
 void addR(Context* c,
