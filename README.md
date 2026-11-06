@@ -58,7 +58,7 @@ Java 25 conformance is still in progress.
 | `shim-util/` | Shared native utilities |
 | `shim-tools/` | Type generation, object writing and binary embedding tools |
 | `shim-tests/` | Native unit tests and Java compatibility tests |
-| `cmake/` | Build configuration and GNU Make rules |
+| `cmake/` | Build configuration |
 | `tools/` | Test runner and debugging support |
 | `docs/` | Documentation, upstream reference and license notices |
 
@@ -66,8 +66,26 @@ Native modules keep headers in `include/shim/` and implementations in `src/`.
 The class library lives in `shim-classpath/java/`; its native methods live in
 `shim-classpath/src/`.
 
-CMake builds the native support libraries, tools and unit tests. GNU Make builds
-the complete VM through the root `GNUmakefile` and `cmake/LegacyMake.mk`.
+CMake builds everything: the VM (`libjvm`, `libshim.a`, the `shim` executables),
+`classpath.jar`, the tools and the tests. It needs CMake 3.28 or newer, Clang and a
+JDK (set `JAVA_HOME`, or `-DSHIM_JAVA_HOME=<jdk>`) for `javac` and the JNI headers.
+
+```bash
+cmake -S . -B build -G Ninja
+cmake --build build
+ctest --test-dir build
+```
+
+| Option | Default | Effect |
+|---|---|---|
+| `SHIM_PROCESS` | `compile` (`interpret` on Apple Silicon) | JIT compiler or interpreter |
+| `SHIM_MODE` | `fast` | `debug`, `debug-fast`, `fast`, `stress`, `stress-major` or `small` |
+| `SHIM_FRAME_POINTER` | `OFF` | Keep frame pointers so native stacks can be walked |
+| `SHIM_TAILS`, `SHIM_CONTINUATIONS` | `OFF` | Tail calls and continuations (x86 only) |
+| `SHIM_LTO` | `OFF` | Link time optimization |
+| `SHIM_WERROR` | `OFF` | Warnings as errors |
+
+Linux, macOS and FreeBSD on x86_64, i386, arm and arm64 are supported.
 
 ## License
 
