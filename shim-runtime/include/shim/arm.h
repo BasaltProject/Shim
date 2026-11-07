@@ -69,6 +69,11 @@
 #define STACK_REGISTER(context) (context->uc_mcontext.cpu.gpr[ARM_REG_SP])
 #define THREAD_REGISTER(context) (context->uc_mcontext.cpu.gpr[ARM_REG_IP])
 #define LINK_REGISTER(context) (context->uc_mcontext.cpu.gpr[ARM_REG_LR])
+#elif(defined __FreeBSD__) && (defined ARCH_arm64)
+#define IP_REGISTER(context) (context->uc_mcontext.mc_gpregs.gp_elr)
+#define STACK_REGISTER(context) (context->uc_mcontext.mc_gpregs.gp_sp)
+#define THREAD_REGISTER(context) (context->uc_mcontext.mc_gpregs.gp_x[19])
+#define LINK_REGISTER(context) (context->uc_mcontext.mc_gpregs.gp_lr)
 #else
 #ifdef ARCH_arm
 #define IP_REGISTER(context) (context->uc_mcontext.arm_pc)

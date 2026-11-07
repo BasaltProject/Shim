@@ -42,6 +42,7 @@ namespace {
 #define IMAGE_FILE_MACHINE_ARM 0x01c0    // ARM Little-Endian
 #define IMAGE_FILE_MACHINE_THUMB 0x01c2  // ARM Thumb/Thumb-2 Little-Endian
 #define IMAGE_FILE_MACHINE_ARMNT 0x01c4  // ARM Thumb-2 Little-Endian
+#define IMAGE_FILE_MACHINE_ARM64 0xaa64  // ARM64 Little-Endian
 #define IMAGE_FILE_32BIT_MACHINE 0x0100  // 32 bit word machine.
 
 #define IMAGE_SCN_ALIGN_1BYTES 0x100000
@@ -240,6 +241,9 @@ class WindowsPlatform : public Platform {
     } else if (Architecture == PlatformInfo::Arm) {
       machine = IMAGE_FILE_MACHINE_ARMNT;
       machineMask = IMAGE_FILE_32BIT_MACHINE;
+    } else if (Architecture == PlatformInfo::Arm64) {
+      machine = IMAGE_FILE_MACHINE_ARM64;
+      machineMask = 0;
     }
 
     int sectionMask;
@@ -306,6 +310,7 @@ class WindowsPlatform : public Platform {
 
 WindowsPlatform<4, PlatformInfo::x86> windows32Platform;
 WindowsPlatform<8, PlatformInfo::x86_64> windows64Platform;
+WindowsPlatform<8, PlatformInfo::Arm64> windowsArm64Platform;
 WindowsPlatform<4, PlatformInfo::Arm>
     windowsRtPlatform;  // Windows Phone 8 and Windows RT
 

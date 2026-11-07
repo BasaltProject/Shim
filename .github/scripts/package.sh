@@ -8,8 +8,9 @@ target="${2:?target}"
 build="${3:?build dir}"
 name="shim-$version-$target"
 
-lib="$(compgen -G "$build/libjvm.*" | head -1)"
+lib="$(compgen -G "$build/libjvm.*" || compgen -G "$build/jvm.dll")"
+exe="$(compgen -G "$build/shim" || compgen -G "$build/shim.exe")"
 stage="$(mktemp -d)/$name"
 mkdir -p "$stage" dist
-cp "$build/shim" "$lib" "$build/classpath.jar" LICENSE LICENSE.txt "$stage"/
+cp "$exe" "$lib" "$build/classpath.jar" LICENSE LICENSE.txt "$stage"/
 tar -C "$(dirname "$stage")" -czf "dist/$name.tar.gz" "$name"

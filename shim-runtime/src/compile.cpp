@@ -21,7 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
-#if defined(__linux__) && __has_include(<execinfo.h>)
+#if defined(__linux__) && !defined(__ANDROID__) && __has_include(<execinfo.h>)
 #define SHIM_NATIVE_BACKTRACE 1
 #include <execinfo.h>
 #include <dlfcn.h>

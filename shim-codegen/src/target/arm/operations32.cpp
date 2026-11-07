@@ -348,6 +348,15 @@ void moveCR(Context* con,
   moveCR2(con, size, src, dst, 0);
 }
 
+void moveZCR(Context* con,
+             unsigned size,
+             lir::Constant* src,
+             unsigned dstSize,
+             lir::RegisterPair* dst)
+{
+  moveCR(con, size, src, dstSize, dst);
+}
+
 void addR(Context* con,
           unsigned size,
           lir::RegisterPair* a,

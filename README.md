@@ -50,7 +50,7 @@ Java 25 conformance is still in progress.
 
 Every push to `main` publishes a release named `<year>.<n>` (for example `26.5`), where `n` counts
 the releases of that year and starts over in January. Each one carries a
-`shim-<version>-<platform>.tar.gz` for Linux x64, Linux arm64, macOS x64 and macOS arm64, holding the `shim` executable, `libjvm`, `classpath.jar` and the licenses, plus a
+`shim-<version>-<platform>.tar.gz` for Linux (glibc and musl), Windows, macOS, FreeBSD and Android, each on x64 and arm64, holding the `shim` executable, `libjvm`, `classpath.jar` and the licenses, plus a
 `SHA256SUMS` file.
 
 ## Project layout
@@ -92,7 +92,7 @@ ctest --test-dir build
 | `SHIM_LTO` | `OFF` | Link time optimization |
 | `SHIM_WERROR` | `OFF` | Warnings as errors |
 
-Linux, macOS and FreeBSD on x86_64, i386, arm and arm64 are supported.
+Linux (glibc and musl), Android, macOS, Windows (MinGW-w64 toolchain, not MSVC) and FreeBSD are supported on x64 and arm64; CI builds and tests all twelve targets.
 
 ## License
 

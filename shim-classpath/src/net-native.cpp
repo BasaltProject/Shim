@@ -39,6 +39,11 @@ typedef SOCKET NetHandle;
 #endif
 typedef int NetLen;
 typedef char NetOptVal;
+// Winsock shares one set of path MTU values between IPv4 and IPv6
+#ifndef IPV6_PMTUDISC_DO
+#define IPV6_PMTUDISC_DO IP_PMTUDISC_DO
+#define IPV6_PMTUDISC_DONT IP_PMTUDISC_DONT
+#endif
 #else
 #include <arpa/inet.h>
 #include <errno.h>

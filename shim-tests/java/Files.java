@@ -108,7 +108,7 @@ public class Files {
     }
 
     if(IsWindows) {
-      expect(new File("/c:\\test").getPath().equals("c:\\test"));
+      expect(new File("/c:\\test").getPath().equals("c:/test"));
     } else {
       expect(new File("/c:\\test").getPath().equals("/c:\\test"));
     }

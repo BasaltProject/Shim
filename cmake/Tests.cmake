@@ -39,7 +39,7 @@ target_link_libraries(shim_test_library PRIVATE shim_target shim_link)
 # javac reads one quoted path per line, so folders with spaces survive
 foreach(_list _test_all_sources _test_extra)
     set(_quoted ${${_list}})
-    list(TRANSFORM _quoted REPLACE "^(.*)$" "\"\\1\"")
+    list(TRANSFORM _quoted REPLACE "^(.+)$" "\"\\1\"")
     list(JOIN _quoted "\n" ${_list}_args)
 endforeach()
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/test-sources.args" CONTENT "${_test_all_sources_args}\n")
@@ -60,4 +60,11 @@ add_custom_command(
     VERBATIM)
 add_custom_target(shim_test_classes ALL DEPENDS "${CMAKE_BINARY_DIR}/test.stamp")
 
-add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure DEPENDS shim_unittest)
+# Java programs that run to completion on the built VM and exit 0
+foreach(_name Hello ArraysTest Strings Exceptions Collections Floats Integers Longs Misc Enums FormatStrings
+        Dates Files Proxies Reflection Zip Threads GC InvokeDynamic Initializers Subroutine Trace Widening)
+    add_test(NAME shim_java_${_name} COMMAND shim_exe -cp "${SHIM_TEST_CLASSES_DIR}" ${_name})
+    set_tests_properties(shim_java_${_name} PROPERTIES TIMEOUT 120 WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+endforeach()
+
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure DEPENDS shim_unittest shim_exe shim_test_classes)

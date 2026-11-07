@@ -23,6 +23,9 @@
 
 #include "windows.h"
 #include "sys/timeb.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef _MSC_VER
 #define FTIME _ftime_s
@@ -47,6 +50,9 @@
 
 namespace shim {
 namespace system {
+
+// Set by the heap, which backs its reservation with memory committed on first touch
+extern "C" bool (*shimLazyCommitHook)(uintptr_t) = 0;
 
 namespace windows {
 
@@ -186,6 +192,11 @@ void logException(LPEXCEPTION_POINTERS e, const char* directory)
     void* base = reinterpret_cast<void*>(e->ContextRecord->Rbp);
     void* stack = reinterpret_cast<void*>(e->ContextRecord->Rsp);
     void* thread = reinterpret_cast<void*>(e->ContextRecord->Rbx);
+#elif defined ARCH_arm64
+    void* ip = reinterpret_cast<void*>(e->ContextRecord->Pc);
+    void* base = reinterpret_cast<void*>(e->ContextRecord->Fp);
+    void* stack = reinterpret_cast<void*>(e->ContextRecord->Sp);
+    void* thread = reinterpret_cast<void*>(e->ContextRecord->X19);
 #endif
 
     HMODULE module;
@@ -214,8 +225,40 @@ void logException(LPEXCEPTION_POINTERS e, const char* directory)
   }
 }
 
+// SHIM_CRASH_STACK=1 lists the stack words that point into a loaded module, innermost first
+void printStackWords(LPEXCEPTION_POINTERS e)
+{
+#ifdef ARCH_x86_64
+  const uintptr_t* sp = reinterpret_cast<const uintptr_t*>(e->ContextRecord->Rsp);
+  const uintptr_t* top = reinterpret_cast<const uintptr_t*>(reinterpret_cast<NT_TIB*>(NtCurrentTeb())->StackBase);
+  fprintf(stderr, "crash: code=%lx at %p\n", static_cast<unsigned long>(e->ExceptionRecord->ExceptionCode),
+          e->ExceptionRecord->ExceptionAddress);
+  for (unsigned i = 0; sp + i < top && i < 512; ++i) {
+    HMODULE module;
+    if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          reinterpret_cast<LPCSTR>(sp[i]),
+                          &module)) {
+      char name[MAX_PATH];
+      GetModuleFileNameA(module, name, sizeof(name));
+      const char* base = strrchr(name, '\\');
+      fprintf(stderr, "crash stack[%u] %s+0x%llx\n", i, base ? base + 1 : name,
+              static_cast<unsigned long long>(sp[i] - reinterpret_cast<uintptr_t>(module)));
+    }
+  }
+  fflush(stderr);
+#else
+  (void) e;
+#endif
+}
+
 LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
 {
+  if (shimLazyCommitHook and e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION
+      and e->ExceptionRecord->NumberParameters >= 2
+      and shimLazyCommitHook(static_cast<uintptr_t>(e->ExceptionRecord->ExceptionInformation[1]))) {
+    return EXCEPTION_CONTINUE_EXECUTION;
+  }
+
   SignalRegistrar::Handler* handler = 0;
   if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
     handler
@@ -237,6 +280,11 @@ LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
     void* base = reinterpret_cast<void*>(e->ContextRecord->Rbp);
     void* stack = reinterpret_cast<void*>(e->ContextRecord->Rsp);
     void* thread = reinterpret_cast<void*>(e->ContextRecord->Rbx);
+#elif defined ARCH_arm64
+    void* ip = reinterpret_cast<void*>(e->ContextRecord->Pc);
+    void* base = reinterpret_cast<void*>(e->ContextRecord->Fp);
+    void* stack = reinterpret_cast<void*>(e->ContextRecord->Sp);
+    void* thread = reinterpret_cast<void*>(e->ContextRecord->X19);
 #endif
 
     bool jump = handler->handleSignal(&ip, &base, &stack, &thread);
@@ -252,10 +300,19 @@ LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
       e->ContextRecord->Rbp = reinterpret_cast<DWORD64>(base);
       e->ContextRecord->Rsp = reinterpret_cast<DWORD64>(stack);
       e->ContextRecord->Rbx = reinterpret_cast<DWORD64>(thread);
+#elif defined ARCH_arm64
+      e->ContextRecord->Pc = reinterpret_cast<DWORD64>(ip);
+      e->ContextRecord->Fp = reinterpret_cast<DWORD64>(base);
+      e->ContextRecord->Sp = reinterpret_cast<DWORD64>(stack);
+      e->ContextRecord->X19 = reinterpret_cast<DWORD64>(thread);
 #endif
 
       return EXCEPTION_CONTINUE_EXECUTION;
-    } else if (SignalRegistrar::Data::instance->crashDumpDirectory) {
+    }
+    if (getenv("SHIM_CRASH_STACK")) {
+      printStackWords(e);
+    }
+    if (SignalRegistrar::Data::instance->crashDumpDirectory) {
       // We only generate a crash dump if exception occurred in code
       // belonging to the current executable.  If the exception
       // occurred in a library, there may be a handler available to
@@ -276,6 +333,24 @@ LONG CALLBACK handleException(LPEXCEPTION_POINTERS e)
 
   return EXCEPTION_CONTINUE_SEARCH;
 }
+
+LONG CALLBACK printCrashStack(LPEXCEPTION_POINTERS e)
+{
+  if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+    printStackWords(e);
+  }
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// The interpreter registers no handlers of its own, so this one is installed on load
+struct CrashStackInstaller {
+  CrashStackInstaller()
+  {
+    if (getenv("SHIM_CRASH_STACK")) {
+      AddVectoredExceptionHandler(0, printCrashStack);
+    }
+  }
+} crashStackInstaller;
 
 }  // namespace windows
 
