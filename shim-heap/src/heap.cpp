@@ -50,12 +50,22 @@
 #if defined(__LP64__) || defined(_LP64)
 #define SHIM_HEAP_PARALLEL 1
 #endif
+#elif defined(_WIN32)
+#include <windows.h>
+#define SHIM_HEAP_RESERVE 1
+extern "C" bool (*shimLazyCommitHook)(uintptr_t);
 #endif
 
 using namespace vm;
 using namespace shim::util;
 
 namespace {
+
+// __builtin_ctzl takes a 32 bit long on Windows, so a mark word needs the width of the pointer
+inline unsigned countTrailingZeros(uintptr_t v)
+{
+  return sizeof(uintptr_t) == 8 ? __builtin_ctzll(v) : __builtin_ctz(static_cast<unsigned>(v));
+}
 
 namespace local {
 
@@ -1063,6 +1073,96 @@ inline void initNextGen2(Context* c)
 
 
 #ifdef SHIM_HEAP_RESERVE
+#ifdef _WIN32
+// Windows has no lazily backed mapping, so the range is only reserved and a handler commits
+// each piece the first time it is touched. A piece comes back zeroed, as a fresh mmap does.
+const size_t CommitChunk = 256 * 1024;
+const unsigned MaxReservations = 16;
+
+struct ReservedRange {
+  volatile uintptr_t begin;
+  volatile uintptr_t end;
+};
+
+ReservedRange reservedRanges[MaxReservations];
+
+bool commitReserved(uintptr_t address)
+{
+  for (unsigned i = 0; i < MaxReservations; ++i) {
+    uintptr_t begin = reservedRanges[i].begin;
+    uintptr_t end = reservedRanges[i].end;
+    if (address >= begin and address < end) {
+      uintptr_t from = address & ~(CommitChunk - 1);
+      if (from < begin) {
+        from = begin;
+      }
+      uintptr_t to = from + CommitChunk;
+      if (to > end) {
+        to = end;
+      }
+      return VirtualAlloc(reinterpret_cast<void*>(from), to - from, MEM_COMMIT, PAGE_READWRITE) != 0;
+    }
+  }
+  return false;
+}
+
+LONG CALLBACK commitOnTouch(PEXCEPTION_POINTERS e)
+{
+  if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION
+      and e->ExceptionRecord->NumberParameters >= 2
+      and commitReserved(static_cast<uintptr_t>(e->ExceptionRecord->ExceptionInformation[1]))) {
+    return EXCEPTION_CONTINUE_EXECUTION;
+  }
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void* mapZeroed(size_t bytes)
+{
+  static bool installed = false;
+  if (not installed) {
+    // The VM's own fault handler asks the hook first, so it never mistakes a lazy commit for a crash
+    shimLazyCommitHook = commitReserved;
+    AddVectoredExceptionHandler(1, commitOnTouch);
+    installed = true;
+  }
+  void* p = VirtualAlloc(0, bytes, MEM_RESERVE, PAGE_READWRITE);
+  if (p == 0) {
+    return 0;
+  }
+  for (unsigned i = 0; i < MaxReservations; ++i) {
+    if (reservedRanges[i].begin == 0) {
+      reservedRanges[i].end = reinterpret_cast<uintptr_t>(p) + bytes;
+      reservedRanges[i].begin = reinterpret_cast<uintptr_t>(p);
+      return p;
+    }
+  }
+  VirtualFree(p, 0, MEM_RELEASE);
+  return 0;
+}
+
+void releaseMemory(void* p, size_t bytes)
+{
+  VirtualFree(p, bytes, MEM_DECOMMIT);
+}
+
+void unmapMemory(void* p, size_t)
+{
+  for (unsigned i = 0; i < MaxReservations; ++i) {
+    if (reservedRanges[i].begin == reinterpret_cast<uintptr_t>(p)) {
+      reservedRanges[i].begin = 0;
+      reservedRanges[i].end = 0;
+    }
+  }
+  VirtualFree(p, 0, MEM_RELEASE);
+}
+
+uintptr_t osPageSize()
+{
+  SYSTEM_INFO info;
+  GetSystemInfo(&info);
+  return info.dwPageSize;
+}
+#else
 void* mapZeroed(size_t bytes)
 {
   void* p = mmap(0,
@@ -1082,6 +1182,18 @@ void releaseMemory(void* p, size_t bytes)
   madvise(p, bytes, MADV_FREE);
 #endif
 }
+
+void unmapMemory(void* p, size_t bytes)
+{
+  munmap(p, bytes);
+}
+
+uintptr_t osPageSize()
+{
+  const long page = sysconf(_SC_PAGESIZE);
+  return page > 0 ? static_cast<uintptr_t>(page) : 0;
+}
+#endif
 #endif
 
 bool reserveGen2(Context* c)
@@ -1117,11 +1229,11 @@ bool reserveGen2(Context* c)
     }
     void* bits = mapZeroed(markBytes * 2);
     if (bits == 0) {
-      munmap(memory, total);
+      unmapMemory(memory, total);
       continue;
     }
 
-#ifdef MADV_NOHUGEPAGE
+#if defined(MADV_NOHUGEPAGE) && !defined(_WIN32)
     if (getenv("SHIM_GC_NOHUGEPAGE")) {
       madvise(memory, total, MADV_NOHUGEPAGE);
       madvise(bits, markBytes * 2, MADV_NOHUGEPAGE);
@@ -1153,8 +1265,8 @@ void releaseGen2(Context* c)
 {
 #ifdef SHIM_HEAP_RESERVE
   if (c->reservation) {
-    munmap(c->reservation, c->reservationBytes);
-    munmap(c->markBits, c->markBitsBytes);
+    unmapMemory(c->reservation, c->reservationBytes);
+    unmapMemory(c->markBits, c->markBitsBytes);
     c->reservation = 0;
     c->markBits = 0;
     c->freshBits = 0;
@@ -1383,7 +1495,7 @@ void sweepChunk(SweepJob* j, unsigned chunk)
   for (unsigned w = lo; w < hi; ++w) {
     uintptr_t bits = c->markBits[w];
     while (bits) {
-      unsigned bit = __builtin_ctzl(bits);
+      unsigned bit = countTrailingZeros(bits);
       bits &= bits - 1;
       unsigned start = indexOf(w, bit);
       if (not part->any) {
@@ -1489,7 +1601,7 @@ void sweepGen2(Context* c)
     for (unsigned w = 0; w < markWords; ++w) {
       uintptr_t bits = c->markBits[w];
       while (bits) {
-        unsigned bit = __builtin_ctzl(bits);
+        unsigned bit = countTrailingZeros(bits);
         bits &= bits - 1;
         unsigned start = indexOf(w, bit);
         if (start > previousEnd and start - previousEnd >= MinimumSpanInWords) {
@@ -1511,8 +1623,7 @@ void sweepGen2(Context* c)
   // madvise operates on OS pages, not the logical 4 KiB GC map granule.
   // Apple Silicon uses 16 KiB pages: advising a partial last page can discard
   // a live neighbour outside the free span when the kernel rounds the range.
-  const long nativePage = sysconf(_SC_PAGESIZE);
-  const uintptr_t page = nativePage > 0 ? static_cast<uintptr_t>(nativePage) : 0;
+  const uintptr_t page = osPageSize();
   const unsigned minimumWords = ReleaseSpanInBytes / BytesPerWord;
 
   for (unsigned i = 0; i < c->spanCount; ++i) {
@@ -1582,8 +1693,8 @@ void releaseRetired(Context* c)
 {
 #ifdef SHIM_HEAP_RESERVE
   if (c->retiredMemory) {
-    munmap(c->retiredMemory, c->retiredBytes);
-    munmap(c->markBits, c->markBitsBytes);
+    unmapMemory(c->retiredMemory, c->retiredBytes);
+    unmapMemory(c->markBits, c->markBitsBytes);
     c->retiredMemory = 0;
     c->markBits = 0;
     c->freshBits = 0;

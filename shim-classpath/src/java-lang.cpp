@@ -122,6 +122,16 @@ void add(JNIEnv* e, jobjectArray array, unsigned index, const char* format, ...)
 
 #ifdef PLATFORM_WINDOWS
 
+// Java sees Windows paths with forward slashes only
+void slashes(WCHAR* path)
+{
+  for (; *path; ++path) {
+    if (*path == L'\\') {
+      *path = L'/';
+    }
+  }
+}
+
 void add(JNIEnv* e,
          jobjectArray array,
          unsigned index,
@@ -1073,7 +1083,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
       array, index++, e->NewStringUTF("line.separator=\r\n"));
 
   e->SetObjectArrayElement(
-      array, index++, e->NewStringUTF("file.separator=\\"));
+      array, index++, e->NewStringUTF("file.separator=/"));
 
   e->SetObjectArrayElement(array, index++, e->NewStringUTF("path.separator=;"));
 
@@ -1114,6 +1124,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
   {
     WCHAR buffer[MAX_PATH];
     GetTempPathW(MAX_PATH, buffer);
+    slashes(buffer);
     add(e, array, index++, L"java.io.tmpdir=%ls", buffer);
   }
 
@@ -1130,6 +1141,7 @@ extern "C" JNIEXPORT jobjectArray JNICALL
   {
     WCHAR buffer[MAX_PATH];
     GetCurrentDirectoryW(MAX_PATH, buffer);
+    slashes(buffer);
     add(e, array, index++, L"user.dir=%ls", buffer);
   }
 

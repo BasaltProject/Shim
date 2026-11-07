@@ -34,7 +34,7 @@ extern "C" void __cxa_pure_virtual(void)
 
 #ifdef BOOT_IMAGE
 
-#if (!defined __x86_64__) && ((defined __MINGW32__) || (defined _MSC_VER))
+#if (!defined __x86_64__) && (!defined __aarch64__) && ((defined __MINGW32__) || (defined _MSC_VER))
 #define BOOTIMAGE_SYMBOL(x) binary_bootimage_bin_##x
 #define CODEIMAGE_SYMBOL(x) binary_codeimage_bin_##x
 #else
@@ -68,7 +68,7 @@ SHIM_EXPORT const uint8_t* codeimageBin(size_t* size)
 
 #ifdef BOOT_CLASSPATH
 
-#if (!defined __x86_64__) && ((defined __MINGW32__) || (defined _MSC_VER))
+#if (!defined __x86_64__) && (!defined __aarch64__) && ((defined __MINGW32__) || (defined _MSC_VER))
 #define SYMBOL(x) binary_classpath_jar_##x
 #else
 #define SYMBOL(x) _binary_classpath_jar_##x

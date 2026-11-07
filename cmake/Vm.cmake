@@ -14,13 +14,13 @@ set(_codegen "${CMAKE_SOURCE_DIR}/shim-codegen/src")
 set(_system "${CMAKE_SOURCE_DIR}/shim-system/src")
 set(_classpath_native "${CMAKE_SOURCE_DIR}/shim-classpath/src")
 
-file(GLOB _system_posix CONFIGURE_DEPENDS "${_system}/posix/*.cpp")
+file(GLOB _system_os CONFIGURE_DEPENDS "${_system}/${SHIM_SYSTEM}/*.cpp")
 file(GLOB _jni_sources CONFIGURE_DEPENDS "${_classpath_native}/*.cpp")
 file(GLOB _compiler_parts CONFIGURE_DEPENDS "${_codegen}/compiler/*.cpp")
 file(GLOB _assembler_sources CONFIGURE_DEPENDS "${_codegen}/target/${SHIM_ASSEMBLER}/*.cpp")
 
 set(_vm_sources
-    "${_system}/posix.cpp" ${_system_posix}
+    "${_system}/${SHIM_SYSTEM}.cpp" ${_system_os}
     "${_runtime}/finder.cpp" "${_runtime}/machine.cpp" "${_runtime}/bootstrap.cpp"
     "${_runtime}/verify.cpp" "${_runtime}/verify-stack.cpp" "${_runtime}/verify-maps.cpp"
     "${_runtime}/util.cpp" "${CMAKE_SOURCE_DIR}/shim-heap/src/heap.cpp"
@@ -74,7 +74,7 @@ add_executable(shim_dynamic "${_runtime}/main.cpp")
 set_target_properties(shim_dynamic PROPERTIES OUTPUT_NAME shim-dynamic)
 target_compile_definitions(shim_dynamic PRIVATE BOOT_LIBRARY="${CMAKE_SHARED_LIBRARY_PREFIX}jvm${CMAKE_SHARED_LIBRARY_SUFFIX}")
 target_link_libraries(shim_dynamic PRIVATE shim_target shim_link shim_jvm)
-if(NOT APPLE)
+if(NOT APPLE AND NOT WIN32)
     set_target_properties(shim_dynamic PROPERTIES BUILD_RPATH "\$ORIGIN" INSTALL_RPATH "\$ORIGIN")
 endif()
 add_dependencies(shim_dynamic shim_generated)

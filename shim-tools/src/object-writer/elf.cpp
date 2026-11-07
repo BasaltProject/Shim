@@ -385,6 +385,12 @@ class ElfPlatform : public Platform {
     // for some reason, string tables require a null first element...
     symbolStringTable.add("");
 
+    // Symbol 0 is the null symbol, and sh_info names the first symbol that is not local
+    Symbol nullSymbol;
+    memset(&nullSymbol, 0, sizeof(Symbol));
+    symbolTable.write(&nullSymbol, sizeof(Symbol));
+    sections[4].header.sh_info = V4(1);
+
     for (SymbolInfo* sym = symbols.begin(); sym != symbols.end(); sym++) {
       size_t nameOffset = symbolStringTable.add(sym->name);
 

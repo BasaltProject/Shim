@@ -89,7 +89,7 @@ jint publish(JNIEnv* e, jlongArray out, const struct stat& st, jlong birthSec, j
   return 0;
 }
 
-#if defined(__linux__) && defined(STATX_BTIME)
+#if defined(__linux__) && !defined(__ANDROID__) && defined(STATX_BTIME)
 jint statxFill(JNIEnv* e, jlongArray out, int dirfd, const char* path, int flags)
 {
   struct statx sx;
@@ -161,7 +161,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_statx(JNIEnv* e, jclass, j
   e->SetLongArrayRegion(out, 0, 16, v);
   return 0;
 #else
-#if defined(__linux__) && defined(STATX_BTIME)
+#if defined(__linux__) && !defined(__ANDROID__) && defined(STATX_BTIME)
   jint r = statxFill(e, out, AT_FDCWD, p.chars, (follow ? 0 : AT_SYMLINK_NOFOLLOW) | AT_STATX_SYNC_AS_STAT);
   if (r != -ENOSYS) {
     return r;
@@ -181,7 +181,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_fstatx(JNIEnv* e, jclass, 
 #ifdef PLATFORM_WINDOWS
   return -ENOSYS;
 #else
-#if defined(__linux__) && defined(STATX_BTIME)
+#if defined(__linux__) && !defined(__ANDROID__) && defined(STATX_BTIME)
   jint r = statxFill(e, out, fd, "", AT_EMPTY_PATH | AT_STATX_SYNC_AS_STAT);
   if (r != -ENOSYS) {
     return r;

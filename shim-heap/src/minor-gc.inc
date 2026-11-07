@@ -504,7 +504,7 @@ void scanRegion(Context* c, GcWorker* w, unsigned region)
   for (unsigned pw = wordOf(firstPage); pw < wordOf(firstPage + pagesPerRegion); ++pw) {
     uintptr_t pageBits = __atomic_load_n(pageData + pw, __ATOMIC_RELAXED);
     while (pageBits) {
-      unsigned pageBit = __builtin_ctzl(pageBits);
+      unsigned pageBit = countTrailingZeros(pageBits);
       pageBits &= pageBits - 1;
       unsigned page = indexOf(pw, pageBit);
       atomicClearBit(pageData, page);
@@ -514,7 +514,7 @@ void scanRegion(Context* c, GcWorker* w, unsigned region)
       for (unsigned lw = wordOf(firstPointer); lw < wordOf(firstPointer + pointersPerPage); ++lw) {
         uintptr_t bits = __atomic_load_n(pointerData + lw, __ATOMIC_RELAXED);
         while (bits) {
-          unsigned bit = __builtin_ctzl(bits);
+          unsigned bit = countTrailingZeros(bits);
           bits &= bits - 1;
           unsigned index = indexOf(lw, bit);
           atomicClearBit(pointerData, index);

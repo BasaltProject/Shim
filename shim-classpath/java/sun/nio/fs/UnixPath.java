@@ -38,7 +38,31 @@ final class UnixPath implements Path {
   }
 
   UnixPath(UnixFileSystem fs, String input) {
-    this(fs, encode(fs, normalizeAndCheck(input)));
+    this(fs, encode(fs, normalizeAndCheck(toInternal(input))));
+  }
+
+  private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
+
+  private static boolean isDrive(String s, int at) {
+    return s.length() >= at + 2 && s.charAt(at + 1) == ':' && Character.isLetter(s.charAt(at))
+        && (s.length() == at + 2 || s.charAt(at + 2) == '/');
+  }
+
+  // A Windows drive path C:/dir is kept as /C:/dir inside, so every Unix root rule keeps working.
+  static String toInternal(String input) {
+    if (!WINDOWS) {
+      return input;
+    }
+    input = input.replace('\\', '/');
+    return isDrive(input, 0) ? "/" + input : input;
+  }
+
+  // And shown the way Windows writes it
+  static String toExternal(String internal) {
+    if (WINDOWS && internal.startsWith("/") && isDrive(internal, 1)) {
+      return internal.length() == 3 ? internal.substring(1) + "/" : internal.substring(1);
+    }
+    return internal;
   }
 
   static String normalizeAndCheck(String input) {
@@ -650,7 +674,7 @@ final class UnixPath implements Path {
   @Override
   public String toString() {
     if (stringValue == null) {
-      stringValue = new String(path, StandardCharsets.UTF_8);
+      stringValue = toExternal(new String(path, StandardCharsets.UTF_8));
     }
     return stringValue;
   }

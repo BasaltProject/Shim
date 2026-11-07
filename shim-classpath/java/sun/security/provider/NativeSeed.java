@@ -16,7 +16,18 @@ final class NativeSeed {
   private NativeSeed() {
   }
 
+  private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
+
+  // The system generator on Windows, which has no random device to read
+  private static native boolean random0(byte[] out, int off, int len);
+
   static void read(String path, byte[] out, int off, int len) {
+    if (WINDOWS) {
+      if (!random0(out, off, len)) {
+        throw new ProviderException("nextBytes() failed");
+      }
+      return;
+    }
     try (FileInputStream in = new FileInputStream(path)) {
       int n = 0;
       while (n < len) {
