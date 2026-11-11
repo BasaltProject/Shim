@@ -43,7 +43,7 @@ public final class RegistryImpl_Stub extends RemoteStub implements Registry, Rem
         out.writeObject(name);
         out.writeObject(obj);
       } catch (java.io.IOException e) {
-        throw new java.rmi.MarshalException("error marshalling arguments", e);
+        throw e instanceof RemoteException ? (RemoteException) e : new java.rmi.MarshalException("error marshalling arguments", e);
       }
       ref.invoke(call);
       ref.done(call);
@@ -90,7 +90,7 @@ public final class RegistryImpl_Stub extends RemoteStub implements Registry, Rem
         java.io.ObjectOutput out = call.getOutputStream();
         out.writeObject(name);
       } catch (java.io.IOException e) {
-        throw new java.rmi.MarshalException("error marshalling arguments", e);
+        throw e instanceof RemoteException ? (RemoteException) e : new java.rmi.MarshalException("error marshalling arguments", e);
       }
       ref.invoke(call);
       Remote result;
@@ -124,7 +124,7 @@ public final class RegistryImpl_Stub extends RemoteStub implements Registry, Rem
         out.writeObject(name);
         out.writeObject(obj);
       } catch (java.io.IOException e) {
-        throw new java.rmi.MarshalException("error marshalling arguments", e);
+        throw e instanceof RemoteException ? (RemoteException) e : new java.rmi.MarshalException("error marshalling arguments", e);
       }
       ref.invoke(call);
       ref.done(call);
@@ -144,7 +144,7 @@ public final class RegistryImpl_Stub extends RemoteStub implements Registry, Rem
         java.io.ObjectOutput out = call.getOutputStream();
         out.writeObject(name);
       } catch (java.io.IOException e) {
-        throw new java.rmi.MarshalException("error marshalling arguments", e);
+        throw e instanceof RemoteException ? (RemoteException) e : new java.rmi.MarshalException("error marshalling arguments", e);
       }
       ref.invoke(call);
       ref.done(call);

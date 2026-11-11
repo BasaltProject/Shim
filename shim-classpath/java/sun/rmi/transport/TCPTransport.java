@@ -96,6 +96,7 @@ public final class TCPTransport {
     }
     if (l != null) {
       l.refs++;
+      retain();
       keyOut[0] = l.key;
       return l.socket.getLocalPort();
     }
@@ -107,6 +108,7 @@ public final class TCPTransport {
     }
     l = new Listener(ss, key);
     l.refs = 1;
+    retain();
     listeners.put(key, l);
     byPort.put(Integer.valueOf(ss.getLocalPort()), l);
     if (port == 0 && ssf == null) {
@@ -119,9 +121,37 @@ public final class TCPTransport {
         acceptLoop(fl);
       }
     }, "RMI TCP Accept-" + ss.getLocalPort());
-    t.setDaemon(false);
+    t.setDaemon(true);
     t.start();
     return ss.getLocalPort();
+  }
+
+  private static int exportedRefs;
+
+  private static void retain() {
+    if (exportedRefs++ == 0) {
+      Thread reaper = new Thread(new Runnable() {
+        public void run() {
+          synchronized (TCPTransport.class) {
+            while (exportedRefs > 0) {
+              try {
+                TCPTransport.class.wait();
+              } catch (InterruptedException e) {
+                return;
+              }
+            }
+          }
+        }
+      }, "RMI Reaper");
+      reaper.setDaemon(false);
+      reaper.start();
+    }
+  }
+
+  private static void releaseOne() {
+    if (--exportedRefs <= 0) {
+      TCPTransport.class.notifyAll();
+    }
   }
 
   public static synchronized void release(int port, Object key) {
@@ -132,7 +162,9 @@ public final class TCPTransport {
     if (l == null) {
       return;
     }
-    if (--l.refs <= 0) {
+    l.refs--;
+    releaseOne();
+    if (l.refs <= 0 && !Integer.valueOf(0).equals(l.key)) {
       l.closed = true;
       listeners.values().remove(l);
       byPort.values().remove(l);
@@ -321,7 +353,7 @@ public final class TCPTransport {
       Throwable e = thrown;
       if (e instanceof Error) {
         e = new ServerError("Error occurred in server thread", (Error) e);
-      } else if (e instanceof RemoteException) {
+      } else if (e instanceof RemoteException && !(e instanceof NoSuchObjectException)) {
         e = new ServerException("RemoteException occurred in server thread", (Exception) e);
       }
       out.writeByte(ExceptionalReturn);
