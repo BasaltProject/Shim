@@ -14,6 +14,8 @@ import java.util.List;
 
 final class TlsParams {
   static final String[] kSupportedProtocols = {"TLSv1.3", "TLSv1.2"};
+  static final String[] kLegacyProtocols = {"TLSv1.1", "TLSv1", "SSLv3", "SSLv2Hello"};
+  static final String[] kDatagramProtocols = {"DTLSv1.2", "DTLSv1.0"};
 
   private TlsParams() {
   }
@@ -28,13 +30,28 @@ final class TlsParams {
   }
 
   static String[] supportedProtocols() {
-    return kSupportedProtocols.clone();
+    String[] out = java.util.Arrays.copyOf(kSupportedProtocols, kSupportedProtocols.length + kLegacyProtocols.length);
+    System.arraycopy(kLegacyProtocols, 0, out, kSupportedProtocols.length, kLegacyProtocols.length);
+    return out;
+  }
+
+  static String[] supportedCipherSuites(boolean datagram) {
+    if (!datagram) {
+      return supportedCipherSuites();
+    }
+    List<String> out = new ArrayList<String>();
+    for (CipherSuite s : CipherSuite.all()) {
+      if (!s.tls13) {
+        out.add(s.name);
+      }
+    }
+    return out.toArray(new String[0]);
   }
 
   static List<Integer> versions(SslConfig cfg) {
     List<Integer> out = new ArrayList<Integer>();
     for (String p : cfg.protocols) {
-      int code = TlsConnection.enabledVersionCode(p);
+      int code = cfg.datagram ? "DTLSv1.2".equals(p) ? TlsConnection.kTls12 : 0 : TlsConnection.enabledVersionCode(p);
       if (code != 0) {
         out.add(code);
       }
@@ -85,7 +102,7 @@ final class TlsParams {
     return new ArrayList<SignatureScheme>(SignatureScheme.all());
   }
 
-  static void checkProtocols(String[] protocols) {
+  static void checkProtocols(String[] protocols, boolean datagram) {
     if (protocols == null) {
       throw new IllegalArgumentException("Protocols cannot be null");
     }
@@ -93,6 +110,12 @@ final class TlsParams {
       boolean ok = false;
       for (String s : kSupportedProtocols) {
         ok |= s.equals(p);
+      }
+      for (String s : kDatagramProtocols) {
+        ok |= datagram && s.equals(p);
+      }
+      for (String s : kLegacyProtocols) {
+        ok |= !datagram && s.equals(p);
       }
       if (!ok) {
         throw new IllegalArgumentException("Unsupported protocol: " + p);

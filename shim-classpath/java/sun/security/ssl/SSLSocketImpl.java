@@ -648,9 +648,12 @@ final class SSLSocketImpl extends SSLSocket {
 
   @Override
   public synchronized void setEnabledProtocols(String[] protocols) {
-    TlsParams.checkProtocols(protocols);
+    TlsParams.checkProtocols(protocols, false);
     cfg.protocols = protocols.clone();
+    protocolsCustom = true;
   }
+
+  private boolean protocolsCustom;
 
   @Override
   public SSLSession getSession() {
@@ -705,7 +708,9 @@ final class SSLSocketImpl extends SSLSocket {
       }
       if (cfg.clientMode != mode) {
         cfg.clientMode = mode;
-        cfg.protocols = context.enabledProtocols(mode);
+        if (!protocolsCustom) {
+          cfg.protocols = context.enabledProtocols(mode);
+        }
       }
     }
   }

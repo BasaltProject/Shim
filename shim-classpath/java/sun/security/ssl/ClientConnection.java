@@ -75,6 +75,8 @@ final class ClientConnection extends TlsConnection {
   private boolean offered12;
   private boolean sawHelloRetry;
   private byte[] cookie;
+  private byte[] dtlsCookie = new byte[0];
+  private boolean sawHelloVerify;
   private NamedGroup.KeyShareKeys keys;
   private NamedGroup keyShareGroup;
   private Tls13Schedule schedule;
@@ -154,7 +156,10 @@ final class ClientConnection extends TlsConnection {
 
   private void sendClientHello() throws SSLException {
     ByteWriter w = new ByteWriter();
-    w.u16(0x0303).bytes(clientRandom).vec8(legacySessionId);
+    w.u16(dtls ? 0xFEFD : 0x0303).bytes(clientRandom).vec8(legacySessionId);
+    if (dtls) {
+      w.vec8(dtlsCookie);
+    }
     w.begin(2);
     for (CipherSuite s : offered) {
       w.u16(s.id);
@@ -251,6 +256,15 @@ final class ClientConnection extends TlsConnection {
   private void dispatch(int type, byte[] body, byte[] message) throws SSLException, GeneralSecurityException {
     switch (state) {
     case kStateServerHello:
+      if (dtls && type == kHelloVerifyRequest && !sawHelloVerify) {
+        sawHelloVerify = true;
+        ByteReader hv = new ByteReader(body);
+        hv.u16();
+        dtlsCookie = hv.vec8();
+        transcript.reset();
+        sendClientHello();
+        break;
+      }
       expect(type == kServerHello, type);
       handleServerHello(body, message);
       break;
@@ -357,6 +371,9 @@ final class ClientConnection extends TlsConnection {
   private void handleServerHello(byte[] body, byte[] message) throws SSLException, GeneralSecurityException {
     ByteReader r = new ByteReader(body);
     int legacyVersion = r.u16();
+    if (dtls) {
+      legacyVersion = legacyVersion == 0xFEFD ? kTls12 : 0;
+    }
     serverRandom = r.bytes(32);
     byte[] sessionId = r.vec8();
     int suiteId = r.u16();
@@ -457,7 +474,7 @@ final class ClientConnection extends TlsConnection {
     }
     hmac12 = suite.hmac;
     transcript.bytes(message);
-    session.setNegotiated(versionName(version), suite.name);
+    session.setNegotiated(protocolName(), suite.name);
     state = kStateTls12Certificate;
   }
 
@@ -519,7 +536,7 @@ final class ClientConnection extends TlsConnection {
     sendCompatChangeCipherSpec();
     installReadCipher(schedule.cipher(schedule.serverHandshake, true));
     installWriteCipher(schedule.cipher(schedule.clientHandshake, false));
-    session.setNegotiated(versionName(version), suite.name);
+    session.setNegotiated(protocolName(), suite.name);
     state = kStateEncryptedExtensions;
   }
 
@@ -846,15 +863,16 @@ final class ClientConnection extends TlsConnection {
     byte[] seed = useExtendedMasterSecret ? sessionHash : TlsPrf.concat(clientRandom, serverRandom);
     masterSecret = TlsPrf.prf(hmac12, shared, label, seed, 48);
     int keyLen = suite.keyLength;
+    int ivLen = suite.aead == CipherSuite.kAeadChacha ? 12 : 4;
     byte[] block = TlsPrf.prf(hmac12, masterSecret, "key expansion", TlsPrf.concat(serverRandom, clientRandom),
-        2 * keyLen + 8);
+        2 * keyLen + 2 * ivLen);
     byte[] cKey = Arrays.copyOfRange(block, 0, keyLen);
     byte[] sKey = Arrays.copyOfRange(block, keyLen, 2 * keyLen);
-    byte[] cIv = Arrays.copyOfRange(block, 2 * keyLen, 2 * keyLen + 4);
-    byte[] sIv = Arrays.copyOfRange(block, 2 * keyLen + 4, 2 * keyLen + 8);
-    pendingReadCipher = new RecordCipher(false, CipherSuite.kAeadGcm, sKey, sIv, true);
+    byte[] cIv = Arrays.copyOfRange(block, 2 * keyLen, 2 * keyLen + ivLen);
+    byte[] sIv = Arrays.copyOfRange(block, 2 * keyLen + ivLen, 2 * keyLen + 2 * ivLen);
+    pendingReadCipher = new RecordCipher(false, suite.aead, sKey, sIv, true);
     sendChangeCipherSpec();
-    installWriteCipher(new RecordCipher(false, CipherSuite.kAeadGcm, cKey, cIv, false));
+    installWriteCipher(new RecordCipher(false, suite.aead, cKey, cIv, false));
     byte[] verify = TlsPrf.prf(hmac12, masterSecret, "client finished", transcriptHash(), 12);
     byte[] fin = buildMessage(kFinished, verify);
     transcript.bytes(fin);

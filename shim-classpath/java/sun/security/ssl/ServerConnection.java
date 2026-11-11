@@ -189,8 +189,12 @@ final class ServerConnection extends TlsConnection {
   private void handleClientHello(byte[] body, byte[] message) throws SSLException, GeneralSecurityException {
     ByteReader r = new ByteReader(body);
     clientLegacyVersion = r.u16();
+    if (dtls) {
+      clientLegacyVersion = clientLegacyVersion == 0xFEFD || clientLegacyVersion == 0xFEFC ? kTls12 : 0x0302;
+    }
     byte[] newRandom = r.bytes(32);
     byte[] sessionId = r.vec8();
+    byte[] helloCookie = dtls ? r.vec8() : null;
     ByteReader suites = r.sub16();
     List<Integer> ids = new ArrayList<Integer>();
     while (suites.hasRemaining()) {
@@ -298,6 +302,13 @@ final class ServerConnection extends TlsConnection {
           + "preferences");
     }
     checkSni(names);
+    if (dtls) {
+      byte[] expected = dtlsCookie(newRandom, sessionId, ids);
+      if (helloCookie.length == 0 || !MessageDigest.isEqual(expected, helloCookie)) {
+        sendHelloVerifyRequest(expected);
+        return;
+      }
+    }
     if (use13) {
       handleClientHello13(message);
     } else {
@@ -305,6 +316,31 @@ final class ServerConnection extends TlsConnection {
       transcript.bytes(message);
       handleClientHello12();
     }
+  }
+
+  private static final byte[] kCookieSecret = new byte[32];
+
+  static {
+    new java.security.SecureRandom().nextBytes(kCookieSecret);
+  }
+
+  private static byte[] dtlsCookie(byte[] random, byte[] sessionId, List<Integer> suiteIds) throws SSLException {
+    ByteWriter w = new ByteWriter();
+    w.bytes(random).vec8(sessionId);
+    for (int id : suiteIds) {
+      w.u16(id);
+    }
+    try {
+      javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+      mac.init(new javax.crypto.spec.SecretKeySpec(kCookieSecret, "HmacSHA256"));
+      return mac.doFinal(w.toByteArray());
+    } catch (GeneralSecurityException e) {
+      throw new SSLException(e);
+    }
+  }
+
+  private void sendHelloVerifyRequest(byte[] cookie) throws SSLException {
+    sendHandshake(buildMessage(kHelloVerifyRequest, new ByteWriter().u16(0xFEFD).vec8(cookie).toByteArray()));
   }
 
   private void checkSni(List<SNIServerName> names) throws SSLException {
@@ -479,7 +515,7 @@ final class ServerConnection extends TlsConnection {
     sendCompatChangeCipherSpec();
     installWriteCipher(schedule.cipher(schedule.serverHandshake, false));
     installReadCipher(schedule.cipher(schedule.clientHandshake, true));
-    session.setNegotiated(versionName(version), suite.name);
+    session.setNegotiated(protocolName(), suite.name);
     String[] names = new String[candidates.size()];
     for (int i = 0; i < names.length; i++) {
       names[i] = candidates.get(i).name;
@@ -697,7 +733,7 @@ final class ServerConnection extends TlsConnection {
     serverRandom = new byte[32];
     random.nextBytes(serverRandom);
     ByteWriter sh = new ByteWriter();
-    sh.u16(kTls12).bytes(serverRandom).vec8(new byte[0]).u16(suite.id).u8(0);
+    sh.u16(dtls ? 0xFEFD : kTls12).bytes(serverRandom).vec8(new byte[0]).u16(suite.id).u8(0);
     sh.begin(2);
     sh.u16(kExtRenegotiationInfo).u16(1).u8(0);
     if (clientExtendedMasterSecret) {
@@ -713,7 +749,7 @@ final class ServerConnection extends TlsConnection {
     byte[] shMsg = buildMessage(kServerHello, sh.toByteArray());
     transcript.bytes(shMsg);
     sendHandshake(shMsg);
-    session.setNegotiated(versionName(version), suite.name);
+    session.setNegotiated(protocolName(), suite.name);
     ByteWriter cw = new ByteWriter();
     cw.begin(3);
     try {
@@ -787,14 +823,15 @@ final class ServerConnection extends TlsConnection {
     String label = clientExtendedMasterSecret ? "extended master secret" : "master secret";
     masterSecret = TlsPrf.prf(hmac12, shared, label, seed, 48);
     int keyLen = suite.keyLength;
+    int ivLen = suite.aead == CipherSuite.kAeadChacha ? 12 : 4;
     byte[] block = TlsPrf.prf(hmac12, masterSecret, "key expansion", TlsPrf.concat(serverRandom, clientRandom),
-        2 * keyLen + 8);
+        2 * keyLen + 2 * ivLen);
     byte[] cKey = Arrays.copyOfRange(block, 0, keyLen);
     byte[] sKey = Arrays.copyOfRange(block, keyLen, 2 * keyLen);
-    byte[] cIv = Arrays.copyOfRange(block, 2 * keyLen, 2 * keyLen + 4);
-    byte[] sIv = Arrays.copyOfRange(block, 2 * keyLen + 4, 2 * keyLen + 8);
-    pendingReadCipher = new RecordCipher(false, CipherSuite.kAeadGcm, cKey, cIv, true);
-    pendingWriteCipher12 = new RecordCipher(false, CipherSuite.kAeadGcm, sKey, sIv, false);
+    byte[] cIv = Arrays.copyOfRange(block, 2 * keyLen, 2 * keyLen + ivLen);
+    byte[] sIv = Arrays.copyOfRange(block, 2 * keyLen + ivLen, 2 * keyLen + 2 * ivLen);
+    pendingReadCipher = new RecordCipher(false, suite.aead, cKey, cIv, true);
+    pendingWriteCipher12 = new RecordCipher(false, suite.aead, sKey, sIv, false);
     state = clientChain != null ? kStateTls12ClientCertificateVerify : kStateTls12ChangeCipherSpec;
   }
 

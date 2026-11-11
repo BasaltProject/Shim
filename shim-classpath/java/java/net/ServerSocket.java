@@ -210,6 +210,9 @@ public class ServerSocket implements Closeable {
   }
 
   public boolean getReuseAddress() throws SocketException {
+    if (!reuseSet && !isClosed() && !System.getProperty("os.name", "").startsWith("Windows")) {
+      return true;
+    }
     return getIntOption(NetNative.OPT_REUSEADDR) != 0;
   }
 

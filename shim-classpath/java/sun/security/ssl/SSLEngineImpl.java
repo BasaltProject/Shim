@@ -23,18 +23,22 @@ final class SSLEngineImpl extends SSLEngine {
   private final SslConfig cfg;
   private TlsConnection conn;
   private boolean modeSet;
-  private boolean clientMode = true;
+  private boolean clientMode;
   private SSLSessionImpl nullSession;
 
   SSLEngineImpl(SSLContextImpl context, String host, int port) {
     super(host, port);
     this.context = context;
-    this.cfg = context.newConfig(true);
+    this.cfg = context.newConfig(false);
   }
+
+  private boolean protocolsCustom;
 
   private void applyMode() {
     cfg.clientMode = clientMode;
-    cfg.protocols = context.enabledProtocols(clientMode);
+    if (!protocolsCustom) {
+      cfg.protocols = context.enabledProtocols(clientMode);
+    }
   }
 
   private synchronized void ensureConnection() throws SSLException {
@@ -104,6 +108,9 @@ final class SSLEngineImpl extends SSLEngine {
     }
     ensureConnection();
     conn.begin();
+    if (conn.dtls && !conn.hasOutput() && conn.failure == null) {
+      conn.retransmitNow();
+    }
     if (conn.failure != null && !conn.hasOutput()) {
       throw conn.failure;
     }
@@ -125,7 +132,10 @@ final class SSLEngineImpl extends SSLEngine {
       return result(SSLEngineResult.Status.OK, 0, 0);
     }
     int n = (int) Math.min(srcRemaining, TlsConnection.kMaxFragment);
-    if (dst.remaining() < n + 29) {
+    if (conn.dtls && cfg.maximumPacketSize > 0) {
+      n = Math.max(1, Math.min(n, cfg.maximumPacketSize - 37));
+    }
+    if (dst.remaining() < n + (conn.dtls ? 37 : 29)) {
       return result(SSLEngineResult.Status.BUFFER_OVERFLOW, 0, 0);
     }
     byte[] plain = new byte[n];
@@ -161,6 +171,9 @@ final class SSLEngineImpl extends SSLEngine {
     }
     ensureConnection();
     conn.begin();
+    if (conn.dtls) {
+      return unwrapDatagram(src, dsts, offset, length, dstRemaining);
+    }
     if (conn.appAvailable() > 0) {
       return drainApp(0, dsts, offset, length);
     }
@@ -196,6 +209,38 @@ final class SSLEngineImpl extends SSLEngine {
     src.position(pos + 5 + len);
     conn.processRecord(type, fragment);
     SSLEngineResult drained = drainApp(5 + len, dsts, offset, length);
+    if (conn.inboundDone && conn.appAvailable() == 0 && drained.getStatus() == SSLEngineResult.Status.OK) {
+      return new SSLEngineResult(SSLEngineResult.Status.CLOSED, drained.getHandshakeStatus(), drained.bytesConsumed(),
+          drained.bytesProduced());
+    }
+    return drained;
+  }
+
+  private SSLEngineResult unwrapDatagram(ByteBuffer src, ByteBuffer[] dsts, int offset, int length, long dstRemaining)
+      throws SSLException {
+    if (conn.appAvailable() > 0) {
+      return drainApp(0, dsts, offset, length);
+    }
+    if (conn.failure != null) {
+      throw conn.failure;
+    }
+    if (!src.hasRemaining()) {
+      return result(SSLEngineResult.Status.BUFFER_UNDERFLOW, 0, 0);
+    }
+    if (conn.inboundDone) {
+      return result(SSLEngineResult.Status.CLOSED, 0, 0);
+    }
+    int pos = src.position();
+    if (src.remaining() >= 13 && (src.get(pos) & 0xff) == RecordCipher.kContentApplicationData && conn.handshakeDone) {
+      int len = ((src.get(pos + 11) & 0xff) << 8) | (src.get(pos + 12) & 0xff);
+      if (dstRemaining < Math.max(0, len - 24)) {
+        return result(SSLEngineResult.Status.BUFFER_OVERFLOW, 0, 0);
+      }
+    }
+    byte[] datagram = new byte[src.remaining()];
+    src.get(datagram);
+    conn.processDatagram(datagram);
+    SSLEngineResult drained = drainApp(datagram.length, dsts, offset, length);
     if (conn.inboundDone && conn.appAvailable() == 0 && drained.getStatus() == SSLEngineResult.Status.OK) {
       return new SSLEngineResult(SSLEngineResult.Status.CLOSED, drained.getHandshakeStatus(), drained.bytesConsumed(),
           drained.bytesProduced());
@@ -265,7 +310,7 @@ final class SSLEngineImpl extends SSLEngine {
 
   @Override
   public String[] getSupportedCipherSuites() {
-    return TlsParams.supportedCipherSuites();
+    return TlsParams.supportedCipherSuites(cfg.datagram);
   }
 
   @Override
@@ -281,7 +326,7 @@ final class SSLEngineImpl extends SSLEngine {
 
   @Override
   public String[] getSupportedProtocols() {
-    return TlsParams.supportedProtocols();
+    return cfg.datagram ? TlsParams.kDatagramProtocols.clone() : TlsParams.supportedProtocols();
   }
 
   @Override
@@ -291,8 +336,9 @@ final class SSLEngineImpl extends SSLEngine {
 
   @Override
   public synchronized void setEnabledProtocols(String[] protocols) {
-    TlsParams.checkProtocols(protocols);
+    TlsParams.checkProtocols(protocols, cfg.datagram);
     cfg.protocols = protocols.clone();
+    protocolsCustom = true;
   }
 
   @Override
@@ -395,6 +441,9 @@ final class SSLEngineImpl extends SSLEngine {
     params.setApplicationProtocols(cfg.applicationProtocols);
     params.setSignatureSchemes(cfg.signatureSchemes);
     params.setNamedGroups(cfg.namedGroups);
+    if (cfg.datagram) {
+      params.setMaximumPacketSize(cfg.maximumPacketSize == 0 ? 16717 : cfg.maximumPacketSize);
+    }
     return params;
   }
 
@@ -415,6 +464,9 @@ final class SSLEngineImpl extends SSLEngine {
     }
     if (params.getNamedGroups() != null) {
       cfg.namedGroups = params.getNamedGroups();
+    }
+    if (cfg.datagram) {
+      cfg.maximumPacketSize = params.getMaximumPacketSize();
     }
   }
 

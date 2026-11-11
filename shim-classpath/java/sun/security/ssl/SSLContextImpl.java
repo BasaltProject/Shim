@@ -17,6 +17,7 @@ import java.security.cert.X509Certificate;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContextSpi;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSessionContext;
@@ -42,6 +43,10 @@ public abstract class SSLContextImpl extends SSLContextSpi {
   abstract String[] enabledProtocols(boolean client);
 
   abstract String[] supportedProtocols();
+
+  boolean datagram() {
+    return false;
+  }
 
   @Override
   protected synchronized void engineInit(KeyManager[] km, TrustManager[] tm, SecureRandom sr)
@@ -154,19 +159,26 @@ public abstract class SSLContextImpl extends SSLContextSpi {
     SslConfig cfg = new SslConfig();
     cfg.clientMode = client;
     cfg.protocols = enabledProtocols(client);
-    cfg.cipherSuites = TlsParams.supportedCipherSuites();
+    cfg.datagram = datagram();
+    cfg.cipherSuites = TlsParams.supportedCipherSuites(cfg.datagram);
     return cfg;
   }
 
   @Override
   protected SSLSocketFactory engineGetSocketFactory() {
     checkInitialized();
+    if (datagram()) {
+      throw new UnsupportedOperationException("DTLS not supported with SSLSocket");
+    }
     return new SSLSocketFactoryImpl(this);
   }
 
   @Override
   protected SSLServerSocketFactory engineGetServerSocketFactory() {
     checkInitialized();
+    if (datagram()) {
+      throw new UnsupportedOperationException("DTLS not supported with SSLServerSocket");
+    }
     return new SSLServerSocketFactoryImpl(this);
   }
 
@@ -230,12 +242,12 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return new String[] {"TLSv1.2"};
+      return client ? new String[] {"TLSv1.2"} : kTls13Up.clone();
     }
 
     @Override
     String[] supportedProtocols() {
-      return new String[] {"TLSv1.2"};
+      return TlsParams.supportedProtocols();
     }
   }
 
@@ -245,12 +257,12 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return new String[0];
+      return client ? new String[0] : kTls13Up.clone();
     }
 
     @Override
     String[] supportedProtocols() {
-      return new String[0];
+      return TlsParams.supportedProtocols();
     }
   }
 
@@ -260,18 +272,30 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return new String[0];
+      return client ? new String[0] : kTls13Up.clone();
     }
 
     @Override
     String[] supportedProtocols() {
-      return new String[0];
+      return TlsParams.supportedProtocols();
     }
   }
 
   public static final class DefaultSSLContext extends SSLContextImpl {
+    private boolean auto = true;
+
     public DefaultSSLContext() throws Exception {
       engineInit(null, null, null);
+      auto = false;
+    }
+
+    @Override
+    protected void engineInit(javax.net.ssl.KeyManager[] km, javax.net.ssl.TrustManager[] tm,
+        java.security.SecureRandom sr) throws java.security.KeyManagementException {
+      if (!auto) {
+        throw new java.security.KeyManagementException("Default SSLContext is initialized automatically");
+      }
+      super.engineInit(km, tm, sr);
     }
 
     @Override
@@ -282,6 +306,60 @@ public abstract class SSLContextImpl extends SSLContextSpi {
     @Override
     String[] supportedProtocols() {
       return TlsParams.supportedProtocols();
+    }
+  }
+
+  public static class DTLSContext extends SSLContextImpl {
+    public DTLSContext() {
+    }
+
+    @Override
+    boolean datagram() {
+      return true;
+    }
+
+    @Override
+    protected SSLParameters engineGetDefaultSSLParameters() {
+      SSLParameters p = new SSLParameters();
+      p.setCipherSuites(TlsParams.supportedCipherSuites(true));
+      p.setProtocols(enabledProtocols(true));
+      return p;
+    }
+
+    @Override
+    protected SSLParameters engineGetSupportedSSLParameters() {
+      SSLParameters p = new SSLParameters();
+      p.setCipherSuites(TlsParams.supportedCipherSuites(true));
+      p.setProtocols(supportedProtocols());
+      return p;
+    }
+
+    @Override
+    String[] enabledProtocols(boolean client) {
+      return new String[] {"DTLSv1.2"};
+    }
+
+    @Override
+    String[] supportedProtocols() {
+      return TlsParams.kDatagramProtocols.clone();
+    }
+  }
+
+  public static final class DTLS12Context extends DTLSContext {
+    public DTLS12Context() {
+    }
+  }
+
+  public static final class DTLS10Context extends DTLSContext {
+    public DTLS10Context() {
+    }
+
+    @Override
+    protected SSLParameters engineGetDefaultSSLParameters() {
+      SSLParameters p = new SSLParameters();
+      p.setCipherSuites(new String[0]);
+      p.setProtocols(new String[0]);
+      return p;
     }
   }
 

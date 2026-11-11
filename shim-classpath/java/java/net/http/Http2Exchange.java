@@ -26,12 +26,13 @@ import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
-/** One HTTP/2 request over a fresh TLS connection negotiated with ALPN; a null result means h2 was not offered. */
+/** Cleartext HTTP/2 (h2c upgrade) exchange for a single request. */
 final class Http2Exchange {
   static final class Result {
     int status;
     Map<String, List<String>> headers = new LinkedHashMap<String, List<String>>();
     byte[] body;
+    javax.net.ssl.SSLSession session;
   }
 
   private static final byte[] kPreface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1);
@@ -50,44 +51,6 @@ final class Http2Exchange {
   private Http2Exchange(InputStream in, OutputStream out) {
     this.in = new DataInputStream(in);
     this.out = out;
-  }
-
-  static Result run(SSLSocketFactory factory, SSLParameters base, java.net.URI uri, String method,
-                    List<String[]> headers, byte[] body, int connectTimeout, int readTimeout) throws IOException {
-    int port = uri.getPort() == -1 ? 443 : uri.getPort();
-    Socket plain = new Socket();
-    plain.connect(new InetSocketAddress(uri.getHost(), port), connectTimeout);
-    SSLSocket socket = (SSLSocket) factory.createSocket(plain, uri.getHost(), port, true);
-    try {
-      SSLParameters p = socket.getSSLParameters();
-      if (base != null) {
-        p.setCipherSuites(base.getCipherSuites() == null ? p.getCipherSuites() : base.getCipherSuites());
-        p.setProtocols(base.getProtocols() == null ? p.getProtocols() : base.getProtocols());
-        p.setEndpointIdentificationAlgorithm(base.getEndpointIdentificationAlgorithm());
-      }
-      p.setApplicationProtocols(new String[] {"h2", "http/1.1"});
-      socket.setSSLParameters(p);
-      socket.setSoTimeout(readTimeout);
-      socket.startHandshake();
-      if (!"h2".equals(socket.getApplicationProtocol())) {
-        socket.close();
-        return null;
-      }
-      return new Http2Exchange(socket.getInputStream(), socket.getOutputStream()).exchange(uri, method, headers, body);
-    } catch (IOException | RuntimeException e) {
-      try {
-        socket.close();
-      } catch (IOException ignored) {
-      }
-      throw e;
-    } finally {
-      if (!socket.isClosed()) {
-        try {
-          socket.close();
-        } catch (IOException ignored) {
-        }
-      }
-    }
   }
 
   private void frame(int type, int flags, int stream, byte[] payload, int off, int len) throws IOException {
@@ -165,56 +128,15 @@ final class Http2Exchange {
     return false;
   }
 
-  private Result exchange(java.net.URI uri, String method, List<String[]> userHeaders, byte[] body)
-      throws IOException {
+  static Result upgraded(InputStream in, OutputStream out) throws IOException {
+    Http2Exchange x = new Http2Exchange(in, out);
     out.write(kPreface);
     byte[] settings = {0, 2, 0, 0, 0, 0, 0, 4, 0, (byte) 0xff, (byte) 0xff, (byte) 0xff};
-    frame(kSettings, 0, 0, settings, 0, settings.length);
-    frame(kWindowUpdate, 0, 0, ints(0x7fff0000), 0, 4);
+    x.frame(kSettings, 0, 0, settings, 0, settings.length);
+    return x.readResponse();
+  }
 
-    String path = uri.getRawPath() == null || uri.getRawPath().isEmpty() ? "/" : uri.getRawPath();
-    if (uri.getRawQuery() != null) {
-      path += "?" + uri.getRawQuery();
-    }
-    String authority = uri.getHost() + (uri.getPort() == -1 ? "" : ":" + uri.getPort());
-    List<String[]> block = new ArrayList<String[]>();
-    block.add(new String[] {":method", method});
-    block.add(new String[] {":scheme", "https"});
-    block.add(new String[] {":authority", authority});
-    block.add(new String[] {":path", path});
-    block.addAll(userHeaders);
-    byte[] encoded = Hpack.encode(block);
-    boolean noBody = body == null || body.length == 0;
-    int pos = 0;
-    int first = Math.min(encoded.length, maxFrame);
-    int f = (noBody ? kEndStream : 0) | (first == encoded.length ? kEndHeaders : 0);
-    frame(kHeaders, f, 1, encoded, 0, first);
-    pos = first;
-    while (pos < encoded.length) {
-      int n = Math.min(encoded.length - pos, maxFrame);
-      frame(kContinuation, pos + n == encoded.length ? kEndHeaders : 0, 1, encoded, pos, n);
-      pos += n;
-    }
-
-    if (!noBody) {
-      int sent = 0;
-      while (sent < body.length) {
-        long room = Math.min(connectionWindow, streamWindow);
-        if (room <= 0) {
-          readFrame();
-          if (!connectionFrame() && type == kRstStream) {
-            throw new IOException("stream reset: " + word(payload, 0));
-          }
-          continue;
-        }
-        int n = (int) Math.min(Math.min(body.length - sent, maxFrame), room);
-        frame(kData, sent + n == body.length ? kEndStream : 0, 1, body, sent, n);
-        sent += n;
-        connectionWindow -= n;
-        streamWindow -= n;
-      }
-    }
-
+  private Result readResponse() throws IOException {
     Result result = new Result();
     ByteArrayOutputStream collected = new ByteArrayOutputStream();
     ByteArrayOutputStream headerBlock = null;

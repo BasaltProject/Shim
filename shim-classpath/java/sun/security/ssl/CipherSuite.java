@@ -39,9 +39,14 @@ final class CipherSuite {
   private static final CipherSuite[] kSuites = {
     new CipherSuite(0x1302, "TLS_AES_256_GCM_SHA384", true, "TLS13", 256, "SHA-384", kAeadGcm),
     new CipherSuite(0x1301, "TLS_AES_128_GCM_SHA256", true, "TLS13", 128, "SHA-256", kAeadGcm),
+    new CipherSuite(0x1303, "TLS_CHACHA20_POLY1305_SHA256", true, "TLS13", 256, "SHA-256", kAeadChacha),
     new CipherSuite(0xc02c, "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", false, "ECDHE_ECDSA", 256, "SHA-384", kAeadGcm),
     new CipherSuite(0xc02b, "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", false, "ECDHE_ECDSA", 128, "SHA-256", kAeadGcm),
+    new CipherSuite(0xcca9, "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256", false, "ECDHE_ECDSA", 256, "SHA-256",
+        kAeadChacha),
     new CipherSuite(0xc030, "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", false, "ECDHE_RSA", 256, "SHA-384", kAeadGcm),
+    new CipherSuite(0xcca8, "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256", false, "ECDHE_RSA", 256, "SHA-256",
+        kAeadChacha),
     new CipherSuite(0xc02f, "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", false, "ECDHE_RSA", 128, "SHA-256", kAeadGcm),
   };
 

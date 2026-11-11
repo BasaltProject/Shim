@@ -70,7 +70,7 @@ final class SSLServerSocketImpl extends SSLServerSocket {
 
   @Override
   public synchronized void setEnabledProtocols(String[] protocols) {
-    TlsParams.checkProtocols(protocols);
+    TlsParams.checkProtocols(protocols, false);
     cfg.protocols = protocols.clone();
   }
 

@@ -83,6 +83,21 @@ abstract class TlsConnection {
   String negotiatedApplicationProtocol;
   private boolean sentCompatCcs;
 
+  boolean dtls;
+  static final int kHelloVerifyRequest = 3;
+  private static final int kDtlsVersion = 0xFEFD;
+  private int sendMessageSeq;
+  private int receiveMessageSeq;
+  private int writeEpoch;
+  private int readEpoch;
+  private final long[] writeSeq = new long[2];
+  private final long[] replayMax = {-1, -1};
+  private final long[] replayMask = new long[2];
+  private final java.util.Map<Integer, DtlsReassembly> reassembly = new java.util.HashMap<Integer, DtlsReassembly>();
+  private final java.util.List<Object[]> flight = new java.util.ArrayList<Object[]>();
+  private boolean newFlight = true;
+  private boolean retransmitWanted;
+
   TlsConnection(SSLContextImpl context, SslConfig cfg, String peerHost, int peerPort, Object owner) {
     this.context = context;
     this.cfg = cfg;
@@ -149,6 +164,9 @@ abstract class TlsConnection {
     }
     if (outboundDone) {
       throw new SSLException("Cannot write application data after close_notify");
+    }
+    if (dtls) {
+      return dtlsRecord(writeEpoch, RecordCipher.kContentApplicationData, Arrays.copyOfRange(src, off, off + len));
     }
     try {
       return writeCipher.encrypt(RecordCipher.kContentApplicationData, src, off, len);
@@ -303,6 +321,10 @@ abstract class TlsConnection {
   }
 
   void queueRecord(int type, byte[] data, int off, int len) throws SSLException {
+    if (dtls) {
+      writeRecord(writeEpoch, type, Arrays.copyOfRange(data, off, off + len));
+      return;
+    }
     if (writeCipher == null) {
       ByteWriter w = new ByteWriter();
       int legacy = type == RecordCipher.kContentHandshake && version == 0 ? 0x0301 : 0x0303;
@@ -318,6 +340,11 @@ abstract class TlsConnection {
   }
 
   void sendHandshake(byte[] message) throws SSLException {
+    if (dtls) {
+      trackFlight(0, message, writeEpoch);
+      emitHandshake(message, writeEpoch);
+      return;
+    }
     int off = 0;
     while (off < message.length) {
       int n = Math.min(kMaxFragment, message.length - off);
@@ -328,8 +355,16 @@ abstract class TlsConnection {
 
   byte[] buildMessage(int type, byte[] body) {
     ByteWriter w = new ByteWriter();
-    w.u8(type).u24(body.length).bytes(body);
+    if (dtls) {
+      w.u8(type).u24(body.length).u16(sendMessageSeq++).u24(0).u24(body.length).bytes(body);
+    } else {
+      w.u8(type).u24(body.length).bytes(body);
+    }
     return w.toByteArray();
+  }
+
+  String protocolName() {
+    return dtls ? "DTLSv1.2" : versionName(version);
   }
 
   void sendCompatChangeCipherSpec() throws SSLException {
@@ -341,15 +376,26 @@ abstract class TlsConnection {
   }
 
   void sendChangeCipherSpec() throws SSLException {
+    if (dtls) {
+      trackFlight(1, new byte[] {1}, 0);
+      writeRecord(0, RecordCipher.kContentChangeCipherSpec, new byte[] {1});
+      return;
+    }
     outRecords.add(new byte[] {20, 3, 3, 0, 1, 1});
   }
 
   void installReadCipher(RecordCipher c) {
     readCipher = c;
+    if (dtls) {
+      readEpoch = 1;
+    }
   }
 
   void installWriteCipher(RecordCipher c) {
     writeCipher = c;
+    if (dtls) {
+      writeEpoch = 1;
+    }
   }
 
   boolean hasReadCipher() {
@@ -361,7 +407,7 @@ abstract class TlsConnection {
   }
 
   RecordCipher newCipher(byte[] key, byte[] iv, boolean decrypting) {
-    return new RecordCipher(version == kTls13, CipherSuite.kAeadGcm, key, iv, decrypting);
+    return new RecordCipher(version == kTls13, suite.aead, key, iv, decrypting);
   }
 
   synchronized void processRecord(int type, byte[] fragment) throws SSLException {
@@ -422,7 +468,7 @@ abstract class TlsConnection {
 
   abstract void onChangeCipherSpec() throws SSLException;
 
-  private void handleAlert(byte[] data) throws SSLException {
+  void handleAlert(byte[] data) throws SSLException {
     if (data.length != 2) {
       throw fatal(kAlertDecodeError, "Invalid alert message");
     }
@@ -452,6 +498,217 @@ abstract class TlsConnection {
       int type = msg[0] & 0xff;
       byte[] body = Arrays.copyOfRange(msg, 4, msg.length);
       handleHandshake(type, body, msg);
+    }
+  }
+
+
+  private byte[] dtlsRecord(int epoch, int type, byte[] data) throws SSLException {
+    long seq = writeSeq[epoch]++;
+    byte[] fragment = data;
+    if (epoch > 0) {
+      try {
+        fragment = writeCipher.encryptDtls(type, data, 0, data.length, ((long) epoch << 48) | seq);
+      } catch (GeneralSecurityException e) {
+        throw new SSLException("Cannot encrypt record", e);
+      }
+    }
+    ByteWriter w = new ByteWriter();
+    w.u8(type).u16(kDtlsVersion).u16(epoch).u16((int) (seq >>> 32)).u32(seq & 0xFFFFFFFFL).u16(fragment.length);
+    w.bytes(fragment);
+    return w.toByteArray();
+  }
+
+  private void writeRecord(int epoch, int type, byte[] data) throws SSLException {
+    outRecords.add(dtlsRecord(epoch, type, data));
+  }
+
+  private void emitHandshake(byte[] message, int epoch) throws SSLException {
+    int bodyLen = message.length - 12;
+    int max = kMaxFragment - 12;
+    if (cfg.maximumPacketSize > 0) {
+      max = Math.max(1, Math.min(max, cfg.maximumPacketSize - 13 - 12 - (epoch > 0 ? 24 : 0)));
+    }
+    int off = 0;
+    do {
+      int n = Math.min(max, bodyLen - off);
+      ByteWriter w = new ByteWriter();
+      w.bytes(message, 0, 6).u24(off).u24(n).bytes(message, 12 + off, n);
+      writeRecord(epoch, RecordCipher.kContentHandshake, w.toByteArray());
+      off += n;
+    } while (off < bodyLen);
+  }
+
+  private void trackFlight(int kind, byte[] data, int epoch) {
+    if (newFlight) {
+      flight.clear();
+      newFlight = false;
+    }
+    flight.add(new Object[] {kind, data, epoch});
+  }
+
+  private void retransmitFlight() throws SSLException {
+    for (Object[] item : flight) {
+      if ((Integer) item[0] == 0) {
+        emitHandshake((byte[]) item[1], (Integer) item[2]);
+      } else {
+        writeRecord(0, RecordCipher.kContentChangeCipherSpec, (byte[]) item[1]);
+      }
+    }
+  }
+
+  synchronized void retransmitNow() throws SSLException {
+    if (dtls && !flight.isEmpty() && !handshakeDone && failure == null) {
+      retransmitFlight();
+    }
+  }
+
+  private boolean replayed(int epoch, long seq) {
+    if (seq > replayMax[epoch]) {
+      return false;
+    }
+    long diff = replayMax[epoch] - seq;
+    return diff >= 64 || (replayMask[epoch] >>> diff & 1) != 0;
+  }
+
+  private void markSeen(int epoch, long seq) {
+    if (seq > replayMax[epoch]) {
+      long shift = replayMax[epoch] < 0 ? 64 : seq - replayMax[epoch];
+      replayMask[epoch] = shift >= 64 ? 1 : (replayMask[epoch] << shift) | 1;
+      replayMax[epoch] = seq;
+    } else {
+      replayMask[epoch] |= 1L << (replayMax[epoch] - seq);
+    }
+  }
+
+  synchronized void processDatagram(byte[] d) throws SSLException {
+    if (failure != null) {
+      throw failure;
+    }
+    retransmitWanted = false;
+    int off = 0;
+    try {
+      while (off + 13 <= d.length) {
+        int type = d[off] & 0xff;
+        int ver = (d[off + 1] & 0xff) << 8 | (d[off + 2] & 0xff);
+        int epoch = (d[off + 3] & 0xff) << 8 | (d[off + 4] & 0xff);
+        long seq = 0;
+        for (int i = 0; i < 6; i++) {
+          seq = seq << 8 | (d[off + 5 + i] & 0xff);
+        }
+        int len = (d[off + 11] & 0xff) << 8 | (d[off + 12] & 0xff);
+        if (off + 13 + len > d.length || (ver != 0xFEFD && ver != 0xFEFF)) {
+          break;
+        }
+        byte[] fragment = Arrays.copyOfRange(d, off + 13, off + 13 + len);
+        off += 13 + len;
+        if (epoch > 1 || type < 20 || type > 23 || replayed(epoch, seq)) {
+          continue;
+        }
+        byte[] data = fragment;
+        if (epoch == 1) {
+          if (readCipher == null || readEpoch != 1) {
+            continue;
+          }
+          try {
+            data = readCipher.decryptDtls(type, fragment, ((long) epoch << 48) | seq);
+          } catch (GeneralSecurityException e) {
+            continue;
+          }
+        }
+        markSeen(epoch, seq);
+        switch (type) {
+        case RecordCipher.kContentChangeCipherSpec:
+          if (readEpoch == 0) {
+            onChangeCipherSpec();
+          }
+          break;
+        case RecordCipher.kContentAlert:
+          handleAlert(data);
+          break;
+        case RecordCipher.kContentHandshake:
+          handleDtlsHandshake(data);
+          break;
+        default:
+          if (handshakeDone && data.length > 0) {
+            appChunks.add(data);
+          }
+          break;
+        }
+        if (inboundDone) {
+          break;
+        }
+      }
+      if (retransmitWanted && failure == null) {
+        retransmitFlight();
+      }
+    } catch (ByteReader.DecodeException e) {
+      throw fatal(kAlertDecodeError, "Illegal handshake message");
+    }
+  }
+
+  private void handleDtlsHandshake(byte[] data) throws SSLException {
+    int off = 0;
+    while (off + 12 <= data.length) {
+      int type = data[off] & 0xff;
+      int mlen = (data[off + 1] & 0xff) << 16 | (data[off + 2] & 0xff) << 8 | (data[off + 3] & 0xff);
+      int mseq = (data[off + 4] & 0xff) << 8 | (data[off + 5] & 0xff);
+      int foff = (data[off + 6] & 0xff) << 16 | (data[off + 7] & 0xff) << 8 | (data[off + 8] & 0xff);
+      int flen = (data[off + 9] & 0xff) << 16 | (data[off + 10] & 0xff) << 8 | (data[off + 11] & 0xff);
+      if (off + 12 + flen > data.length || foff + flen > mlen || mlen > (1 << 20)) {
+        return;
+      }
+      byte[] piece = Arrays.copyOfRange(data, off + 12, off + 12 + flen);
+      off += 12 + flen;
+      if (mseq < receiveMessageSeq) {
+        retransmitWanted = true;
+        continue;
+      }
+      if (mseq > receiveMessageSeq + 16) {
+        continue;
+      }
+      DtlsReassembly r = reassembly.get(mseq);
+      if (r == null) {
+        r = new DtlsReassembly(type, mlen);
+        reassembly.put(mseq, r);
+      }
+      if (r.type != type || r.length != mlen) {
+        continue;
+      }
+      r.add(foff, piece);
+      while (true) {
+        DtlsReassembly next = reassembly.get(receiveMessageSeq);
+        if (next == null || !next.complete()) {
+          break;
+        }
+        reassembly.remove(receiveMessageSeq);
+        ByteWriter w = new ByteWriter();
+        w.u8(next.type).u24(next.length).u16(receiveMessageSeq).u24(0).u24(next.length).bytes(next.data);
+        receiveMessageSeq++;
+        newFlight = true;
+        handleHandshake(next.type, next.data, w.toByteArray());
+      }
+    }
+  }
+
+  static final class DtlsReassembly {
+    final int type;
+    final int length;
+    final byte[] data;
+    private final java.util.BitSet seen = new java.util.BitSet();
+
+    DtlsReassembly(int type, int length) {
+      this.type = type;
+      this.length = length;
+      this.data = new byte[length];
+    }
+
+    void add(int offset, byte[] piece) {
+      System.arraycopy(piece, 0, data, offset, piece.length);
+      seen.set(offset, offset + piece.length);
+    }
+
+    boolean complete() {
+      return seen.nextClearBit(0) >= length;
     }
   }
 

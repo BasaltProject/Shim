@@ -187,9 +187,11 @@ final class WebSocketClient {
       if (uri.getPort() >= 0) {
         request.append(':').append(uri.getPort());
       }
-      request.append("\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n");
+      request.append("\r\n");
+      request.insert(request.indexOf("Host: "), "Connection: Upgrade\r\n");
+      request.append("Upgrade: websocket\r\n");
+      request.append("User-Agent: Java-http-client/").append(System.getProperty("java.version")).append("\r\n");
       request.append("Sec-WebSocket-Key: ").append(key).append("\r\n");
-      request.append("Sec-WebSocket-Version: 13\r\n");
       if (!protocols.isEmpty()) {
         request.append("Sec-WebSocket-Protocol: ");
         for (int i = 0; i < protocols.size(); ++i) {
@@ -197,6 +199,7 @@ final class WebSocketClient {
         }
         request.append("\r\n");
       }
+      request.append("Sec-WebSocket-Version: 13\r\n");
       for (String[] h : extra) {
         request.append(h[0]).append(": ").append(h[1]).append("\r\n");
       }

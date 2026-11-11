@@ -29,6 +29,8 @@ final class SslConfig {
   boolean enableSessionCreation = true;
   boolean useCipherSuitesOrder;
   BiFunction<?, List<String>, String> alpnSelector;
+  boolean datagram;
+  int maximumPacketSize;
 
   SslConfig copy() {
     SslConfig c = new SslConfig();
@@ -46,6 +48,8 @@ final class SslConfig {
     c.enableSessionCreation = enableSessionCreation;
     c.useCipherSuitesOrder = useCipherSuitesOrder;
     c.alpnSelector = alpnSelector;
+    c.datagram = datagram;
+    c.maximumPacketSize = maximumPacketSize;
     return c;
   }
 }

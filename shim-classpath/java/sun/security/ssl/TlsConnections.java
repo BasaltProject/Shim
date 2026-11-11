@@ -16,9 +16,9 @@ final class TlsConnections {
 
   static TlsConnection create(SSLContextImpl context, SslConfig cfg, String host, int port, Object owner)
       throws SSLException {
-    if (cfg.clientMode) {
-      return new ClientConnection(context, cfg, host, port, owner);
-    }
-    return new ServerConnection(context, cfg, host, port, owner);
+    TlsConnection c = cfg.clientMode ? new ClientConnection(context, cfg, host, port, owner)
+        : new ServerConnection(context, cfg, host, port, owner);
+    c.dtls = cfg.datagram;
+    return c;
   }
 }

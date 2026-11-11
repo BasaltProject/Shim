@@ -34,6 +34,12 @@ public final class SunJSSE extends Provider {
         "X.509");
     add("KeyManagerFactory", "NewSunX509", "sun.security.ssl.KeyManagerFactoryImpl$X509", "PKIX");
     add("SSLContext", "TLS", "sun.security.ssl.SSLContextImpl$TLSContext", "SSL");
+    add("Signature", "MD5andSHA1withRSA", "sun.security.ssl.RSASignature");
+    putService(new Provider.Service(this, "KeyStore", "PKCS12", "sun.security.pkcs12.PKCS12KeyStore$DualFormatPKCS12",
+        Arrays.<String>asList(), new HashMap<String, String>()));
+    add("SSLContext", "DTLS", "sun.security.ssl.SSLContextImpl$DTLSContext");
+    add("SSLContext", "DTLSv1.0", "sun.security.ssl.SSLContextImpl$DTLS10Context");
+    add("SSLContext", "DTLSv1.2", "sun.security.ssl.SSLContextImpl$DTLS12Context");
     add("SSLContext", "Default", "sun.security.ssl.SSLContextImpl$DefaultSSLContext");
     add("SSLContext", "TLSv1.2", "sun.security.ssl.SSLContextImpl$TLS12Context");
     add("SSLContext", "TLSv1.1", "sun.security.ssl.SSLContextImpl$TLS11Context");
