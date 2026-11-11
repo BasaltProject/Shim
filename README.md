@@ -75,7 +75,7 @@ The class library lives in `shim-classpath/java/`; its native methods live in
 
 CMake builds everything: the VM (`libjvm`, `libshim.a`, the `shim` executables),
 `classpath.jar`, the tools and the tests. It needs CMake 3.28 or newer, Clang and a
-JDK (set `JAVA_HOME`, or `-DSHIM_JAVA_HOME=<jdk>`) for `javac` and the JNI headers.
+JDK 25 or newer (set `JAVA_HOME`, or `-DSHIM_JAVA_HOME=<jdk>`) for `javac` and the JNI headers.
 
 ```bash
 cmake -S . -B build -G Ninja

@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '25'
 
       - uses: lukka/get-cmake@latest
 
@@ -140,7 +140,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: ${{ matrix.java }}
-          java-version: '17'
+          java-version: '25'
 
       - name: Install the MinGW toolchain
         uses: msys2/setup-msys2@v2
@@ -197,8 +197,8 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
           TARGET: ${{ matrix.target }}
         run: |
-          docker run --rm -e VERSION -e TARGET -v "$PWD:/src" -w /src alpine:3.22 sh -ec '
-            apk add --no-cache bash build-base clang cmake ninja openjdk17-jdk zlib-dev linux-headers file tar coreutils
+          docker run --rm -e VERSION -e TARGET -v "$PWD:/src" -w /src alpine:3.23 sh -ec '
+            apk add --no-cache bash build-base clang cmake ninja openjdk25-jdk zlib-dev linux-headers file tar coreutils
             export JAVA_HOME=/usr/lib/jvm/default-jvm
             CC=clang CXX=clang++ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON \
                 -DSHIM_FRAME_POINTER=ON "-DSHIM_VERSION_STRING=$VERSION"
@@ -237,10 +237,10 @@ jobs:
           envs: VERSION TARGET
           cpu: 4
           mem: 8192
-          prepare: pkg install -y bash cmake ninja openjdk17
+          prepare: pkg install -y bash cmake ninja openjdk25
           run: |
             set -eu
-            export JAVA_HOME=/usr/local/openjdk17
+            export JAVA_HOME=/usr/local/openjdk25
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE= -DBUILD_TESTING=ON "-DSHIM_VERSION_STRING=$VERSION"
             cmake --build build
             ctest --test-dir build --output-on-failure
@@ -262,7 +262,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '25'
 
       - name: Install the cross-compiler
         run: |
@@ -345,7 +345,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '25'
 
       - uses: android-actions/setup-android@v4
 
