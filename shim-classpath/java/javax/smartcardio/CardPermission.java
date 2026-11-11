@@ -55,7 +55,7 @@ public class CardPermission extends Permission {
       } else if (t.equals("transmitControl")) {
         m |= A_TRANSMIT_CONTROL;
       } else {
-        throw new IllegalArgumentException("Invalid action: " + t);
+        throw new IllegalArgumentException("Invalid action: '" + t + "'");
       }
     }
     return m;

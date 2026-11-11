@@ -8,7 +8,6 @@
 
 package javax.smartcardio;
 
-import java.security.AccessController;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.Provider;
@@ -18,10 +17,6 @@ import java.util.List;
 public final class TerminalFactory {
   private static final Provider NONE = new Provider("None", "1.0", "none") {
     private static final long serialVersionUID = 2745808869881593918L;
-  };
-
-  private static final Provider PCSC = new Provider("SunPCSC", "25", "Sun PC/SC provider") {
-    private static final long serialVersionUID = 6168388284028876579L;
   };
 
   private static final String PROP_NAME = "javax.smartcardio.TerminalFactory.DefaultType";
@@ -84,10 +79,22 @@ public final class TerminalFactory {
     if (type == null) {
       throw new NullPointerException("type must not be null");
     }
-    if (type.equals("PC/SC")) {
-      NoSuchAlgorithmException e = new NoSuchAlgorithmException("Error constructing TerminalFactory for PC/SC using SunPCSC");
-      e.initCause(new IllegalStateException("SCARD_E_NO_SERVICE"));
-      throw e;
+    NoSuchAlgorithmException failure = null;
+    for (Provider p : Security.getProviders()) {
+      Provider.Service s = p.getService("TerminalFactory", type);
+      if (s == null) {
+        continue;
+      }
+      try {
+        return new TerminalFactory((TerminalFactorySpi) s.newInstance(params), p, type);
+      } catch (NoSuchAlgorithmException e) {
+        if (failure == null) {
+          failure = e;
+        }
+      }
+    }
+    if (failure != null) {
+      throw failure;
     }
     throw new NoSuchAlgorithmException(type + " TerminalFactory not available");
   }
@@ -99,9 +106,6 @@ public final class TerminalFactory {
     }
     Provider p = Security.getProvider(provider);
     if (p == null) {
-      if (provider.equals("SunPCSC")) {
-        return getInstance(type, params);
-      }
       throw new NoSuchProviderException("no such provider: " + provider);
     }
     return getInstance(type, params, p);
@@ -112,7 +116,14 @@ public final class TerminalFactory {
     if (provider == null) {
       throw new IllegalArgumentException("missing provider");
     }
-    return getInstance(type, params);
+    if (type == null) {
+      throw new NullPointerException("type must not be null");
+    }
+    Provider.Service s = provider.getService("TerminalFactory", type);
+    if (s == null) {
+      throw new NoSuchAlgorithmException(type + " TerminalFactory not available");
+    }
+    return new TerminalFactory((TerminalFactorySpi) s.newInstance(params), provider, type);
   }
 
   public Provider getProvider() {

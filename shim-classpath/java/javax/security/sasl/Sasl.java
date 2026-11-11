@@ -127,7 +127,6 @@ public class Sasl {
         }
       }
     }
-    list.add(new com.sun.security.sasl.ClientFactoryImpl());
     return Collections.enumeration(list);
   }
 
@@ -144,7 +143,6 @@ public class Sasl {
         }
       }
     }
-    list.add(new com.sun.security.sasl.ServerFactoryImpl());
     return Collections.enumeration(list);
   }
 }

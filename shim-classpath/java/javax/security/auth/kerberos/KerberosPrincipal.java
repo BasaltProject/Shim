@@ -61,8 +61,9 @@ public final class KerberosPrincipal implements Principal, Serializable {
       }
     } else {
       n = name;
-      r = System.getProperty("java.security.krb5.realm");
-      if (r == null) {
+      try {
+        r = sun.security.krb5.Config.getInstance().defaultRealm();
+      } catch (sun.security.krb5.KrbException e) {
         throw new IllegalArgumentException("Cannot find default realm");
       }
     }

@@ -15,5 +15,7 @@ public final class JdkSASLProvider extends Provider {
 
   public JdkSASLProvider() {
     super("JdkSASL", "25", "JDK SASL provider(implements client and server mechanisms for GSSAPI)");
+    put("SaslClientFactory.GSSAPI", "com.sun.security.sasl.gsskerb.FactoryImpl");
+    put("SaslServerFactory.GSSAPI", "com.sun.security.sasl.gsskerb.FactoryImpl");
   }
 }

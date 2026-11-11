@@ -36,26 +36,7 @@ public final class EncryptionKey implements SecretKey {
   }
 
   static String getAlgorithmName(int eType) {
-    switch (eType) {
-      case 1:
-        return "des-cbc-crc";
-      case 2:
-        return "des-cbc-md4";
-      case 3:
-        return "des-cbc-md5";
-      case 16:
-        return "des3-cbc-sha1-kd";
-      case 17:
-        return "aes128-cts-hmac-sha1-96";
-      case 18:
-        return "aes256-cts-hmac-sha1-96";
-      case 23:
-        return "rc4-hmac";
-      case 0:
-        return "NULL";
-      default:
-        throw new IllegalArgumentException("Unsupported encryption type: " + eType);
-    }
+    return eType == 0 ? "NULL" : sun.security.krb5.Crypto.name(eType);
   }
 
   public final String getFormat() {

@@ -56,8 +56,7 @@ public final class KerberosCredMessage implements Destroyable {
     if (destroyed) {
       return "Destroyed KerberosCredMessage";
     }
-    return "KerberosCredMessage: sender=" + sender + ", recipient=" + recipient + ", message=" + message.length
-        + " bytes";
+    return "KRB_CRED from " + sender + " to " + recipient;
   }
 
   public int hashCode() {

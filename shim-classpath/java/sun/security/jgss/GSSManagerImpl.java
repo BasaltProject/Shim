@@ -5,23 +5,31 @@
  *
  * SPDX-License-Identifier: MIT
  */
-
 package sun.security.jgss;
 
-import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.security.Provider;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import javax.security.auth.Subject;
+import com.sun.security.jgss.ExtendedGSSContextImpl;
 import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
+import sun.security.jgss.krb5.Krb5Util;
+import sun.security.krb5.Asn1;
+import sun.security.krb5.Creds;
+import sun.security.krb5.PrincipalName;
 
 public final class GSSManagerImpl extends GSSManager {
-  static final Oid KRB5 = oid("1.2.840.113554.1.2.2");
-  static final Oid SPNEGO = oid("1.3.6.1.5.5.2");
-  static final Oid KRB5_NT_PRINCIPAL_NAME = oid("1.2.840.113554.1.2.2.1");
-  static final Oid KRB5_NT_ENTERPRISE_NAME = oid("1.2.840.113554.1.2.2.6");
+  public static final Oid KRB5 = oid("1.2.840.113554.1.2.2");
+  public static final Oid KRB5_MS = oid("1.2.840.48018.1.2.2");
+  public static final Oid SPNEGO = oid("1.3.6.1.5.5.2");
+  public static final Oid KRB5_NT_PRINCIPAL_NAME = oid("1.2.840.113554.1.2.2.1");
 
   private static Oid oid(String s) {
     try {
@@ -34,52 +42,72 @@ public final class GSSManagerImpl extends GSSManager {
   public GSSManagerImpl() {
   }
 
+  public static Oid sniffMech(byte[] in, int off, int len) {
+    try {
+      if (len > 2 && in[off] == 0x60) {
+        Asn1.Node n = Asn1.read(in, off, off + len);
+        Asn1.Node o = Asn1.read(in, n.off, n.off + n.len);
+        Oid m = new Oid(Arrays.copyOfRange(in, n.off, n.off + o.total));
+        return m.equals(SPNEGO) ? SPNEGO : KRB5;
+      }
+      if (len > 0 && (in[off] == (byte) 0xa0 || in[off] == (byte) 0xa1)) {
+        return SPNEGO;
+      }
+    } catch (IOException | GSSException e) {
+      return KRB5;
+    }
+    return KRB5;
+  }
+
   public Oid[] getMechs() {
     return new Oid[] {KRB5, SPNEGO};
   }
 
   public Oid[] getNamesForMech(Oid mech) throws GSSException {
-    if (mech.equals(KRB5) || mech.equals(SPNEGO)) {
-      return new Oid[] {GSSName.NT_HOSTBASED_SERVICE, GSSName.NT_USER_NAME, KRB5_NT_PRINCIPAL_NAME,
-          GSSName.NT_EXPORT_NAME};
+    if (mech.equals(KRB5)) {
+      return new Oid[] {GSSName.NT_USER_NAME, GSSName.NT_HOSTBASED_SERVICE, GSSName.NT_EXPORT_NAME,
+          KRB5_NT_PRINCIPAL_NAME};
     }
-    throw new GSSException(GSSException.BAD_MECH);
+    if (mech.equals(SPNEGO)) {
+      return new Oid[] {GSSName.NT_USER_NAME, GSSName.NT_HOSTBASED_SERVICE, GSSName.NT_EXPORT_NAME};
+    }
+    throw new GSSExceptionImpl(GSSException.BAD_MECH, mech);
   }
 
   public Oid[] getMechsForName(Oid nameType) {
+    if (nameType.equals(KRB5_NT_PRINCIPAL_NAME)) {
+      return new Oid[] {KRB5};
+    }
     if (nameType.equals(GSSName.NT_HOSTBASED_SERVICE) || nameType.equals(GSSName.NT_USER_NAME)
-        || nameType.equals(KRB5_NT_PRINCIPAL_NAME) || nameType.equals(GSSName.NT_EXPORT_NAME)) {
+        || nameType.equals(GSSName.NT_EXPORT_NAME)) {
       return new Oid[] {KRB5, SPNEGO};
     }
     return new Oid[0];
   }
 
+  private static void checkMech(Oid mech) throws GSSException {
+    if (mech != null && !mech.equals(KRB5) && !mech.equals(SPNEGO)) {
+      throw new GSSExceptionImpl(GSSException.BAD_MECH, mech);
+    }
+  }
+
   public GSSName createName(String nameStr, Oid nameType) throws GSSException {
-    return new NameImpl(nameStr, nameType, null);
+    return new GSSNameImpl(nameStr, nameType);
   }
 
   public GSSName createName(byte[] name, Oid nameType) throws GSSException {
-    if (nameType != null && nameType.equals(GSSName.NT_EXPORT_NAME)) {
-      if (name.length < 6 || name[0] != 0x04 || name[1] != 0x01) {
-        throw new GSSException(GSSException.BAD_NAME);
-      }
-      int oidLen = ((name[2] & 0xff) << 8) | (name[3] & 0xff);
-      int pos = 4 + oidLen;
-      if (pos + 4 > name.length) {
-        throw new GSSException(GSSException.BAD_NAME);
-      }
-      int nameLen = ((name[pos] & 0xff) << 24) | ((name[pos + 1] & 0xff) << 16) | ((name[pos + 2] & 0xff) << 8)
-          | (name[pos + 3] & 0xff);
-      byte[] oidDer = new byte[oidLen];
-      System.arraycopy(name, 4, oidDer, 0, oidLen);
-      return new NameImpl(new String(name, pos + 4, nameLen), null, new Oid(oidDer));
+    if (name == null) {
+      throw new GSSExceptionImpl(GSSException.BAD_NAME, "Cannot import null name");
     }
-    return new NameImpl(new String(name), nameType, null);
+    if (nameType != null && nameType.equals(GSSName.NT_EXPORT_NAME)) {
+      return GSSNameImpl.fromExport(name);
+    }
+    return new GSSNameImpl(new String(name, java.nio.charset.StandardCharsets.UTF_8), nameType);
   }
 
   public GSSName createName(String nameStr, Oid nameType, Oid mech) throws GSSException {
     checkMech(mech);
-    return new NameImpl(nameStr, nameType, mech);
+    return new GSSNameImpl(nameStr, nameType);
   }
 
   public GSSName createName(byte[] name, Oid nameType, Oid mech) throws GSSException {
@@ -87,289 +115,98 @@ public final class GSSManagerImpl extends GSSManager {
     return createName(name, nameType);
   }
 
-  private void checkMech(Oid mech) throws GSSException {
-    if (mech != null && !mech.equals(KRB5) && !mech.equals(SPNEGO)) {
-      throw new GSSException(GSSException.BAD_MECH);
-    }
-  }
-
   public GSSCredential createCredential(int usage) throws GSSException {
-    throw new GSSException(GSSException.NO_CRED, -1, "No Kerberos credentials found");
+    return createCredential(null, GSSCredential.DEFAULT_LIFETIME, (Oid[]) null, usage);
   }
 
   public GSSCredential createCredential(GSSName aName, int lifetime, Oid mech, int usage) throws GSSException {
-    throw new GSSException(GSSException.NO_CRED, -1, "No Kerberos credentials found");
+    return createCredential(aName, lifetime, mech == null ? null : new Oid[] {mech}, usage);
   }
 
   public GSSCredential createCredential(GSSName aName, int lifetime, Oid[] mechs, int usage) throws GSSException {
-    throw new GSSException(GSSException.NO_CRED, -1, "No Kerberos credentials found");
+    if (usage < GSSCredential.INITIATE_AND_ACCEPT || usage > GSSCredential.ACCEPT_ONLY) {
+      throw new GSSException(GSSException.FAILURE, -1, "Invalid usage mode requested - " + usage);
+    }
+    boolean explicit = mechs != null;
+    Oid[] ms = explicit ? mechs : new Oid[] {KRB5, SPNEGO};
+    for (Oid m : ms) {
+      checkMech(m);
+    }
+    GSSNameImpl name = aName == null ? null : (GSSNameImpl) aName;
+    GSSCredentialImpl cred = new GSSCredentialImpl(name);
+    GSSException last = null;
+    for (Oid m : ms) {
+      try {
+        addKrb5(cred, m, name, usage);
+      } catch (GSSException e) {
+        last = e;
+      }
+    }
+    if (cred.elems().isEmpty()) {
+      if (explicit && last != null) {
+        throw last;
+      }
+      throw new GSSException(GSSException.NO_CRED);
+    }
+    return cred;
+  }
+
+  private void addKrb5(GSSCredentialImpl cred, Oid mech, GSSNameImpl name, int usage) throws GSSException {
+    Subject s = Krb5Util.currentSubject();
+    PrincipalName want = name == null ? null : name.principal();
+    boolean init = usage != GSSCredential.ACCEPT_ONLY;
+    boolean accept = usage != GSSCredential.INITIATE_ONLY;
+    GSSException failure = null;
+    boolean any = false;
+    if (init) {
+      Creds tgt = Krb5Util.findTgt(s, want);
+      if (tgt != null) {
+        cred.addElemPublic(mech, GSSCredential.INITIATE_ONLY, GSSNameImpl.of(tgt.client), tgt, s);
+        any = true;
+      } else {
+        failure = new GSSException(GSSException.NO_CRED, -1, "Failed to find any Kerberos tgt");
+      }
+    }
+    if (accept) {
+      List<PrincipalName> names = Krb5Util.acceptNames(s);
+      PrincipalName pick = null;
+      for (PrincipalName p : names) {
+        if (want == null || p.equals(want)) {
+          pick = p;
+          break;
+        }
+      }
+      if (pick != null) {
+        cred.addElemPublic(mech, GSSCredential.ACCEPT_ONLY, GSSNameImpl.of(pick), null, s);
+        any = true;
+      } else if (failure == null) {
+        failure = new GSSException(GSSException.NO_CRED, -1, "Failed to find any Kerberos Key");
+      }
+    }
+    if (!any) {
+      throw failure;
+    }
   }
 
   public GSSContext createContext(GSSName peer, Oid mech, GSSCredential myCred, int lifetime) throws GSSException {
+    Oid m = mech == null ? KRB5 : mech;
     if (peer == null) {
       throw new GSSException(GSSException.BAD_NAME);
     }
-    return new ContextImpl(peer, mech == null ? KRB5 : mech, true);
+    return new ExtendedGSSContextImpl(peer, m, (GSSCredentialImpl) myCred, lifetime);
   }
 
   public GSSContext createContext(GSSCredential myCred) throws GSSException {
-    return new ContextImpl(null, KRB5, false);
+    return new ExtendedGSSContextImpl((GSSCredentialImpl) myCred);
   }
 
   public GSSContext createContext(byte[] interProcessToken) throws GSSException {
-    throw new GSSException(GSSException.NO_CONTEXT);
+    throw new GSSException(GSSException.UNAVAILABLE, -1, "GSSContext import is not supported");
   }
 
   public void addProviderAtFront(Provider p, Oid mech) throws GSSException {
   }
 
   public void addProviderAtEnd(Provider p, Oid mech) throws GSSException {
-  }
-
-  private static final class NameImpl implements GSSName {
-    private final String name;
-    private final Oid type;
-    private final Oid mech;
-
-    NameImpl(String name, Oid type, Oid mech) throws GSSException {
-      if (name == null) {
-        throw new GSSException(GSSException.BAD_NAME, -1, "Name cannot be null");
-      }
-      this.name = name;
-      this.type = type;
-      this.mech = mech;
-    }
-
-    public boolean equals(GSSName other) throws GSSException {
-      return equals((Object) other);
-    }
-
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!(other instanceof NameImpl)) {
-        return false;
-      }
-      NameImpl n = (NameImpl) other;
-      return name.equals(n.name) && (type == null ? n.type == null : type.equals(n.type));
-    }
-
-    public int hashCode() {
-      return name.hashCode();
-    }
-
-    public GSSName canonicalize(Oid mech) throws GSSException {
-      return new NameImpl(name, type, mech == null ? KRB5 : mech);
-    }
-
-    public byte[] export() throws GSSException {
-      if (mech == null) {
-        throw new GSSException(GSSException.NAME_NOT_MN);
-      }
-      byte[] der = mech.getDER();
-      byte[] n = name.getBytes();
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-      out.write(0x04);
-      out.write(0x01);
-      out.write(der.length >> 8);
-      out.write(der.length);
-      out.write(der, 0, der.length);
-      out.write(n.length >> 24);
-      out.write(n.length >> 16);
-      out.write(n.length >> 8);
-      out.write(n.length);
-      out.write(n, 0, n.length);
-      return out.toByteArray();
-    }
-
-    public String toString() {
-      return name;
-    }
-
-    public Oid getStringNameType() throws GSSException {
-      return type;
-    }
-
-    public boolean isAnonymous() {
-      return type != null && type.equals(GSSName.NT_ANONYMOUS);
-    }
-
-    public boolean isMN() {
-      return mech != null;
-    }
-  }
-
-  private static final class ContextImpl implements GSSContext {
-    private final GSSName peer;
-    private final Oid mech;
-    private final boolean initiator;
-    private boolean disposed;
-
-    ContextImpl(GSSName peer, Oid mech, boolean initiator) {
-      this.peer = peer;
-      this.mech = mech;
-      this.initiator = initiator;
-    }
-
-    private GSSException noCred() {
-      return new GSSException(GSSException.NO_CRED, -1, "Unable to obtain Kerberos credentials");
-    }
-
-    public byte[] initSecContext(byte[] inputBuf, int offset, int len) throws GSSException {
-      throw noCred();
-    }
-
-    public int initSecContext(java.io.InputStream inStream, java.io.OutputStream outStream) throws GSSException {
-      throw noCred();
-    }
-
-    public byte[] acceptSecContext(byte[] inTok, int offset, int len) throws GSSException {
-      throw noCred();
-    }
-
-    public void acceptSecContext(java.io.InputStream inStream, java.io.OutputStream outStream) throws GSSException {
-      throw noCred();
-    }
-
-    public boolean isEstablished() {
-      return false;
-    }
-
-    public void dispose() throws GSSException {
-      disposed = true;
-    }
-
-    public int getWrapSizeLimit(int qop, boolean confReq, int maxTokenSize) throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public byte[] wrap(byte[] inBuf, int offset, int len, org.ietf.jgss.MessageProp msgProp) throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public void wrap(java.io.InputStream inStream, java.io.OutputStream outStream, org.ietf.jgss.MessageProp msgProp)
-        throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public byte[] unwrap(byte[] inBuf, int offset, int len, org.ietf.jgss.MessageProp msgProp) throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public void unwrap(java.io.InputStream inStream, java.io.OutputStream outStream, org.ietf.jgss.MessageProp msgProp)
-        throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public byte[] getMIC(byte[] inMsg, int offset, int len, org.ietf.jgss.MessageProp msgProp) throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public void getMIC(java.io.InputStream inStream, java.io.OutputStream outStream, org.ietf.jgss.MessageProp msgProp)
-        throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public void verifyMIC(byte[] inTok, int tokOffset, int tokLen, byte[] inMsg, int msgOffset, int msgLen,
-        org.ietf.jgss.MessageProp msgProp) throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public void verifyMIC(java.io.InputStream tokStream, java.io.InputStream msgStream,
-        org.ietf.jgss.MessageProp msgProp) throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public byte[] export() throws GSSException {
-      throw new GSSException(GSSException.UNAVAILABLE);
-    }
-
-    public void requestMutualAuth(boolean state) throws GSSException {
-    }
-
-    public void requestReplayDet(boolean state) throws GSSException {
-    }
-
-    public void requestSequenceDet(boolean state) throws GSSException {
-    }
-
-    public void requestCredDeleg(boolean state) throws GSSException {
-    }
-
-    public void requestAnonymity(boolean state) throws GSSException {
-    }
-
-    public void requestConf(boolean state) throws GSSException {
-    }
-
-    public void requestInteg(boolean state) throws GSSException {
-    }
-
-    public void requestLifetime(int lifetime) throws GSSException {
-    }
-
-    public void setChannelBinding(org.ietf.jgss.ChannelBinding cb) throws GSSException {
-    }
-
-    public boolean getCredDelegState() {
-      return false;
-    }
-
-    public boolean getMutualAuthState() {
-      return false;
-    }
-
-    public boolean getReplayDetState() {
-      return false;
-    }
-
-    public boolean getSequenceDetState() {
-      return false;
-    }
-
-    public boolean getAnonymityState() {
-      return false;
-    }
-
-    public boolean isTransferable() throws GSSException {
-      return false;
-    }
-
-    public boolean isProtReady() {
-      return false;
-    }
-
-    public boolean getConfState() {
-      return false;
-    }
-
-    public boolean getIntegState() {
-      return false;
-    }
-
-    public int getLifetime() {
-      return 0;
-    }
-
-    public GSSName getSrcName() throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public GSSName getTargName() throws GSSException {
-      return peer;
-    }
-
-    public Oid getMech() throws GSSException {
-      return mech;
-    }
-
-    public GSSCredential getDelegCred() throws GSSException {
-      throw new GSSException(GSSException.NO_CONTEXT);
-    }
-
-    public boolean isInitiator() throws GSSException {
-      return initiator;
-    }
   }
 }

@@ -236,7 +236,7 @@ public class KerberosTicket implements Destroyable, Refreshable, java.io.Seriali
         caddrBuf.append("clientAddresses[" + i + "] = " + clientAddresses[i].toString());
       }
     }
-    return ("Ticket (hex) = " + "\n" + EncryptionKeyDump.dump(asn1Encoding) + "\n" + "Client Principal = "
+    return ("Ticket (hex) = " + "\n" + new sun.security.util.HexDumpEncoder().encodeBuffer(asn1Encoding) + "\n" + "Client Principal = "
         + client.toString() + "\n" + "Server Principal = " + server.toString() + "\n" + "Session Key = "
         + sessionKey.toString() + "\n" + "Forwardable Ticket " + flags[FORWARDABLE_TICKET_FLAG] + "\n"
         + "Forwarded Ticket " + flags[FORWARDED_TICKET_FLAG] + "\n" + "Proxiable Ticket "
@@ -316,19 +316,6 @@ public class KerberosTicket implements Destroyable, Refreshable, java.io.Seriali
     destroyed = false;
   }
 
-  private static final class EncryptionKeyDump {
-    static String dump(byte[] b) {
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < b.length; i++) {
-        if (i > 0 && i % 16 == 0) {
-          sb.append('\n');
-        }
-        sb.append(String.format("%02X ", b[i] & 0xff));
-      }
-      return sb.toString();
-    }
-  }
-
   private static final class KeyImpl implements SecretKey {
     private static final long serialVersionUID = -7889313790214321193L;
 
@@ -349,26 +336,7 @@ public class KerberosTicket implements Destroyable, Refreshable, java.io.Seriali
     }
 
     public String getAlgorithm() {
-      switch (keyType) {
-        case 1:
-          return "des-cbc-crc";
-        case 2:
-          return "des-cbc-md4";
-        case 3:
-          return "des-cbc-md5";
-        case 16:
-          return "des3-cbc-sha1-kd";
-        case 17:
-          return "aes128-cts-hmac-sha1-96";
-        case 18:
-          return "aes256-cts-hmac-sha1-96";
-        case 23:
-          return "rc4-hmac";
-        case 0:
-          return "NULL";
-        default:
-          return "NULL";
-      }
+      return keyType == 0 ? "NULL" : sun.security.krb5.Crypto.name(keyType);
     }
 
     public boolean isDestroyed() {
@@ -400,7 +368,7 @@ public class KerberosTicket implements Destroyable, Refreshable, java.io.Seriali
     }
 
     public String toString() {
-      return "EncryptionKey: keyType=" + keyType + " keyBytes (hex dump)=" + EncryptionKeyDump.dump(keyBytes);
+      return "keyType=" + keyType + ", " + keyBytes.length + "-byte key";
     }
   }
 }

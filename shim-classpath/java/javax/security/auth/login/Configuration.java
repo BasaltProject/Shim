@@ -53,6 +53,32 @@ public abstract class Configuration {
     if (type == null) {
       throw new NullPointerException("null type name");
     }
+    if (type.equals("JavaLoginConfig")) {
+      java.net.URI uri = null;
+      if (params instanceof java.security.URIParameter) {
+        uri = ((java.security.URIParameter) params).getURI();
+      } else if (params != null) {
+        throw new IllegalArgumentException("Invalid or unrecognized Configuration.Parameters");
+      }
+      final Configuration inner;
+      try {
+        inner = uri == null ? new com.sun.security.auth.login.ConfigFile()
+            : new com.sun.security.auth.login.ConfigFile(uri);
+      } catch (RuntimeException e) {
+        throw new SecurityException(e);
+      }
+      return new Configuration(java.security.Security.getProvider("SUN"), type, params) {
+        @Override
+        public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
+          return inner.getAppConfigurationEntry(name);
+        }
+
+        @Override
+        public void refresh() {
+          inner.refresh();
+        }
+      };
+    }
     throw new NoSuchAlgorithmException(type + " Configuration not available");
   }
 

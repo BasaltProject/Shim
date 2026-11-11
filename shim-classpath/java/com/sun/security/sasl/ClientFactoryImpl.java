@@ -16,11 +16,11 @@ import javax.security.sasl.SaslClientFactory;
 import javax.security.sasl.SaslException;
 
 public final class ClientFactoryImpl implements SaslClientFactory {
-  private static final String[] myMechs = {"EXTERNAL", "PLAIN", "CRAM-MD5"};
+  private static final String[] myMechs = {"EXTERNAL", "CRAM-MD5", "PLAIN"};
   private static final int[] mechPolicies = {
       SaslUtil.NOPLAINTEXT | SaslUtil.NOACTIVE | SaslUtil.NODICTIONARY | SaslUtil.NOANONYMOUS,
-      SaslUtil.NOANONYMOUS,
-      SaslUtil.NOPLAINTEXT | SaslUtil.NOANONYMOUS};
+      SaslUtil.NOPLAINTEXT | SaslUtil.NOANONYMOUS,
+      SaslUtil.NOANONYMOUS};
 
   public ClientFactoryImpl() {
   }
@@ -30,9 +30,9 @@ public final class ClientFactoryImpl implements SaslClientFactory {
     for (int i = 0; i < mechs.length; i++) {
       if (mechs[i].equals(myMechs[0]) && SaslUtil.policyMatches(mechPolicies[0], props)) {
         return new ExternalClient(authorizationId);
-      } else if (mechs[i].equals(myMechs[1]) && SaslUtil.policyMatches(mechPolicies[1], props)) {
-        return new PlainClient(authorizationId, cbh);
       } else if (mechs[i].equals(myMechs[2]) && SaslUtil.policyMatches(mechPolicies[2], props)) {
+        return new PlainClient(authorizationId, cbh);
+      } else if (mechs[i].equals(myMechs[1]) && SaslUtil.policyMatches(mechPolicies[1], props)) {
         return new CramMD5Client(cbh);
       }
     }

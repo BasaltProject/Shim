@@ -10,18 +10,18 @@ package com.sun.security.sasl;
 
 import java.util.Map;
 
-final class SaslUtil {
-  static final int NOPLAINTEXT = 0x01;
-  static final int NOACTIVE = 0x02;
-  static final int NODICTIONARY = 0x04;
-  static final int FORWARD_SECRECY = 0x08;
-  static final int NOANONYMOUS = 0x10;
-  static final int PASS_CREDENTIALS = 0x20;
+public final class SaslUtil {
+  public static final int NOPLAINTEXT = 0x01;
+  public static final int NOACTIVE = 0x02;
+  public static final int NODICTIONARY = 0x04;
+  public static final int FORWARD_SECRECY = 0x08;
+  public static final int NOANONYMOUS = 0x10;
+  public static final int PASS_CREDENTIALS = 0x20;
 
   private SaslUtil() {
   }
 
-  static boolean policyMatches(int flags, Map<String, ?> props) {
+  public static boolean policyMatches(int flags, Map<String, ?> props) {
     if (props == null) {
       return true;
     }
@@ -51,7 +51,7 @@ final class SaslUtil {
     return v != null && "true".equalsIgnoreCase(String.valueOf(v));
   }
 
-  static String hex(byte[] b) {
+  public static String hex(byte[] b) {
     StringBuilder sb = new StringBuilder();
     for (byte x : b) {
       sb.append(Character.forDigit((x >> 4) & 0xf, 16)).append(Character.forDigit(x & 0xf, 16));
@@ -59,7 +59,7 @@ final class SaslUtil {
     return sb.toString();
   }
 
-  static byte[] hmacMd5(byte[] key, byte[] text) {
+  public static byte[] hmacMd5(byte[] key, byte[] text) {
     try {
       javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacMD5");
       mac.init(new javax.crypto.spec.SecretKeySpec(key.length == 0 ? new byte[1] : key, "HmacMD5"));
