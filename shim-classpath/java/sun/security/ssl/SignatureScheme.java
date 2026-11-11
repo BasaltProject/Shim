@@ -19,6 +19,7 @@ final class SignatureScheme {
   static final int kEcdsa = 0;
   static final int kRsaPss = 1;
   static final int kRsaPkcs1 = 2;
+  static final int kDsa = 3;
 
   final int id;
   final String name;
@@ -49,7 +50,18 @@ final class SignatureScheme {
     new SignatureScheme(0x0401, "rsa_pkcs1_sha256", kRsaPkcs1, "SHA256withRSA", "SHA-256", 0, null),
     new SignatureScheme(0x0501, "rsa_pkcs1_sha384", kRsaPkcs1, "SHA384withRSA", "SHA-384", 0, null),
     new SignatureScheme(0x0601, "rsa_pkcs1_sha512", kRsaPkcs1, "SHA512withRSA", "SHA-512", 0, null),
+    new SignatureScheme(0x0402, "dsa_sha256", kDsa, "SHA256withDSA", "SHA-256", 0, null),
   };
+
+  static final SignatureScheme kLegacyRsa = new SignatureScheme(0, "md5_sha1_rsa", kRsaPkcs1, "MD5andSHA1withRSA",
+      "MD5", 0, null);
+  static final SignatureScheme kLegacyDsa = new SignatureScheme(0, "sha1_dsa", kDsa, "SHA1withDSA", "SHA-1", 0, null);
+  static final SignatureScheme kLegacyEcdsa = new SignatureScheme(0, "sha1_ecdsa", kEcdsa, "SHA1withECDSA", "SHA-1",
+      0, null);
+
+  static SignatureScheme legacyFor(int kind) {
+    return kind == kEcdsa ? kLegacyEcdsa : kind == kDsa ? kLegacyDsa : kLegacyRsa;
+  }
 
   static List<SignatureScheme> all() {
     return Arrays.asList(kAll);
@@ -79,6 +91,9 @@ final class SignatureScheme {
         return false;
       }
       return !tls13 || curve.equals(key.curveName);
+    }
+    if (kind == kDsa) {
+      return !tls13 && keyAlgorithm.equals("DSA");
     }
     if (kind == kRsaPkcs1) {
       return keyAlgorithm.equals("RSA");

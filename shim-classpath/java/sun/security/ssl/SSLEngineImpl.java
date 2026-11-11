@@ -39,6 +39,9 @@ final class SSLEngineImpl extends SSLEngine {
     if (!protocolsCustom) {
       cfg.protocols = context.enabledProtocols(clientMode);
     }
+    if (!cfg.suitesCustom) {
+      cfg.cipherSuites = context.defaultSuites(clientMode);
+    }
   }
 
   private synchronized void ensureConnection() throws SSLException {
@@ -322,6 +325,7 @@ final class SSLEngineImpl extends SSLEngine {
   public synchronized void setEnabledCipherSuites(String[] suites) {
     TlsParams.checkSuites(suites);
     cfg.cipherSuites = suites.clone();
+    cfg.suitesCustom = true;
   }
 
   @Override

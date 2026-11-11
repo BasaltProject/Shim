@@ -34,18 +34,51 @@ final class NamedGroup {
   static final NamedGroup kSecp384r1 = new NamedGroup(0x0018, "secp384r1", "secp384r1", 48);
   static final NamedGroup kSecp521r1 = new NamedGroup(0x0019, "secp521r1", "secp521r1", 66);
 
-  private static final NamedGroup[] kAll = {kX25519, kSecp256r1, kSecp384r1, kSecp521r1};
+  static final NamedGroup kFfdhe2048 = new NamedGroup(0x0100, "ffdhe2048", null, 256, 2048);
+  static final NamedGroup kFfdhe3072 = new NamedGroup(0x0101, "ffdhe3072", null, 384, 3072);
+  static final NamedGroup kFfdhe4096 = new NamedGroup(0x0102, "ffdhe4096", null, 512, 4096);
+  static final NamedGroup kFfdhe6144 = new NamedGroup(0x0103, "ffdhe6144", null, 768, 6144);
+  static final NamedGroup kFfdhe8192 = new NamedGroup(0x0104, "ffdhe8192", null, 1024, 8192);
+
+  private static final NamedGroup[] kAll = {kX25519, kSecp256r1, kSecp384r1, kSecp521r1, kFfdhe2048, kFfdhe3072,
+      kFfdhe4096, kFfdhe6144, kFfdhe8192};
 
   final int id;
   final String name;
   final String curve;
   final int fieldBytes;
+  final int dhBits;
 
   private NamedGroup(int id, String name, String curve, int fieldBytes) {
+    this(id, name, curve, fieldBytes, 0);
+  }
+
+  private NamedGroup(int id, String name, String curve, int fieldBytes, int dhBits) {
     this.id = id;
     this.name = name;
     this.curve = curve;
     this.fieldBytes = fieldBytes;
+    this.dhBits = dhBits;
+  }
+
+  boolean isDh() {
+    return dhBits != 0;
+  }
+
+  java.math.BigInteger dhPrime() {
+    return FfdhePrimes.prime(dhBits);
+  }
+
+  static NamedGroup byPrime(java.math.BigInteger p, java.math.BigInteger g) {
+    if (!g.equals(java.math.BigInteger.valueOf(2))) {
+      return null;
+    }
+    for (NamedGroup n : kAll) {
+      if (n.isDh() && n.dhBits == p.bitLength() && n.dhPrime().equals(p)) {
+        return n;
+      }
+    }
+    return null;
   }
 
   static List<NamedGroup> all() {
@@ -71,7 +104,7 @@ final class NamedGroup {
   }
 
   boolean isXdh() {
-    return curve == null;
+    return curve == null && !isDh();
   }
 
   KeyShareKeys generate(SecureRandom random) throws GeneralSecurityException {
@@ -88,10 +121,15 @@ final class NamedGroup {
     private final byte[] xPrivate;
     private final byte[] publicEncoded;
     private PrivateKey ecPrivate;
+    private DhExchange dh;
 
     KeyShareKeys(NamedGroup group, SecureRandom random) throws GeneralSecurityException {
       this.group = group;
-      if (group.isXdh()) {
+      if (group.isDh()) {
+        xPrivate = null;
+        dh = new DhExchange(group.dhPrime(), java.math.BigInteger.valueOf(2), random);
+        publicEncoded = dh.publicPadded();
+      } else if (group.isXdh()) {
         xPrivate = new byte[32];
         random.nextBytes(xPrivate);
         publicEncoded = X25519.publicKey(xPrivate);
@@ -110,6 +148,12 @@ final class NamedGroup {
     }
 
     byte[] deriveSecret(byte[] peer) throws GeneralSecurityException {
+      if (group.isDh()) {
+        if (peer.length != dh.primeBytes()) {
+          throw new InvalidKeyException("Invalid FFDHE key share");
+        }
+        return dh.secret(peer, true);
+      }
       if (group.isXdh()) {
         if (peer.length != 32) {
           throw new InvalidKeyException("Invalid x25519 key share");

@@ -634,6 +634,7 @@ final class SSLSocketImpl extends SSLSocket {
   public synchronized void setEnabledCipherSuites(String[] suites) {
     TlsParams.checkSuites(suites);
     cfg.cipherSuites = suites.clone();
+    cfg.suitesCustom = true;
   }
 
   @Override
@@ -710,6 +711,9 @@ final class SSLSocketImpl extends SSLSocket {
         cfg.clientMode = mode;
         if (!protocolsCustom) {
           cfg.protocols = context.enabledProtocols(mode);
+        }
+        if (!cfg.suitesCustom) {
+          cfg.cipherSuites = context.defaultSuites(mode);
         }
       }
     }

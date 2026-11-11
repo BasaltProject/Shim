@@ -65,9 +65,18 @@ abstract class DSA extends SignatureSpi {
     if (k.getParams() == null) {
       throw new InvalidKeyException("DSA public key lacks parameters");
     }
+    checkStrength(k.getParams());
     publicKey = k;
     privateKey = null;
     reset();
+  }
+
+  private void checkStrength(DSAParams params) throws InvalidKeyException {
+    reset();
+    if (digest != null && params.getQ().bitLength() > digest.getDigestLength() * 8) {
+      throw new InvalidKeyException("The security strength of " + digestName
+          + " digest algorithm is not sufficient for this key size");
+    }
   }
 
   @Override
@@ -84,6 +93,7 @@ abstract class DSA extends SignatureSpi {
     if (k.getParams() == null) {
       throw new InvalidKeyException("DSA private key lacks parameters");
     }
+    checkStrength(k.getParams());
     privateKey = k;
     publicKey = null;
     this.random = random;

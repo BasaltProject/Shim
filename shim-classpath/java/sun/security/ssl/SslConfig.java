@@ -27,8 +27,9 @@ final class SslConfig {
   String[] signatureSchemes;
   String[] namedGroups;
   boolean enableSessionCreation = true;
-  boolean useCipherSuitesOrder;
+  boolean useCipherSuitesOrder = true;
   BiFunction<?, List<String>, String> alpnSelector;
+  boolean suitesCustom;
   boolean datagram;
   int maximumPacketSize;
 
@@ -48,6 +49,7 @@ final class SslConfig {
     c.enableSessionCreation = enableSessionCreation;
     c.useCipherSuitesOrder = useCipherSuitesOrder;
     c.alpnSelector = alpnSelector;
+    c.suitesCustom = suitesCustom;
     c.datagram = datagram;
     c.maximumPacketSize = maximumPacketSize;
     return c;

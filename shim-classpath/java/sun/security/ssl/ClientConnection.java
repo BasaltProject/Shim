@@ -87,10 +87,11 @@ final class ClientConnection extends TlsConnection {
   private byte[] certificateRequestContext = new byte[0];
   private boolean useExtendedMasterSecret;
   private byte[] masterSecret;
-  private String hmac12;
   private RecordCipher pendingReadCipher;
   private byte[] serverKeyExchangeEcdhe;
   private NamedGroup serverKeyExchangeGroup;
+  private java.math.BigInteger serverDhP;
+  private java.math.BigInteger serverDhG;
   private PrivateKey clientKey;
   private X509Certificate[] clientChain;
 
@@ -119,14 +120,19 @@ final class ClientConnection extends TlsConnection {
 
   @Override
   void startHandshakeImpl() throws SSLException {
-    offeredVersions = TlsParams.versions(cfg);
-    offered13 = offeredVersions.contains(kTls13) && !TlsParams.suites(cfg, true, false).isEmpty();
-    offered12 = offeredVersions.contains(kTls12) && !TlsParams.suites(cfg, false, true).isEmpty();
+    offeredVersions = new ArrayList<Integer>();
+    for (int v : TlsParams.versions(cfg)) {
+      if (!TlsParams.suites(cfg, Collections.singletonList(v)).isEmpty()) {
+        offeredVersions.add(v);
+      }
+    }
+    offered13 = offeredVersions.contains(kTls13);
+    offered12 = offeredVersions.size() > (offered13 ? 1 : 0);
     if (!offered13 && !offered12) {
       throw new SSLHandshakeException("No appropriate protocol (protocol is disabled or cipher suites are "
           + "inappropriate)");
     }
-    offered = TlsParams.suites(cfg, offered13, offered12);
+    offered = TlsParams.suites(cfg, offeredVersions);
     groups = TlsParams.groups(cfg);
     schemes = TlsParams.schemes(cfg);
     session = new SSLSessionImpl(context.clientSessionContext(), peerHost, peerPort);
@@ -156,7 +162,8 @@ final class ClientConnection extends TlsConnection {
 
   private void sendClientHello() throws SSLException {
     ByteWriter w = new ByteWriter();
-    w.u16(dtls ? 0xFEFD : 0x0303).bytes(clientRandom).vec8(legacySessionId);
+    int top = Math.min(offeredVersions.get(0), kTls12);
+    w.u16(dtls ? top == kTls12 ? 0xFEFD : 0xFEFF : top).bytes(clientRandom).vec8(legacySessionId);
     if (dtls) {
       w.vec8(dtlsCookie);
     }
@@ -194,7 +201,9 @@ final class ClientConnection extends TlsConnection {
       sa.u16(s.id);
     }
     sa.end();
-    ext(w, kExtSignatureAlgorithms, sa.toByteArray());
+    if (offered13 || offeredVersions.contains(kTls12)) {
+      ext(w, kExtSignatureAlgorithms, sa.toByteArray());
+    }
     if (cfg.applicationProtocols.length > 0) {
       ByteWriter ap = new ByteWriter();
       ap.begin(2);
@@ -208,7 +217,7 @@ final class ClientConnection extends TlsConnection {
       ext(w, kExtExtendedMasterSecret, new byte[0]);
       ext(w, kExtRenegotiationInfo, new byte[] {0});
     }
-    if (offered13) {
+    if (!dtls) {
       ByteWriter sv = new ByteWriter();
       sv.begin(1);
       for (int v : offeredVersions) {
@@ -372,7 +381,7 @@ final class ClientConnection extends TlsConnection {
     ByteReader r = new ByteReader(body);
     int legacyVersion = r.u16();
     if (dtls) {
-      legacyVersion = legacyVersion == 0xFEFD ? kTls12 : 0;
+      legacyVersion = legacyVersion == 0xFEFD ? kTls12 : legacyVersion == 0xFEFF ? kTls11 : 0;
     }
     serverRandom = r.bytes(32);
     byte[] sessionId = r.vec8();
@@ -453,26 +462,29 @@ final class ClientConnection extends TlsConnection {
     if (helloRetry) {
       throw fatal(kAlertIllegalParameter, "Unexpected HelloRetryRequest");
     }
-    if (legacyVersion != kTls12 || !offered12 || chosen.tls13) {
+    if (legacyVersion == kTls13 || !offeredVersions.contains(legacyVersion)) {
       throw fatal(kAlertProtocolVersion, "The server selected protocol version "
-          + (legacyVersion == 0x0302 ? "TLS11" : legacyVersion == 0x0301 ? "TLS10" : "0x"
-              + Integer.toHexString(legacyVersion)) + " is not accepted by client preferences ["
+          + (legacyVersion == kTls12 ? "TLS12" : legacyVersion == kTls11 ? "TLS11" : legacyVersion == kTls10 ? "TLS10"
+              : "0x" + Integer.toHexString(legacyVersion)) + " is not accepted by client preferences ["
           + offeredNames() + "]");
     }
-    if (offered13) {
-      byte[] tail = Arrays.copyOfRange(serverRandom, 24, 32);
-      if (Arrays.equals(tail, new byte[] {0x44, 0x4F, 0x57, 0x4E, 0x47, 0x52, 0x44, 1})
-          || Arrays.equals(tail, new byte[] {0x44, 0x4F, 0x57, 0x4E, 0x47, 0x52, 0x44, 0})) {
-        throw fatal(kAlertIllegalParameter, "Unexpected ServerHello downgrade indication");
-      }
+    if (chosen.tls13 || !chosen.supports(legacyVersion)) {
+      throw fatal(kAlertIllegalParameter, "Server selected improper ciphersuite " + chosen.name);
+    }
+    byte[] tail = Arrays.copyOfRange(serverRandom, 24, 32);
+    byte[] marker = {0x44, 0x4F, 0x57, 0x4E, 0x47, 0x52, 0x44, 0};
+    boolean low = Arrays.equals(tail, marker);
+    marker[7] = 1;
+    if (offered13 && (low || Arrays.equals(tail, marker)) || offeredVersions.contains(kTls12) && legacyVersion
+        < kTls12 && low) {
+      throw fatal(kAlertIllegalParameter, "Unexpected ServerHello downgrade indication");
     }
     suite = chosen;
-    version = kTls12;
+    version = legacyVersion;
     useExtendedMasterSecret = ems;
     if (alpn != null) {
       acceptAlpn(alpn);
     }
-    hmac12 = suite.hmac;
     transcript.bytes(message);
     session.setNegotiated(protocolName(), suite.name);
     state = kStateTls12Certificate;
@@ -484,7 +496,8 @@ final class ClientConnection extends TlsConnection {
       if (i > 0) {
         sb.append(", ");
       }
-      sb.append(offeredVersions.get(i) == kTls13 ? "TLS13" : "TLS12");
+      int v = offeredVersions.get(i);
+      sb.append(dtls ? "DTLS" : "TLS").append(v == kTls13 ? "13" : v == kTls12 ? "12" : v == kTls11 ? "11" : "10");
     }
     return sb.toString();
   }
@@ -761,20 +774,38 @@ final class ClientConnection extends TlsConnection {
 
   private void handleServerKeyExchange(byte[] body) throws SSLException, GeneralSecurityException {
     ByteReader r = new ByteReader(body);
-    int curveType = r.u8();
-    int groupId = r.u16();
-    byte[] point = r.vec8();
-    int paramsLen = 1 + 2 + 1 + point.length;
-    if (curveType != 3) {
-      throw fatal(kAlertIllegalParameter, "Unsupported ECCurveType: " + curveType);
+    int paramsLen;
+    NamedGroup g = null;
+    byte[] point = null;
+    if (suite.dhe()) {
+      java.math.BigInteger p = new java.math.BigInteger(1, r.vec16());
+      java.math.BigInteger gen = new java.math.BigInteger(1, r.vec16());
+      point = r.vec16();
+      paramsLen = body.length - r.remaining();
+      if (p.bitLength() < 1024 || p.bitLength() > 8192 || !p.testBit(0)
+          || gen.compareTo(java.math.BigInteger.valueOf(2)) < 0 || gen.compareTo(p.subtract(java.math.BigInteger.ONE))
+          >= 0) {
+        throw fatal(kAlertInsufficientSecurity, "Unsupported Diffie-Hellman parameters");
+      }
+      serverDhP = p;
+      serverDhG = gen;
+    } else {
+      int curveType = r.u8();
+      int groupId = r.u16();
+      point = r.vec8();
+      paramsLen = 1 + 2 + 1 + point.length;
+      if (curveType != 3) {
+        throw fatal(kAlertIllegalParameter, "Unsupported ECCurveType: " + curveType);
+      }
+      g = NamedGroup.byId(groupId);
+      if (g == null || g.isDh() || !groups.contains(g)) {
+        throw fatal(kAlertIllegalParameter, "Unsupported named group: " + groupId);
+      }
     }
-    NamedGroup g = NamedGroup.byId(groupId);
-    if (g == null || !groups.contains(g)) {
-      throw fatal(kAlertIllegalParameter, "Unsupported named group: " + groupId);
-    }
-    int schemeId = r.u16();
+    int schemeId = version >= kTls12 ? r.u16() : 0;
     byte[] signature = r.vec16();
-    SignatureScheme scheme = TlsCrypto.findScheme(schemeId, schemes);
+    SignatureScheme scheme = version >= kTls12 ? TlsCrypto.findScheme(schemeId, schemes)
+        : SignatureScheme.legacyFor(suite.certKind());
     PublicKey pub = serverChain[0].getPublicKey();
     if (scheme == null || !scheme.usableWith(pub.getAlgorithm(), SignatureScheme.PublicKeyInfo.of(pub), false)) {
       throw fatal(kAlertIllegalParameter, "Unsupported signature scheme: 0x" + Integer.toHexString(schemeId));
@@ -795,13 +826,22 @@ final class ClientConnection extends TlsConnection {
 
   private void handleCertificateRequest12(byte[] body) throws SSLException {
     ByteReader r = new ByteReader(body);
-    r.vec8();
-    ByteReader sa = r.sub16();
+    byte[] certTypes = r.vec8();
     serverSchemes = new ArrayList<SignatureScheme>();
-    while (sa.hasRemaining()) {
-      SignatureScheme s = TlsCrypto.findScheme(sa.u16(), schemes);
-      if (s != null) {
-        serverSchemes.add(s);
+    if (version >= kTls12) {
+      ByteReader sa = r.sub16();
+      while (sa.hasRemaining()) {
+        SignatureScheme s = TlsCrypto.findScheme(sa.u16(), schemes);
+        if (s != null) {
+          serverSchemes.add(s);
+        }
+      }
+    } else {
+      for (byte t : certTypes) {
+        if (t == 1 || t == 2 || t == 64) {
+          serverSchemes.add(SignatureScheme.legacyFor(t == 64 ? SignatureScheme.kEcdsa : t == 2
+              ? SignatureScheme.kDsa : SignatureScheme.kRsaPss));
+        }
       }
     }
     ByteReader cas = r.sub16();
@@ -813,10 +853,11 @@ final class ClientConnection extends TlsConnection {
   }
 
   private void handleServerHelloDone() throws SSLException, GeneralSecurityException {
-    NamedGroup.KeyShareKeys ephemeral = serverKeyExchangeGroup.generate(random);
+    NamedGroup.KeyShareKeys ephemeral = suite.dhe() ? null : serverKeyExchangeGroup.generate(random);
+    DhExchange dh = suite.dhe() ? new DhExchange(serverDhP, serverDhG, random) : null;
     byte[] shared;
     try {
-      shared = ephemeral.deriveSecret(serverKeyExchangeEcdhe);
+      shared = dh != null ? dh.secret(serverKeyExchangeEcdhe, false) : ephemeral.deriveSecret(serverKeyExchangeEcdhe);
     } catch (GeneralSecurityException e) {
       throw fatal(kAlertIllegalParameter, "Invalid server key exchange value: " + e.getMessage(), e);
     }
@@ -849,31 +890,29 @@ final class ClientConnection extends TlsConnection {
       transcript.bytes(certMsg);
       sendHandshake(certMsg);
     }
-    byte[] cke = buildMessage(kClientKeyExchange, new ByteWriter().vec8(ephemeral.publicBytes()).toByteArray());
+    byte[] cke = buildMessage(kClientKeyExchange, dh != null ? new ByteWriter().vec16(dh.publicPadded()).toByteArray()
+        : new ByteWriter().vec8(ephemeral.publicBytes()).toByteArray());
     transcript.bytes(cke);
     byte[] sessionHash = hashOf(transcript.toByteArray());
     sendHandshake(cke);
     if (certScheme != null) {
       byte[] sig = TlsCrypto.sign(certScheme, clientKey, transcript.toByteArray(), random);
-      byte[] cv = buildMessage(kCertificateVerify, new ByteWriter().u16(certScheme.id).vec16(sig).toByteArray());
+      ByteWriter cvBody = new ByteWriter();
+      if (version >= kTls12) {
+        cvBody.u16(certScheme.id);
+      }
+      byte[] cv = buildMessage(kCertificateVerify, cvBody.vec16(sig).toByteArray());
       transcript.bytes(cv);
       sendHandshake(cv);
     }
     String label = useExtendedMasterSecret ? "extended master secret" : "master secret";
     byte[] seed = useExtendedMasterSecret ? sessionHash : TlsPrf.concat(clientRandom, serverRandom);
-    masterSecret = TlsPrf.prf(hmac12, shared, label, seed, 48);
-    int keyLen = suite.keyLength;
-    int ivLen = suite.aead == CipherSuite.kAeadChacha ? 12 : 4;
-    byte[] block = TlsPrf.prf(hmac12, masterSecret, "key expansion", TlsPrf.concat(serverRandom, clientRandom),
-        2 * keyLen + 2 * ivLen);
-    byte[] cKey = Arrays.copyOfRange(block, 0, keyLen);
-    byte[] sKey = Arrays.copyOfRange(block, keyLen, 2 * keyLen);
-    byte[] cIv = Arrays.copyOfRange(block, 2 * keyLen, 2 * keyLen + ivLen);
-    byte[] sIv = Arrays.copyOfRange(block, 2 * keyLen + ivLen, 2 * keyLen + 2 * ivLen);
-    pendingReadCipher = new RecordCipher(false, suite.aead, sKey, sIv, true);
+    masterSecret = prf(shared, label, seed, 48);
+    RecordCipher[] ciphers = RecordCipher.keyBlock12(suite, version, dtls, masterSecret, serverRandom, clientRandom);
+    pendingReadCipher = ciphers[1];
     sendChangeCipherSpec();
-    installWriteCipher(new RecordCipher(false, suite.aead, cKey, cIv, false));
-    byte[] verify = TlsPrf.prf(hmac12, masterSecret, "client finished", transcriptHash(), 12);
+    installWriteCipher(ciphers[0]);
+    byte[] verify = prf(masterSecret, "client finished", transcriptHash(), 12);
     byte[] fin = buildMessage(kFinished, verify);
     transcript.bytes(fin);
     sendHandshake(fin);
@@ -881,7 +920,7 @@ final class ClientConnection extends TlsConnection {
   }
 
   private void handleFinished12(byte[] body, byte[] message) throws SSLException, GeneralSecurityException {
-    byte[] expected = TlsPrf.prf(hmac12, masterSecret, "server finished", transcriptHash(), 12);
+    byte[] expected = prf(masterSecret, "server finished", transcriptHash(), 12);
     if (!MessageDigest.isEqual(expected, body)) {
       throw fatal(kAlertDecryptError, "Invalid Finished message");
     }

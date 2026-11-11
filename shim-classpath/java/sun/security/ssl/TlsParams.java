@@ -48,11 +48,46 @@ final class TlsParams {
     return out.toArray(new String[0]);
   }
 
+  private static volatile java.util.Set<String> disabledAlgorithms;
+
+  static boolean permitted(String protocol) {
+    java.util.Set<String> set = disabledAlgorithms;
+    if (set == null) {
+      set = new java.util.HashSet<String>();
+      String property = java.security.Security.getProperty("jdk.tls.disabledAlgorithms");
+      if (property != null) {
+        for (String token : property.split(",")) {
+          set.add(token.trim());
+        }
+      }
+      disabledAlgorithms = set;
+    }
+    return !set.contains(protocol);
+  }
+
+  static int versionCode(String protocol, boolean datagram) {
+    if (datagram) {
+      return "DTLSv1.2".equals(protocol) ? TlsConnection.kTls12 : "DTLSv1.0".equals(protocol) ? TlsConnection.kTls11
+          : 0;
+    }
+    return TlsConnection.enabledVersionCode(protocol);
+  }
+
+  static String[] availableProtocols(String[] candidates) {
+    List<String> out = new ArrayList<String>();
+    for (String p : candidates) {
+      if (permitted(p)) {
+        out.add(p);
+      }
+    }
+    return out.toArray(new String[0]);
+  }
+
   static List<Integer> versions(SslConfig cfg) {
     List<Integer> out = new ArrayList<Integer>();
     for (String p : cfg.protocols) {
-      int code = cfg.datagram ? "DTLSv1.2".equals(p) ? TlsConnection.kTls12 : 0 : TlsConnection.enabledVersionCode(p);
-      if (code != 0) {
+      int code = permitted(p) ? versionCode(p, cfg.datagram) : 0;
+      if (code != 0 && !out.contains(code)) {
         out.add(code);
       }
     }
@@ -60,18 +95,44 @@ final class TlsParams {
     return out;
   }
 
-  static List<CipherSuite> suites(SslConfig cfg, boolean allow13, boolean allow12) {
+  static List<CipherSuite> suites(SslConfig cfg, List<Integer> versions) {
     List<CipherSuite> out = new ArrayList<CipherSuite>();
     for (String n : cfg.cipherSuites) {
       CipherSuite s = CipherSuite.byName(n);
-      if (s == null) {
+      if (s == null || s.scsv) {
         continue;
       }
-      if (s.tls13 ? allow13 : allow12) {
-        out.add(s);
+      for (int v : versions) {
+        if (s.supports(v)) {
+          out.add(s);
+          break;
+        }
       }
     }
     return out;
+  }
+
+  static String[] applicableSuites(String[] protocols, boolean datagram) {
+    List<Integer> versions = new ArrayList<Integer>();
+    for (String p : protocols) {
+      int code = versionCode(p, datagram);
+      if (code != 0) {
+        versions.add(code);
+      }
+    }
+    List<String> out = new ArrayList<String>();
+    for (CipherSuite s : CipherSuite.all()) {
+      if (datagram && s.tls13) {
+        continue;
+      }
+      for (int v : versions) {
+        if (s.supports(v)) {
+          out.add(s.name);
+          break;
+        }
+      }
+    }
+    return out.toArray(new String[0]);
   }
 
   static List<NamedGroup> groups(SslConfig cfg) {

@@ -160,8 +160,12 @@ public abstract class SSLContextImpl extends SSLContextSpi {
     cfg.clientMode = client;
     cfg.protocols = enabledProtocols(client);
     cfg.datagram = datagram();
-    cfg.cipherSuites = TlsParams.supportedCipherSuites(cfg.datagram);
+    cfg.cipherSuites = defaultSuites(client);
     return cfg;
+  }
+
+  String[] defaultSuites(boolean client) {
+    return TlsParams.applicableSuites(enabledProtocols(client), datagram());
   }
 
   @Override
@@ -204,7 +208,12 @@ public abstract class SSLContextImpl extends SSLContextSpi {
     return clientContext;
   }
 
-  private static final String[] kTls13Up = {"TLSv1.3", "TLSv1.2"};
+  private static final String[] kTls13Up = {"TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1"};
+  private static final String[] kTls12Up = {"TLSv1.2", "TLSv1.1", "TLSv1"};
+  private static final String[] kTls11Up = {"TLSv1.1", "TLSv1"};
+  private static final String[] kTls10Only = {"TLSv1"};
+  private static final String[] kDtlsAll = {"DTLSv1.2", "DTLSv1.0"};
+  private static final String[] kDtls10Only = {"DTLSv1.0"};
 
   public static final class TLSContext extends SSLContextImpl {
     public TLSContext() {
@@ -212,7 +221,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return kTls13Up.clone();
+      return TlsParams.availableProtocols(kTls13Up);
     }
 
     @Override
@@ -227,7 +236,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return kTls13Up.clone();
+      return TlsParams.availableProtocols(kTls13Up);
     }
 
     @Override
@@ -242,7 +251,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return client ? new String[] {"TLSv1.2"} : kTls13Up.clone();
+      return TlsParams.availableProtocols(client ? kTls12Up : kTls13Up);
     }
 
     @Override
@@ -257,7 +266,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return client ? new String[0] : kTls13Up.clone();
+      return TlsParams.availableProtocols(client ? kTls11Up : kTls13Up);
     }
 
     @Override
@@ -272,7 +281,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return client ? new String[0] : kTls13Up.clone();
+      return TlsParams.availableProtocols(client ? kTls10Only : kTls13Up);
     }
 
     @Override
@@ -300,7 +309,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return kTls13Up.clone();
+      return TlsParams.availableProtocols(kTls13Up);
     }
 
     @Override
@@ -321,7 +330,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
     @Override
     protected SSLParameters engineGetDefaultSSLParameters() {
       SSLParameters p = new SSLParameters();
-      p.setCipherSuites(TlsParams.supportedCipherSuites(true));
+      p.setCipherSuites(defaultSuites(true));
       p.setProtocols(enabledProtocols(true));
       return p;
     }
@@ -336,7 +345,7 @@ public abstract class SSLContextImpl extends SSLContextSpi {
 
     @Override
     String[] enabledProtocols(boolean client) {
-      return new String[] {"DTLSv1.2"};
+      return TlsParams.availableProtocols(kDtlsAll);
     }
 
     @Override
@@ -355,11 +364,8 @@ public abstract class SSLContextImpl extends SSLContextSpi {
     }
 
     @Override
-    protected SSLParameters engineGetDefaultSSLParameters() {
-      SSLParameters p = new SSLParameters();
-      p.setCipherSuites(new String[0]);
-      p.setProtocols(new String[0]);
-      return p;
+    String[] enabledProtocols(boolean client) {
+      return TlsParams.availableProtocols(client ? kDtls10Only : kDtlsAll);
     }
   }
 

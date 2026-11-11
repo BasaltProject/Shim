@@ -19,6 +19,8 @@ import javax.net.ssl.SSLHandshakeException;
 abstract class TlsConnection {
   static final int kTls13 = 0x0304;
   static final int kTls12 = 0x0303;
+  static final int kTls11 = 0x0302;
+  static final int kTls10 = 0x0301;
 
   static final int kClientHello = 1;
   static final int kServerHello = 2;
@@ -82,10 +84,10 @@ abstract class TlsConnection {
   SSLException failure;
   String negotiatedApplicationProtocol;
   private boolean sentCompatCcs;
+  private boolean appRecordSent;
 
   boolean dtls;
   static final int kHelloVerifyRequest = 3;
-  private static final int kDtlsVersion = 0xFEFD;
   private int sendMessageSeq;
   private int receiveMessageSeq;
   private int writeEpoch;
@@ -169,6 +171,12 @@ abstract class TlsConnection {
       return dtlsRecord(writeEpoch, RecordCipher.kContentApplicationData, Arrays.copyOfRange(src, off, off + len));
     }
     try {
+      boolean split = appRecordSent && len >= 1 && version == kTls10 && suite.aead == CipherSuite.kCbc;
+      appRecordSent = true;
+      if (split) {
+        byte[] first = writeCipher.encrypt(RecordCipher.kContentApplicationData, src, off, 1);
+        return TlsPrf.concat(first, writeCipher.encrypt(RecordCipher.kContentApplicationData, src, off + 1, len - 1));
+      }
       return writeCipher.encrypt(RecordCipher.kContentApplicationData, src, off, len);
     } catch (GeneralSecurityException e) {
       throw abort(new SSLException("Cannot encrypt record", e));
@@ -327,8 +335,7 @@ abstract class TlsConnection {
     }
     if (writeCipher == null) {
       ByteWriter w = new ByteWriter();
-      int legacy = type == RecordCipher.kContentHandshake && version == 0 ? 0x0301 : 0x0303;
-      w.u8(type).u16(legacy).u16(len).bytes(data, off, len);
+      w.u8(type).u16(plainRecordVersion(type)).u16(len).bytes(data, off, len);
       outRecords.add(w.toByteArray());
       return;
     }
@@ -363,8 +370,19 @@ abstract class TlsConnection {
     return w.toByteArray();
   }
 
+  private int plainRecordVersion(int type) {
+    if (version == 0) {
+      return type == RecordCipher.kContentHandshake ? kTls10 : kTls12;
+    }
+    return Math.min(version, kTls12);
+  }
+
+  private int dtlsRecordVersion() {
+    return version == 0 || version == kTls11 ? 0xFEFF : 0xFEFD;
+  }
+
   String protocolName() {
-    return dtls ? "DTLSv1.2" : versionName(version);
+    return dtls ? version == kTls11 ? "DTLSv1.0" : "DTLSv1.2" : versionName(version);
   }
 
   void sendCompatChangeCipherSpec() throws SSLException {
@@ -381,7 +399,8 @@ abstract class TlsConnection {
       writeRecord(0, RecordCipher.kContentChangeCipherSpec, new byte[] {1});
       return;
     }
-    outRecords.add(new byte[] {20, 3, 3, 0, 1, 1});
+    int v = plainRecordVersion(RecordCipher.kContentChangeCipherSpec);
+    outRecords.add(new byte[] {20, (byte) (v >> 8), (byte) v, 0, 1, 1});
   }
 
   void installReadCipher(RecordCipher c) {
@@ -513,7 +532,7 @@ abstract class TlsConnection {
       }
     }
     ByteWriter w = new ByteWriter();
-    w.u8(type).u16(kDtlsVersion).u16(epoch).u16((int) (seq >>> 32)).u32(seq & 0xFFFFFFFFL).u16(fragment.length);
+    w.u8(type).u16(dtlsRecordVersion()).u16(epoch).u16((int) (seq >>> 32)).u32(seq & 0xFFFFFFFFL).u16(fragment.length);
     w.bytes(fragment);
     return w.toByteArray();
   }
@@ -526,7 +545,7 @@ abstract class TlsConnection {
     int bodyLen = message.length - 12;
     int max = kMaxFragment - 12;
     if (cfg.maximumPacketSize > 0) {
-      max = Math.max(1, Math.min(max, cfg.maximumPacketSize - 13 - 12 - (epoch > 0 ? 24 : 0)));
+      max = Math.max(1, Math.min(max, cfg.maximumPacketSize - 13 - 12 - (epoch > 0 ? protectionOverhead() : 0)));
     }
     int off = 0;
     do {
@@ -536,6 +555,10 @@ abstract class TlsConnection {
       writeRecord(epoch, RecordCipher.kContentHandshake, w.toByteArray());
       off += n;
     } while (off < bodyLen);
+  }
+
+  private int protectionOverhead() {
+    return suite.aead == CipherSuite.kCbc ? 16 + suite.macLength + 16 : 24;
   }
 
   private void trackFlight(int kind, byte[] data, int epoch) {
@@ -713,19 +736,23 @@ abstract class TlsConnection {
   }
 
   byte[] transcriptHash() throws SSLException {
+    return hashOf(transcript.toByteArray());
+  }
+
+  byte[] hashOf(byte[] data) throws SSLException {
     try {
-      return MessageDigest.getInstance(suite.hash).digest(transcript.toByteArray());
+      if (version != 0 && version < kTls12) {
+        return TlsPrf.concat(MessageDigest.getInstance("MD5").digest(data), MessageDigest.getInstance("SHA-1")
+            .digest(data));
+      }
+      return MessageDigest.getInstance(suite.hash).digest(data);
     } catch (GeneralSecurityException e) {
       throw new SSLException(e);
     }
   }
 
-  byte[] hashOf(byte[] data) throws SSLException {
-    try {
-      return MessageDigest.getInstance(suite.hash).digest(data);
-    } catch (GeneralSecurityException e) {
-      throw new SSLException(e);
-    }
+  byte[] prf(byte[] secret, String label, byte[] seed, int length) {
+    return TlsPrf.prf(version, suite.hmac, secret, label, seed, length);
   }
 
   void finishHandshake() {
@@ -735,7 +762,8 @@ abstract class TlsConnection {
   }
 
   static String versionName(int version) {
-    return version == kTls13 ? "TLSv1.3" : version == kTls12 ? "TLSv1.2" : "NONE";
+    return version == kTls13 ? "TLSv1.3" : version == kTls12 ? "TLSv1.2" : version == kTls11 ? "TLSv1.1"
+        : version == kTls10 ? "TLSv1" : "NONE";
   }
 
   static int enabledVersionCode(String name) {
@@ -744,6 +772,10 @@ abstract class TlsConnection {
       return kTls13;
     case "TLSv1.2":
       return kTls12;
+    case "TLSv1.1":
+      return kTls11;
+    case "TLSv1":
+      return kTls10;
     default:
       return 0;
     }

@@ -70,7 +70,13 @@ final class TlsCrypto {
     return null;
   }
 
+  static int keyKind(PublicKey key) {
+    String alg = key.getAlgorithm();
+    return alg.equals("EC") ? SignatureScheme.kEcdsa : alg.equals("DSA") ? SignatureScheme.kDsa
+        : SignatureScheme.kRsaPss;
+  }
+
   static String keyTypeFor(SignatureScheme scheme) {
-    return scheme.kind == SignatureScheme.kEcdsa ? "EC" : scheme.kind == SignatureScheme.kRsaPss ? "RSA" : "RSA";
+    return scheme.kind == SignatureScheme.kEcdsa ? "EC" : scheme.kind == SignatureScheme.kDsa ? "DSA" : "RSA";
   }
 }
