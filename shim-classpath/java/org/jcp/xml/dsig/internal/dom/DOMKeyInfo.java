@@ -124,6 +124,8 @@ public final class DOMKeyInfo implements KeyInfo {
         ((DOMRetrievalMethod) kiType).marshal(kiElem, dsPrefix, context);
       } else if (kiType instanceof DOMX509Data) {
         ((DOMX509Data) kiType).marshal(kiElem, dsPrefix, context);
+      } else if (kiType instanceof DOMX509IssuerSerial) {
+        ((DOMX509IssuerSerial) kiType).marshal(kiElem, dsPrefix, context);
       } else if (kiType instanceof DOMPGPData) {
         ((DOMPGPData) kiType).marshal(kiElem, dsPrefix, context);
       } else if (kiType instanceof DOMStructure) {

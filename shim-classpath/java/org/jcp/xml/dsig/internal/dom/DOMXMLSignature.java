@@ -182,7 +182,7 @@ public final class DOMXMLSignature implements XMLSignature {
         }
       }
     }
-    java.util.Set<Reference> digested = new java.util.HashSet<Reference>();
+    java.util.Set<Reference> digested = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Reference, Boolean>());
     for (Reference ref : allReferences) {
       digestReference(ref, context, manifests, byObjectId, digested);
     }

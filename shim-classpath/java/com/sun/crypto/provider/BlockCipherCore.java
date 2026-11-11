@@ -33,6 +33,7 @@ final class BlockCipherCore {
   static final int OFB_MODE = 3;
   static final int PCBC_MODE = 4;
   static final int CTR_MODE = 5;
+  static final int CTS_MODE = 6;
 
   private static final int PAD_NONE = 0;
   private static final int PAD_PKCS5 = 1;
@@ -56,6 +57,7 @@ final class BlockCipherCore {
   private final byte[] buffer;
   private int buffered;
   private long processed;
+  private final java.io.ByteArrayOutputStream ctsBuffer = new java.io.ByteArrayOutputStream();
   private final byte[] scratch;
 
   BlockCipherCore(SymmetricCipher raw, String algorithm) {
@@ -76,6 +78,8 @@ final class BlockCipherCore {
       cipherMode = ECB_MODE;
     } else if (modeUpperCase.equals("CBC")) {
       cipherMode = CBC_MODE;
+    } else if (modeUpperCase.equals("CTS")) {
+      cipherMode = CTS_MODE;
     } else if (modeUpperCase.equals("PCBC")) {
       cipherMode = PCBC_MODE;
     } else if (modeUpperCase.equals("CTR")) {
@@ -123,6 +127,10 @@ final class BlockCipherCore {
       padding = PAD_NONE;
       throw new NoSuchPaddingException("Padding: " + paddingScheme + " not implemented");
     }
+    if (padding != PAD_NONE && cipherMode == CTS_MODE) {
+      padding = PAD_NONE;
+      throw new NoSuchPaddingException("CTS mode must be used with NoPadding");
+    }
     if (padding != PAD_NONE && cipherMode == CTR_MODE) {
       padding = PAD_NONE;
       throw new NoSuchPaddingException("CTR mode must be used with NoPadding");
@@ -156,7 +164,7 @@ final class BlockCipherCore {
   }
 
   int getOutputSize(int inputLen) {
-    int totalLen = buffered + inputLen;
+    int totalLen = buffered + inputLen + ctsBuffer.size();
     if (padding != PAD_NONE && !decrypting) {
       totalLen += blockSize - (int) ((processed + totalLen) % blockSize);
     }
@@ -196,6 +204,7 @@ final class BlockCipherCore {
   }
 
   private void resetState() {
+    ctsBuffer.reset();
     buffered = 0;
     processed = 0;
     register = null;
@@ -359,6 +368,10 @@ final class BlockCipherCore {
   int update(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
       throws ShortBufferException {
     checkInitialized();
+    if (cipherMode == CTS_MODE) {
+      ctsBuffer.write(input, inputOffset, inputLen);
+      return 0;
+    }
     int len = buffered + inputLen;
     if (padding != PAD_NONE && decrypting) {
       len -= blockSize;
@@ -419,6 +432,9 @@ final class BlockCipherCore {
   int doFinal(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
       throws IllegalBlockSizeException, ShortBufferException, BadPaddingException {
     checkInitialized();
+    if (cipherMode == CTS_MODE) {
+      return doFinalCts(input, inputOffset, inputLen, output, outputOffset);
+    }
     int estOutSize = getOutputSize(inputLen);
     boolean checkLater = decrypting && padding != PAD_NONE;
     if (!checkLater && (output == null || (output.length - outputOffset) < estOutSize)) {
@@ -507,6 +523,78 @@ final class BlockCipherCore {
     }
     resetStateKeepIv();
     return outLen;
+  }
+
+  private int doFinalCts(byte[] input, int inputOffset, int inputLen, byte[] output, int outputOffset)
+      throws IllegalBlockSizeException, ShortBufferException {
+    if (inputLen > 0) {
+      ctsBuffer.write(input, inputOffset, inputLen);
+    }
+    byte[] data = ctsBuffer.toByteArray();
+    if (data.length < blockSize) {
+      resetState();
+      throw new IllegalBlockSizeException("input is too short!");
+    }
+    if (output == null || output.length - outputOffset < data.length) {
+      throw new ShortBufferException("Output buffer must be (at least) " + data.length + " bytes long");
+    }
+    byte[] result = ciphertextStealing(data);
+    System.arraycopy(result, 0, output, outputOffset, result.length);
+    resetState();
+    return result.length;
+  }
+
+  private byte[] ciphertextStealing(byte[] data) {
+    int n = (data.length + blockSize - 1) / blockSize;
+    int r = data.length - (n - 1) * blockSize;
+    byte[] out = new byte[data.length];
+    byte[] chain = iv.clone();
+    byte[] tmp = new byte[blockSize];
+    if (!decrypting) {
+      byte[] padded = java.util.Arrays.copyOf(data, n * blockSize);
+      byte[] enc = new byte[padded.length];
+      for (int i = 0; i < n; i++) {
+        for (int j = 0; j < blockSize; j++) {
+          tmp[j] = (byte) (padded[i * blockSize + j] ^ chain[j]);
+        }
+        raw.encryptBlock(tmp, 0, enc, i * blockSize);
+        System.arraycopy(enc, i * blockSize, chain, 0, blockSize);
+      }
+      if (n == 1) {
+        return enc;
+      }
+      System.arraycopy(enc, 0, out, 0, (n - 2) * blockSize);
+      System.arraycopy(enc, (n - 1) * blockSize, out, (n - 2) * blockSize, blockSize);
+      System.arraycopy(enc, (n - 2) * blockSize, out, (n - 1) * blockSize, r);
+      return out;
+    }
+    if (n == 1) {
+      raw.decryptBlock(data, 0, tmp, 0);
+      for (int j = 0; j < blockSize; j++) {
+        out[j] = (byte) (tmp[j] ^ chain[j]);
+      }
+      return out;
+    }
+    for (int i = 0; i < n - 2; i++) {
+      raw.decryptBlock(data, i * blockSize, tmp, 0);
+      for (int j = 0; j < blockSize; j++) {
+        out[i * blockSize + j] = (byte) (tmp[j] ^ chain[j]);
+      }
+      System.arraycopy(data, i * blockSize, chain, 0, blockSize);
+    }
+    byte[] d = new byte[blockSize];
+    raw.decryptBlock(data, (n - 2) * blockSize, d, 0);
+    byte[] prevFull = new byte[blockSize];
+    System.arraycopy(data, (n - 1) * blockSize, prevFull, 0, r);
+    System.arraycopy(d, r, prevFull, r, blockSize - r);
+    for (int j = 0; j < r; j++) {
+      out[(n - 1) * blockSize + j] = (byte) (d[j] ^ prevFull[j]);
+    }
+    raw.decryptBlock(prevFull, 0, tmp, 0);
+    for (int j = 0; j < blockSize; j++) {
+      out[(n - 2) * blockSize + j] = (byte) (tmp[j] ^ chain[j]);
+    }
+    return out;
   }
 
   private void resetStateKeepIv() {

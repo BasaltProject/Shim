@@ -28,6 +28,7 @@ import sun.security.util.DerValue;
 
 abstract class DSA extends SignatureSpi {
   private final String digestName;
+  private final boolean p1363;
   private MessageDigest digest;
   private java.io.ByteArrayOutputStream raw;
   private DSAPrivateKey privateKey;
@@ -35,7 +36,12 @@ abstract class DSA extends SignatureSpi {
   private SecureRandom random;
 
   DSA(String digestName) {
+    this(digestName, false);
+  }
+
+  DSA(String digestName, boolean p1363) {
     this.digestName = digestName;
+    this.p1363 = p1363;
   }
 
   private void reset() {
@@ -134,6 +140,15 @@ abstract class DSA extends SignatureSpi {
       r = g.modPow(k, p).mod(q);
       s = k.modInverse(q).multiply(z.add(x.multiply(r))).mod(q);
     } while (r.signum() == 0 || s.signum() == 0);
+    if (p1363) {
+      int n = (q.bitLength() + 7) / 8;
+      byte[] out = new byte[2 * n];
+      byte[] rb = r.toByteArray();
+      byte[] sb = s.toByteArray();
+      System.arraycopy(rb, Math.max(0, rb.length - n), out, n - Math.min(n, rb.length), Math.min(n, rb.length));
+      System.arraycopy(sb, Math.max(0, sb.length - n), out, 2 * n - Math.min(n, sb.length), Math.min(n, sb.length));
+      return out;
+    }
     try {
       DerOutputStream body = new DerOutputStream();
       body.putInteger(r);
@@ -158,9 +173,18 @@ abstract class DSA extends SignatureSpi {
     BigInteger r;
     BigInteger s;
     try {
-      DerInputStream in = new DerValue(sig).data();
-      r = in.getDerValue().getBigInteger();
-      s = in.getDerValue().getBigInteger();
+      if (p1363) {
+        int n = (q.bitLength() + 7) / 8;
+        if (sig.length != 2 * n) {
+          throw new SignatureException("Invalid encoding for signature");
+        }
+        r = new BigInteger(1, java.util.Arrays.copyOfRange(sig, 0, n));
+        s = new BigInteger(1, java.util.Arrays.copyOfRange(sig, n, 2 * n));
+      } else {
+        DerInputStream in = new DerValue(sig).data();
+        r = in.getDerValue().getBigInteger();
+        s = in.getDerValue().getBigInteger();
+      }
     } catch (IOException | RuntimeException e) {
       throw new SignatureException("Invalid encoding for signature", e);
     }
@@ -220,6 +244,90 @@ abstract class DSA extends SignatureSpi {
   public static final class RawDSA extends DSA {
     public RawDSA() {
       super(null);
+    }
+  }
+
+  public static final class SHA1withDSAinP1363Format extends DSA {
+    public SHA1withDSAinP1363Format() {
+      super("SHA-1", true);
+    }
+  }
+
+  public static final class SHA224withDSAinP1363Format extends DSA {
+    public SHA224withDSAinP1363Format() {
+      super("SHA-224", true);
+    }
+  }
+
+  public static final class SHA256withDSAinP1363Format extends DSA {
+    public SHA256withDSAinP1363Format() {
+      super("SHA-256", true);
+    }
+  }
+
+  public static final class SHA384withDSAinP1363Format extends DSA {
+    public SHA384withDSAinP1363Format() {
+      super("SHA-384", true);
+    }
+  }
+
+  public static final class SHA512withDSAinP1363Format extends DSA {
+    public SHA512withDSAinP1363Format() {
+      super("SHA-512", true);
+    }
+  }
+
+  public static final class SHA3_224withDSA extends DSA {
+    public SHA3_224withDSA() {
+      super("SHA3-224");
+    }
+  }
+
+  public static final class SHA3_224withDSAinP1363Format extends DSA {
+    public SHA3_224withDSAinP1363Format() {
+      super("SHA3-224", true);
+    }
+  }
+
+  public static final class SHA3_256withDSA extends DSA {
+    public SHA3_256withDSA() {
+      super("SHA3-256");
+    }
+  }
+
+  public static final class SHA3_256withDSAinP1363Format extends DSA {
+    public SHA3_256withDSAinP1363Format() {
+      super("SHA3-256", true);
+    }
+  }
+
+  public static final class SHA3_384withDSA extends DSA {
+    public SHA3_384withDSA() {
+      super("SHA3-384");
+    }
+  }
+
+  public static final class SHA3_384withDSAinP1363Format extends DSA {
+    public SHA3_384withDSAinP1363Format() {
+      super("SHA3-384", true);
+    }
+  }
+
+  public static final class SHA3_512withDSA extends DSA {
+    public SHA3_512withDSA() {
+      super("SHA3-512");
+    }
+  }
+
+  public static final class SHA3_512withDSAinP1363Format extends DSA {
+    public SHA3_512withDSAinP1363Format() {
+      super("SHA3-512", true);
+    }
+  }
+
+  public static final class RawDSAinP1363Format extends DSA {
+    public RawDSAinP1363Format() {
+      super(null, true);
     }
   }
 }

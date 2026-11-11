@@ -276,6 +276,10 @@ public class DOMTransform implements Transform {
     if (data == null) {
       throw new NullPointerException("data must not be null");
     }
+    if (algorithm.equals(Transform.XSLT) && xc != null
+        && Boolean.TRUE.equals(xc.getProperty("org.jcp.xml.dsig.secureValidation"))) {
+      throw new TransformException("Transform " + algorithm + " is forbidden when secure validation is enabled");
+    }
     try {
       if (algorithm.equals(Transform.ENVELOPED)) {
         return envelopedSignature(data);
@@ -404,7 +408,7 @@ public class DOMTransform implements Transform {
       StringBuilder sb = new StringBuilder();
       for (Object o : (NodeSetData<?>) data) {
         Node n = (Node) o;
-        if (n.getNodeType() == Node.TEXT_NODE || n.getNodeType() == Node.CDATA_SECTION_NODE) {
+        if (n.getNodeType() == Node.TEXT_NODE) {
           sb.append(n.getNodeValue());
         }
       }

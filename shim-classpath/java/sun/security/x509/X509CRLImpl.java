@@ -283,7 +283,7 @@ public class X509CRLImpl extends X509CRL {
     if (exts.isEmpty()) {
       return null;
     }
-    Set<String> r = new HashSet<String>();
+    Set<String> r = new java.util.TreeSet<String>();
     for (X509Ext e : exts.values()) {
       if (e.critical) {
         r.add(e.oid);
@@ -297,7 +297,7 @@ public class X509CRLImpl extends X509CRL {
     if (exts.isEmpty()) {
       return null;
     }
-    Set<String> r = new HashSet<String>();
+    Set<String> r = new java.util.TreeSet<String>();
     for (X509Ext e : exts.values()) {
       if (!e.critical) {
         r.add(e.oid);

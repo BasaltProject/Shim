@@ -49,24 +49,29 @@ public abstract class TransformService implements Transform {
     }
     Provider p = Security.getProvider(provider);
     if (p == null) {
-      if (provider.equals("XMLDSig")) {
-        p = new org.jcp.xml.dsig.internal.dom.XMLDSigRI();
-      } else {
-        throw new NoSuchProviderException("No such provider: " + provider);
-      }
+      throw new NoSuchProviderException("No such provider: " + provider);
     }
     return find(algorithm, mechanismType, p);
   }
 
   private static TransformService find(String algorithm, String mechanismType, Provider provider)
       throws NoSuchAlgorithmException {
-    if (mechanismType.equals("DOM") && org.jcp.xml.dsig.internal.dom.DOMTransform.isKnown(algorithm)
-        && (provider == null || provider.getName().equals("XMLDSig"))) {
-      TransformService ts = new org.jcp.xml.dsig.internal.dom.DOMTransformService(algorithm);
-      ts.algorithm = algorithm;
-      ts.mechanism = mechanismType;
-      ts.provider = provider != null ? provider : new org.jcp.xml.dsig.internal.dom.XMLDSigRI();
-      return ts;
+    if (mechanismType.equals("DOM")) {
+      Provider[] candidates = provider != null ? new Provider[] {provider} : Security.getProviders();
+      for (Provider p : candidates) {
+        Provider.Service s = p.getService("TransformService", algorithm);
+        if (s != null && mechanismType.equals(s.getAttribute("MechanismType"))) {
+          try {
+            TransformService ts = (TransformService) s.newInstance(null);
+            ts.algorithm = algorithm;
+            ts.mechanism = mechanismType;
+            ts.provider = p;
+            return ts;
+          } catch (NoSuchAlgorithmException e) {
+            throw e;
+          }
+        }
+      }
     }
     throw new NoSuchAlgorithmException(algorithm + " algorithm and " + mechanismType + " mechanism not available");
   }

@@ -68,6 +68,21 @@ class KeyGeneratorCore extends KeyGeneratorSpi {
     }
   }
 
+  public static final class RC2KeyGenerator extends KeyGeneratorCore {
+    public RC2KeyGenerator() {
+      super("RC2", 128);
+    }
+
+    @Override
+    protected void engineInit(int keysize, SecureRandom random) {
+      if (keysize < 40 || keysize > 1024 || keysize % 8 != 0) {
+        throw new InvalidParameterException("Key length for RC2 must be between 40 and 1024 bits");
+      }
+      super.setKeyBytes(keysize >> 3);
+      super.engineInit(random);
+    }
+  }
+
   public static final class BlowfishKeyGenerator extends KeyGeneratorCore {
     public BlowfishKeyGenerator() {
       super("Blowfish", 128);

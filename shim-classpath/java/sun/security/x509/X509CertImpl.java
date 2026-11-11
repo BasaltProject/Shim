@@ -544,7 +544,7 @@ public class X509CertImpl extends X509Certificate {
     if (exts.isEmpty()) {
       return null;
     }
-    Set<String> result = new HashSet<String>();
+    Set<String> result = new java.util.TreeSet<String>();
     for (X509Ext e : exts.values()) {
       if (e.critical) {
         result.add(e.oid);
@@ -558,7 +558,7 @@ public class X509CertImpl extends X509Certificate {
     if (exts.isEmpty()) {
       return null;
     }
-    Set<String> result = new HashSet<String>();
+    Set<String> result = new java.util.TreeSet<String>();
     for (X509Ext e : exts.values()) {
       if (!e.critical) {
         result.add(e.oid);

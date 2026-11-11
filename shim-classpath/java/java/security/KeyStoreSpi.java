@@ -190,6 +190,6 @@ public abstract class KeyStoreSpi {
   }
 
   public boolean engineProbe(InputStream stream) throws IOException {
-    throw new UnsupportedOperationException();
+    return false;
   }
 }

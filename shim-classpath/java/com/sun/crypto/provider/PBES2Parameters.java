@@ -263,4 +263,9 @@ public class PBES2Parameters extends AlgorithmParametersSpi {
       super("PBEWithHmacSHA512/256AndAES_256");
     }
   }
+
+  public static final class General extends PBES2Parameters {
+    public General() {
+    }
+  }
 }

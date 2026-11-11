@@ -22,7 +22,7 @@ public final class DOMUtils {
   private static final ThreadLocal<Boolean> SECURE = new ThreadLocal<Boolean>();
 
   private static final java.util.Set<String> DISALLOWED = new java.util.HashSet<String>(java.util.Arrays.asList(
-      "http://www.w3.org/TR/1999/REC-xslt-19991116", "http://www.w3.org/2001/04/xmldsig-more#rsa-md5",
+      "http://www.w3.org/2001/04/xmldsig-more#rsa-md5",
       "http://www.w3.org/2001/04/xmldsig-more#hmac-md5", "http://www.w3.org/2001/04/xmldsig-more#md5",
       "http://www.w3.org/2000/09/xmldsig#sha1", "http://www.w3.org/2000/09/xmldsig#dsa-sha1",
       "http://www.w3.org/2000/09/xmldsig#rsa-sha1", "http://www.w3.org/2007/05/xmldsig-more#sha1-rsa-MGF1",
@@ -169,14 +169,7 @@ public final class DOMUtils {
   }
 
   public static byte[] decodeBase64(String s) {
-    StringBuilder b = new StringBuilder(s.length());
-    for (int i = 0; i < s.length(); i++) {
-      char c = s.charAt(i);
-      if (!Character.isWhitespace(c)) {
-        b.append(c);
-      }
-    }
-    return java.util.Base64.getDecoder().decode(b.toString());
+    return java.util.Base64.getMimeDecoder().decode(s);
   }
 
   public static String encodeBase64(byte[] data) {

@@ -23,16 +23,24 @@ import javax.xml.crypto.dsig.spec.TransformParameterSpec;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
-public final class DOMTransformService extends TransformService {
+public class DOMTransformService extends TransformService {
   private DOMTransform delegate;
-  private final String algorithm;
+  private final String preset;
+
+  public DOMTransformService() {
+    this.preset = null;
+  }
 
   public DOMTransformService(String algorithm) {
-    this.algorithm = algorithm;
+    this.preset = algorithm;
+  }
+
+  private String algorithm() {
+    return preset != null ? preset : getAlgorithm();
   }
 
   public void init(TransformParameterSpec params) throws InvalidAlgorithmParameterException {
-    delegate = new DOMTransform(algorithm, params);
+    delegate = new DOMTransform(algorithm(), params);
   }
 
   public void init(XMLStructure parent, XMLCryptoContext context) throws InvalidAlgorithmParameterException {
@@ -50,7 +58,7 @@ public final class DOMTransformService extends TransformService {
   public void marshalParams(XMLStructure parent, XMLCryptoContext context) throws MarshalException {
     if (delegate == null) {
       try {
-        delegate = new DOMTransform(algorithm, null);
+        delegate = new DOMTransform(algorithm(), null);
       } catch (InvalidAlgorithmParameterException e) {
         throw new MarshalException(e);
       }

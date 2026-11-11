@@ -102,7 +102,15 @@ public final class DOMSignatureMethod implements SignatureMethod {
     return n.toUpperCase();
   }
 
+  private static final String kRsaRipemd160 = "http://www.w3.org/2001/04/xmldsig-more#rsa-ripemd160";
+  private static final String kHmacRipemd160 = "http://www.w3.org/2001/04/xmldsig-more#hmac-ripemd160";
+
   private static int typeOf(String alg) {
+    if (alg.equals(kRsaRipemd160)) {
+      return T_RSA;
+    } else if (alg.equals(kHmacRipemd160)) {
+      return T_HMAC;
+    }
     if (alg.equals(RSA_SHA1) || alg.equals(RSA_SHA224) || alg.equals(RSA_SHA256) || alg.equals(RSA_SHA384)
         || alg.equals(RSA_SHA512)) {
       return T_RSA;
@@ -123,7 +131,11 @@ public final class DOMSignatureMethod implements SignatureMethod {
   }
 
   private static String jcaOf(String alg) {
-    if (alg.equals(RSA_SHA1)) {
+    if (alg.equals(kRsaRipemd160)) {
+      return "RIPEMD160withRSA";
+    } else if (alg.equals(kHmacRipemd160)) {
+      return "HMACRIPEMD160";
+    } else if (alg.equals(RSA_SHA1)) {
       return "SHA1withRSA";
     } else if (alg.equals(RSA_SHA224)) {
       return "SHA224withRSA";
@@ -242,6 +254,12 @@ public final class DOMSignatureMethod implements SignatureMethod {
     return new PSSParameterSpec(digest, "MGF1", new java.security.spec.MGF1ParameterSpec(digest), salt, 1);
   }
 
+  private static void checkHmacLength(int bits, int digestBytes) throws XMLSignatureException {
+    if (bits < digestBytes * 8) {
+      throw new XMLSignatureException("HMACOutputLength must not be less than " + digestBytes * 8);
+    }
+  }
+
   byte[] sign(Key key, SignedInfo si, XMLSignContext context) throws InvalidKeyException, XMLSignatureException {
     if (key == null || si == null) {
       throw new NullPointerException();
@@ -257,6 +275,7 @@ public final class DOMSignatureMethod implements SignatureMethod {
         byte[] full = mac.doFinal(data);
         if (params instanceof HMACParameterSpec) {
           int bits = ((HMACParameterSpec) params).getOutputLength();
+          checkHmacLength(bits, full.length);
           return Arrays.copyOf(full, (bits + 7) / 8);
         }
         return full;
@@ -271,7 +290,7 @@ public final class DOMSignatureMethod implements SignatureMethod {
       if (type == T_EC) {
         return derToConcat(sig, ((java.security.interfaces.ECKey) key).getParams().getOrder().bitLength());
       } else if (type == T_DSA) {
-        return derToConcat(sig, 160);
+        return derToConcat(sig, ((java.security.interfaces.DSAKey) key).getParams().getQ().bitLength());
       }
       return sig;
     } catch (IOException e) {
@@ -302,6 +321,7 @@ public final class DOMSignatureMethod implements SignatureMethod {
         int bytes = full.length;
         if (params instanceof HMACParameterSpec) {
           int bits = ((HMACParameterSpec) params).getOutputLength();
+          checkHmacLength(bits, full.length);
           if (bits % 8 != 0) {
             throw new SignatureException("unsupported HMAC output length");
           }

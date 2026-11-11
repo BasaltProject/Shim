@@ -95,7 +95,7 @@ public final class SunJCE extends Provider {
         new String[] {}, new String[] {});
     add("Cipher", "AES", "com.sun.crypto.provider.AESCipher$General", new String[] {"OID.2.16.840.1.101.3.4.1",
         "2.16.840.1.101.3.4.1"}, new String[] {"SupportedKeyFormats", "RAW", "SupportedModes",
-            "ECB|CBC|PCBC|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64|CFB72|CFB80|CFB88|CFB96|CFB104|CFB112|CFB120|CFB128|OFB72|OFB80|OFB88|OFB96|OFB104|OFB112|OFB120|OFB128", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING"});
+            "ECB|CBC|PCBC|CTS|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64|CFB72|CFB80|CFB88|CFB96|CFB104|CFB112|CFB120|CFB128|OFB72|OFB80|OFB88|OFB96|OFB104|OFB112|OFB120|OFB128", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING"});
     add("SecretKeyFactory", "PBKDF2WithHmacSHA256", "com.sun.crypto.provider.PBKDF2Core$HmacSHA256", new String[] {},
         new String[] {});
     add("Cipher", "RSA", "com.sun.crypto.provider.RSACipher", new String[] {}, new String[] {"SupportedKeyClasses",
@@ -110,6 +110,11 @@ public final class SunJCE extends Provider {
             "RAW"});
     add("KeyGenerator", "HmacSHA1", "com.sun.crypto.provider.HmacKeyGenerators$HmacSHA1",
         new String[] {"OID.1.2.840.113549.2.7", "1.2.840.113549.2.7"}, new String[] {});
+    add("KeyGenerator", "SunTlsPrf", "com.sun.crypto.provider.TlsPrfGenerator$V10", new String[] {}, new String[] {});
+    add("KeyGenerator", "SunTls12Prf", "com.sun.crypto.provider.TlsPrfGenerator$V12", new String[] {}, new String[] {});
+    add("KeyGenerator", "SunTlsMasterSecret", "com.sun.crypto.provider.TlsMasterSecretGenerator", new String[] {"SunTls12MasterSecret", "SunTlsExtendedMasterSecret"}, new String[] {});
+    add("KeyGenerator", "SunTlsKeyMaterial", "com.sun.crypto.provider.TlsKeyMaterialGenerator", new String[] {"SunTls12KeyMaterial"}, new String[] {});
+    add("KeyGenerator", "SunTlsRsaPremasterSecret", "com.sun.crypto.provider.TlsRsaPremasterSecretGenerator", new String[] {"SunTls12RsaPremasterSecret"}, new String[] {});
     add("KeyGenerator", "AES", "com.sun.crypto.provider.AESKeyGenerator", new String[] {"OID.2.16.840.1.101.3.4.1",
         "2.16.840.1.101.3.4.1"}, new String[] {});
     add("Cipher", "AES_128/OFB/NoPadding", "com.sun.crypto.provider.AESCipher$AES128_OFB_NoPadding",
@@ -163,6 +168,37 @@ public final class SunJCE extends Provider {
     add("Cipher", "RC2", "com.sun.crypto.provider.RC2Cipher", new String[] {}, new String[] {"SupportedKeyFormats",
         "RAW", "SupportedModes",
             "ECB|CBC|PCBC|CTR|CTS|CFB|OFB|CFB8|CFB16|CFB24|CFB32|CFB40|CFB48|CFB56|CFB64|OFB8|OFB16|OFB24|OFB32|OFB40|OFB48|OFB56|OFB64", "SupportedPaddings", "NOPADDING|PKCS5PADDING|ISO10126PADDING"});
+    add("Mac", "HmacPBESHA1", "com.sun.crypto.provider.HmacPBE$HmacPBESHA1", new String[] {}, new String[] {});
+    add("Mac", "PBEWithHmacSHA1", "com.sun.crypto.provider.HmacPBE$PBEWithHmacSHA1", new String[] {}, new String[] {});
+    add("Mac", "HmacPBESHA224", "com.sun.crypto.provider.HmacPBE$HmacPBESHA224", new String[] {}, new String[] {});
+    add("Mac", "PBEWithHmacSHA224", "com.sun.crypto.provider.HmacPBE$PBEWithHmacSHA224", new String[] {}, new String[] {});
+    add("Mac", "HmacPBESHA256", "com.sun.crypto.provider.HmacPBE$HmacPBESHA256", new String[] {}, new String[] {});
+    add("Mac", "PBEWithHmacSHA256", "com.sun.crypto.provider.HmacPBE$PBEWithHmacSHA256", new String[] {}, new String[] {});
+    add("Mac", "HmacPBESHA384", "com.sun.crypto.provider.HmacPBE$HmacPBESHA384", new String[] {}, new String[] {});
+    add("Mac", "PBEWithHmacSHA384", "com.sun.crypto.provider.HmacPBE$PBEWithHmacSHA384", new String[] {}, new String[] {});
+    add("Mac", "HmacPBESHA512", "com.sun.crypto.provider.HmacPBE$HmacPBESHA512", new String[] {}, new String[] {});
+    add("Mac", "PBEWithHmacSHA512", "com.sun.crypto.provider.HmacPBE$PBEWithHmacSHA512", new String[] {}, new String[] {});
+    add("Mac", "HmacPBESHA512/224", "com.sun.crypto.provider.HmacPBE$HmacPBESHA512_224", new String[] {}, new String[] {});
+    add("Mac", "PBEWithHmacSHA512/224", "com.sun.crypto.provider.HmacPBE$PBEWithHmacSHA512_224", new String[] {}, new String[] {});
+    add("Mac", "HmacPBESHA512/256", "com.sun.crypto.provider.HmacPBE$HmacPBESHA512_256", new String[] {}, new String[] {});
+    add("Mac", "PBEWithHmacSHA512/256", "com.sun.crypto.provider.HmacPBE$PBEWithHmacSHA512_256", new String[] {}, new String[] {});
+    add("Mac", "SslMacMD5", "com.sun.crypto.provider.SslMac$SslMacMD5", new String[] {}, new String[] {});
+    add("Mac", "SslMacSHA1", "com.sun.crypto.provider.SslMac$SslMacSHA1", new String[] {}, new String[] {});
+    add("Cipher", "DESedeWrap", "com.sun.crypto.provider.DESedeWrapCipher", new String[] {"DESedeWrap/CBC/NoPadding"}, new String[] {"SupportedModes", "CBC", "SupportedPaddings", "NOPADDING", "SupportedKeyFormats", "RAW"});
+    add("AlgorithmParameters", "RC2", "com.sun.crypto.provider.RC2Parameters", new String[] {"1.2.840.113549.3.2", "OID.1.2.840.113549.3.2"}, new String[] {});
+    add("KeyPairGenerator", "ML-KEM", "sun.security.provider.MLKEMImpl$KPGAny", new String[] {}, new String[] {});
+    add("KeyFactory", "ML-KEM", "sun.security.provider.MLKEMImpl$KFAny", new String[] {}, new String[] {});
+    add("KEM", "ML-KEM", "sun.security.provider.MLKEMImpl$KemAny", new String[] {}, new String[] {});
+    add("KeyPairGenerator", "ML-KEM-512", "sun.security.provider.MLKEMImpl$KPG512", new String[] {}, new String[] {});
+    add("KeyFactory", "ML-KEM-512", "sun.security.provider.MLKEMImpl$KF512", new String[] {}, new String[] {});
+    add("KEM", "ML-KEM-512", "sun.security.provider.MLKEMImpl$Kem512", new String[] {}, new String[] {});
+    add("KeyPairGenerator", "ML-KEM-768", "sun.security.provider.MLKEMImpl$KPG768", new String[] {}, new String[] {});
+    add("KeyFactory", "ML-KEM-768", "sun.security.provider.MLKEMImpl$KF768", new String[] {}, new String[] {});
+    add("KEM", "ML-KEM-768", "sun.security.provider.MLKEMImpl$Kem768", new String[] {}, new String[] {});
+    add("KeyPairGenerator", "ML-KEM-1024", "sun.security.provider.MLKEMImpl$KPG1024", new String[] {}, new String[] {});
+    add("KeyFactory", "ML-KEM-1024", "sun.security.provider.MLKEMImpl$KF1024", new String[] {}, new String[] {});
+    add("KEM", "ML-KEM-1024", "sun.security.provider.MLKEMImpl$Kem1024", new String[] {}, new String[] {});
+    add("AlgorithmParameters", "PBES2", "com.sun.crypto.provider.PBES2Parameters$General", new String[] {"OID.1.2.840.113549.1.5.13", "1.2.840.113549.1.5.13"}, new String[] {});
     add("Mac", "HmacMD5", "com.sun.crypto.provider.HmacCore$HmacMD5", new String[] {},
         new String[] {"SupportedKeyFormats", "RAW"});
     add("KeyGenerator", "DESede", "com.sun.crypto.provider.DESedeKeyGenerator", new String[] {"TripleDES"},
@@ -210,7 +246,20 @@ public final class SunJCE extends Provider {
     add("Cipher", "ChaCha20-Poly1305", "com.sun.crypto.provider.ChaCha20Cipher$ChaCha20Poly1305", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
     add("KeyGenerator", "ChaCha20", "com.sun.crypto.provider.KeyGeneratorCore$ChaCha20KeyGenerator", new String[] {}, new String[] {});
     add("AlgorithmParameters", "ChaCha20-Poly1305", "com.sun.crypto.provider.ChaCha20Poly1305Parameters", new String[] {}, new String[] {});
+    add("KeyStore", "JCEKS", "com.sun.crypto.provider.JceKeyStore", new String[] {}, new String[] {});
+    add("KeyGenerator", "RC2", "com.sun.crypto.provider.KeyGeneratorCore$RC2KeyGenerator", new String[] {"OID.1.2.840.113549.3.2", "1.2.840.113549.3.2"}, new String[] {});
     add("Cipher", "AES/KW/NoPadding", "com.sun.crypto.provider.AESKeyWrap", new String[] {"AESWrap"}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES/KW/PKCS5Padding", "com.sun.crypto.provider.AESKeyWrap$KW_PKCS5", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES/KWP/NoPadding", "com.sun.crypto.provider.AESKeyWrap$KWP", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_128/KW/NoPadding", "com.sun.crypto.provider.AESKeyWrap$KW128", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_128/KW/PKCS5Padding", "com.sun.crypto.provider.AESKeyWrap$KW128_PKCS5", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_128/KWP/NoPadding", "com.sun.crypto.provider.AESKeyWrap$KWP128", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_192/KW/NoPadding", "com.sun.crypto.provider.AESKeyWrap$KW192", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_192/KW/PKCS5Padding", "com.sun.crypto.provider.AESKeyWrap$KW192_PKCS5", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_192/KWP/NoPadding", "com.sun.crypto.provider.AESKeyWrap$KWP192", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_256/KW/NoPadding", "com.sun.crypto.provider.AESKeyWrap$KW256", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_256/KW/PKCS5Padding", "com.sun.crypto.provider.AESKeyWrap$KW256_PKCS5", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
+    add("Cipher", "AES_256/KWP/NoPadding", "com.sun.crypto.provider.AESKeyWrap$KWP256", new String[] {}, new String[] {"SupportedKeyFormats", "RAW"});
     add("Cipher", "ARCFOUR", "com.sun.crypto.provider.ARCFOURCipher", new String[] {"OID.1.2.840.113549.3.4", "1.2.840.113549.3.4", "RC4"}, new String[] {"SupportedModes", "ECB", "SupportedPaddings", "NOPADDING", "SupportedKeyFormats", "RAW"});
     add("KeyGenerator", "ARCFOUR", "com.sun.crypto.provider.KeyGeneratorCore$ARCFOURKeyGenerator", new String[] {"OID.1.2.840.113549.3.4", "1.2.840.113549.3.4", "RC4"}, new String[] {});
     add("Cipher", "PBEWithHmacSHA1AndAES_128", "com.sun.crypto.provider.PBES2Core$HmacSHA1AndAES_128", new String[] {},

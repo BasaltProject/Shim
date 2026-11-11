@@ -23,7 +23,7 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.ShortBufferException;
 import javax.crypto.spec.IvParameterSpec;
 
-public final class AESKeyWrap extends CipherSpi {
+public class AESKeyWrap extends CipherSpi {
   private static final byte[] kDefaultIv = {
       (byte) 0xa6, (byte) 0xa6, (byte) 0xa6, (byte) 0xa6, (byte) 0xa6, (byte) 0xa6, (byte) 0xa6, (byte) 0xa6};
 
@@ -32,21 +32,75 @@ public final class AESKeyWrap extends CipherSpi {
   private boolean wrapping;
   private boolean initialized;
   private byte[] iv = kDefaultIv;
+  private boolean extended;
+  private boolean pkcs5;
+  private final int fixedKeyBytes;
 
   public AESKeyWrap() {
+    this(false, false, 0);
+  }
+
+  AESKeyWrap(boolean extended, boolean pkcs5, int fixedKeyBytes) {
+    this.extended = extended;
+    this.pkcs5 = pkcs5;
+    this.fixedKeyBytes = fixedKeyBytes;
+  }
+
+  public static final class KW_PKCS5 extends AESKeyWrap {
+    public KW_PKCS5() { super(false, true, 0); }
+  }
+
+  public static final class KWP extends AESKeyWrap {
+    public KWP() { super(true, false, 0); }
+  }
+
+  public static final class KW128 extends AESKeyWrap {
+    public KW128() { super(false, false, 16); }
+  }
+
+  public static final class KW128_PKCS5 extends AESKeyWrap {
+    public KW128_PKCS5() { super(false, true, 16); }
+  }
+
+  public static final class KWP128 extends AESKeyWrap {
+    public KWP128() { super(true, false, 16); }
+  }
+
+  public static final class KW192 extends AESKeyWrap {
+    public KW192() { super(false, false, 24); }
+  }
+
+  public static final class KW192_PKCS5 extends AESKeyWrap {
+    public KW192_PKCS5() { super(false, true, 24); }
+  }
+
+  public static final class KWP192 extends AESKeyWrap {
+    public KWP192() { super(true, false, 24); }
+  }
+
+  public static final class KW256 extends AESKeyWrap {
+    public KW256() { super(false, false, 32); }
+  }
+
+  public static final class KW256_PKCS5 extends AESKeyWrap {
+    public KW256_PKCS5() { super(false, true, 32); }
+  }
+
+  public static final class KWP256 extends AESKeyWrap {
+    public KWP256() { super(true, false, 32); }
   }
 
   @Override
   protected void engineSetMode(String mode) throws NoSuchAlgorithmException {
-    if (!mode.equalsIgnoreCase("KW")) {
+    if (!mode.equalsIgnoreCase(extended ? "KWP" : "KW")) {
       throw new NoSuchAlgorithmException("Invalid cipher mode: " + mode);
     }
   }
 
   @Override
   protected void engineSetPadding(String padding) throws NoSuchPaddingException {
-    if (!padding.equalsIgnoreCase("NoPadding")) {
-      throw new NoSuchPaddingException("Padding must be NoPadding");
+    if (pkcs5 ? !padding.equalsIgnoreCase("PKCS5Padding") : !padding.equalsIgnoreCase("NoPadding")) {
+      throw new NoSuchPaddingException("Padding must be " + (pkcs5 ? "PKCS5Padding" : "NoPadding"));
     }
   }
 
@@ -58,6 +112,12 @@ public final class AESKeyWrap extends CipherSpi {
   @Override
   protected int engineGetOutputSize(int inputLen) {
     int total = inputLen + buffer.size();
+    if (extended) {
+      return wrapping ? ((total + 7) / 8) * 8 + 8 : Math.max(total - 8, 0);
+    }
+    if (pkcs5) {
+      return wrapping ? (total / 8 + 1) * 8 + 8 : Math.max(total - 8, 0);
+    }
     return wrapping ? total + 8 : Math.max(total - 8, 0);
   }
 
@@ -87,7 +147,8 @@ public final class AESKeyWrap extends CipherSpi {
       throw new InvalidKeyException("Invalid key algorithm");
     }
     byte[] k = key.getEncoded();
-    if (k == null || (k.length != 16 && k.length != 24 && k.length != 32)) {
+    if (k == null || (fixedKeyBytes != 0 ? k.length != fixedKeyBytes
+        : (k.length != 16 && k.length != 24 && k.length != 32))) {
       throw new InvalidKeyException("Invalid key length: " + (k == null ? 0 : k.length) + " bytes");
     }
     if (params != null) {
@@ -144,6 +205,99 @@ public final class AESKeyWrap extends CipherSpi {
   }
 
   private byte[] wrap(byte[] in) throws IllegalBlockSizeException {
+    if (extended) {
+      return wrapPadded(in);
+    }
+    if (pkcs5) {
+      int pad = 8 - in.length % 8;
+      byte[] padded = java.util.Arrays.copyOf(in, in.length + pad);
+      java.util.Arrays.fill(padded, in.length, padded.length, (byte) pad);
+      return wrapCore(padded);
+    }
+    return wrapCore(in);
+  }
+
+  private byte[] unwrap(byte[] in) throws IllegalBlockSizeException, BadPaddingException {
+    if (extended) {
+      return unwrapPadded(in);
+    }
+    byte[] r = unwrapCore(in);
+    if (pkcs5) {
+      int pad = r.length == 0 ? 0 : r[r.length - 1] & 0xff;
+      if (pad < 1 || pad > 8 || pad > r.length) {
+        throw new BadPaddingException("Invalid padding");
+      }
+      for (int i = r.length - pad; i < r.length; i++) {
+        if ((r[i] & 0xff) != pad) {
+          throw new BadPaddingException("Invalid padding");
+        }
+      }
+      return java.util.Arrays.copyOf(r, r.length - pad);
+    }
+    return r;
+  }
+
+  private static final byte[] kPaddedIv = {(byte) 0xa6, 0x59, 0x59, (byte) 0xa6};
+
+  private byte[] wrapPadded(byte[] in) throws IllegalBlockSizeException {
+    if (in.length == 0) {
+      throw new IllegalBlockSizeException("Empty input");
+    }
+    int padded = (in.length + 7) / 8 * 8;
+    byte[] aiv = new byte[8];
+    System.arraycopy(kPaddedIv, 0, aiv, 0, 4);
+    aiv[4] = (byte) (in.length >>> 24);
+    aiv[5] = (byte) (in.length >>> 16);
+    aiv[6] = (byte) (in.length >>> 8);
+    aiv[7] = (byte) in.length;
+    byte[] data = java.util.Arrays.copyOf(in, padded);
+    if (padded == 8) {
+      byte[] b = new byte[16];
+      System.arraycopy(aiv, 0, b, 0, 8);
+      System.arraycopy(data, 0, b, 8, 8);
+      byte[] out = new byte[16];
+      aes.encryptBlock(b, 0, out, 0);
+      return out;
+    }
+    byte[] saved = iv;
+    iv = aiv;
+    try {
+      return wrapCore(data);
+    } finally {
+      iv = saved;
+    }
+  }
+
+  private byte[] unwrapPadded(byte[] in) throws IllegalBlockSizeException, BadPaddingException {
+    if (in.length % 8 != 0 || in.length < 16) {
+      throw new IllegalBlockSizeException("data should be at least 16 bytes and multiples of 8");
+    }
+    byte[] data;
+    byte[] aiv = new byte[8];
+    if (in.length == 16) {
+      byte[] b = new byte[16];
+      aes.decryptBlock(in, 0, b, 0);
+      System.arraycopy(b, 0, aiv, 0, 8);
+      data = java.util.Arrays.copyOfRange(b, 8, 16);
+    } else {
+      byte[] full = unwrapCoreIv(in, aiv);
+      data = full;
+    }
+    int len = ((aiv[4] & 0xff) << 24) | ((aiv[5] & 0xff) << 16) | ((aiv[6] & 0xff) << 8) | (aiv[7] & 0xff);
+    boolean ok = aiv[0] == kPaddedIv[0] && aiv[1] == kPaddedIv[1] && aiv[2] == kPaddedIv[2]
+        && aiv[3] == kPaddedIv[3] && len > data.length - 8 && len <= data.length;
+    for (int i = ok ? len : 0; ok && i < data.length; i++) {
+      if (data[i] != 0) {
+        ok = false;
+      }
+    }
+    if (!ok) {
+      throw new BadPaddingException("Integrity check failed");
+    }
+    return java.util.Arrays.copyOf(data, len);
+  }
+
+  private byte[] wrapCore(byte[] in) throws IllegalBlockSizeException {
     if (in.length % 8 != 0 || in.length < 16) {
       throw new IllegalBlockSizeException("data should be at least 16 bytes and multiples of 8");
     }
@@ -172,12 +326,21 @@ public final class AESKeyWrap extends CipherSpi {
     return out;
   }
 
-  private byte[] unwrap(byte[] in) throws IllegalBlockSizeException, BadPaddingException {
+  private byte[] unwrapCore(byte[] in) throws IllegalBlockSizeException, BadPaddingException {
+    byte[] a = new byte[8];
+    byte[] r = unwrapCoreIv(in, a);
+    if (!java.security.MessageDigest.isEqual(a, iv)) {
+      throw new BadPaddingException("Integrity check failed");
+    }
+    return r;
+  }
+
+  private byte[] unwrapCoreIv(byte[] in, byte[] aOut) throws IllegalBlockSizeException {
     if (in.length % 8 != 0 || in.length < 24) {
       throw new IllegalBlockSizeException("data should be at least 24 bytes and multiples of 8");
     }
     int n = in.length / 8 - 1;
-    byte[] a = new byte[8];
+    byte[] a = aOut;
     System.arraycopy(in, 0, a, 0, 8);
     byte[] r = new byte[n * 8];
     System.arraycopy(in, 8, r, 0, r.length);
@@ -196,9 +359,6 @@ public final class AESKeyWrap extends CipherSpi {
         System.arraycopy(b, 0, a, 0, 8);
         System.arraycopy(b, 8, r, i * 8, 8);
       }
-    }
-    if (!java.security.MessageDigest.isEqual(a, iv)) {
-      throw new BadPaddingException("Integrity check failed");
     }
     return r;
   }
