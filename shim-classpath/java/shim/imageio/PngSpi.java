@@ -23,9 +23,8 @@ public final class PngSpi {
   public static final class Reader extends ImageReaderSpi {
     public Reader() {
       super("Oracle Corporation", "1.0", new String[] {"png", "PNG"}, new String[] {"png"},
-          new String[] {"image/png", "image/x-png"}, "shim.imageio.PngReader", STANDARD_INPUT_TYPE,
-          new String[] {"shim.imageio.PngSpi$Writer"}, false, null, null, null, null, true,
-          "javax_imageio_png_1.0", null, null, null);
+          new String[] {"image/png", "image/x-png"}, "com.sun.imageio.plugins.png.PNGImageReader", STANDARD_INPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.png.PNGImageWriterSpi"}, false, null, null, null, null, true, "javax_imageio_png_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
@@ -58,9 +57,8 @@ public final class PngSpi {
   public static final class Writer extends ImageWriterSpi {
     public Writer() {
       super("Oracle Corporation", "1.0", new String[] {"png", "PNG"}, new String[] {"png"},
-          new String[] {"image/png", "image/x-png"}, "shim.imageio.PngWriter", STANDARD_OUTPUT_TYPE,
-          new String[] {"shim.imageio.PngSpi$Reader"}, false, null, null, null, null, true,
-          "javax_imageio_png_1.0", null, null, null);
+          new String[] {"image/png", "image/x-png"}, "com.sun.imageio.plugins.png.PNGImageWriter", STANDARD_OUTPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.png.PNGImageReaderSpi"}, false, null, null, null, null, true, "javax_imageio_png_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {

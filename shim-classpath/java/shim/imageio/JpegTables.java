@@ -61,26 +61,125 @@ final class JpegTables {
   }
 
   static void idct(int[] coef, int[] out) {
-    double[] tmp = new double[64];
-    for (int v = 0; v < 8; v++) {
-      for (int x = 0; x < 8; x++) {
-        double s = 0;
-        for (int u = 0; u < 8; u++) {
-          s += kCos[x][u] * coef[v * 8 + u];
-        }
-        tmp[v * 8 + x] = s;
+    int[] ws = new int[64];
+    for (int c = 0; c < 8; c++) {
+      idct1(coef, c, 8, ws, c, 8, 11, false, null);
+    }
+    for (int r = 0; r < 8; r++) {
+      idct1(ws, r * 8, 1, null, r * 8, 1, 18, true, out);
+    }
+  }
+
+  private static void idct1(int[] in, int io, int is, int[] dst, int dop, int ds, int shift, boolean last, int[] out) {
+    int z2 = in[io + 2 * is];
+    int z3 = in[io + 6 * is];
+    int z1 = (z2 + z3) * 4433;
+    int tmp2 = z1 + z3 * -15137;
+    int tmp3 = z1 + z2 * 6270;
+    z2 = in[io];
+    z3 = in[io + 4 * is];
+    int tmp0 = (z2 + z3) << 13;
+    int tmp1 = (z2 - z3) << 13;
+    int t10 = tmp0 + tmp3;
+    int t13 = tmp0 - tmp3;
+    int t11 = tmp1 + tmp2;
+    int t12 = tmp1 - tmp2;
+    tmp0 = in[io + 7 * is];
+    tmp1 = in[io + 5 * is];
+    tmp2 = in[io + 3 * is];
+    tmp3 = in[io + is];
+    z1 = tmp0 + tmp3;
+    z2 = tmp1 + tmp2;
+    z3 = tmp0 + tmp2;
+    int z4 = tmp1 + tmp3;
+    int z5 = (z3 + z4) * 9633;
+    tmp0 *= 2446;
+    tmp1 *= 16819;
+    tmp2 *= 25172;
+    tmp3 *= 12299;
+    z1 *= -7373;
+    z2 *= -20995;
+    z3 *= -16069;
+    z4 *= -3196;
+    z3 += z5;
+    z4 += z5;
+    tmp0 += z1 + z3;
+    tmp1 += z2 + z4;
+    tmp2 += z2 + z3;
+    tmp3 += z1 + z4;
+    int[] r = {t10 + tmp3, t11 + tmp2, t12 + tmp1, t13 + tmp0, t13 - tmp0, t12 - tmp1, t11 - tmp2, t10 - tmp3};
+    for (int k = 0; k < 8; k++) {
+      int v = (r[k] + (1 << (shift - 1))) >> shift;
+      if (last) {
+        v += 128;
+        out[dop + k] = v < 0 ? 0 : v > 255 ? 255 : v;
+      } else {
+        dst[dop + k * ds] = v;
       }
     }
-    for (int x = 0; x < 8; x++) {
-      for (int y = 0; y < 8; y++) {
-        double s = 0;
-        for (int v = 0; v < 8; v++) {
-          s += kCos[y][v] * tmp[v * 8 + x];
-        }
-        int val = (int) Math.round(s) + 128;
-        out[y * 8 + x] = val < 0 ? 0 : val > 255 ? 255 : val;
-      }
+  }
+
+  static void fdctInt(int[] in, int[] out) {
+    int[] ws = new int[64];
+    for (int r = 0; r < 8; r++) {
+      int o = r * 8;
+      int t0 = in[o] + in[o + 7];
+      int t7 = in[o] - in[o + 7];
+      int t1 = in[o + 1] + in[o + 6];
+      int t6 = in[o + 1] - in[o + 6];
+      int t2 = in[o + 2] + in[o + 5];
+      int t5 = in[o + 2] - in[o + 5];
+      int t3 = in[o + 3] + in[o + 4];
+      int t4 = in[o + 3] - in[o + 4];
+      butterfly(ws, o, 1, t0, t1, t2, t3, t4, t5, t6, t7, true);
     }
+    for (int c = 0; c < 8; c++) {
+      int t0 = ws[c] + ws[c + 56];
+      int t7 = ws[c] - ws[c + 56];
+      int t1 = ws[c + 8] + ws[c + 48];
+      int t6 = ws[c + 8] - ws[c + 48];
+      int t2 = ws[c + 16] + ws[c + 40];
+      int t5 = ws[c + 16] - ws[c + 40];
+      int t3 = ws[c + 24] + ws[c + 32];
+      int t4 = ws[c + 24] - ws[c + 32];
+      butterfly(out, c, 8, t0, t1, t2, t3, t4, t5, t6, t7, false);
+    }
+  }
+
+  private static int descale(int x, int n) { return (x + (1 << (n - 1))) >> n; }
+
+  private static void butterfly(int[] dst, int o, int st, int t0, int t1, int t2, int t3, int t4, int t5, int t6,
+      int t7, boolean rows) {
+    int t10 = t0 + t3;
+    int t13 = t0 - t3;
+    int t11 = t1 + t2;
+    int t12 = t1 - t2;
+    int even = rows ? 11 : 15;
+    int pass = 2;
+    dst[o] = rows ? (t10 + t11) << pass : descale(t10 + t11, pass);
+    dst[o + 4 * st] = rows ? (t10 - t11) << pass : descale(t10 - t11, pass);
+    int z1 = (t12 + t13) * 4433;
+    dst[o + 2 * st] = descale(z1 + t13 * 6270, even);
+    dst[o + 6 * st] = descale(z1 + t12 * -15137, even);
+    z1 = t4 + t7;
+    int z2 = t5 + t6;
+    int z3 = t4 + t6;
+    int z4 = t5 + t7;
+    int z5 = (z3 + z4) * 9633;
+    t4 *= 2446;
+    t5 *= 16819;
+    t6 *= 25172;
+    t7 *= 12299;
+    z1 *= -7373;
+    z2 *= -20995;
+    z3 *= -16069;
+    z4 *= -3196;
+    z3 += z5;
+    z4 += z5;
+    dst[o + 7 * st] = descale(t4 + z1 + z3, even);
+    dst[o + 5 * st] = descale(t5 + z2 + z4, even);
+    dst[o + 3 * st] = descale(t6 + z2 + z3, even);
+    dst[o + st] = descale(t7 + z1 + z4, even);
   }
 
   static void fdct(double[] block, double[] out) {

@@ -103,6 +103,10 @@ public abstract class CodecReader extends ImageReader {
 
   protected String[] nativeFormat() { return null; }
 
+  protected void reportProgress(int rows) {
+    processImageProgress(100f);
+  }
+
   public IIOMetadata getImageMetadata(int imageIndex) throws IOException {
     checkIndex(imageIndex);
     String[] nf = nativeFormat();
@@ -116,7 +120,7 @@ public abstract class CodecReader extends ImageReader {
     BufferedImage src = raw(imageIndex);
     processImageStarted(imageIndex);
     if (param == null) {
-      processImageProgress(100f);
+      reportProgress(src.getHeight());
       processImageComplete();
       return copyOf(src);
     }
@@ -142,7 +146,7 @@ public abstract class CodecReader extends ImageReader {
         }
       }
     }
-    processImageProgress(100f);
+    reportProgress(dstRegion.height);
     processImageComplete();
     return dest;
   }

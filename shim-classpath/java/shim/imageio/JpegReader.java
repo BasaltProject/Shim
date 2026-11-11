@@ -68,8 +68,19 @@ public final class JpegReader extends CodecReader {
   private int adobeTransform = -1;
   private boolean jfif;
 
+  protected void reportProgress(int rows) {
+    int interval = Math.max((rows - 1) / 20, 1);
+    for (int y = interval; y <= rows - 1; y += interval) {
+      processImageProgress((float) y / (rows - 1) * 100.0F);
+    }
+  }
+
   public JpegReader(ImageReaderSpi spi) {
     super(spi);
+  }
+
+  public javax.imageio.ImageReadParam getDefaultReadParam() {
+    return new javax.imageio.plugins.jpeg.JPEGImageReadParam();
   }
 
   public javax.imageio.metadata.IIOMetadata getImageMetadata(int imageIndex) throws IOException {
@@ -542,14 +553,17 @@ public final class JpegReader extends CodecReader {
       planes[ci] = plane;
       pw[ci] = stride;
     }
+    byte[][] full = new byte[n][];
+    for (int ci = 0; ci < n; ci++) {
+      full[ci] = upsample(planes[ci], pw[ci], comps[ci]);
+    }
     if (n == 1) {
       BufferedImage bi = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
       WritableRaster r = bi.getRaster();
       int[] row = new int[width];
-      Component c = comps[0];
       for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-          row[x] = planes[0][(y * c.v / vmax) * pw[0] + (x * c.h / hmax)] & 0xff;
+          row[x] = full[0][y * width + x] & 0xff;
         }
         r.setPixels(0, y, width, 1, row);
       }
@@ -564,20 +578,18 @@ public final class JpegReader extends CodecReader {
       for (int x = 0; x < width; x++) {
         int[] v = new int[n];
         for (int ci = 0; ci < n; ci++) {
-          Component c = comps[ci];
-          v[ci] = planes[ci][(y * c.v / vmax) * pw[ci] + (x * c.h / hmax)] & 0xff;
+          v[ci] = full[ci][y * width + x] & 0xff;
         }
         int rr;
         int gg;
         int bb;
         if (n >= 3) {
           if (ycc) {
-            double Y = v[0];
-            double cb = v[1] - 128;
-            double cr = v[2] - 128;
-            rr = clamp(Y + 1.402 * cr);
-            gg = clamp(Y - 0.344136 * cb - 0.714136 * cr);
-            bb = clamp(Y + 1.772 * cb);
+            int cb = v[1] - 128;
+            int cr = v[2] - 128;
+            rr = clamp8(v[0] + ((91881 * cr + 32768) >> 16));
+            gg = clamp8(v[0] + ((-22554 * cb + -46802 * cr + 32768) >> 16));
+            bb = clamp8(v[0] + ((116130 * cb + 32768) >> 16));
           } else {
             rr = v[0];
             gg = v[1];
@@ -605,6 +617,59 @@ public final class JpegReader extends CodecReader {
       r.setPixels(0, y, width, 1, px);
     }
     return bi;
+  }
+
+  private static int clamp8(int i) { return i < 0 ? 0 : i > 255 ? 255 : i; }
+
+  private byte[] upsample(byte[] plane, int stride, Component c) {
+    int dw = (width * c.h + hmax - 1) / hmax;
+    int dh = (height * c.v + vmax - 1) / vmax;
+    byte[] out = new byte[width * height];
+    int hx = hmax / c.h;
+    int vx = vmax / c.v;
+    boolean fancy = hx == 2 && (vx == 1 || vx == 2) && dw > 2 && hmax % c.h == 0 && vmax % c.v == 0;
+    if (!fancy) {
+      for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+          out[y * width + x] = plane[(y * c.v / vmax) * stride + (x * c.h / hmax)];
+        }
+      }
+      return out;
+    }
+    for (int y = 0; y < height; y++) {
+      int r0 = Math.min(dh - 1, y / vx);
+      int r1 = vx == 1 ? r0 : (y & 1) == 0 ? Math.max(0, r0 - 1) : Math.min(dh - 1, r0 + 1);
+      for (int i = 0; i < dw; i++) {
+        int x0 = 2 * i;
+        int x1 = x0 + 1;
+        if (vx == 1) {
+          int cur = plane[r0 * stride + i] & 0xff;
+          int lo = i == 0 ? cur : plane[r0 * stride + i - 1] & 0xff;
+          int hi = i == dw - 1 ? cur : plane[r0 * stride + i + 1] & 0xff;
+          int a = i == 0 ? cur : (3 * cur + lo + 1) >> 2;
+          int b = i == dw - 1 ? cur : (3 * cur + hi + 2) >> 2;
+          if (x0 < width) {
+            out[y * width + x0] = (byte) a;
+          }
+          if (x1 < width) {
+            out[y * width + x1] = (byte) b;
+          }
+        } else {
+          int sum = 3 * (plane[r0 * stride + i] & 0xff) + (plane[r1 * stride + i] & 0xff);
+          int last = i == 0 ? sum : 3 * (plane[r0 * stride + i - 1] & 0xff) + (plane[r1 * stride + i - 1] & 0xff);
+          int next = i == dw - 1 ? sum : 3 * (plane[r0 * stride + i + 1] & 0xff) + (plane[r1 * stride + i + 1] & 0xff);
+          int a = i == 0 ? (sum * 4 + 8) >> 4 : (sum * 3 + last + 8) >> 4;
+          int b = i == dw - 1 ? (sum * 4 + 7) >> 4 : (sum * 3 + next + 7) >> 4;
+          if (x0 < width) {
+            out[y * width + x0] = (byte) a;
+          }
+          if (x1 < width) {
+            out[y * width + x1] = (byte) b;
+          }
+        }
+      }
+    }
+    return out;
   }
 
   private static int clamp(double v) {

@@ -47,6 +47,10 @@ public final class TiffReader extends CodecReader {
     super(spi);
   }
 
+  public javax.imageio.ImageReadParam getDefaultReadParam() {
+    return new javax.imageio.plugins.tiff.TIFFImageReadParam();
+  }
+
   protected void resetState() {
     ifdOffsets = null;
     directories.clear();
@@ -275,6 +279,9 @@ public final class TiffReader extends CodecReader {
   protected BufferedImage decode(int index) throws IOException {
     TIFFDirectory d = directory(index);
     ImageInputStream in = stream();
+    if (intField(d, 259, 1) == 6 && d.containsTIFFField(513)) {
+      return exifJpeg(d);
+    }
     int w = intField(d, 256, 0);
     int h = intField(d, 257, 0);
     if (w <= 0 || h <= 0) {
@@ -529,6 +536,39 @@ public final class TiffReader extends CodecReader {
       }
     }
     return new BufferedImage(cm, r, premultiplied, null);
+  }
+
+  private BufferedImage exifJpeg(TIFFDirectory d) throws IOException {
+    ImageInputStream in = stream();
+    long offset = d.getTIFFField(513).getAsLong(0);
+    int length = d.containsTIFFField(514) ? d.getTIFFField(514).getAsInt(0) : (int) (in.length() - offset);
+    byte[] data = new byte[length];
+    in.seek(offset);
+    in.readFully(data);
+    BufferedImage img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(data));
+    if (img == null) {
+      throw new IIOException("Cannot decode JPEG compressed TIFF data");
+    }
+    if (img.getRaster().getNumBands() != 3) {
+      return img;
+    }
+    java.awt.image.WritableRaster raster = java.awt.image.Raster.createInterleavedRaster(
+        java.awt.image.DataBuffer.TYPE_BYTE, img.getWidth(), img.getHeight(), img.getWidth() * 3, 3,
+        new int[] {0, 1, 2}, null);
+    int[] px = new int[3];
+    for (int y = 0; y < img.getHeight(); y++) {
+      for (int x = 0; x < img.getWidth(); x++) {
+        int argb = img.getRGB(x, y);
+        px[0] = (argb >> 16) & 0xff;
+        px[1] = (argb >> 8) & 0xff;
+        px[2] = argb & 0xff;
+        raster.setPixel(x, y, px);
+      }
+    }
+    java.awt.image.ColorModel cm = new java.awt.image.ComponentColorModel(
+        java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_sRGB), false, false,
+        java.awt.Transparency.OPAQUE, java.awt.image.DataBuffer.TYPE_BYTE);
+    return new BufferedImage(cm, raster, false, null);
   }
 
   private static byte[] jpegStrip(byte[] enc, TIFFDirectory d, int width, int rows, int bands) throws IOException {

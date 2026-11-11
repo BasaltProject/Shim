@@ -22,9 +22,9 @@ public final class GifSpi {
 
   public static final class Reader extends ImageReaderSpi {
     public Reader() {
-      super("Oracle Corporation", "1.0", new String[] {"gif", "GIF"}, new String[] {"gif"}, new String[] {"image/gif"}, "shim.imageio.GifReader",
-          STANDARD_INPUT_TYPE, new String[] {"shim.imageio.GifSpi$Writer"}, false, null, null, null, null, true,
-          null, null, null, null);
+      super("Oracle Corporation", "1.0", new String[] {"gif", "GIF"}, new String[] {"gif"},
+          new String[] {"image/gif"}, "com.sun.imageio.plugins.gif.GIFImageReader", STANDARD_INPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.gif.GIFImageWriterSpi"}, true, "javax_imageio_gif_stream_1.0", null, null, null, true, "javax_imageio_gif_image_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
@@ -55,9 +55,9 @@ public final class GifSpi {
 
   public static final class Writer extends ImageWriterSpi {
     public Writer() {
-      super("Oracle Corporation", "1.0", new String[] {"gif", "GIF"}, new String[] {"gif"}, new String[] {"image/gif"}, "shim.imageio.GifWriter",
-          STANDARD_OUTPUT_TYPE, new String[] {"shim.imageio.GifSpi$Reader"}, false, null, null, null, null, true,
-          null, null, null, null);
+      super("Oracle Corporation", "1.0", new String[] {"gif", "GIF"}, new String[] {"gif"},
+          new String[] {"image/gif"}, "com.sun.imageio.plugins.gif.GIFImageWriter", STANDARD_OUTPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.gif.GIFImageReaderSpi"}, true, "javax_imageio_gif_stream_1.0", null, null, null, true, "javax_imageio_gif_image_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {

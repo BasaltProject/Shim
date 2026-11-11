@@ -17,6 +17,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import javax.imageio.IIOImage;
+import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.spi.ImageWriterSpi;
@@ -25,9 +26,67 @@ import javax.imageio.stream.ImageOutputStream;
 public final class GifWriter extends CodecWriter {
   private boolean sequence;
   private boolean headerWritten;
+  private GifMetadata streamMeta;
+  private byte[] globalTable;
+
+  private static final class Frame {
+    int[] palette = new int[256];
+    int paletteSize;
+    int transparent = -1;
+    int sampleBits = 8;
+    byte[] idx;
+    int w;
+    int h;
+  }
 
   public GifWriter(ImageWriterSpi spi) {
     super(spi);
+  }
+
+  public ImageWriteParam getDefaultWriteParam() {
+    return new com.sun.imageio.plugins.gif.GIFImageWriteParam(getLocale());
+  }
+
+  public IIOMetadata getDefaultStreamMetadata(ImageWriteParam param) {
+    return GifMetadata.defaultStream(null);
+  }
+
+  public IIOMetadata getDefaultImageMetadata(ImageTypeSpecifier imageType, ImageWriteParam param) {
+    return GifMetadata.defaultImage(imageType);
+  }
+
+  public IIOMetadata convertStreamMetadata(IIOMetadata inData, ImageWriteParam param) {
+    return convert(inData, true, null);
+  }
+
+  public IIOMetadata convertImageMetadata(IIOMetadata inData, ImageTypeSpecifier imageType, ImageWriteParam param) {
+    return convert(inData, false, imageType);
+  }
+
+  private static GifMetadata convert(IIOMetadata in, boolean stream, ImageTypeSpecifier type) {
+    if (in == null) {
+      return null;
+    }
+    if (in instanceof GifMetadata && ((GifMetadata) in).isStream() == stream) {
+      return (GifMetadata) in;
+    }
+    GifMetadata out = stream ? GifMetadata.defaultStream(type) : GifMetadata.defaultImage(type);
+    String[] names = in.getMetadataFormatNames();
+    if (names == null) {
+      return null;
+    }
+    for (String name : names) {
+      if (name.equals(out.getNativeMetadataFormatName())
+          || name.equals(javax.imageio.metadata.IIOMetadataFormatImpl.standardMetadataFormatName)) {
+        try {
+          out.mergeTree(name, in.getAsTree(name));
+          return out;
+        } catch (javax.imageio.metadata.IIOInvalidTreeException e) {
+          return null;
+        }
+      }
+    }
+    return null;
   }
 
   public boolean canWriteSequence() {
@@ -35,15 +94,18 @@ public final class GifWriter extends CodecWriter {
   }
 
   public void prepareWriteSequence(IIOMetadata streamMetadata) throws IOException {
+    stream();
     sequence = true;
     headerWritten = false;
+    globalTable = null;
+    streamMeta = convert(streamMetadata, true, null);
   }
 
   public void writeToSequence(IIOImage image, ImageWriteParam param) throws IOException {
     if (!sequence) {
       throw new IllegalStateException("prepareWriteSequence() was not invoked!");
     }
-    writeFrame(image, !headerWritten, true);
+    writeFrame(image, param, !headerWritten);
     headerWritten = true;
   }
 
@@ -54,21 +116,33 @@ public final class GifWriter extends CodecWriter {
     stream().writeByte(0x3b);
     stream().flush();
     sequence = false;
+    streamMeta = null;
+    globalTable = null;
   }
 
   public void write(IIOMetadata streamMetadata, IIOImage image, ImageWriteParam param) throws IOException {
-    writeFrame(image, true, false);
+    if (sequence) {
+      throw new IllegalStateException("sequence is active");
+    }
+    if (image.hasRaster()) {
+      throw new UnsupportedOperationException("Rasters not supported");
+    }
+    streamMeta = convert(streamMetadata, true, null);
+    globalTable = null;
+    writeFrame(image, param, true);
     stream().writeByte(0x3b);
     stream().flush();
+    streamMeta = null;
+    globalTable = null;
   }
 
-  private void writeFrame(IIOImage image, boolean header, boolean loop) throws IOException {
-    ImageOutputStream out = stream();
-    out.setByteOrder(ByteOrder.LITTLE_ENDIAN);
-    BufferedImage bi = shim.awt.ImageSupport.toBuffered(image.getRenderedImage());
+  private static Frame convert(BufferedImage bi) {
+    Frame f = new Frame();
     int w = bi.getWidth();
     int h = bi.getHeight();
-    int[] palette = new int[256];
+    f.w = w;
+    f.h = h;
+    int[] palette = f.palette;
     int paletteSize;
     int transparent = -1;
     byte[] idx = new byte[w * h];
@@ -85,7 +159,8 @@ public final class GifWriter extends CodecWriter {
           idx[y * w + x] = (byte) px[0];
         }
       }
-    } else if (cm instanceof IndexColorModel && bi.getRaster().getNumBands() == 1 && ((IndexColorModel) cm).getMapSize() <= 256) {
+    } else if (cm instanceof IndexColorModel && bi.getRaster().getNumBands() == 1
+        && ((IndexColorModel) cm).getMapSize() <= 256) {
       IndexColorModel icm = (IndexColorModel) cm;
       paletteSize = icm.getMapSize();
       for (int i = 0; i < paletteSize; i++) {
@@ -100,98 +175,133 @@ public final class GifWriter extends CodecWriter {
         }
       }
     } else {
-      Map<Integer, Integer> colors = new HashMap<>();
       int[] argb = bi.getRGB(0, 0, w, h, null, 0, w);
-      boolean overflow = false;
-      boolean hasTransparent = false;
-      for (int p : argb) {
-        if ((p >>> 24) < 128) {
-          hasTransparent = true;
-        } else if (!colors.containsKey(p | 0xff000000)) {
-          if (colors.size() >= (hasTransparent ? 255 : 256)) {
-            overflow = true;
-            break;
-          }
-          colors.put(p | 0xff000000, colors.size());
-        }
-      }
-      if (overflow) {
-        colors = quantize(argb);
-        hasTransparent = false;
-        for (int p : argb) {
-          if ((p >>> 24) < 128) {
-            hasTransparent = true;
-            break;
-          }
-        }
-      }
-      int count = colors.size();
-      for (Map.Entry<Integer, Integer> e : colors.entrySet()) {
-        palette[e.getValue()] = e.getKey();
-      }
-      if (hasTransparent) {
-        transparent = count;
-        count++;
-      }
-      paletteSize = count;
+      Octree tree = Octree.build(argb, w, h, cm.getTransparency() != java.awt.Transparency.OPAQUE);
+      System.arraycopy(tree.palette, 0, palette, 0, tree.paletteSize);
+      paletteSize = tree.paletteSize;
+      transparent = tree.transparentIndex;
       for (int i = 0; i < argb.length; i++) {
-        int p = argb[i];
-        if ((p >>> 24) < 128) {
-          idx[i] = (byte) transparent;
-        } else {
-          Integer v = colors.get(p | 0xff000000);
-          idx[i] = (byte) (v != null ? v : nearest(palette, colors.size(), p));
-        }
+        idx[i] = (byte) tree.indexOf(argb[i]);
       }
     }
+    f.sampleBits = bi.getSampleModel().getSampleSize(0);
+    f.paletteSize = paletteSize;
+    f.transparent = transparent;
+    f.idx = idx;
+    return f;
+  }
+
+  private static int bitsFor(int size) {
     int bits = 1;
-    while ((1 << bits) < paletteSize) {
+    while ((1 << bits) < size) {
       bits++;
     }
-    processImageStarted(0);
-    if (header) {
-      out.write(new byte[] {'G', 'I', 'F', '8', '9', 'a'});
-      out.writeShort(w);
-      out.writeShort(h);
-      out.writeByte(loop ? 0x70 : 0xF0 | (bits - 1));
-      out.writeByte(0);
-      out.writeByte(0);
-      if (!loop) {
-        writeTable(out, palette, paletteSize, bits);
-      }
-      if (loop) {
-        out.writeByte(0x21);
-        out.writeByte(0xff);
-        out.writeByte(11);
-        out.write(new byte[] {'N', 'E', 'T', 'S', 'C', 'A', 'P', 'E', '2', '.', '0'});
-        out.writeByte(3);
-        out.writeByte(1);
-        out.writeShort(0);
-        out.writeByte(0);
+    return bits;
+  }
+
+  private static byte[] tableBytes(Frame f) {
+    int bits = bitsFor(f.paletteSize);
+    byte[] t = new byte[3 << bits];
+    for (int i = f.paletteSize; i < (1 << bits); i++) {
+      t[3 * i] = (byte) (f.palette[0] >> 16);
+      t[3 * i + 1] = (byte) (f.palette[0] >> 8);
+      t[3 * i + 2] = (byte) f.palette[0];
+    }
+    for (int i = 0; i < f.paletteSize; i++) {
+      t[3 * i] = (byte) (f.palette[i] >> 16);
+      t[3 * i + 1] = (byte) (f.palette[i] >> 8);
+      t[3 * i + 2] = (byte) f.palette[i];
+    }
+    return t;
+  }
+
+  private static boolean samePalette(byte[] global, Frame f) {
+    if (global == null || global.length / 3 < f.paletteSize) {
+      return false;
+    }
+    for (int i = 0; i < f.paletteSize; i++) {
+      if (global[3 * i] != (byte) (f.palette[i] >> 16) || global[3 * i + 1] != (byte) (f.palette[i] >> 8)
+          || global[3 * i + 2] != (byte) f.palette[i]) {
+        return false;
       }
     }
-    if (transparent >= 0 || loop || header) {
+    return true;
+  }
+
+  private void writeFrame(IIOImage image, ImageWriteParam param, boolean header) throws IOException {
+    ImageOutputStream out = stream();
+    out.setByteOrder(ByteOrder.LITTLE_ENDIAN);
+    BufferedImage bi = shim.awt.ImageSupport.toBuffered(image.getRenderedImage());
+    Frame f = convert(bi);
+    GifMetadata im = convert(image.getMetadata(), false, ImageTypeSpecifier.createFromRenderedImage(bi));
+    byte[] frameTable = im != null && im.localTableBytes() != null ? im.localTableBytes() : tableBytes(f);
+    processImageStarted(0);
+    if (header) {
+      GifMetadata sm = streamMeta;
+      byte[] gct = sm != null && sm.globalTableBytes() != null ? sm.globalTableBytes() : frameTable;
+      globalTable = gct;
+      int tableBits = bitsFor(gct.length / 3);
+      int screenW = sm != null && sm.screenWidth() > 0 ? sm.screenWidth() : f.w;
+      int screenH = sm != null && sm.screenHeight() > 0 ? sm.screenHeight() : f.h;
+      int res = sm != null && sm.colorResolutionBits() > 0 ? sm.colorResolutionBits() : 8;
+      out.write(new byte[] {'G', 'I', 'F', '8', sm != null && sm.versionName().equals("87a") ? (byte) '7' : (byte) '9',
+          'a'});
+      out.writeShort(screenW);
+      out.writeShort(screenH);
+      out.writeByte(0x80 | ((res - 1) << 4) | (sm != null && sm.globalSortFlag() ? 8 : 0) | (tableBits - 1));
+      out.writeByte(sm != null ? sm.backgroundColorIndex() : 0);
+      out.writeByte(sm != null ? sm.pixelAspect() : 0);
+      out.write(gct, 0, gct.length);
+    }
+    boolean writeGce = im != null ? im.hasGraphicControl() : f.transparent >= 0;
+    if (writeGce) {
+      boolean transparentFlag = im != null ? im.transparentFlag() : true;
+      int transparentIndex = im != null ? im.transparentColorIndex() : f.transparent;
       out.writeByte(0x21);
       out.writeByte(0xf9);
       out.writeByte(4);
-      out.writeByte((transparent >= 0 ? 1 : 0) | (loop ? 8 : 0));
-      out.writeShort(loop ? 10 : 0);
-      out.writeByte(transparent >= 0 ? transparent : 0);
+      out.writeByte(((im != null ? im.disposalMethod() : 0) << 2) | (im != null && im.userInputFlag() ? 2 : 0)
+          | (transparentFlag ? 1 : 0));
+      out.writeShort(im != null ? im.delayTime() : 0);
+      out.writeByte(transparentFlag ? transparentIndex : (im != null ? im.transparentColorIndex() : 0));
       out.writeByte(0);
     }
-    out.writeByte(0x2c);
-    out.writeShort(0);
-    out.writeShort(0);
-    out.writeShort(w);
-    out.writeShort(h);
-    if (!loop && header) {
-      out.writeByte(0x40);
-      idx = interlace(idx, w, h);
-    } else {
-      out.writeByte(0x80 | (bits - 1));
-      writeTable(out, palette, paletteSize, bits);
+    if (im != null) {
+      for (Object[] a : im.applicationExtensions()) {
+        out.writeByte(0x21);
+        out.writeByte(0xff);
+        out.writeByte(11);
+        out.write(pad((String) a[0], 8));
+        out.write(pad((String) a[1], 3));
+        writeBlocks(out, (byte[]) a[2]);
+      }
+      for (String c : im.commentExtensions()) {
+        out.writeByte(0x21);
+        out.writeByte(0xfe);
+        writeBlocks(out, c.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+      }
     }
-    int minCode = Math.max(2, bits);
+    boolean interlace = param != null && param.canWriteProgressive()
+        ? (param.getProgressiveMode() == ImageWriteParam.MODE_COPY_FROM_METADATA
+            ? (im == null || im.interlaceFlag()) : param.getProgressiveMode() != ImageWriteParam.MODE_DISABLED)
+        : (im == null || im.interlaceFlag());
+    boolean local = im != null && im.localTableBytes() != null
+        ? !java.util.Arrays.equals(im.localTableBytes(), globalTable)
+        : !samePalette(globalTable, f);
+    byte[] table = local ? frameTable : globalTable;
+    int bits = bitsFor(table.length / 3);
+    out.writeByte(0x2c);
+    out.writeShort(im != null ? im.imageLeft() : 0);
+    out.writeShort(im != null ? im.imageTop() : 0);
+    out.writeShort(f.w);
+    out.writeShort(f.h);
+    out.writeByte((local ? 0x80 : 0) | (bits - 1) | (interlace ? 0x40 : 0)
+        | (local && im != null && im.localSortFlag() ? 0x20 : 0));
+    if (local) {
+      out.write(frameTable, 0, frameTable.length);
+    }
+    byte[] idx = interlace ? interlace(f.idx, f.w, f.h) : f.idx;
+    int minCode = Math.max(2, Math.max(bits, f.sampleBits));
     out.writeByte(minCode);
     byte[] lzw = encode(idx, minCode);
     int off = 0;
@@ -206,13 +316,22 @@ public final class GifWriter extends CodecWriter {
     processImageComplete();
   }
 
-  private static void writeTable(ImageOutputStream out, int[] palette, int paletteSize, int bits) throws IOException {
-    for (int i = 0; i < (1 << bits); i++) {
-      int c = i < paletteSize ? palette[i] : 0;
-      out.writeByte(c >> 16);
-      out.writeByte(c >> 8);
-      out.writeByte(c);
+  private static byte[] pad(String s, int n) {
+    byte[] b = new byte[n];
+    byte[] src = s.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+    System.arraycopy(src, 0, b, 0, Math.min(n, src.length));
+    return b;
+  }
+
+  private static void writeBlocks(ImageOutputStream out, byte[] data) throws IOException {
+    int off = 0;
+    while (off < data.length) {
+      int n = Math.min(255, data.length - off);
+      out.writeByte(n);
+      out.write(data, off, n);
+      off += n;
     }
+    out.writeByte(0);
   }
 
   private static byte[] interlace(byte[] idx, int w, int h) {
@@ -227,56 +346,6 @@ public final class GifWriter extends CodecWriter {
       }
     }
     return r;
-  }
-
-  private static int nearest(int[] palette, int count, int argb) {
-    int best = 0;
-    int bestD = Integer.MAX_VALUE;
-    for (int i = 0; i < count; i++) {
-      int dr = ((argb >> 16) & 0xff) - ((palette[i] >> 16) & 0xff);
-      int dg = ((argb >> 8) & 0xff) - ((palette[i] >> 8) & 0xff);
-      int db = (argb & 0xff) - (palette[i] & 0xff);
-      int d = dr * dr + dg * dg + db * db;
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    }
-    return best;
-  }
-
-  private static Map<Integer, Integer> quantize(int[] argb) {
-    Map<Integer, int[]> buckets = new HashMap<>();
-    for (int p : argb) {
-      if ((p >>> 24) < 128) {
-        continue;
-      }
-      int key = ((p >> 16) & 0xe0) << 16 | ((p >> 8) & 0xe0) << 8 | (p & 0xc0);
-      int[] b = buckets.get(key);
-      if (b == null) {
-        b = new int[4];
-        buckets.put(key, b);
-      }
-      b[0] += (p >> 16) & 0xff;
-      b[1] += (p >> 8) & 0xff;
-      b[2] += p & 0xff;
-      b[3]++;
-    }
-    Map<Integer, Integer> out = new HashMap<>();
-    int i = 0;
-    for (int[] b : buckets.values()) {
-      if (i >= 255) {
-        break;
-      }
-      int c = 0xff000000 | ((b[0] / b[3]) << 16) | ((b[1] / b[3]) << 8) | (b[2] / b[3]);
-      out.put(c, i++);
-    }
-    for (int p : argb) {
-      if ((p >>> 24) >= 128 && !out.containsKey(p | 0xff000000) && out.size() < 255) {
-        out.put(p | 0xff000000, out.size());
-      }
-    }
-    return out;
   }
 
   private static byte[] encode(byte[] data, int minCode) {

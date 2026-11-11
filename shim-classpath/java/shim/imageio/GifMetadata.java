@@ -10,6 +10,11 @@ package shim.imageio;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
+import java.awt.image.ColorModel;
+import java.awt.image.IndexColorModel;
+import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.metadata.IIOInvalidTreeException;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.metadata.IIOMetadataFormatImpl;
@@ -44,10 +49,62 @@ public final class GifMetadata extends IIOMetadata {
   private boolean transparent;
   private int delay;
   private int transparentIndex;
+  private final List<Object[]> applications = new ArrayList<>();
+  private final List<String> comments = new ArrayList<>();
+
+  public GifMetadata(boolean stream) {
+    super(true, stream ? kStreamFormat : kImageFormat, null, null, null);
+    this.stream = stream;
+    reset();
+  }
+
+  public static GifMetadata defaultImage(ImageTypeSpecifier type) {
+    GifMetadata m = new GifMetadata(false);
+    if (type != null) {
+      m.width = type.getSampleModel().getWidth();
+      m.height = type.getSampleModel().getHeight();
+      ColorModel cm = type.getColorModel();
+      IndexColorModel icm = cm instanceof IndexColorModel ? (IndexColorModel) cm : defaultPalette();
+      m.localTable = tableOf(icm);
+      m.hasGce = true;
+      int t = icm.getTransparentPixel();
+      if (t >= 0 && cm instanceof IndexColorModel) {
+        m.transparent = true;
+        m.transparentIndex = t;
+      }
+    }
+    return m;
+  }
+
+  private static IndexColorModel defaultPalette() {
+    return (IndexColorModel) new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_BYTE_INDEXED)
+        .getColorModel();
+  }
+
+  public static GifMetadata defaultStream(ImageTypeSpecifier type) {
+    GifMetadata m = new GifMetadata(true);
+    return m;
+  }
+
+  static byte[] tableOf(IndexColorModel icm) {
+    int n = icm.getMapSize();
+    int size = 2;
+    while (size < n) {
+      size <<= 1;
+    }
+    byte[] t = new byte[size * 3];
+    for (int i = 0; i < n; i++) {
+      t[3 * i] = (byte) icm.getRed(i);
+      t[3 * i + 1] = (byte) icm.getGreen(i);
+      t[3 * i + 2] = (byte) icm.getBlue(i);
+    }
+    return t;
+  }
 
   public GifMetadata(ImageInputStream in, boolean stream, int imageIndex) throws IOException {
     super(true, stream ? kStreamFormat : kImageFormat, null, null, null);
     this.stream = stream;
+    version = "89a";
     ByteOrder old = in.getByteOrder();
     in.setByteOrder(ByteOrder.LITTLE_ENDIAN);
     try {
@@ -70,6 +127,17 @@ public final class GifMetadata extends IIOMetadata {
     }
   }
 
+  private static byte[] readBlocks(ImageInputStream in) throws IOException {
+    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+    int n;
+    while ((n = in.read()) > 0) {
+      byte[] b = new byte[n];
+      in.readFully(b);
+      out.write(b, 0, n);
+    }
+    return out.toByteArray();
+  }
+
   private void parse(ImageInputStream in, int imageIndex) throws IOException {
     in.seek(0);
     byte[] sig = new byte[6];
@@ -90,6 +158,7 @@ public final class GifMetadata extends IIOMetadata {
     }
     int index = 0;
     boolean gce = false;
+    hasGce = true;
     while (true) {
       int b = in.read();
       if (b == 0x21) {
@@ -108,6 +177,15 @@ public final class GifMetadata extends IIOMetadata {
             in.skipBytes(3);
           }
           in.readUnsignedByte();
+        } else if (label == 0xFF && index == imageIndex) {
+          int n = in.readUnsignedByte();
+          byte[] head = new byte[n];
+          in.readFully(head);
+          String id = new String(head, 0, Math.min(8, n), java.nio.charset.StandardCharsets.ISO_8859_1);
+          String auth = n > 8 ? new String(head, 8, Math.min(3, n - 8), java.nio.charset.StandardCharsets.ISO_8859_1) : "";
+          applications.add(new Object[] {id, auth, readBlocks(in)});
+        } else if (label == 0xFE && index == imageIndex) {
+          comments.add(new String(readBlocks(in), java.nio.charset.StandardCharsets.ISO_8859_1));
         } else {
           skipBlocks(in);
         }
@@ -138,7 +216,7 @@ public final class GifMetadata extends IIOMetadata {
     }
   }
 
-  public boolean isReadOnly() { return true; }
+  public boolean isReadOnly() { return false; }
 
   public Node getAsTree(String formatName) {
     if (IIOMetadataFormatImpl.standardMetadataFormatName.equals(formatName)) {
@@ -213,6 +291,24 @@ public final class GifMetadata extends IIOMetadata {
       g.setAttribute("delayTime", Integer.toString(delay));
       g.setAttribute("transparentColorIndex", Integer.toString(transparentIndex));
       root.appendChild(g);
+    }
+    if (!applications.isEmpty()) {
+      IIOMetadataNode apps = new IIOMetadataNode("ApplicationExtensions");
+      for (Object[] a : applications) {
+        IIOMetadataNode e = new IIOMetadataNode("ApplicationExtension");
+        e.setAttribute("applicationID", (String) a[0]);
+        e.setAttribute("authenticationCode", (String) a[1]);
+        e.setUserObject(((byte[]) a[2]).clone());
+        apps.appendChild(e);
+      }
+      root.appendChild(apps);
+    }
+    if (!comments.isEmpty()) {
+      IIOMetadataNode cs = new IIOMetadataNode("CommentExtensions");
+      for (String c : comments) {
+        cs.appendChild(node("CommentExtension", "value", c));
+      }
+      root.appendChild(cs);
     }
     return root;
   }
@@ -292,10 +388,226 @@ public final class GifMetadata extends IIOMetadata {
   }
 
   public void mergeTree(String formatName, Node root) throws IIOInvalidTreeException {
-    throw new IllegalStateException("Metadata is read-only!");
+    if (IIOMetadataFormatImpl.standardMetadataFormatName.equals(formatName)) {
+      mergeStandard(root);
+      return;
+    }
+    if (!(stream ? kStreamFormat : kImageFormat).equals(formatName)) {
+      throw new IllegalArgumentException("Not a recognized format!");
+    }
+    if (root == null || !formatName.equals(root.getNodeName())) {
+      throw new IIOInvalidTreeException("Root must be " + formatName, root);
+    }
+    for (Node c = root.getFirstChild(); c != null; c = c.getNextSibling()) {
+      String name = c.getNodeName();
+      if (stream && name.equals("Version")) {
+        version = attr(c, "value", version);
+      } else if (stream && name.equals("LogicalScreenDescriptor")) {
+        screenW = intAttr(c, "logicalScreenWidth", screenW);
+        screenH = intAttr(c, "logicalScreenHeight", screenH);
+        colorResolution = intAttr(c, "colorResolution", colorResolution);
+        aspect = intAttr(c, "pixelAspectRatio", aspect);
+      } else if (stream && name.equals("GlobalColorTable")) {
+        backgroundIndex = intAttr(c, "backgroundColorIndex", backgroundIndex);
+        globalSorted = boolAttr(c, "sortFlag", globalSorted);
+        globalTable = readTable(c, intAttr(c, "sizeOfGlobalColorTable", 0));
+      } else if (!stream && name.equals("ImageDescriptor")) {
+        left = intAttr(c, "imageLeftPosition", left);
+        top = intAttr(c, "imageTopPosition", top);
+        width = intAttr(c, "imageWidth", width);
+        height = intAttr(c, "imageHeight", height);
+        interlaced = boolAttr(c, "interlaceFlag", interlaced);
+      } else if (!stream && name.equals("LocalColorTable")) {
+        localSorted = boolAttr(c, "sortFlag", localSorted);
+        localTable = readTable(c, intAttr(c, "sizeOfLocalColorTable", 0));
+      } else if (!stream && name.equals("GraphicControlExtension")) {
+        hasGce = true;
+        String d = attr(c, "disposalMethod", kDisposal[disposal]);
+        for (int i = 0; i < kDisposal.length; i++) {
+          if (kDisposal[i].equals(d)) {
+            disposal = i;
+          }
+        }
+        userInput = boolAttr(c, "userInputFlag", userInput);
+        transparent = boolAttr(c, "transparentColorFlag", transparent);
+        delay = intAttr(c, "delayTime", delay);
+        transparentIndex = intAttr(c, "transparentColorIndex", transparentIndex);
+      } else if (!stream && name.equals("ApplicationExtensions")) {
+        applications.clear();
+        for (Node e = c.getFirstChild(); e != null; e = e.getNextSibling()) {
+          Object user = e instanceof IIOMetadataNode ? ((IIOMetadataNode) e).getUserObject() : null;
+          if (!(user instanceof byte[])) {
+            throw new IIOInvalidTreeException("Application extension needs a byte[] user object", e);
+          }
+          applications.add(new Object[] {attr(e, "applicationID", ""), attr(e, "authenticationCode", ""),
+              ((byte[]) user).clone()});
+        }
+      } else if (!stream && name.equals("CommentExtensions")) {
+        comments.clear();
+        for (Node e = c.getFirstChild(); e != null; e = e.getNextSibling()) {
+          comments.add(attr(e, "value", ""));
+        }
+      }
+    }
+  }
+
+  private void mergeStandard(Node root) throws IIOInvalidTreeException {
+    for (Node c = root.getFirstChild(); c != null; c = c.getNextSibling()) {
+      if (c.getNodeName().equals("Chroma")) {
+        for (Node p = c.getFirstChild(); p != null; p = p.getNextSibling()) {
+          if (p.getNodeName().equals("Palette")) {
+            int n = 0;
+            for (Node e = p.getFirstChild(); e != null; e = e.getNextSibling()) {
+              n = Math.max(n, intAttr(e, "index", 0) + 1);
+            }
+            byte[] t = readTable(p, n);
+            if (stream) {
+              globalTable = t;
+            } else {
+              localTable = t;
+            }
+          } else if (p.getNodeName().equals("BackgroundIndex") && stream) {
+            backgroundIndex = intAttr(p, "value", 0);
+          }
+        }
+      } else if (c.getNodeName().equals("Transparency") && !stream) {
+        for (Node p = c.getFirstChild(); p != null; p = p.getNextSibling()) {
+          if (p.getNodeName().equals("TransparentIndex")) {
+            hasGce = true;
+            transparent = true;
+            transparentIndex = intAttr(p, "value", 0);
+          }
+        }
+      } else if (c.getNodeName().equals("Dimension") && !stream) {
+        for (Node p = c.getFirstChild(); p != null; p = p.getNextSibling()) {
+          if (p.getNodeName().equals("HorizontalPixelOffset")) {
+            left = intAttr(p, "value", 0);
+          } else if (p.getNodeName().equals("VerticalPixelOffset")) {
+            top = intAttr(p, "value", 0);
+          }
+        }
+      } else if (c.getNodeName().equals("Text") && !stream) {
+        comments.clear();
+        for (Node e = c.getFirstChild(); e != null; e = e.getNextSibling()) {
+          comments.add(attr(e, "value", ""));
+        }
+      }
+    }
+  }
+
+  private static String attr(Node n, String name, String fallback) {
+    Node a = n.getAttributes() == null ? null : n.getAttributes().getNamedItem(name);
+    return a == null || a.getNodeValue().isEmpty() ? fallback : a.getNodeValue();
+  }
+
+  private static int intAttr(Node n, String name, int fallback) throws IIOInvalidTreeException {
+    String v = attr(n, name, null);
+    if (v == null) {
+      return fallback;
+    }
+    try {
+      return Integer.parseInt(v.trim());
+    } catch (NumberFormatException e) {
+      throw new IIOInvalidTreeException("Bad value for " + name + " attribute!", n);
+    }
+  }
+
+  private static boolean boolAttr(Node n, String name, boolean fallback) throws IIOInvalidTreeException {
+    String v = attr(n, name, null);
+    if (v == null) {
+      return fallback;
+    }
+    if (v.equalsIgnoreCase("true")) {
+      return true;
+    }
+    if (v.equalsIgnoreCase("false")) {
+      return false;
+    }
+    throw new IIOInvalidTreeException("Bad value for " + name + " attribute!", n);
+  }
+
+  private static byte[] readTable(Node node, int size) throws IIOInvalidTreeException {
+    int n = size;
+    for (Node e = node.getFirstChild(); e != null; e = e.getNextSibling()) {
+      n = Math.max(n, intAttr(e, "index", 0) + 1);
+    }
+    byte[] t = new byte[n * 3];
+    for (Node e = node.getFirstChild(); e != null; e = e.getNextSibling()) {
+      int i = intAttr(e, "index", 0);
+      t[3 * i] = (byte) intAttr(e, "red", 0);
+      t[3 * i + 1] = (byte) intAttr(e, "green", 0);
+      t[3 * i + 2] = (byte) intAttr(e, "blue", 0);
+    }
+    return t;
   }
 
   public void reset() {
-    throw new IllegalStateException("Metadata is read-only!");
+    version = "89a";
+    screenW = 0;
+    screenH = 0;
+    colorResolution = 0;
+    aspect = 0;
+    globalTable = null;
+    backgroundIndex = 0;
+    globalSorted = false;
+    left = 0;
+    top = 0;
+    width = 0;
+    height = 0;
+    interlaced = true;
+    localTable = null;
+    localSorted = false;
+    hasGce = false;
+    disposal = 0;
+    userInput = false;
+    transparent = false;
+    delay = 0;
+    transparentIndex = 0;
+    applications.clear();
+    comments.clear();
   }
+
+  boolean isStream() { return stream; }
+
+  int screenWidth() { return screenW; }
+
+  int screenHeight() { return screenH; }
+
+  int colorResolutionBits() { return colorResolution; }
+
+  int pixelAspect() { return aspect; }
+
+  String versionName() { return version; }
+
+  byte[] globalTableBytes() { return globalTable; }
+
+  int backgroundColorIndex() { return backgroundIndex; }
+
+  boolean globalSortFlag() { return globalSorted; }
+
+  int imageLeft() { return left; }
+
+  int imageTop() { return top; }
+
+  boolean interlaceFlag() { return interlaced; }
+
+  byte[] localTableBytes() { return localTable; }
+
+  boolean localSortFlag() { return localSorted; }
+
+  boolean hasGraphicControl() { return hasGce; }
+
+  int disposalMethod() { return disposal; }
+
+  boolean userInputFlag() { return userInput; }
+
+  boolean transparentFlag() { return transparent; }
+
+  int delayTime() { return delay; }
+
+  int transparentColorIndex() { return transparentIndex; }
+
+  List<Object[]> applicationExtensions() { return applications; }
+
+  List<String> commentExtensions() { return comments; }
 }

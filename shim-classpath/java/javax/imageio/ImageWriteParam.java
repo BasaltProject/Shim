@@ -69,15 +69,19 @@ public class ImageWriteParam extends IIOParam {
     }
   }
 
-  private void needExplicitCompression() {
-    needCompression(".");
+  private void needExplicitCompression() { needExplicitCompression("."); }
+
+  private void needExplicitCompression(String suffix) {
+    needCompression(suffix);
     if (compressionMode != MODE_EXPLICIT) {
       throw new IllegalStateException("Compression mode not MODE_EXPLICIT!");
     }
   }
 
-  private void needCompressionType() {
-    needExplicitCompression();
+  private void needCompressionType() { needCompressionType("."); }
+
+  private void needCompressionType(String suffix) {
+    needExplicitCompression(suffix);
     if (compressionTypes != null && compressionType == null) {
       throw new IllegalStateException("No compression type set!");
     }
@@ -202,7 +206,7 @@ public class ImageWriteParam extends IIOParam {
   }
 
   public void setCompressionType(String compressionType) {
-    needExplicitCompression();
+    needExplicitCompression("");
     if (compressionType == null) {
       this.compressionType = null;
       return;
@@ -226,7 +230,7 @@ public class ImageWriteParam extends IIOParam {
   }
 
   public void unsetCompression() {
-    needExplicitCompression();
+    needExplicitCompression("");
     compressionType = null;
     compressionQuality = 1.0F;
   }
@@ -240,12 +244,12 @@ public class ImageWriteParam extends IIOParam {
   }
 
   public boolean isCompressionLossless() {
-    needCompressionType();
+    needCompressionType("");
     return true;
   }
 
   public void setCompressionQuality(float quality) {
-    needCompressionType();
+    needCompressionType("");
     if (quality < 0.0F || quality > 1.0F) {
       throw new IllegalArgumentException("Quality out-of-bounds!");
     }

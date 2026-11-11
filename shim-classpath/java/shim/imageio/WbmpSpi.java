@@ -23,8 +23,8 @@ public final class WbmpSpi {
   public static final class Reader extends ImageReaderSpi {
     public Reader() {
       super("Oracle Corporation", "1.0", new String[] {"wbmp", "WBMP"}, new String[] {"wbmp"},
-          new String[] {"image/vnd.wap.wbmp"}, "shim.imageio.WbmpReader", STANDARD_INPUT_TYPE,
-          new String[] {"shim.imageio.WbmpSpi$Writer"}, false, null, null, null, null, true, null, null, null, null);
+          new String[] {"image/vnd.wap.wbmp"}, "com.sun.imageio.plugins.wbmp.WBMPImageReader", STANDARD_INPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.wbmp.WBMPImageWriterSpi"}, true, null, null, null, null, true, "javax_imageio_wbmp_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
@@ -69,8 +69,8 @@ public final class WbmpSpi {
   public static final class Writer extends ImageWriterSpi {
     public Writer() {
       super("Oracle Corporation", "1.0", new String[] {"wbmp", "WBMP"}, new String[] {"wbmp"},
-          new String[] {"image/vnd.wap.wbmp"}, "shim.imageio.WbmpWriter", STANDARD_OUTPUT_TYPE,
-          new String[] {"shim.imageio.WbmpSpi$Reader"}, false, null, null, null, null, true, null, null, null, null);
+          new String[] {"image/vnd.wap.wbmp"}, "com.sun.imageio.plugins.wbmp.WBMPImageWriter", STANDARD_OUTPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.wbmp.WBMPImageReaderSpi"}, true, null, null, null, null, true, null, null, null, null);
     }
 
     public String getDescription(Locale locale) {

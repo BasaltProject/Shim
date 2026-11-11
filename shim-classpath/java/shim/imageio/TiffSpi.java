@@ -23,9 +23,8 @@ public final class TiffSpi {
   public static final class Reader extends ImageReaderSpi {
     public Reader() {
       super("Oracle Corporation", "1.0", new String[] {"tif", "TIF", "tiff", "TIFF"}, new String[] {"tif", "tiff"},
-          new String[] {"image/tiff"}, "shim.imageio.TiffReader", STANDARD_INPUT_TYPE,
-          new String[] {"shim.imageio.TiffSpi$Writer"}, false, null, null, null, null, true,
-          "javax_imageio_tiff_image_1.0", "com.sun.imageio.plugins.tiff.TIFFImageMetadataFormat", null, null);
+          new String[] {"image/tiff"}, "com.sun.imageio.plugins.tiff.TIFFImageReader", STANDARD_INPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.tiff.TIFFImageWriterSpi"}, false, "javax_imageio_tiff_stream_1.0", null, null, null, true, "javax_imageio_tiff_image_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
@@ -58,9 +57,8 @@ public final class TiffSpi {
   public static final class Writer extends ImageWriterSpi {
     public Writer() {
       super("Oracle Corporation", "1.0", new String[] {"tif", "TIF", "tiff", "TIFF"}, new String[] {"tif", "tiff"},
-          new String[] {"image/tiff"}, "shim.imageio.TiffWriter", STANDARD_OUTPUT_TYPE,
-          new String[] {"shim.imageio.TiffSpi$Reader"}, false, null, null, null, null, true,
-          "javax_imageio_tiff_image_1.0", "com.sun.imageio.plugins.tiff.TIFFImageMetadataFormat", null, null);
+          new String[] {"image/tiff"}, "com.sun.imageio.plugins.tiff.TIFFImageWriter", STANDARD_OUTPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.tiff.TIFFImageReaderSpi"}, false, "javax_imageio_tiff_stream_1.0", null, null, null, true, "javax_imageio_tiff_image_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {

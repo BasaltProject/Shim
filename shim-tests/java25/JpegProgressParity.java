@@ -1,0 +1,11 @@
+/*
+ * Copyright (c) 2026 BasaltMC.
+ * Licensed under MIT; see LICENSE:
+ * https://github.com/BasaltProject/Shim/blob/main/LICENSE
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+import javax.imageio.*; import javax.imageio.event.*; import javax.imageio.stream.*; import javax.imageio.plugins.jpeg.*; import java.awt.image.*; import java.io.*; import java.util.*;
+public class JpegProgressParity { public static void main(String[] a) throws Exception { for(int h: new int[]{8,16,100,130}) { BufferedImage im=new BufferedImage(40,h,BufferedImage.TYPE_INT_RGB); for(int y=0;y<h;y++)for(int x=0;x<40;x++) im.setRGB(x,y,(x*6)<<16|(y*2&255)<<8|90); ImageWriter w=ImageIO.getImageWritersByFormatName("jpeg").next(); StringBuilder sb=new StringBuilder(); w.addIIOWriteProgressListener(new IIOWriteProgressListener(){ public void imageStarted(ImageWriter s,int i){sb.append("S ");} public void imageProgress(ImageWriter s,float p){sb.append(p).append(' ');} public void imageComplete(ImageWriter s){sb.append("C");} public void thumbnailStarted(ImageWriter s,int i,int j){} public void thumbnailProgress(ImageWriter s,float p){} public void thumbnailComplete(ImageWriter s){} public void writeAborted(ImageWriter s){sb.append("A");}}); ByteArrayOutputStream bo=new ByteArrayOutputStream(); ImageOutputStream os=ImageIO.createImageOutputStream(bo); w.setOutput(os); w.write(null,new IIOImage(im,null,null),w.getDefaultWriteParam()); os.close(); System.out.println("write h="+h+": "+sb);
+   for(boolean prog: new boolean[]{false}){ ImageReader r=ImageIO.getImageReadersByFormatName("jpeg").next(); StringBuilder rb=new StringBuilder(); r.addIIOReadProgressListener(new IIOReadProgressListener(){ public void sequenceStarted(ImageReader s,int i){} public void sequenceComplete(ImageReader s){} public void imageStarted(ImageReader s,int i){rb.append("S ");} public void imageProgress(ImageReader s,float p){rb.append(p).append(' ');} public void imageComplete(ImageReader s){rb.append("C");} public void thumbnailStarted(ImageReader s,int i,int j){} public void thumbnailProgress(ImageReader s,float p){} public void thumbnailComplete(ImageReader s){} public void readAborted(ImageReader s){}}); r.setInput(ImageIO.createImageInputStream(new ByteArrayInputStream(bo.toByteArray()))); r.read(0); System.out.println("read  h="+h+": "+rb); } } } }

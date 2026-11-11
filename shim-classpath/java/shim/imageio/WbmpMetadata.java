@@ -67,10 +67,10 @@ public final class WbmpMetadata extends IIOMetadata {
   }
 
   public void mergeTree(String formatName, Node root) throws IIOInvalidTreeException {
-    throw new IllegalStateException("Metadata is read-only!");
+    throw new IllegalStateException("Metadata is read-only.");
   }
 
   public void reset() {
-    throw new IllegalStateException("Metadata is read-only!");
+    throw new IllegalStateException("Metadata is read-only.");
   }
 }

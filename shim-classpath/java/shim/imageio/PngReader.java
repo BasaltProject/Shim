@@ -40,7 +40,7 @@ public final class PngReader extends CodecReader {
 
   public javax.imageio.metadata.IIOMetadata getImageMetadata(int imageIndex) throws IOException {
     javax.imageio.metadata.IIOMetadata m = super.getImageMetadata(imageIndex);
-    return ((ImageInfoMetadata) m).withNativeTree(PngNative.read(stream()));
+    return PngMetadata.parse(stream());
   }
 
   protected String[] nativeFormat() { return new String[] {"javax_imageio_png_1.0", "deflate", "true"}; }

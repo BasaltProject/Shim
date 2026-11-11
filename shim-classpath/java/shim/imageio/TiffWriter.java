@@ -43,16 +43,6 @@ public final class TiffWriter extends CodecWriter {
   private long pendingNextPointer = -1;
   private boolean sequence;
 
-  private static final class Param extends ImageWriteParam {
-    Param(Locale locale) {
-      super(locale);
-      canWriteTiles = true;
-      canOffsetTiles = true;
-      canWriteCompressed = true;
-      compressionTypes = kCompressionTypes.clone();
-    }
-  }
-
   private static final class Layout {
     int bands;
     int bits;
@@ -82,7 +72,7 @@ public final class TiffWriter extends CodecWriter {
   }
 
   public ImageWriteParam getDefaultWriteParam() {
-    return new Param(getLocale());
+    return new com.sun.imageio.plugins.tiff.TIFFImageWriteParam(getLocale());
   }
 
   public boolean canWriteRasters() {
@@ -482,6 +472,11 @@ public final class TiffWriter extends CodecWriter {
       throw new IllegalArgumentException("image == null!");
     }
     ImageOutputStream out = stream();
+    if (param != null && param.canWriteCompressed() && param.getCompressionMode() == ImageWriteParam.MODE_EXPLICIT
+        && "Exif JPEG".equals(param.getCompressionType())) {
+      writeExifJpeg(out, image);
+      return;
+    }
     if (!sequence) {
       pendingNextPointer = -1;
       writeHeader(out);
@@ -492,6 +487,37 @@ public final class TiffWriter extends CodecWriter {
     }
     processImageStarted(0);
     writeImage(out, image, param, ifdPos);
+    out.flush();
+    processImageProgress(100f);
+    processImageComplete();
+  }
+
+  private void writeExifJpeg(ImageOutputStream out, IIOImage image) throws IOException {
+    BufferedImage bi = shim.awt.ImageSupport.toBuffered(image.getRenderedImage());
+    java.awt.image.ColorModel cm = bi.getColorModel();
+    if (cm.getNumComponents() != 3 || cm.hasAlpha() || cm.getComponentSize(0) != 8 || cm.getComponentSize(1) != 8
+        || cm.getComponentSize(2) != 8) {
+      throw new IIOException("Old JPEG compression not supported!");
+    }
+    processImageStarted(0);
+    byte[] jpeg = JpegWriter.encodeWithoutJfif(bi);
+    ByteOrder order = out.getByteOrder();
+    ByteBuffer bb = ByteBuffer.allocate(104 + jpeg.length).order(order);
+    bb.put((byte) (order == ByteOrder.BIG_ENDIAN ? 'M' : 'I')).put((byte) (order == ByteOrder.BIG_ENDIAN ? 'M' : 'I'));
+    bb.putShort((short) 42).putInt(8).putShort((short) 6);
+    int[][] entries = {{259, 3, 6}, {282, 5, 88}, {283, 5, 96}, {296, 3, 1}, {513, 4, 104}, {514, 4, jpeg.length}};
+    for (int[] e : entries) {
+      bb.putShort((short) e[0]).putShort((short) e[1]).putInt(1);
+      if (e[1] == 3) {
+        bb.putShort((short) e[2]).putShort((short) 0);
+      } else {
+        bb.putInt(e[2]);
+      }
+    }
+    bb.putInt(0).putShort((short) 0);
+    bb.putInt(1).putInt(1).putInt(1).putInt(1);
+    bb.put(jpeg);
+    out.write(bb.array());
     out.flush();
     processImageProgress(100f);
     processImageComplete();

@@ -22,13 +22,13 @@ public final class JpegSpi {
 
   public static final class Reader extends ImageReaderSpi {
     public Reader() {
-      super("Oracle Corporation", "1.0", new String[] {"jpeg", "jpg", "JPG", "JPEG"}, new String[] {"jpg", "jpeg"}, new String[] {"image/jpeg"}, "shim.imageio.JpegReader",
-          STANDARD_INPUT_TYPE, new String[] {"shim.imageio.JpegSpi$Writer"}, false, null, null, null, null, true,
-          null, null, null, null);
+      super("Oracle Corporation", "0.5", new String[] {"JPEG", "jpeg", "JPG", "jpg"}, new String[] {"jpg", "jpeg"},
+          new String[] {"image/jpeg"}, "com.sun.imageio.plugins.jpeg.JPEGImageReader", STANDARD_INPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.jpeg.JPEGImageWriterSpi"}, true, "javax_imageio_jpeg_stream_1.0", null, null, null, true, "javax_imageio_jpeg_image_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
-      return "Standard JPEG image reader";
+      return "Standard JPEG Image Reader";
     }
 
     public boolean canDecodeInput(Object source) throws IOException {
@@ -55,13 +55,13 @@ public final class JpegSpi {
 
   public static final class Writer extends ImageWriterSpi {
     public Writer() {
-      super("Oracle Corporation", "1.0", new String[] {"jpeg", "jpg", "JPG", "JPEG"}, new String[] {"jpg", "jpeg"}, new String[] {"image/jpeg"}, "shim.imageio.JpegWriter",
-          STANDARD_OUTPUT_TYPE, new String[] {"shim.imageio.JpegSpi$Reader"}, false, null, null, null, null, true,
-          null, null, null, null);
+      super("Oracle Corporation", "0.5", new String[] {"JPEG", "jpeg", "JPG", "jpg"}, new String[] {"jpg", "jpeg"},
+          new String[] {"image/jpeg"}, "com.sun.imageio.plugins.jpeg.JPEGImageWriter", STANDARD_OUTPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.jpeg.JPEGImageReaderSpi"}, true, "javax_imageio_jpeg_stream_1.0", null, null, null, true, "javax_imageio_jpeg_image_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
-      return "Standard JPEG image writer";
+      return "Standard JPEG Image Writer";
     }
 
     public boolean isFormatLossless() {
@@ -69,7 +69,15 @@ public final class JpegSpi {
     }
 
     public boolean canEncodeImage(ImageTypeSpecifier type) {
-      return !type.getColorModel().hasAlpha();
+      if (type.getColorModel().hasAlpha()) {
+        return false;
+      }
+      for (int size : type.getSampleModel().getSampleSize()) {
+        if (size > 8) {
+          return false;
+        }
+      }
+      return true;
     }
 
     public ImageWriter createWriterInstance(Object extension) throws IOException {

@@ -22,13 +22,13 @@ public final class BmpSpi {
 
   public static final class Reader extends ImageReaderSpi {
     public Reader() {
-      super("Oracle Corporation", "1.0", new String[] {"bmp", "BMP"}, new String[] {"bmp"}, new String[] {"image/bmp"}, "shim.imageio.BmpReader",
-          STANDARD_INPUT_TYPE, new String[] {"shim.imageio.BmpSpi$Writer"}, false, null, null, null, null, true,
-          null, null, null, null);
+      super("Oracle Corporation", "1.0", new String[] {"bmp", "BMP"}, new String[] {"bmp"},
+          new String[] {"image/bmp"}, "com.sun.imageio.plugins.bmp.BMPImageReader", STANDARD_INPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.bmp.BMPImageWriterSpi"}, false, null, null, null, null, true, "javax_imageio_bmp_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
-      return "Standard BMP image reader";
+      return "Standard BMP Image Reader";
     }
 
     public boolean canDecodeInput(Object source) throws IOException {
@@ -55,13 +55,13 @@ public final class BmpSpi {
 
   public static final class Writer extends ImageWriterSpi {
     public Writer() {
-      super("Oracle Corporation", "1.0", new String[] {"bmp", "BMP"}, new String[] {"bmp"}, new String[] {"image/bmp"}, "shim.imageio.BmpWriter",
-          STANDARD_OUTPUT_TYPE, new String[] {"shim.imageio.BmpSpi$Reader"}, false, null, null, null, null, true,
-          null, null, null, null);
+      super("Oracle Corporation", "1.0", new String[] {"bmp", "BMP"}, new String[] {"bmp"},
+          new String[] {"image/bmp"}, "com.sun.imageio.plugins.bmp.BMPImageWriter", STANDARD_OUTPUT_TYPE,
+          new String[] {"com.sun.imageio.plugins.bmp.BMPImageReaderSpi"}, false, null, null, null, null, true, "javax_imageio_bmp_1.0", null, null, null);
     }
 
     public String getDescription(Locale locale) {
-      return "Standard BMP image writer";
+      return "Standard BMP Image Writer";
     }
 
     public boolean isFormatLossless() {
@@ -69,7 +69,15 @@ public final class BmpSpi {
     }
 
     public boolean canEncodeImage(ImageTypeSpecifier type) {
-      return !type.getColorModel().hasAlpha();
+      if (type.getColorModel().hasAlpha()) {
+        return false;
+      }
+      for (int size : type.getSampleModel().getSampleSize()) {
+        if (size > 8) {
+          return false;
+        }
+      }
+      return true;
     }
 
     public ImageWriter createWriterInstance(Object extension) throws IOException {

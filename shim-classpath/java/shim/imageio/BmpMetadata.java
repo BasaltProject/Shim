@@ -89,6 +89,15 @@ public final class BmpMetadata extends IIOMetadata {
     }
   }
 
+  private boolean fresh;
+
+  public BmpMetadata(int bitsPerPixel) {
+    super(true, kFormat, null, null, null);
+    version = "BMP v. 3.x";
+    bits = bitsPerPixel;
+    fresh = true;
+  }
+
   public boolean isReadOnly() { return true; }
 
   public Node getAsTree(String formatName) {
@@ -178,7 +187,9 @@ public final class BmpMetadata extends IIOMetadata {
     IIOMetadataNode d = new IIOMetadataNode("Data");
     IIOMetadataNode n = new IIOMetadataNode("BitsPerSample");
     String v = "";
-    if (palette == null) {
+    if (fresh) {
+      v = " ";
+    } else if (palette == null) {
       if (bits == 16 && compression != 3) {
         v = "5 5 5 ";
       } else if (bits == 16 || bits == 32) {
@@ -193,10 +204,10 @@ public final class BmpMetadata extends IIOMetadata {
   }
 
   public void mergeTree(String formatName, Node root) throws IIOInvalidTreeException {
-    throw new IllegalStateException("Metadata is read-only!");
+    throw new IllegalStateException("Metadata is read-only.");
   }
 
   public void reset() {
-    throw new IllegalStateException("Metadata is read-only!");
+    throw new IllegalStateException("Metadata is read-only.");
   }
 }

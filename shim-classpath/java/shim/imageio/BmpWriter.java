@@ -26,6 +26,23 @@ public final class BmpWriter extends CodecWriter {
     super(spi);
   }
 
+  public IIOMetadata getDefaultImageMetadata(javax.imageio.ImageTypeSpecifier type, ImageWriteParam param) {
+    int n;
+    if (type.getColorModel() instanceof java.awt.image.IndexColorModel) {
+      int size = ((java.awt.image.IndexColorModel) type.getColorModel()).getMapSize();
+      n = size <= 2 ? 1 : size <= 16 ? 4 : 8;
+    } else if (type.getNumBands() == 1) {
+      n = 8;
+    } else {
+      n = 24;
+    }
+    return new BmpMetadata(n);
+  }
+
+  public javax.imageio.ImageWriteParam getDefaultWriteParam() {
+    return new javax.imageio.plugins.bmp.BMPImageWriteParam(getLocale());
+  }
+
   public void write(IIOMetadata streamMetadata, IIOImage image, ImageWriteParam param) throws IOException {
     ImageOutputStream out = stream();
     BufferedImage bi = shim.awt.ImageSupport.toBuffered(image.getRenderedImage());
@@ -62,7 +79,7 @@ public final class BmpWriter extends CodecWriter {
     out.writeShort(1);
     out.writeShort(bits);
     out.writeInt(0);
-    out.writeInt(0);
+    out.writeInt(rowBytes * h);
     out.writeInt(0);
     out.writeInt(0);
     out.writeInt(0);

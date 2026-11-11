@@ -21,7 +21,6 @@ public class BMPImageWriteParam extends ImageWriteParam {
     compressionTypes = new String[] {"BI_RGB", "BI_RLE8", "BI_RLE4", "BI_BITFIELDS", "BI_JPEG", "BI_PNG"};
     canWriteCompressed = true;
     compressionMode = MODE_COPY_FROM_METADATA;
-    compressionType = "BI_RGB";
   }
 
   public void setTopDown(boolean topDown) { this.topDown = topDown; }
