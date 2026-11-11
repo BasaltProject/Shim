@@ -222,9 +222,7 @@ public interface IntStream extends BaseStream<Integer, IntStream> {
     return Stream.concat(a.boxed(), b.boxed()).mapToInt(Integer::intValue).onClose(a::close).onClose(b::close);
   }
 
-  default IntSummaryStatistics summaryStatistics() {
-    return collect(IntSummaryStatistics::new, IntSummaryStatistics::accept, IntSummaryStatistics::combine);
-  }
+  IntSummaryStatistics summaryStatistics();
 
   interface Builder extends IntConsumer {
     @Override

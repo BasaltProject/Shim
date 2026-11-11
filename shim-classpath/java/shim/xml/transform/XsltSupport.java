@@ -300,10 +300,10 @@ final class XsltSupport {
         return Double.valueOf(1.0);
       }
       if (p.endsWith("vendor")) {
-        return "Basalt Shim";
+        return "Apache Software Foundation (Xalan XSLTC)";
       }
       if (p.endsWith("vendor-url")) {
-        return "https://basaltmc.org";
+        return "http://xml.apache.org/xalan-j";
       }
       return "";
     }

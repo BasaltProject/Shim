@@ -9,6 +9,9 @@ package java.util.stream;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.DoubleSummaryStatistics;
+import java.util.IntSummaryStatistics;
+import java.util.LongSummaryStatistics;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -822,6 +825,11 @@ public final class StreamSupport {
   }
 
   static class IntPipeline implements IntStream {
+
+    @Override
+    public IntSummaryStatistics summaryStatistics() {
+      return collect(IntSummaryStatistics::new, IntSummaryStatistics::accept, IntSummaryStatistics::combine);
+    }
     private final Spliterator.OfInt spliterator;
     private final boolean parallel;
     private List<Runnable> closeHandlers = null;
@@ -1094,6 +1102,11 @@ public final class StreamSupport {
   }
 
   static class LongPipeline implements LongStream {
+
+    @Override
+    public LongSummaryStatistics summaryStatistics() {
+      return collect(LongSummaryStatistics::new, LongSummaryStatistics::accept, LongSummaryStatistics::combine);
+    }
     private final Spliterator.OfLong spliterator;
     private final boolean parallel;
     private List<Runnable> closeHandlers = null;
@@ -1360,6 +1373,11 @@ public final class StreamSupport {
   }
 
   static class DoublePipeline implements DoubleStream {
+
+    @Override
+    public DoubleSummaryStatistics summaryStatistics() {
+      return collect(DoubleSummaryStatistics::new, DoubleSummaryStatistics::accept, DoubleSummaryStatistics::combine);
+    }
     private final Spliterator.OfDouble spliterator;
     private final boolean parallel;
     private List<Runnable> closeHandlers = null;

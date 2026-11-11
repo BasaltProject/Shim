@@ -27,7 +27,27 @@ import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
 public final class Agents {
-  private static final List<ClassFileTransformer> transformers = new ArrayList<ClassFileTransformer>();
+  private static final class Entry {
+    final ClassFileTransformer transformer;
+    final boolean retransformable;
+
+    Entry(ClassFileTransformer transformer, boolean retransformable) {
+      this.transformer = transformer;
+      this.retransformable = retransformable;
+    }
+  }
+
+  private static final List<Entry> transformers = new ArrayList<Entry>();
+  private static final java.util.WeakHashMap<ClassLoader, Map<String, byte[]>> originals =
+      new java.util.WeakHashMap<ClassLoader, Map<String, byte[]>>();
+  private static final Object bootKey = new Object();
+  private static final Map<String, byte[]> bootOriginals = new java.util.HashMap<String, byte[]>();
+
+  private static native String redefine0(Class<?> c, byte[] bytes);
+
+  private static native void setNativePrefixes0(byte[] joined);
+
+  private static volatile boolean canSetPrefix;
   private static volatile boolean active;
   private static volatile boolean canRetransform;
   private static volatile boolean canRedefine;
@@ -69,6 +89,7 @@ public final class Agents {
   private static void flags(Manifest m) {
     canRetransform = "true".equalsIgnoreCase(m.getMainAttributes().getValue("Can-Retransform-Classes"));
     canRedefine = "true".equalsIgnoreCase(m.getMainAttributes().getValue("Can-Redefine-Classes"));
+    canSetPrefix = "true".equalsIgnoreCase(m.getMainAttributes().getValue("Can-Set-Native-Method-Prefix"));
   }
 
   private static Method find(Class<?> c, String name, Class<?>... types) {
@@ -130,22 +151,86 @@ public final class Agents {
 
   public static byte[] transform(ClassLoader loader, String name, Class<?> redefined, ProtectionDomain pd,
       byte[] bytes) {
-    ClassFileTransformer[] list;
+    if (redefined == null && bytes != null) {
+      remember(loader, name, bytes);
+    }
+    return runTransformers(loader, name, redefined, pd, bytes, false);
+  }
+
+  private static void remember(ClassLoader loader, String name, byte[] bytes) {
+    synchronized (originals) {
+      Map<String, byte[]> m;
+      if (loader == null) {
+        m = bootOriginals;
+      } else {
+        m = originals.get(loader);
+        if (m == null) {
+          m = new java.util.HashMap<String, byte[]>();
+          originals.put(loader, m);
+        }
+      }
+      m.putIfAbsent(name, bytes);
+    }
+  }
+
+  private static void replaceOriginal(ClassLoader loader, String name, byte[] bytes) {
+    synchronized (originals) {
+      Map<String, byte[]> m = loader == null ? bootOriginals : originals.get(loader);
+      if (m == null) {
+        m = new java.util.HashMap<String, byte[]>();
+        originals.put(loader, m);
+      }
+      m.put(name, bytes.clone());
+    }
+  }
+
+  private static byte[] original(ClassLoader loader, String name) {
+    synchronized (originals) {
+      Map<String, byte[]> m = loader == null ? bootOriginals : originals.get(loader);
+      byte[] b = m == null ? null : m.get(name);
+      if (b != null) {
+        return b;
+      }
+    }
+    return loader == null ? readClass(ClassLoader.getSystemClassLoader(), name.replace('/', '.'))
+        : readClass(loader, name.replace('/', '.'));
+  }
+
+  private static byte[] runTransformers(ClassLoader loader, String name, Class<?> redefined, ProtectionDomain pd,
+      byte[] bytes, boolean retransformOnly) {
+    Entry[] list;
     synchronized (transformers) {
-      list = transformers.toArray(new ClassFileTransformer[0]);
+      list = transformers.toArray(new Entry[0]);
     }
     byte[] current = bytes;
-    for (ClassFileTransformer t : list) {
+    for (Entry e : list) {
+      if (retransformOnly && !e.retransformable) {
+        continue;
+      }
       try {
-        byte[] out = t.transform(loader, name, redefined, pd, current);
+        byte[] out = e.transformer.transform(loader, name, redefined, pd, current);
         if (out != null) {
           current = out;
         }
-      } catch (IllegalClassFormatException | RuntimeException e) {
+      } catch (IllegalClassFormatException | RuntimeException ex) {
         // a failing transformer leaves the bytes untouched, as in the JDK
       }
     }
     return current == bytes ? null : current;
+  }
+
+  private static void redefine(Class<?> c, byte[] bytes) throws UnmodifiableClassException {
+    String r = redefine0(c, bytes);
+    if (r == null) {
+      return;
+    }
+    if (r.startsWith("NCDFE:")) {
+      throw new NoClassDefFoundError(r.substring(6));
+    }
+    if (r.startsWith("UOE:")) {
+      throw new UnsupportedOperationException(r.substring(4));
+    }
+    throw new InternalError(r);
   }
 
   public static byte[] readClass(ClassLoader loader, String name) {
@@ -169,7 +254,7 @@ public final class Agents {
     public void addTransformer(ClassFileTransformer transformer, boolean canRetransform) {
       java.util.Objects.requireNonNull(transformer);
       synchronized (transformers) {
-        transformers.add(transformer);
+        transformers.add(new Entry(transformer, canRetransform));
       }
       active = true;
     }
@@ -182,7 +267,12 @@ public final class Agents {
     @Override
     public boolean removeTransformer(ClassFileTransformer transformer) {
       synchronized (transformers) {
-        return transformers.remove(transformer);
+        for (Entry e : transformers) {
+          if (e.transformer == transformer) {
+            return transformers.remove(e);
+          }
+        }
+        return false;
       }
     }
 
@@ -201,6 +291,15 @@ public final class Agents {
           throw new UnmodifiableClassException(c.getName());
         }
       }
+      for (Class<?> c : classes) {
+        String internal = c.getName().replace('.', '/');
+        byte[] base = original(c.getClassLoader(), internal);
+        if (base == null) {
+          throw new UnmodifiableClassException(c.getName());
+        }
+        byte[] changed = runTransformers(c.getClassLoader(), internal, c, c.getProtectionDomain(), base, true);
+        redefine(c, changed != null ? changed : base);
+      }
     }
 
     @Override
@@ -214,12 +313,29 @@ public final class Agents {
       if (!canRedefine) {
         throw new UnsupportedOperationException("redefineClasses is not supported in this environment");
       }
-      throw new UnsupportedOperationException("redefineClasses");
+      java.util.Objects.requireNonNull(definitions);
+      if (!canRedefine) {
+        throw new UnsupportedOperationException("redefineClasses is not supported in this environment");
+      }
+      for (ClassDefinition d : definitions) {
+        Class<?> c = d.getDefinitionClass();
+        if (!isModifiableClass(c)) {
+          throw new UnmodifiableClassException(c.getName());
+        }
+      }
+      for (ClassDefinition d : definitions) {
+        Class<?> c = d.getDefinitionClass();
+        byte[] bytes = d.getDefinitionClassFile();
+        replaceOriginal(c.getClassLoader(), c.getName().replace('.', '/'), bytes);
+        byte[] changed = runTransformers(c.getClassLoader(), c.getName().replace('.', '/'), c,
+            c.getProtectionDomain(), bytes, false);
+        redefine(c, changed != null ? changed : bytes);
+      }
     }
 
     @Override
     public boolean isModifiableClass(Class<?> theClass) {
-      return !theClass.isArray() && !theClass.isPrimitive();
+      return !theClass.isArray() && !theClass.isPrimitive() && !theClass.isHidden();
     }
 
     @Override
@@ -284,12 +400,37 @@ public final class Agents {
 
     @Override
     public boolean isNativeMethodPrefixSupported() {
-      return false;
+      return canSetPrefix;
     }
+
+    private final java.util.Map<ClassFileTransformer, String> prefixes = new java.util.LinkedHashMap<>();
 
     @Override
     public void setNativeMethodPrefix(ClassFileTransformer transformer, String prefix) {
-      throw new UnsupportedOperationException();
+      if (!canSetPrefix) {
+        throw new UnsupportedOperationException("setNativeMethodPrefix is not supported in this environment");
+      }
+      java.util.Objects.requireNonNull(transformer, "null passed as 'transformer' in setNativeMethodPrefix");
+      java.util.Objects.requireNonNull(prefix, "null passed as 'prefix' in setNativeMethodPrefix");
+      synchronized (prefixes) {
+        boolean registered = false;
+        synchronized (transformers) {
+          for (Entry e : transformers) {
+            registered |= e.transformer == transformer;
+          }
+        }
+        if (!registered) {
+          throw new IllegalArgumentException("transformer not registered in setNativeMethodPrefix");
+        }
+        prefixes.put(transformer, prefix);
+        StringBuilder sb = new StringBuilder();
+        for (String p : prefixes.values()) {
+          if (!p.isEmpty()) {
+            sb.append(p).append('\n');
+          }
+        }
+        setNativePrefixes0(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      }
     }
 
     @Override

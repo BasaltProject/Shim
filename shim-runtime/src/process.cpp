@@ -77,6 +77,10 @@ unsigned mangle(int8_t c, char* dst)
   }
 }
 
+__thread unsigned tlsStripPrefix = 0;
+char* nativePrefixes = 0;
+unsigned nativePrefixesLength = 0;
+
 unsigned jniNameLength(Thread* t UNUSED, GcMethod* method, bool decorate)
 {
   unsigned size = 0;
@@ -89,7 +93,7 @@ unsigned jniNameLength(Thread* t UNUSED, GcMethod* method, bool decorate)
   ++size;
 
   GcByteArray* methodName = method->name();
-  for (unsigned i = 0; i < methodName->length() - 1; ++i) {
+  for (unsigned i = tlsStripPrefix; i < methodName->length() - 1; ++i) {
     size += mangledSize(methodName->body()[i]);
   }
 
@@ -125,7 +129,7 @@ void makeJNIName(Thread* t UNUSED,
   *(name++) = '_';
 
   GcByteArray* methodName = method->name();
-  for (unsigned i = 0; i < methodName->length() - 1; ++i) {
+  for (unsigned i = tlsStripPrefix; i < methodName->length() - 1; ++i) {
     name += mangle(methodName->body()[i], name);
   }
 
@@ -231,7 +235,31 @@ void* resolveNativeMethod(Thread* t,
   return 0;
 }
 
-GcNative* resolveNativeMethod(Thread* t, GcMethod* method)
+bool hasWrapper(Thread* t UNUSED, GcMethod* method, unsigned strip)
+{
+  GcByteArray* name = method->name();
+  GcByteArray* spec = method->spec();
+  GcArray* table = cast<GcArray>(t, method->class_()->methodTable());
+  if (table == 0) {
+    return false;
+  }
+  for (unsigned i = 0; i < table->length(); ++i) {
+    GcMethod* m = cast<GcMethod>(t, table->body()[i]);
+    if (m->flags() & ACC_NATIVE) {
+      continue;
+    }
+    GcByteArray* mn = m->name();
+    GcByteArray* ms = m->spec();
+    if (mn->length() == name->length() - strip && ms->length() == spec->length()
+        && memcmp(mn->body().begin(), name->body().begin() + strip, mn->length() - 1) == 0
+        && memcmp(ms->body().begin(), spec->body().begin(), spec->length() - 1) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+GcNative* resolveNativeMethodExact(Thread* t, GcMethod* method)
 {
   void* p = resolveNativeMethod(t, method, "Shim_", sizeof("Shim_") - 1, 3);
   if (p) {
@@ -246,9 +274,146 @@ GcNative* resolveNativeMethod(Thread* t, GcMethod* method)
   return 0;
 }
 
+GcNative* resolveNativeMethod(Thread* t, GcMethod* method)
+{
+  GcNative* native = resolveNativeMethodExact(t, method);
+  if (native || nativePrefixesLength == 0) {
+    return native;
+  }
+  const char* name = reinterpret_cast<const char*>(method->name()->body().begin());
+  unsigned total = method->name()->length() - 1;
+  unsigned strip = 0;
+  for (bool progressed = true; progressed;) {
+    progressed = false;
+    unsigned end = nativePrefixesLength;
+    while (end > 0) {
+      unsigned start = end - 1;
+      while (start > 0 && nativePrefixes[start - 1] != '\n') {
+        --start;
+      }
+      unsigned len = end - 1 - start;
+      if (len > 0 && strip + len < total && strncmp(name + strip, nativePrefixes + start, len) == 0) {
+        strip += len;
+        if (!hasWrapper(t, method, strip)) {
+          continue;
+        }
+        tlsStripPrefix = strip;
+        native = resolveNativeMethodExact(t, method);
+        tlsStripPrefix = 0;
+        if (native) {
+          return native;
+        }
+        progressed = true;
+        break;
+      }
+      end = start;
+    }
+  }
+  return 0;
+}
+
 }  // namespace
 
 namespace vm {
+
+void setNativeMethodPrefixes(const char* joined, unsigned length)
+{
+  char* copy = length ? static_cast<char*>(malloc(length)) : 0;
+  if (length) {
+    memcpy(copy, joined, length);
+  }
+  char* old = nativePrefixes;
+  nativePrefixes = copy;
+  nativePrefixesLength = length;
+  free(old);
+}
+
+namespace {
+
+unsigned appendType(const char* spec, unsigned i, char* out, unsigned* n, unsigned cap)
+{
+  unsigned dims = 0;
+  while (spec[i] == '[') {
+    ++dims;
+    ++i;
+  }
+  const char* prim = 0;
+  switch (spec[i]) {
+  case 'B': prim = "byte"; break;
+  case 'C': prim = "char"; break;
+  case 'D': prim = "double"; break;
+  case 'F': prim = "float"; break;
+  case 'I': prim = "int"; break;
+  case 'J': prim = "long"; break;
+  case 'S': prim = "short"; break;
+  case 'Z': prim = "boolean"; break;
+  case 'V': prim = "void"; break;
+  default: break;
+  }
+  if (prim) {
+    for (; *prim && *n + 1 < cap; ++prim) {
+      out[(*n)++] = *prim;
+    }
+    ++i;
+  } else {
+    ++i;
+    while (spec[i] != ';' && *n + 1 < cap) {
+      out[(*n)++] = spec[i] == '/' ? '.' : spec[i];
+      ++i;
+    }
+    ++i;
+  }
+  for (; dims && *n + 2 < cap; --dims) {
+    out[(*n)++] = '[';
+    out[(*n)++] = ']';
+  }
+  return i;
+}
+
+void describeMethod(GcMethod* method, char* out, unsigned cap)
+{
+  const char* spec = reinterpret_cast<const char*>(method->spec()->body().begin());
+  unsigned n = 0;
+  unsigned i = 1;
+  unsigned close = 0;
+  while (spec[close] != ')') {
+    ++close;
+  }
+  unsigned r = appendType(spec, close + 1, out, &n, cap);
+  (void)r;
+  if (n + 1 < cap) {
+    out[n++] = ' ';
+  }
+  const char* cn = reinterpret_cast<const char*>(method->class_()->name()->body().begin());
+  for (unsigned k = 0; k < method->class_()->name()->length() - 1 && n + 1 < cap; ++k) {
+    out[n++] = cn[k] == '/' ? '.' : cn[k];
+  }
+  if (n + 1 < cap) {
+    out[n++] = '.';
+  }
+  const char* mn = reinterpret_cast<const char*>(method->name()->body().begin());
+  for (unsigned k = 0; k < method->name()->length() - 1 && n + 1 < cap; ++k) {
+    out[n++] = mn[k];
+  }
+  if (n + 1 < cap) {
+    out[n++] = '(';
+  }
+  bool first = true;
+  while (i < close) {
+    if (!first && n + 2 < cap) {
+      out[n++] = ',';
+      out[n++] = ' ';
+    }
+    first = false;
+    i = appendType(spec, i, out, &n, cap);
+  }
+  if (n + 1 < cap) {
+    out[n++] = ')';
+  }
+  out[n] = 0;
+}
+
+}  // namespace
 
 void resolveNative(Thread* t, GcMethod* method)
 {
@@ -261,12 +426,9 @@ void resolveNative(Thread* t, GcMethod* method)
   if (getMethodRuntimeData(t, method)->native() == 0) {
     GcNative* native = resolveNativeMethod(t, method);
     if (UNLIKELY(native == 0)) {
-      throwNew(t,
-               GcUnsatisfiedLinkError::Type,
-               "%s.%s%s",
-               method->class_()->name()->body().begin(),
-               method->name()->body().begin(),
-               method->spec()->body().begin());
+      char description[1024];
+      describeMethod(method, description, sizeof description);
+      throwNew(t, GcUnsatisfiedLinkError::Type, "'%s'", description);
     }
 
     PROTECT(t, native);

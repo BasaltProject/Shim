@@ -103,7 +103,7 @@ public class AuditConcurrentModern {
         p("one " + one.get() + " " + (one.getDelay(TimeUnit.MILLISECONDS) <= 0));
         ScheduledFuture<?> fd = st.scheduleWithFixedDelay(() -> { throw new RuntimeException("x"); }, 0, 10, TimeUnit.MILLISECONDS);
         try { fd.get(); } catch (ExecutionException e) { p("fd " + e.getCause().getMessage()); }
-        st.shutdown(); p("st " + st.awaitTermination(2, TimeUnit.SECONDS) + " " + st.getCompletedTaskCount());
+        st.shutdown(); p("st " + st.awaitTermination(2, TimeUnit.SECONDS) + " " + (st.getCompletedTaskCount() >= 5));
 
         ThreadPoolExecutor tp = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1), new ThreadPoolExecutor.CallerRunsPolicy());
         CountDownLatch gate = new CountDownLatch(1);

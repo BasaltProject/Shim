@@ -26,6 +26,15 @@ public final class TypeVariableImpl implements TypeVariable {
     return bounds != null ? bounds.clone() : new Type[] { baseType };
   }
 
+  public java.lang.reflect.AnnotatedType[] getAnnotatedBounds() {
+    Type[] b = getBounds();
+    java.lang.reflect.AnnotatedType[] res = new java.lang.reflect.AnnotatedType[b.length];
+    for (int i = 0; i < b.length; i++) {
+      res[i] = java.lang.reflect.AnnotatedType.of(b[i]);
+    }
+    return res;
+  }
+
   public void setBounds(Type[] bounds) {
     this.bounds = bounds;
     this.baseType = bounds[0];

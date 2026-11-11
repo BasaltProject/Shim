@@ -87,4 +87,84 @@ public final class SplittableRandom implements RandomGenerator, RandomGenerator.
       }
     }
   }
+
+  @Override
+  public java.util.stream.IntStream ints() {
+    return RandomGenerator.SplittableGenerator.super.ints();
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(long streamSize) {
+    return RandomGenerator.SplittableGenerator.super.ints(streamSize);
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(int randomNumberOrigin, int randomNumberBound) {
+    return RandomGenerator.SplittableGenerator.super.ints(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(long streamSize, int randomNumberOrigin, int randomNumberBound) {
+    return RandomGenerator.SplittableGenerator.super.ints(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs() {
+    return RandomGenerator.SplittableGenerator.super.longs();
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long streamSize) {
+    return RandomGenerator.SplittableGenerator.super.longs(streamSize);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long randomNumberOrigin, long randomNumberBound) {
+    return RandomGenerator.SplittableGenerator.super.longs(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long streamSize, long randomNumberOrigin, long randomNumberBound) {
+    return RandomGenerator.SplittableGenerator.super.longs(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles() {
+    return RandomGenerator.SplittableGenerator.super.doubles();
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(long streamSize) {
+    return RandomGenerator.SplittableGenerator.super.doubles(streamSize);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(double randomNumberOrigin, double randomNumberBound) {
+    return RandomGenerator.SplittableGenerator.super.doubles(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(long streamSize, double randomNumberOrigin, double randomNumberBound) {
+    return RandomGenerator.SplittableGenerator.super.doubles(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.Stream<RandomGenerator.SplittableGenerator> splits(long streamSize) {
+    return RandomGenerator.SplittableGenerator.super.splits(streamSize);
+  }
+
+  @Override
+  public java.util.stream.Stream<RandomGenerator.SplittableGenerator> splits() {
+    return RandomGenerator.SplittableGenerator.super.splits();
+  }
+
+  @Override
+  public java.util.stream.Stream<RandomGenerator.SplittableGenerator> splits(RandomGenerator.SplittableGenerator source) {
+    return RandomGenerator.SplittableGenerator.super.splits(source);
+  }
+
+  @Override
+  public java.util.stream.Stream<RandomGenerator.SplittableGenerator> splits(long streamSize, RandomGenerator.SplittableGenerator source) {
+    return RandomGenerator.SplittableGenerator.super.splits(streamSize, source);
+  }
 }

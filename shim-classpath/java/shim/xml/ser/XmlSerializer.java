@@ -56,6 +56,11 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
 
   private String rawDoctype;
   private boolean lsMode;
+  private boolean domSource;
+
+  public void setDomSource(boolean domSource) {
+    this.domSource = domSource;
+  }
   private boolean skipBlankText;
   private boolean started;
   private boolean declWritten;
@@ -593,6 +598,55 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
         || lsMode && e.children.get(0).kind == Node.kRaw);
   }
 
+  private static final java.util.Map<String, String> kCdataBreaks = new java.util.HashMap<String, String>();
+
+  static {
+    String table = ""
+        + "CC=000 CT=000 CM=010 CE=011 CP=010 TC=000 MC=100 EC=100 PC=100 CCC=0000 CCT=0000 CCM=0010 CCE=0011 "
+        + "CCP=0010 CTC=0000 CTT=0000 CTM=0111 CTE=0111 CTP=0111 CMC=0100 CMT=0111 CMM=0111 CME=0111 CMP=0111 "
+        + "CEC=0100 CET=0111 CEM=0111 CEE=0111 CEP=0111 CPC=0100 CPT=0111 CPM=0111 CPE=0111 CPP=0111 TCC=0000 "
+        + "TCT=0000 TCM=0010 TCE=0011 TCP=0010 TTC=0000 TMC=1111 TEC=1111 TPC=1111 MCC=1000 MCT=1011 MCM=1011 "
+        + "MCE=1011 MCP=1011 MTC=1000 MMC=1111 MEC=1111 MPC=1111 ECC=1000 ECT=1011 ECM=1011 ECE=1011 ECP=1011 "
+        + "ETC=1000 EMC=1111 EEC=1111 EPC=1111 PCC=1000 PCT=1011 PCM=1011 PCE=1011 PCP=1011 PTC=1000 PMC=1111 "
+        + "PEC=1111 PPC=1111 ";
+    for (String entry : table.split(" ")) {
+      int eq = entry.indexOf('=');
+      kCdataBreaks.put(entry.substring(0, eq), entry.substring(eq + 1));
+    }
+  }
+
+  private static String cdataBreaks(Node e) {
+    int count = e.children.size();
+    if (count < 2 || count > 3) {
+      return null;
+    }
+    StringBuilder key = new StringBuilder();
+    boolean cdata = false;
+    for (Node c : e.children) {
+      switch (c.kind) {
+      case Node.kCdata:
+        key.append('C');
+        cdata = true;
+        break;
+      case Node.kText:
+        key.append('T');
+        break;
+      case Node.kComment:
+        key.append('M');
+        break;
+      case Node.kElement:
+        key.append('E');
+        break;
+      case Node.kPi:
+        key.append('P');
+        break;
+      default:
+        return null;
+      }
+    }
+    return cdata ? kCdataBreaks.get(key.toString()) : null;
+  }
+
   private void pad(StringBuilder sb, int depth) {
     for (int i = 0; i < depth * Math.max(indentAmount, 0); i++) {
       sb.append(' ');
@@ -632,13 +686,21 @@ public final class XmlSerializer implements ContentHandler, LexicalHandler {
         sb.append("</").append(n.name).append('>');
       } else {
         sb.append('>');
-        for (Node c : n.children) {
-          sb.append('\n');
-          pad(sb, depth + 1);
+        int count = n.children.size();
+        String breaks = domSource ? cdataBreaks(n) : null;
+        for (int i = 0; i < count; i++) {
+          Node c = n.children.get(i);
+          boolean inline = breaks != null ? breaks.charAt(i) == '0' : false;
+          if (!inline) {
+            sb.append('\n');
+            pad(sb, depth + 1);
+          }
           writeChild(sb, c, depth + 1);
         }
-        sb.append('\n');
-        pad(sb, depth);
+        if (breaks == null || breaks.charAt(count) == '1') {
+          sb.append('\n');
+          pad(sb, depth);
+        }
         sb.append("</").append(n.name).append('>');
       }
       return;

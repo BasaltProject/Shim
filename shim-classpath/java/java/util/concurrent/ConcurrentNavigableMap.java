@@ -24,19 +24,13 @@ public interface ConcurrentNavigableMap<K, V>
   ConcurrentNavigableMap<K, V> tailMap(K fromKey, boolean inclusive);
 
   @Override
-  default ConcurrentNavigableMap<K, V> subMap(K fromKey, K toKey) {
-    return subMap(fromKey, true, toKey, false);
-  }
+  ConcurrentNavigableMap<K, V> subMap(K fromKey, K toKey);
 
   @Override
-  default ConcurrentNavigableMap<K, V> headMap(K toKey) {
-    return headMap(toKey, false);
-  }
+  ConcurrentNavigableMap<K, V> headMap(K toKey);
 
   @Override
-  default ConcurrentNavigableMap<K, V> tailMap(K fromKey) {
-    return tailMap(fromKey, true);
-  }
+  ConcurrentNavigableMap<K, V> tailMap(K fromKey);
 
   @Override
   ConcurrentNavigableMap<K, V> descendingMap();

@@ -287,7 +287,7 @@ public class SaxReader implements XMLReader, Locator2 {
       actualEncoding = input.encodingName;
       documentSystemId = input.systemId;
       p.namespaceAware = namespaces;
-      p.loadExternalDtd = loadExternalDtd && externalParameterEntities;
+      p.loadExternalDtd = (loadExternalDtd || validation) && externalParameterEntities;
       p.externalGeneralEntities = externalGeneralEntities;
       parser = p;
       run(p);
@@ -327,6 +327,19 @@ public class SaxReader implements XMLReader, Locator2 {
     return XmlInput.open(def, null);
   }
 
+  private void reportValidity(String message, int line, int column) {
+    SAXParseException ex = new SAXParseException(message, parser.publicId(), parser.systemId(), line, column);
+    try {
+      if (errorHandler != null) {
+        errorHandler.error(ex);
+      } else {
+        System.err.println("[Error] " + location(ex) + ": " + message);
+      }
+    } catch (SAXException e) {
+      throw new Wrapped(e);
+    }
+  }
+
   private SAXException fatal(XmlException e) throws SAXException {
     if (e.internal) {
       return new SAXException(e.getMessage());
@@ -354,6 +367,7 @@ public class SaxReader implements XMLReader, Locator2 {
   }
 
   private void run(XmlPullParser p) throws IOException, SAXException {
+    DtdValidator validator = null;
     try {
       Attributes2Impl attrs = new Attributes2Impl();
       while (true) {
@@ -367,6 +381,9 @@ public class SaxReader implements XMLReader, Locator2 {
           }
           break;
         case XmlPullParser.kEndDocument:
+          if (validator != null) {
+            validator.endDocument();
+          }
           if (contentHandler != null) {
             contentHandler.endDocument();
           }
@@ -374,7 +391,7 @@ public class SaxReader implements XMLReader, Locator2 {
         case XmlPullParser.kDtdStart:
           if (disallowDoctype) {
             throw new XmlException("DOCTYPE is disallowed when the feature \"http://apache.org/xml/features/disallow-doctype-decl\" set to true.",
-                p.line(), p.column(), p.systemId(), p.publicId());
+                p.line(), Math.max(1, p.column() - (ev.a == null ? 0 : ev.a.length() + 1)), p.systemId(), p.publicId());
           }
           if (lexicalHandler != null) {
             lexicalHandler.startDTD(ev.a, ev.b, ev.c);
@@ -416,12 +433,40 @@ public class SaxReader implements XMLReader, Locator2 {
           }
           break;
         case XmlPullParser.kStartElement:
+          if (validation) {
+            if (validator == null) {
+              validator = new DtdValidator(p.dtd, new DtdValidator.Sink() {
+                public void error(String message) {
+                  reportValidity(message, parser.line(), parser.column());
+                }
+
+                public void errorAt(String message, int line, int column) {
+                  reportValidity(message, line, column);
+                }
+
+                public int line() {
+                  return parser.line();
+                }
+
+                public int column() {
+                  return parser.column();
+                }
+              });
+            }
+            validator.startElement(ev.a, ev.attrs, ev.nameLine, ev.nameCol);
+          }
           startElement(ev, attrs);
           break;
         case XmlPullParser.kEndElement:
+          if (validator != null) {
+            validator.endElement();
+          }
           endElement(ev);
           break;
         case XmlPullParser.kCharacters:
+          if (validator != null) {
+            validator.characters(ev.a, ev.a.trim().isEmpty());
+          }
           if (contentHandler != null) {
             char[] c = ev.a.toCharArray();
             contentHandler.characters(c, 0, c.length);

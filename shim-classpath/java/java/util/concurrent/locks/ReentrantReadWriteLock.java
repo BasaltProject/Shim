@@ -67,6 +67,17 @@ public class ReentrantReadWriteLock implements ReadWriteLock, Serializable {
     }
   }
 
+  @Override
+  public String toString() {
+    return super.toString() + "[Write locks = " + getWriteHoldTotal() + ", Read locks = " + getReadLockCount() + "]";
+  }
+
+  private int getWriteHoldTotal() {
+    synchronized (sync) {
+      return writeHoldCount;
+    }
+  }
+
   public int getWriteHoldCount() {
     synchronized (sync) {
       return (writerOwner == Thread.currentThread()) ? writeHoldCount : 0;

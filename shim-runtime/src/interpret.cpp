@@ -3372,6 +3372,14 @@ class MyProcessor : public Processor {
                          0);
   }
 
+  virtual bool redefineMethods(vm::Thread* t, GcArray* olds, GcArray* news)
+  {
+    for (unsigned i = 0; i < olds->length(); ++i) {
+      cast<GcMethod>(t, olds->body()[i])->setCode(t, cast<GcMethod>(t, news->body()[i])->code());
+    }
+    return true;
+  }
+
   virtual void initVtable(vm::Thread*, GcClass*)
   {
     // ignore

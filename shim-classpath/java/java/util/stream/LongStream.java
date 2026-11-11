@@ -220,9 +220,7 @@ public interface LongStream extends BaseStream<Long, LongStream> {
     return Stream.concat(a.boxed(), b.boxed()).mapToLong(Long::longValue).onClose(a::close).onClose(b::close);
   }
 
-  default LongSummaryStatistics summaryStatistics() {
-    return collect(LongSummaryStatistics::new, LongSummaryStatistics::accept, LongSummaryStatistics::combine);
-  }
+  LongSummaryStatistics summaryStatistics();
 
   interface Builder extends LongConsumer {
     @Override

@@ -128,6 +128,8 @@ class Processor {
 
   virtual void initVtable(Thread* t, GcClass* c) = 0;
 
+  virtual bool redefineMethods(Thread* t, GcArray* olds, GcArray* news) = 0;
+
   virtual void visitObjects(Thread* t, Heap::Visitor* v) = 0;
 
   virtual void walkStack(Thread* t, StackVisitor* v) = 0;

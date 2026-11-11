@@ -18,12 +18,5 @@ public interface TypeVariable<D extends GenericDeclaration> extends Type, Annota
   D getGenericDeclaration();
   String getName();
 
-  default AnnotatedType[] getAnnotatedBounds() {
-    Type[] bounds = getBounds();
-    AnnotatedType[] res = new AnnotatedType[bounds.length];
-    for (int i = 0; i < bounds.length; i++) {
-      res[i] = AnnotatedTypeImpl.create(bounds[i]);
-    }
-    return res;
-  }
+  AnnotatedType[] getAnnotatedBounds();
 }

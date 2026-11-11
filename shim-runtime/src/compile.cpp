@@ -10029,6 +10029,90 @@ class MyProcessor : public Processor {
                          vtableLength);
   }
 
+  virtual bool redefineMethods(Thread* vmt, GcArray* olds, GcArray* news)
+  {
+#if defined(__x86_64__) || defined(__i386__) || defined(__aarch64__)
+    MyThread* t = static_cast<MyThread*>(vmt);
+    PROTECT(t, olds);
+    PROTECT(t, news);
+    unsigned count = olds->length();
+    GcArray* clones = makeArray(t, count);
+    PROTECT(t, clones);
+    RUNTIME_ARRAY(uintptr_t, oldAddress, count);
+    RUNTIME_ARRAY(unsigned, oldSize, count);
+    for (unsigned i = 0; i < count; ++i) {
+      GcMethod* o = cast<GcMethod>(t, olds->body()[i]);
+      RUNTIME_ARRAY_BODY(oldAddress)[i] = 0;
+      if (methodAddress(t, o) != local::defaultThunk(t)) {
+        uintptr_t a = methodCompiled(t, o);
+        if (a >= reinterpret_cast<uintptr_t>(codeImage) and a < reinterpret_cast<uintptr_t>(codeImage) + codeImageSize) {
+          return false;
+        }
+        clones->setBodyElement(t, i, methodClone(t, o));
+        RUNTIME_ARRAY_BODY(oldAddress)[i] = a;
+        RUNTIME_ARRAY_BODY(oldSize)[i] = methodCompiledSize(t, o);
+      }
+    }
+    {
+      ENTER(t, Thread::ExclusiveState);
+      for (unsigned i = 0; i < count; ++i) {
+        GcMethod* o = cast<GcMethod>(t, olds->body()[i]);
+        if (clones->body()[i]) {
+          treeUpdate(t, compileRoots(t)->methodTree(), RUNTIME_ARRAY_BODY(oldAddress)[i], clones->body()[i],
+                     compileRoots(t)->methodTreeSentinal(), compareIpToMethodBounds);
+        }
+        o->setCode(t, cast<GcMethod>(t, news->body()[i])->code());
+      }
+    }
+    for (unsigned i = 0; i < count; ++i) {
+      if (clones->body()[i]) {
+        local::compile(t, local::codeAllocator(t), 0, cast<GcMethod>(t, olds->body()[i]));
+      }
+    }
+    {
+      ENTER(t, Thread::ExclusiveState);
+      for (unsigned i = 0; i < count; ++i) {
+        if (clones->body()[i] == 0) {
+          continue;
+        }
+        uint8_t* entry = reinterpret_cast<uint8_t*>(RUNTIME_ARRAY_BODY(oldAddress)[i]);
+        uint8_t* target = reinterpret_cast<uint8_t*>(methodAddress(t, cast<GcMethod>(t, olds->body()[i])));
+#if defined(__aarch64__)
+        if (RUNTIME_ARRAY_BODY(oldSize)[i] >= 16) {
+          // ldr x16, #8; br x16; .quad target
+          uint32_t insns[2] = {0x58000050u, 0xD61F0200u};
+          uint64_t abs = reinterpret_cast<uint64_t>(target);
+          memcpy(entry + 8, &abs, 8);
+          memcpy(entry, insns, 8);
+          __builtin___clear_cache(reinterpret_cast<char*>(entry), reinterpret_cast<char*>(entry + 16));
+        }
+#else
+        intptr_t rel = target - (entry + 5);
+        if (rel >= INT32_MIN and rel <= INT32_MAX) {
+          int32_t r32 = static_cast<int32_t>(rel);
+          entry[0] = 0xE9;
+          memcpy(entry + 1, &r32, 4);
+        } else if (RUNTIME_ARRAY_BODY(oldSize)[i] >= 13) {
+          uint64_t abs = reinterpret_cast<uint64_t>(target);
+          entry[0] = 0x49;
+          entry[1] = 0xBA;
+          memcpy(entry + 2, &abs, 8);
+          entry[10] = 0x41;
+          entry[11] = 0xFF;
+          entry[12] = 0xE2;
+        }
+#endif
+      }
+    }
+    return true;
+#else
+    (void)vmt;
+    (void)olds;
+    (void)news;
+    return false;
+#endif
+  }
+
   virtual void initVtable(Thread* t, GcClass* c)
   {
     PROTECT(t, c);

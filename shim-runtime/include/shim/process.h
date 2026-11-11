@@ -67,6 +67,8 @@ inline bool isSpecialMethod(Thread* t, GcMethod* method, GcClass* class_)
 
 void resolveNative(Thread* t, GcMethod* method);
 
+void setNativeMethodPrefixes(const char* joined, unsigned length);
+
 int findLineNumber(Thread* t, GcMethod* method, unsigned ip);
 
 }  // namespace vm

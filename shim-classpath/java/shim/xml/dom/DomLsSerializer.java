@@ -83,6 +83,7 @@ public class DomLsSerializer implements LSSerializer {
     Document owner = node.getNodeType() == Node.DOCUMENT_NODE ? (Document) node : node.getOwnerDocument();
     ser.setVersion(owner == null ? "1.0" : owner.getXmlVersion());
     DomToSax walker = new DomToSax(ser, ser, true);
+    ser.setDomSource(true);
     walker.lsMode = true;
     walker.comments = config.bool("comments");
     walker.cdataSections = config.bool("cdata-sections");

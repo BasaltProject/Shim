@@ -228,6 +228,9 @@ public class IdentityTransformer extends Transformer {
           handler.startDocument();
         }
         try {
+          if (target.serializer != null) {
+            target.serializer.setDomSource(true);
+          }
           new DomToSax(handler, lexical, true).parse(node);
         } catch (RuntimeException e) {
           throw new TransformerException(e);

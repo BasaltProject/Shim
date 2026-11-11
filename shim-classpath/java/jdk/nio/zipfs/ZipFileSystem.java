@@ -72,6 +72,7 @@ class ZipFileSystem extends FileSystem {
     FileTime mtime;
     FileTime atime;
     FileTime ctime;
+    boolean sized;
     long crc = -1;
     int method = ZipEntry.DEFLATED;
     long csize = -1;
@@ -886,6 +887,8 @@ class ZipFileSystem extends FileSystem {
       Node c = new Node(dp, s.dir);
       if (!s.dir) {
         c.data = s.data != null ? s.data : readSource(s);
+        c.comment = s.comment;
+        c.sized = true;
       }
       c.mtime = copyAttrs ? s.mtime : FileTime.fromMillis(System.currentTimeMillis());
       if (copyAttrs) {
@@ -947,7 +950,8 @@ class ZipFileSystem extends FileSystem {
       if (n.comment != null) {
         e.setComment(n.comment);
       }
-      if (n.dir) {
+      boolean keepDeflated = n.dir && n.source != null && n.source.getMethod() == ZipEntry.DEFLATED;
+      if (n.dir && !keepDeflated) {
         e.setMethod(ZipEntry.STORED);
         e.setSize(0);
         e.setCompressedSize(0);
@@ -956,9 +960,25 @@ class ZipFileSystem extends FileSystem {
         zos.closeEntry();
         continue;
       }
-      byte[] data = n.data != null ? n.data : readSource(n);
+      byte[] data = keepDeflated ? new byte[0] : (n.data != null ? n.data : readSource(n));
       int method = n.data != null ? compressionMethod : (n.source != null ? n.source.getMethod() : compressionMethod);
       e.setMethod(method);
+      if (method == ZipEntry.DEFLATED && n.sized) {
+        CRC32 crc = new CRC32();
+        crc.update(data, 0, data.length);
+        java.util.zip.Deflater def = new java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true);
+        def.setInput(data);
+        def.finish();
+        byte[] sink = new byte[8192];
+        long csize = 0;
+        while (!def.finished()) {
+          csize += def.deflate(sink);
+        }
+        def.end();
+        e.setSize(data.length);
+        e.setCompressedSize(csize);
+        e.setCrc(crc.getValue());
+      }
       if (method == ZipEntry.STORED) {
         CRC32 crc = new CRC32();
         crc.update(data, 0, data.length);

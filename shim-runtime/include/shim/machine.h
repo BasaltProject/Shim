@@ -4029,6 +4029,8 @@ GcClass* defineClass(Thread* t,
                      GcClass* hiddenTarget = 0,
                      GcByteArray* expectedName = 0);
 
+const char* redefineClass(Thread* t, GcClass* old, const uint8_t* data, unsigned size);
+
 inline GcMethod* methodClone(Thread* t, GcMethod* method)
 {
   return makeMethod(t,

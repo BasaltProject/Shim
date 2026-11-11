@@ -146,6 +146,7 @@ public class LogManager {
       return;
     }
     try {
+      owner.readPrimordialConfiguration();
       owner.rootLogger = owner.new RootLogger();
       owner.addLogger(owner.rootLogger);
       if (!owner.rootLogger.isLevelInitialized()) {

@@ -8,6 +8,7 @@
 
 #include "shim/machine.h"
 
+#include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -262,6 +263,7 @@ extern "C" SHIM_EXPORT void JNICALL
     memcpy(buf + 18, &r, 8);
   }
 #endif
+  buf[20] = errno;
   gThread = previousThread;
 #else
   (void)arguments;

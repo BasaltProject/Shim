@@ -203,9 +203,7 @@ public interface DoubleStream extends BaseStream<Double, DoubleStream> {
     return Stream.concat(a.boxed(), b.boxed()).mapToDouble(Double::doubleValue).onClose(a::close).onClose(b::close);
   }
 
-  default DoubleSummaryStatistics summaryStatistics() {
-    return collect(DoubleSummaryStatistics::new, DoubleSummaryStatistics::accept, DoubleSummaryStatistics::combine);
-  }
+  DoubleSummaryStatistics summaryStatistics();
 
   interface Builder extends DoubleConsumer {
     @Override

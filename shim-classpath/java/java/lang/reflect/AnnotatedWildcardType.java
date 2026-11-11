@@ -15,7 +15,5 @@ public interface AnnotatedWildcardType extends AnnotatedType {
   AnnotatedType[] getAnnotatedUpperBounds();
 
   @Override
-  default AnnotatedType getAnnotatedOwnerType() {
-    return null;
-  }
+  AnnotatedType getAnnotatedOwnerType();
 }

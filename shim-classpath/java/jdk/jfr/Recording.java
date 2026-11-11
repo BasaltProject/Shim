@@ -286,6 +286,8 @@ public final class Recording implements Closeable {
         } catch (IOException e) {
           throw new IllegalStateException("Could not write recording to destination: " + e.getMessage(), e);
         }
+        close();
+        return true;
       }
       JfrRuntime.stateChanged(this);
       return true;

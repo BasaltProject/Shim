@@ -44,18 +44,7 @@ public interface Collection<T> extends Iterable<T> {
 
   public boolean removeAll(Collection<?> c);
 
-  default boolean retainAll(Collection<?> c) {
-    Objects.requireNonNull(c);
-    boolean changed = false;
-    Iterator<T> it = iterator();
-    while (it.hasNext()) {
-      if (!c.contains(it.next())) {
-        it.remove();
-        changed = true;
-      }
-    }
-    return changed;
-  }
+  boolean retainAll(Collection<?> c);
 
   public Object[] toArray();
 

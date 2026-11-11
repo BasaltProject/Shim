@@ -52,15 +52,9 @@ public interface List<T> extends Collection<T>, SequencedCollection<T> {
 
   public ListIterator<T> listIterator();
 
-  default List<T> subList(int fromIndex, int toIndex) {
-    Objects.checkFromToIndex(fromIndex, toIndex, size());
-    int len = toIndex - fromIndex;
-    ArrayList<T> sub = new ArrayList<T>(len);
-    for (int i = fromIndex; i < toIndex; ++i) {
-      sub.add(get(i));
-    }
-    return sub;
-  }
+  List<T> subList(int fromIndex, int toIndex);
+
+  boolean retainAll(Collection<?> c);
 
   default void sort(Comparator<? super T> c) {
     Object[] a = toArray();

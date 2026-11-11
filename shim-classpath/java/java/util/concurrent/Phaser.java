@@ -180,6 +180,14 @@ public class Phaser {
     }
   }
 
+  @Override
+  public String toString() {
+    synchronized (lock) {
+      return super.toString() + "[phase = " + getPhase() + " parties = " + getRegisteredParties() + " arrived = "
+          + getArrivedParties() + "]";
+    }
+  }
+
   public final int getPhase() {
     synchronized (lock) {
       return terminated ? (Integer.MIN_VALUE + phase) : phase;

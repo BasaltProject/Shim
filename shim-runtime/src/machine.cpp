@@ -7232,6 +7232,106 @@ GcClass* defineClass(Thread* t,
   return c;
 }
 
+const char* redefineClass(Thread* t, GcClass* old, const uint8_t* data, unsigned size)
+{
+  PROTECT(t, old);
+
+  GcClass* n = parseClass(t, old->loader(), data, size, GcClassFormatError::Type, 0, 0);
+  PROTECT(t, n);
+
+  if (not byteArrayEqual(t, n->name(), old->name())) {
+    return "NCDFE:class name mismatch";
+  }
+  if (n->super() != old->super()) {
+    return "UOE:class redefinition failed: attempted to change superclass";
+  }
+  if (n->flags() != old->flags()) {
+    return "UOE:class redefinition failed: attempted to change the class modifiers";
+  }
+  GcArray* oldInterfaces = cast<GcArray>(t, old->interfaceTable());
+  GcArray* newInterfaces = cast<GcArray>(t, n->interfaceTable());
+  if ((oldInterfaces ? oldInterfaces->length() : 0) != (newInterfaces ? newInterfaces->length() : 0)) {
+    return "UOE:class redefinition failed: attempted to change the interfaces";
+  }
+
+  GcArray* oldFields = cast<GcArray>(t, old->fieldTable());
+  GcArray* newFields = cast<GcArray>(t, n->fieldTable());
+  unsigned oldFieldCount = oldFields ? oldFields->length() : 0;
+  if (oldFieldCount != (newFields ? newFields->length() : 0)) {
+    return "UOE:class redefinition failed: attempted to add or delete a field";
+  }
+  for (unsigned i = 0; i < oldFieldCount; ++i) {
+    GcField* a = cast<GcField>(t, oldFields->body()[i]);
+    bool found = false;
+    for (unsigned j = 0; j < oldFieldCount and not found; ++j) {
+      GcField* b = cast<GcField>(t, newFields->body()[j]);
+      if (byteArrayEqual(t, a->name(), b->name()) and byteArrayEqual(t, a->spec(), b->spec())) {
+        if (a->flags() != b->flags()) {
+          return "UOE:class redefinition failed: attempted to change the modifiers of a field";
+        }
+        found = true;
+      }
+    }
+    if (not found) {
+      return "UOE:class redefinition failed: attempted to add or delete a field";
+    }
+  }
+
+  GcArray* oldMethods = cast<GcArray>(t, old->methodTable());
+  GcArray* newMethods = cast<GcArray>(t, n->methodTable());
+  unsigned methodCount = oldMethods ? oldMethods->length() : 0;
+  if (methodCount != (newMethods ? newMethods->length() : 0)) {
+    return "UOE:class redefinition failed: attempted to add or delete a method";
+  }
+  unsigned replaced = 0;
+  for (unsigned i = 0; i < methodCount; ++i) {
+    GcMethod* a = cast<GcMethod>(t, oldMethods->body()[i]);
+    GcMethod* match = 0;
+    for (unsigned j = 0; j < methodCount and match == 0; ++j) {
+      GcMethod* b = cast<GcMethod>(t, newMethods->body()[j]);
+      if (byteArrayEqual(t, a->name(), b->name()) and byteArrayEqual(t, a->spec(), b->spec())) {
+        match = b;
+      }
+    }
+    if (match == 0) {
+      return "UOE:class redefinition failed: attempted to add or delete a method";
+    }
+    if (a->flags() != match->flags()) {
+      return "UOE:class redefinition failed: attempted to change the modifiers of a method";
+    }
+    if ((a->flags() & (ACC_NATIVE | ACC_ABSTRACT)) == 0 and a->code() and match->code()) {
+      ++replaced;
+    }
+  }
+
+  GcArray* olds = makeArray(t, replaced);
+  PROTECT(t, olds);
+  GcArray* news = makeArray(t, replaced);
+  PROTECT(t, news);
+  unsigned k = 0;
+  for (unsigned i = 0; i < methodCount; ++i) {
+    GcMethod* a = cast<GcMethod>(t, oldMethods->body()[i]);
+    if ((a->flags() & (ACC_NATIVE | ACC_ABSTRACT)) != 0 or a->code() == 0) {
+      continue;
+    }
+    for (unsigned j = 0; j < methodCount; ++j) {
+      GcMethod* b = cast<GcMethod>(t, newMethods->body()[j]);
+      if (b->code() and byteArrayEqual(t, a->name(), b->name()) and byteArrayEqual(t, a->spec(), b->spec())) {
+        bindClassReferences(t, b->code()->pool(), old->name(), old);
+        olds->setBodyElement(t, k, a);
+        news->setBodyElement(t, k, b);
+        ++k;
+        break;
+      }
+    }
+  }
+
+  if (not t->m->processor->redefineMethods(t, olds, news)) {
+    return "UOE:class redefinition is not supported for this method";
+  }
+  return 0;
+}
+
 void populateMultiArray(Thread* t,
                         object array,
                         int32_t* counts,

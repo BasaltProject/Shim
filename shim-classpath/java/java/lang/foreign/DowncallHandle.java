@@ -23,9 +23,10 @@ final class DowncallHandle extends MethodHandle {
   private final MemoryLayout ret;
   private final int intRegs;
   private final boolean x86;
+  private final boolean captureErrno;
 
   DowncallHandle(MemorySegment address, FunctionDescriptor fd, Linker.Option... options) {
-    super(type(address, fd));
+    super(type(address, fd, captures(options)));
     long regs = NativeLinkerImpl.supported0();
     if (regs == 0L) {
       throw new UnsupportedOperationException("Native downcalls are not supported on this platform");
@@ -33,6 +34,7 @@ final class DowncallHandle extends MethodHandle {
     this.intRegs = (int) regs;
     this.x86 = regs == 6L;
     this.address = address;
+    this.captureErrno = captures(options);
     this.args = fd.argumentLayouts();
     this.ret = fd.returnLayout().orElse(null);
     for (MemoryLayout l : args) {
@@ -53,8 +55,21 @@ final class DowncallHandle extends MethodHandle {
     throw new UnsupportedOperationException("Unsupported layout on this platform: " + l);
   }
 
-  private static MethodType type(MemorySegment address, FunctionDescriptor fd) {
+  private static boolean captures(Linker.Option[] options) {
+    for (Linker.Option o : options) {
+      if (o instanceof NativeLinkerImpl.CaptureCallStateOption
+          && ((NativeLinkerImpl.CaptureCallStateOption) o).capturedState.length > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static MethodType type(MemorySegment address, FunctionDescriptor fd, boolean capture) {
     MethodType t = fd.toMethodType();
+    if (capture) {
+      t = t.insertParameterTypes(0, MemorySegment.class);
+    }
     if (fd.returnLayout().isPresent() && fd.returnLayout().get() instanceof GroupLayout) {
       t = t.insertParameterTypes(0, SegmentAllocator.class);
     }
@@ -123,6 +138,10 @@ final class DowncallHandle extends MethodHandle {
     boolean structRet = ret instanceof GroupLayout;
     if (structRet) {
       allocator = (SegmentAllocator) arguments[offset++];
+    }
+    MemorySegment captureSeg = null;
+    if (captureErrno) {
+      captureSeg = (MemorySegment) arguments[offset++];
     }
     if (fn == 0L) {
       throw new IllegalArgumentException("Symbol is NULL: " + MemorySegment.ofAddress(0L));
@@ -218,6 +237,9 @@ final class DowncallHandle extends MethodHandle {
         }
       }
       NativeLinkerImpl.call0(fn, buf, kind);
+      if (captureSeg != null) {
+        captureSeg.set(ValueLayout.JAVA_INT, 0L, (int) u.getLong(buf + 20 * 8L));
+      }
       if (structRet) {
         if (ret.byteSize() <= 16) {
           int intIdx = 0;

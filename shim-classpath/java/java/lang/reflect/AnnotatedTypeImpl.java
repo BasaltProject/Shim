@@ -13,6 +13,11 @@ import java.lang.annotation.Annotation;
 import java.util.Objects;
 
 class AnnotatedTypeImpl implements AnnotatedType {
+  @Override
+  public AnnotatedType getAnnotatedOwnerType() {
+    return null;
+  }
+
   private final Type type;
 
   AnnotatedTypeImpl(Type type) {

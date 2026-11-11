@@ -334,140 +334,92 @@ public class ReentrantLock implements Lock, Serializable {
     private static final long serialVersionUID = -5782782379348924978L;
     private final Object condSync = new Object();
     private int condWaiters;
-    private long condSignals;
+    private final java.util.ArrayDeque<boolean[]> waitQ = new java.util.ArrayDeque<boolean[]>();
 
-    public void await() throws InterruptedException {
-      if (Thread.interrupted()) {
+    private long awaitImpl(boolean timed, long nanos, boolean uninterruptible, boolean[] timedOut)
+        throws InterruptedException {
+      if (!uninterruptible && Thread.interrupted()) {
         throw new InterruptedException();
       }
-      int count;
+      long deadline = timed ? System.nanoTime() + nanos : 0L;
+      boolean[] token = new boolean[1];
       boolean interrupted = false;
+      boolean interruptedBefore = false;
+      int count;
       synchronized (condSync) {
         count = fullyRelease();
+        waitQ.addLast(token);
         condWaiters++;
         try {
-          condSync.wait();
-        } catch (InterruptedException e) {
-          interrupted = true;
+          while (!token[0]) {
+            try {
+              if (timed) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) {
+                  if (waitQ.remove(token)) {
+                    condWaiters--;
+                    timedOut[0] = true;
+                  }
+                  break;
+                }
+                condSync.wait(remaining / 1000000L, (int) (remaining % 1000000L));
+              } else {
+                condSync.wait();
+              }
+            } catch (InterruptedException e) {
+              interrupted = true;
+              if (!uninterruptible) {
+                if (waitQ.remove(token)) {
+                  condWaiters--;
+                  interruptedBefore = true;
+                }
+                break;
+              }
+            }
+          }
         } finally {
-          condWaiters--;
+          if (waitQ.remove(token)) {
+            condWaiters--;
+          }
         }
       }
       reacquire(count);
-      if (interrupted || Thread.interrupted()) {
-        throw new InterruptedException();
+      if (interrupted) {
+        if (interruptedBefore) {
+          throw new InterruptedException();
+        }
+        Thread.currentThread().interrupt();
       }
+      return timed ? deadline - System.nanoTime() : 0L;
+    }
+
+    public void await() throws InterruptedException {
+      awaitImpl(false, 0L, false, new boolean[1]);
     }
 
     public boolean await(long time, TimeUnit unit) throws InterruptedException {
-      if (Thread.interrupted()) {
-        throw new InterruptedException();
-      }
-      long nanos = unit.toNanos(time);
-      if (nanos <= 0) {
-        int count = fullyRelease();
-        reacquire(count);
-        return false;
-      }
-      long deadline = System.nanoTime() + nanos;
-      int count;
-      boolean interrupted = false;
-      boolean timedOut = false;
-      synchronized (condSync) {
-        count = fullyRelease();
-        condWaiters++;
-        try {
-          long seen = condSignals;
-          while (true) {
-            long remaining = deadline - System.nanoTime();
-            if (remaining <= 0) {
-              timedOut = condSignals == seen;
-              break;
-            }
-            condSync.wait(remaining / 1000000L, (int) (remaining % 1000000L));
-            if (condSignals != seen) {
-              break;
-            }
-          }
-        } catch (InterruptedException e) {
-          interrupted = true;
-        } finally {
-          condWaiters--;
-        }
-      }
-      reacquire(count);
-      if (interrupted || Thread.interrupted()) {
-        throw new InterruptedException();
-      }
-      return !timedOut;
+      boolean[] timedOut = new boolean[1];
+      awaitImpl(true, unit.toNanos(time), false, timedOut);
+      return !timedOut[0];
     }
 
     public long awaitNanos(long nanosTimeout) throws InterruptedException {
-      if (Thread.interrupted()) {
-        throw new InterruptedException();
-      }
-      if (nanosTimeout <= 0) {
-        int count = fullyRelease();
-        reacquire(count);
-        return 0;
-      }
-      long start = System.nanoTime();
-      long deadline = start + nanosTimeout;
-      int count;
-      boolean interrupted = false;
-      synchronized (condSync) {
-        count = fullyRelease();
-        condWaiters++;
-        try {
-          long remaining = deadline - System.nanoTime();
-          if (remaining > 0) {
-            long millis = remaining / 1000000L;
-            int remNanos = (int) (remaining % 1000000L);
-            condSync.wait(millis, remNanos);
-          }
-        } catch (InterruptedException e) {
-          interrupted = true;
-        } finally {
-          condWaiters--;
-        }
-      }
-      reacquire(count);
-      if (interrupted || Thread.interrupted()) {
-        throw new InterruptedException();
-      }
-      long elapsed = System.nanoTime() - start;
-      return nanosTimeout - elapsed;
+      return awaitImpl(true, nanosTimeout, false, new boolean[1]);
     }
 
     public void awaitUninterruptibly() {
-      int count;
-      synchronized (condSync) {
-        count = fullyRelease();
-        condWaiters++;
-        boolean interrupted = false;
-        try {
-          while (true) {
-            try {
-              condSync.wait();
-              break;
-            } catch (InterruptedException e) {
-              interrupted = true;
-            }
-          }
-        } finally {
-          condWaiters--;
-          if (interrupted) {
-            Thread.currentThread().interrupt();
-          }
-        }
+      try {
+        awaitImpl(false, 0L, true, new boolean[1]);
+      } catch (InterruptedException impossible) {
+        throw new AssertionError(impossible);
       }
-      reacquire(count);
     }
 
     public boolean awaitUntil(Date deadline) throws InterruptedException {
       Objects.requireNonNull(deadline);
-      long millis = deadline.getTime() - System.currentTimeMillis();
-      return await(millis, TimeUnit.MILLISECONDS);
+      boolean[] timedOut = new boolean[1];
+      awaitImpl(true, (deadline.getTime() - System.currentTimeMillis()) * 1000000L, false, timedOut);
+      return !timedOut[0];
     }
 
     public void signal() {
@@ -475,8 +427,12 @@ public class ReentrantLock implements Lock, Serializable {
         throw new IllegalMonitorStateException();
       }
       synchronized (condSync) {
-        condSignals++;
-      condSync.notify();
+        boolean[] t = waitQ.pollFirst();
+        if (t != null) {
+          condWaiters--;
+          t[0] = true;
+          condSync.notifyAll();
+        }
       }
     }
 
@@ -485,8 +441,12 @@ public class ReentrantLock implements Lock, Serializable {
         throw new IllegalMonitorStateException();
       }
       synchronized (condSync) {
-        condSignals++;
-      condSync.notifyAll();
+        boolean[] t;
+        while ((t = waitQ.pollFirst()) != null) {
+          condWaiters--;
+          t[0] = true;
+        }
+        condSync.notifyAll();
       }
     }
   }

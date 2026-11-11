@@ -64,6 +64,8 @@ public final class XmlPullParser {
     public List<Attr> attrs;
     public int line;
     public int col;
+    public int nameLine;
+    public int nameCol;
     public String systemId;
     public boolean flag;
     public String uri = "";
@@ -959,6 +961,8 @@ public final class XmlPullParser {
   private int startElement() throws IOException, XmlException {
     sc.read();
     String name = scanElementName();
+    int nameLine = sc.line();
+    int nameCol = sc.col();
     checkQName(name);
     int nsMark = nsPrefixes.size();
     List<String> decls = new ArrayList<String>();
@@ -1027,6 +1031,8 @@ public final class XmlPullParser {
     String[] declArray = decls.toArray(new String[decls.size()]);
     Ev start = ev(kStartElement);
     start.a = name;
+    start.nameLine = nameLine;
+    start.nameCol = nameCol;
     start.attrs = attrs;
     start.nsDecls = declArray;
     if (namespaceAware) {

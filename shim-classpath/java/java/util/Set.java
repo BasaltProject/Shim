@@ -24,6 +24,8 @@
 package java.util;
 
 public interface Set<T> extends Collection<T> {
+  boolean retainAll(Collection<?> c);
+
   boolean equals(Object o);
 
   int hashCode();

@@ -1283,6 +1283,16 @@ public final class Collections {
     public int previousIndex() {
       return innerListIterator.previousIndex();
     }
+
+    @Override
+    public void set(T e) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void add(T e) {
+      throw new UnsupportedOperationException();
+    }
   }
   
   static class UnmodifiableCollection<T> implements Collection<T>, java.io.Serializable {

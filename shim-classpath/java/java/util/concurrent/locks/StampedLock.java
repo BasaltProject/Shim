@@ -300,6 +300,19 @@ public class StampedLock implements Serializable {
     }
   }
 
+  @Override
+  public String toString() {
+    String state;
+    if (isWriteLocked()) {
+      state = "[Write-locked]";
+    } else if (getReadLockCount() > 0) {
+      state = "[Read-locks:" + getReadLockCount() + "]";
+    } else {
+      state = "[Unlocked]";
+    }
+    return super.toString() + state;
+  }
+
   public boolean isWriteLocked() {
     synchronized (sync) {
       return writer != null;

@@ -13,7 +13,5 @@ public interface AnnotatedArrayType extends AnnotatedType {
   AnnotatedType getAnnotatedGenericComponentType();
 
   @Override
-  default AnnotatedType getAnnotatedOwnerType() {
-    return null;
-  }
+  AnnotatedType getAnnotatedOwnerType();
 }

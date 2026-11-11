@@ -13,7 +13,5 @@ public interface AnnotatedParameterizedType extends AnnotatedType {
   AnnotatedType[] getAnnotatedActualTypeArguments();
 
   @Override
-  default AnnotatedType getAnnotatedOwnerType() {
-    return null;
-  }
+  AnnotatedType getAnnotatedOwnerType();
 }

@@ -48,17 +48,8 @@ final class HeapMemorySegment extends AbstractMemorySegment {
   }
 
   @Override
-  void checkAlignment(long offset, long alignment) {
-    if (Long.bitCount(alignment) != 1) {
-      throw new IllegalArgumentException("Alignment must be a power of 2: " + alignment);
-    }
-    if (alignment > elementAlignment) {
-      throw new IllegalArgumentException("Target offset " + offset + " is incompatible with alignment constraint " + alignment);
-    }
-    long eff = baseOffset + offset;
-    if ((eff & (alignment - 1L)) != 0) {
-      throw new IllegalArgumentException("Target offset " + offset + " is incompatible with alignment constraint " + alignment);
-    }
+  boolean isAligned(long offset, long alignment) {
+    return alignment <= elementAlignment && ((baseOffset + offset) & (alignment - 1L)) == 0;
   }
 
   @Override
@@ -213,7 +204,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkAccess();
     checkBounds(offset, 1L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     return UNSAFE.getByteVolatile(base, arrBaseOffset + baseOffset + offset);
   }
 
@@ -222,7 +213,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkWrite();
     checkBounds(offset, 1L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     UNSAFE.putByteVolatile(base, arrBaseOffset + baseOffset + offset, value);
   }
 
@@ -243,7 +234,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkAccess();
     checkBounds(offset, 2L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     char val = UNSAFE.getCharVolatile(base, arrBaseOffset + baseOffset + offset);
     if (layout.order() != ByteOrder.nativeOrder()) {
       val = Character.reverseBytes(val);
@@ -256,7 +247,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkWrite();
     checkBounds(offset, 2L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     char val = (layout.order() != ByteOrder.nativeOrder()) ? Character.reverseBytes(value) : value;
     UNSAFE.putCharVolatile(base, arrBaseOffset + baseOffset + offset, val);
   }
@@ -266,7 +257,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkAccess();
     checkBounds(offset, 2L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     short val = UNSAFE.getShortVolatile(base, arrBaseOffset + baseOffset + offset);
     if (layout.order() != ByteOrder.nativeOrder()) {
       val = Short.reverseBytes(val);
@@ -279,7 +270,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkWrite();
     checkBounds(offset, 2L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     short val = (layout.order() != ByteOrder.nativeOrder()) ? Short.reverseBytes(value) : value;
     UNSAFE.putShortVolatile(base, arrBaseOffset + baseOffset + offset, val);
   }
@@ -289,7 +280,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkAccess();
     checkBounds(offset, 4L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     int val = UNSAFE.getIntVolatile(base, arrBaseOffset + baseOffset + offset);
     if (layout.order() != ByteOrder.nativeOrder()) {
       val = Integer.reverseBytes(val);
@@ -302,7 +293,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkWrite();
     checkBounds(offset, 4L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     int val = (layout.order() != ByteOrder.nativeOrder()) ? Integer.reverseBytes(value) : value;
     UNSAFE.putIntVolatile(base, arrBaseOffset + baseOffset + offset, val);
   }
@@ -326,7 +317,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkAccess();
     checkBounds(offset, 8L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     long val = UNSAFE.getLongVolatile(base, arrBaseOffset + baseOffset + offset);
     if (layout.order() != ByteOrder.nativeOrder()) {
       val = Long.reverseBytes(val);
@@ -339,7 +330,7 @@ final class HeapMemorySegment extends AbstractMemorySegment {
     Objects.requireNonNull(layout, "layout");
     checkWrite();
     checkBounds(offset, 8L);
-    checkAlignment(offset, layout.byteAlignment());
+    checkAlignment(offset, layout);
     long val = (layout.order() != ByteOrder.nativeOrder()) ? Long.reverseBytes(value) : value;
     UNSAFE.putLongVolatile(base, arrBaseOffset + baseOffset + offset, val);
   }

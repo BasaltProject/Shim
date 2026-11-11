@@ -39,7 +39,7 @@ import shim.Iso88591;
 import shim.Utf8;
 
 public final class String
-  implements Comparable<String>, CharSequence, Serializable,
+  implements Serializable, Comparable<String>, CharSequence,
              java.lang.constant.Constable, java.lang.constant.ConstantDesc
 {
   private static final long serialVersionUID = -6849794470754667710L;

@@ -28,23 +28,13 @@ public interface ListIterator<E> extends Iterator<E> {
 
   public E previous();
 
-  default int nextIndex() {
-    throw new UnsupportedOperationException();
-  }
+  int nextIndex();
 
-  default int previousIndex() {
-    throw new UnsupportedOperationException();
-  }
+  int previousIndex();
 
-  default void remove() {
-    throw new UnsupportedOperationException();
-  }
+  void remove();
 
-  default void set(E e) {
-    throw new UnsupportedOperationException();
-  }
+  void set(E e);
 
-  default void add(E e) {
-    throw new UnsupportedOperationException();
-  }
+  void add(E e);
 }

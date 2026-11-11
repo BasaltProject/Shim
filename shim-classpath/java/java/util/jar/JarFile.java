@@ -26,6 +26,8 @@ package java.util.jar;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.CodeSigner;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -50,6 +52,9 @@ public class JarFile extends ZipFile {
   private Boolean multiRelease;
   private final Runtime.Version version;
   private final int versionFeature;
+  private final boolean verify;
+  private JarSignatures signatures;
+  private boolean signaturesLoaded;
 
   public JarFile(String name) throws IOException {
     this(new File(name), true, ZipFile.OPEN_READ, baseVersion());
@@ -74,6 +79,7 @@ public class JarFile extends ZipFile {
   public JarFile(File file, boolean verify, int mode, Runtime.Version version) throws IOException {
     super(file, mode);
     Objects.requireNonNull(version, "version");
+    this.verify = verify;
     if (version.feature() <= 8) {
       this.version = BASE_VERSION;
       this.versionFeature = 8;
@@ -123,6 +129,33 @@ public class JarFile extends ZipFile {
         manifestLoaded = true;
       }
       return manifest;
+    }
+  }
+
+  Enumeration<? extends ZipEntry> rawEntries() {
+    return super.entries();
+  }
+
+  InputStream rawInputStream(ZipEntry ze) throws IOException {
+    return super.getInputStream(ze);
+  }
+
+  private JarSignatures signatures() throws IOException {
+    synchronized (this) {
+      if (!signaturesLoaded) {
+        signaturesLoaded = true;
+        if (verify) {
+          ZipEntry ze = super.getEntry(MANIFEST_NAME);
+          if (ze != null) {
+            byte[] raw;
+            try (InputStream is = super.getInputStream(ze)) {
+              raw = is.readAllBytes();
+            }
+            signatures = JarSignatures.load(this, raw);
+          }
+        }
+      }
+      return signatures;
     }
   }
 
@@ -233,7 +266,16 @@ public class JarFile extends ZipFile {
   @Override
   public InputStream getInputStream(ZipEntry ze) throws IOException {
     Objects.requireNonNull(ze, "entry");
-    return super.getInputStream(ze);
+    InputStream raw = super.getInputStream(ze);
+    if (raw == null || !verify) {
+      return raw;
+    }
+    JarSignatures sig = signatures();
+    if (sig == null) {
+      return raw;
+    }
+    String n = ze instanceof JarFileEntry ? ((JarFileEntry) ze).getRealName() : ze.getName();
+    return JarSignatures.isSignatureFile(n) ? raw : sig.wrap(n, raw);
   }
 
   private final class JarFileEntry extends JarEntry {
@@ -257,6 +299,29 @@ public class JarFile extends ZipFile {
     @Override
     public String getRealName() {
       return super.getName();
+    }
+
+    @Override
+    public CodeSigner[] getCodeSigners() {
+      try {
+        JarSignatures sig = JarFile.this.signatures();
+        return sig == null ? null : sig.signersOf(getRealName());
+      } catch (IOException e) {
+        return null;
+      }
+    }
+
+    @Override
+    public Certificate[] getCertificates() {
+      CodeSigner[] cs = getCodeSigners();
+      if (cs == null) {
+        return null;
+      }
+      List<Certificate> all = new ArrayList<Certificate>();
+      for (CodeSigner c : cs) {
+        all.addAll(c.getSignerCertPath().getCertificates());
+      }
+      return all.toArray(new Certificate[0]);
     }
 
     @Override

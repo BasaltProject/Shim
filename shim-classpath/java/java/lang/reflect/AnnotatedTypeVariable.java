@@ -13,7 +13,5 @@ public interface AnnotatedTypeVariable extends AnnotatedType {
   AnnotatedType[] getAnnotatedBounds();
 
   @Override
-  default AnnotatedType getAnnotatedOwnerType() {
-    return null;
-  }
+  AnnotatedType getAnnotatedOwnerType();
 }

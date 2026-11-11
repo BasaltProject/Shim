@@ -312,4 +312,64 @@ public class Random implements RandomGenerator, Serializable {
       return generator.doubles(origin, bound).limit(streamSize);
     }
   }
+
+  @Override
+  public java.util.stream.IntStream ints() {
+    return RandomGenerator.super.ints();
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(long streamSize) {
+    return RandomGenerator.super.ints(streamSize);
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(int randomNumberOrigin, int randomNumberBound) {
+    return RandomGenerator.super.ints(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(long streamSize, int randomNumberOrigin, int randomNumberBound) {
+    return RandomGenerator.super.ints(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs() {
+    return RandomGenerator.super.longs();
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long streamSize) {
+    return RandomGenerator.super.longs(streamSize);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long randomNumberOrigin, long randomNumberBound) {
+    return RandomGenerator.super.longs(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long streamSize, long randomNumberOrigin, long randomNumberBound) {
+    return RandomGenerator.super.longs(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles() {
+    return RandomGenerator.super.doubles();
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(long streamSize) {
+    return RandomGenerator.super.doubles(streamSize);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(double randomNumberOrigin, double randomNumberBound) {
+    return RandomGenerator.super.doubles(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(long streamSize, double randomNumberOrigin, double randomNumberBound) {
+    return RandomGenerator.super.doubles(streamSize, randomNumberOrigin, randomNumberBound);
+  }
 }

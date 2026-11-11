@@ -155,4 +155,74 @@ public final class ThreadLocalRandom extends Random {
   public boolean nextBoolean() {
     return mix64(rnd += GAMMA) < 0;
   }
+
+  @Override
+  public java.util.stream.IntStream ints() {
+    return super.ints();
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(long streamSize) {
+    return super.ints(streamSize);
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(int randomNumberOrigin, int randomNumberBound) {
+    return super.ints(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.IntStream ints(long streamSize, int randomNumberOrigin, int randomNumberBound) {
+    return super.ints(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs() {
+    return super.longs();
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long streamSize) {
+    return super.longs(streamSize);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long randomNumberOrigin, long randomNumberBound) {
+    return super.longs(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.LongStream longs(long streamSize, long randomNumberOrigin, long randomNumberBound) {
+    return super.longs(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles() {
+    return super.doubles();
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(long streamSize) {
+    return super.doubles(streamSize);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(double randomNumberOrigin, double randomNumberBound) {
+    return super.doubles(randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public java.util.stream.DoubleStream doubles(long streamSize, double randomNumberOrigin, double randomNumberBound) {
+    return super.doubles(streamSize, randomNumberOrigin, randomNumberBound);
+  }
+
+  @Override
+  public float nextFloat(float bound) {
+    return super.nextFloat(bound);
+  }
+
+  @Override
+  public float nextFloat(float origin, float bound) {
+    return super.nextFloat(origin, bound);
+  }
 }

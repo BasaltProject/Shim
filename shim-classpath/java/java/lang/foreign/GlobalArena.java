@@ -40,6 +40,6 @@ final class GlobalArena implements Arena {
 
   @Override
   public void close() {
-    throw new UnsupportedOperationException("Cannot close the global arena");
+    throw new UnsupportedOperationException("Attempted to close a non-closeable session");
   }
 }

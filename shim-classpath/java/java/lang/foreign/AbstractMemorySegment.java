@@ -57,14 +57,14 @@ abstract class AbstractMemorySegment implements MemorySegment {
 
   void checkAlive() {
     if (!scope.isAlive()) {
-      throw new IllegalStateException("Segment scope is closed");
+      throw new IllegalStateException("Already closed");
     }
   }
 
   void checkAccess() {
     checkAlive();
     if (!isAccessibleBy(Thread.currentThread())) {
-      throw new WrongThreadException("Segment is not accessible by current thread");
+      throw new WrongThreadException("Attempted access outside owning thread");
     }
   }
 
@@ -77,11 +77,30 @@ abstract class AbstractMemorySegment implements MemorySegment {
 
   void checkBounds(long offset, long length) {
     if (offset < 0 || length < 0 || offset > byteSize - length) {
-      throw new IndexOutOfBoundsException("Out of bound access: offset=" + offset + ", length=" + length + ", size=" + byteSize);
+      throw new IndexOutOfBoundsException("Out of bound access on segment " + this + "; new offset = " + offset
+          + "; new length = " + length);
     }
   }
 
-  abstract void checkAlignment(long offset, long alignment);
+  abstract boolean isAligned(long offset, long alignment);
+
+  final void checkAlignment(long offset, long alignment) {
+    checkAlignment(offset, alignment, null);
+  }
+
+  final void checkAlignment(long offset, MemoryLayout layout) {
+    checkAlignment(offset, layout.byteAlignment(), layout);
+  }
+
+  private void checkAlignment(long offset, long alignment, MemoryLayout layout) {
+    if (Long.bitCount(alignment) != 1) {
+      throw new IllegalArgumentException("Alignment must be a power of 2: " + alignment);
+    }
+    if (!isAligned(offset, alignment)) {
+      throw new IllegalArgumentException("Target offset " + offset + " is incompatible with alignment constraint "
+          + alignment + (layout != null ? " (of " + layout + ")" : "") + " for segment " + this);
+    }
+  }
 
   @Override
   public MemorySegment asSlice(long offset) {
@@ -143,7 +162,7 @@ abstract class AbstractMemorySegment implements MemorySegment {
     if (layout.byteAlignment() > maxByteAlignment()) {
       throw new IllegalArgumentException("Incompatible alignment constraints");
     }
-    checkAlignment(0L, layout.byteAlignment());
+    checkAlignment(0L, layout);
     long count = byteSize / elemSize;
     return LongStream.range(0, count).mapToObj(i -> asSlice(i * elemSize, elemSize));
   }
@@ -169,7 +188,8 @@ abstract class AbstractMemorySegment implements MemorySegment {
       }
       baos.write(b);
     }
-    throw new IllegalArgumentException("String is not null-terminated within segment bounds");
+    throw new IndexOutOfBoundsException("No null terminator found: " + this + " using region [" + offset + ", "
+        + byteSize + ")");
   }
 
   @Override

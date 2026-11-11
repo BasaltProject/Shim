@@ -278,7 +278,10 @@ public interface RandomGenerator {
     }
 
     Stream<RandomGenerator> rngs();
-    Stream<RandomGenerator> rngs(long streamSize);
+    default Stream<RandomGenerator> rngs(long streamSize) {
+      if (streamSize < 0L) throw new IllegalArgumentException("size must be non-negative");
+      return rngs().limit(streamSize);
+    }
   }
 
   interface SplittableGenerator extends StreamableGenerator {

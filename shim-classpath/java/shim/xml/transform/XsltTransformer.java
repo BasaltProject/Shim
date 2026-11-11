@@ -53,6 +53,7 @@ final class XsltTransformer extends IdentityTransformer {
   private final Map<Node, String> ids = new IdentityHashMap<Node, String>();
   private final Map<String, Map<String, List<Node>>> keyIndexes = new HashMap<String, Map<String, List<Node>>>();
   private final Map<String, Document> documents = new HashMap<String, Document>();
+  private final Map<Document, Integer> documentBases = new IdentityHashMap<Document, Integer>();
   private int idCounter = 10000;
   private final List<String> cdata = new ArrayList<String>();
 
@@ -96,6 +97,7 @@ final class XsltTransformer extends IdentityTransformer {
       globalBusy.clear();
       keyIndexes.clear();
       ids.clear();
+      documentBases.clear();
       scope = new Scope(null);
       DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
       f.setNamespaceAware(true);
@@ -1066,10 +1068,40 @@ final class XsltTransformer extends IdentityTransformer {
   String generateId(Node n) {
     String id = ids.get(n);
     if (id == null) {
-      id = "N" + (idCounter++);
-      ids.put(n, id);
+      Document owner = n.getNodeType() == Node.DOCUMENT_NODE ? (Document) n : n.getOwnerDocument();
+      if (owner != null && !documentBases.containsKey(owner)) {
+        int base = 65536 * (documentBases.size() + 1);
+        documentBases.put(owner, base);
+        int[] next = {base};
+        numberNodes(owner, next, true);
+      }
+      id = ids.get(n);
+      if (id == null) {
+        id = "N" + (idCounter++);
+        ids.put(n, id);
+      }
     }
     return id;
+  }
+
+  private void numberNodes(Node n, int[] next, boolean top) {
+    ids.put(n, "N" + next[0]++);
+    if (n.getNodeType() == Node.ELEMENT_NODE) {
+      if (n.getParentNode() != null && n.getParentNode().getNodeType() == Node.DOCUMENT_NODE) {
+        next[0]++;
+      }
+      NamedNodeMap attrs = n.getAttributes();
+      for (int i = 0; i < attrs.getLength(); i++) {
+        Node a = attrs.item(i);
+        String name = a.getNodeName();
+        if (!name.equals("xmlns") && !name.startsWith("xmlns:")) {
+          ids.put(a, "N" + next[0]++);
+        }
+      }
+    }
+    for (Node c = n.getFirstChild(); c != null; c = c.getNextSibling()) {
+      numberNodes(c, next, false);
+    }
   }
 
   List<Node> keyLookup(String name, Object value) {

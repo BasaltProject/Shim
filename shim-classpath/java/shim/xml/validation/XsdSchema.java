@@ -432,11 +432,21 @@ final class XsdSchema {
     return t instanceof XsdSimple ? (XsdSimple) t : XsdSimple.builtin("anySimpleType");
   }
 
+  private static String anonymousChain(Element e) {
+    StringBuilder sb = new StringBuilder();
+    org.w3c.dom.Node n = e.getParentNode();
+    while (n instanceof Element && n.getParentNode() instanceof Element) {
+      sb.append(((Element) n).getAttribute("name"));
+      n = n.getParentNode();
+    }
+    return sb.toString();
+  }
+
   XsdSimple buildSimple(Element st, String name, String owner) {
     Doc d = docOf(st);
     XsdSimple t = new XsdSimple(d.targetNamespace, name);
     t.anonymous = name.isEmpty();
-    t.anonymousOwner = owner;
+    t.anonymousOwner = anonymousChain(st);
     for (Node c = st.getFirstChild(); c != null; c = c.getNextSibling()) {
       if (isXs(c, "restriction")) {
         Element r = (Element) c;
@@ -595,7 +605,7 @@ final class XsdSchema {
       if (!extension) {
         XsdSimple restricted = new XsdSimple(d.targetNamespace, "");
         restricted.anonymous = true;
-        restricted.anonymousOwner = owner;
+        restricted.anonymousOwner = anonymousChain(ct);
         restricted.base = c.simple == null ? XsdSimple.builtin("anySimpleType") : c.simple;
         restricted.variety = restricted.base.variety;
         restricted.lexical = restricted.base.lexical;

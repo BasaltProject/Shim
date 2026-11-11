@@ -21,6 +21,7 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
+#include "shim/process.h"
 #include "shim/machine.h"
 #include "shim/constants.h"
 #include "shim/processor.h"
@@ -1676,6 +1677,34 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 {
   GcMonitor* m = objectMonitor(t, reinterpret_cast<object>(arguments[0]), false);
   return (m == 0 or m->owner() == 0) ? 0 : m->depth();
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_shim_Agents_redefine0(Thread* t, object, uintptr_t* arguments)
+{
+  GcJclass* jc = cast<GcJclass>(t, reinterpret_cast<object>(arguments[0]));
+  GcByteArray* bytes = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[1]));
+  PROTECT(t, jc);
+  PROTECT(t, bytes);
+  unsigned length = bytes->length();
+  uint8_t* copy = static_cast<uint8_t*>(malloc(length));
+  memcpy(copy, bytes->body().begin(), length);
+  const char* error = 0;
+  {
+    THREAD_RESOURCE(t, uint8_t*, copy, free(copy));
+    error = redefineClass(t, jc->vmClass(), copy, length);
+  }
+  if (error == 0) {
+    return 0;
+  }
+  return reinterpret_cast<int64_t>(makeString(t, "%s", error));
+}
+
+extern "C" SHIM_EXPORT void JNICALL
+    Shim_shim_Agents_setNativePrefixes0(Thread* t, object, uintptr_t* arguments)
+{
+  GcByteArray* bytes = cast<GcByteArray>(t, reinterpret_cast<object>(arguments[0]));
+  setNativeMethodPrefixes(reinterpret_cast<const char*>(bytes->body().begin()), bytes->length());
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL

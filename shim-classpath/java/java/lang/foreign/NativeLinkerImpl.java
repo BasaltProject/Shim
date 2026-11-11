@@ -17,8 +17,7 @@ final class NativeLinkerImpl implements Linker {
   static final NativeLinkerImpl INSTANCE = new NativeLinkerImpl();
 
   static final StructLayout CAPTURE_STATE_LAYOUT = MemoryLayout.structLayout(
-      ValueLayout.JAVA_INT.withName("error"),
-      MemoryLayout.paddingLayout(4L)
+      ValueLayout.JAVA_INT.withName("errno")
   );
 
   static native long dlopen0(long path);
@@ -169,7 +168,23 @@ final class NativeLinkerImpl implements Linker {
     final String[] capturedState;
 
     CaptureCallStateOption(String[] capturedState) {
+      for (String n : capturedState) {
+        if (!"errno".equals(n)) {
+          throw new IllegalArgumentException("Unknown name: " + n + ", must be one of: [errno]");
+        }
+      }
       this.capturedState = capturedState;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof CaptureCallStateOption
+          && java.util.Arrays.equals(capturedState, ((CaptureCallStateOption) o).capturedState);
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Arrays.hashCode(capturedState);
     }
   }
 

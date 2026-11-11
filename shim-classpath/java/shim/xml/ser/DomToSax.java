@@ -237,7 +237,7 @@ public final class DomToSax {
         ownDecl = true;
       }
     }
-    boolean ownFirst = !declarations.isEmpty() || lsMode;
+    boolean ownFirst = !declarations.isEmpty() || lsMode || !p.isEmpty();
     AttributesImpl atts = new AttributesImpl();
     if (ownDecl && ownFirst) {
       if (declare(scope, declared, p, ownUri)) {
