@@ -102,7 +102,8 @@ public class BasicMenuItemUI extends javax.swing.plaf.MenuItemUI {
     }
     Integer gap = (Integer) UIManager.get(prefix + ".textIconGap");
     defaultTextIconGap = gap != null ? gap.intValue() : 4;
-    LookAndFeel.installProperty(menuItem, "opaque", Boolean.TRUE);
+    Object opaqueDefault = UIManager.get(prefix + ".opaque");
+    LookAndFeel.installProperty(menuItem, "opaque", opaqueDefault != null ? opaqueDefault : Boolean.TRUE);
     if (menuItem.getMargin() == null || menuItem.getMargin() instanceof UIResource) {
       menuItem.setMargin(UIManager.getInsets(prefix + ".margin"));
     }

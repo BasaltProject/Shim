@@ -300,6 +300,10 @@ public final class Fonts {
 
     public int numGlyphs() { return delegate.numGlyphs(); }
 
+    public long ligature(String s, int index) { return delegate.ligature(s, index); }
+
+    public float glyphAdvance(int glyph) { return delegate.glyphAdvance(glyph); }
+
     public int missingGlyph() { return delegate.missingGlyph(); }
 
     public int glyphCode(int cp) { return delegate.glyphCode(cp); }

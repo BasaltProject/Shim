@@ -100,7 +100,7 @@ public class MidiSystem {
   private static MidiFileFormat formatOf(Object[] parsed) {
     Sequence seq = (Sequence) parsed[0];
     return new MidiFileFormat(((Integer) parsed[1]).intValue(), seq.getDivisionType(), seq.getResolution(),
-        MidiFileFormat.UNKNOWN_LENGTH, seq.getMicrosecondLength());
+        MidiFileFormat.UNKNOWN_LENGTH, MidiFileFormat.UNKNOWN_LENGTH);
   }
 
   public static Sequence getSequence(InputStream stream) throws InvalidMidiDataException, IOException {

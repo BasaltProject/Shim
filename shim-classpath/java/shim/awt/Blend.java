@@ -104,11 +104,36 @@ public final class Blend {
     int da = dst >>> 24;
     if (da == 255) {
       int inv = 255 - sa;
-      int r = (((src >> 16) & 0xff) * sa + ((dst >> 16) & 0xff) * inv + 127) / 255;
-      int g = (((src >> 8) & 0xff) * sa + ((dst >> 8) & 0xff) * inv + 127) / 255;
-      int b = ((src & 0xff) * sa + (dst & 0xff) * inv + 127) / 255;
+      int r = mul8(sa, (src >> 16) & 0xff) + mul8(inv, (dst >> 16) & 0xff);
+      int g = mul8(sa, (src >> 8) & 0xff) + mul8(inv, (dst >> 8) & 0xff);
+      int b = mul8(sa, src & 0xff) + mul8(inv, dst & 0xff);
       return 0xff000000 | (r << 16) | (g << 8) | b;
     }
-    return compose(AlphaComposite.SRC_OVER, (src & 0x00ffffff) | (sa << 24), dst, 1f);
+    int dstF = mul8(255 - sa, da);
+    int ra = sa + dstF;
+    int r = mul8(sa, (src >> 16) & 0xff) + mul8(dstF, (dst >> 16) & 0xff);
+    int g = mul8(sa, (src >> 8) & 0xff) + mul8(dstF, (dst >> 8) & 0xff);
+    int b = mul8(sa, src & 0xff) + mul8(dstF, dst & 0xff);
+    if (ra < 255) {
+      r = div8(ra, r);
+      g = div8(ra, g);
+      b = div8(ra, b);
+    }
+    return (ra << 24) | (r << 16) | (g << 8) | b;
+  }
+
+  private static int mul8(int a, int b) {
+    return (a * b * 0x10101 + (1 << 23)) >>> 24;
+  }
+
+  private static int div8(int a, int b) {
+    if (a == 0) {
+      return b;
+    }
+    if (b >= a) {
+      return 255;
+    }
+    long inc = ((0xffL << 24) + a / 2) / a;
+    return (int) (((1L << 23) + b * inc) >>> 24);
   }
 }

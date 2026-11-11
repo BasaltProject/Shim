@@ -214,6 +214,10 @@ public class Introspector {
     }
     String simple = beanClass.getName();
     simple = simple.substring(simple.lastIndexOf('.') + 1);
+    found = instantiate("com.sun.beans.infos." + simple + "BeanInfo", loader);
+    if (found != null) {
+      return found;
+    }
     String[] path;
     synchronized (kLock) {
       path = searchPath == null ? null : searchPath.clone();
@@ -615,6 +619,22 @@ public class Introspector {
         changed = true;
       }
     }
+    if (parent.isExpert() && !child.isExpert()) {
+      child.setExpert(true);
+    }
+    if (parent.isHidden() && !child.isHidden()) {
+      child.setHidden(true);
+    }
+    if (parent.isPreferred() && !child.isPreferred()) {
+      child.setPreferred(true);
+    }
+    java.util.Enumeration<String> names = parent.attributeNames();
+    while (names.hasMoreElements()) {
+      String key = names.nextElement();
+      if (child.getValue(key) == null) {
+        child.setValue(key, parent.getValue(key));
+      }
+    }
     if (!changed) {
       return child;
     }
@@ -934,6 +954,29 @@ public class Introspector {
         pd.setShortDescription(plainAnnotation.description());
       }
     }
+    String tableFlags = null;
+    String tableTransient = null;
+    if (plainAnnotation == null) {
+      String plainFlags = tableFlagsOf(pd.getReadMethod(), pd.getWriteMethod());
+      String indexedFlags = null;
+      if (pd instanceof IndexedPropertyDescriptor) {
+        IndexedPropertyDescriptor ipd = (IndexedPropertyDescriptor) pd;
+        indexedFlags = tableFlagsOf(ipd.getIndexedReadMethod(), ipd.getIndexedWriteMethod());
+      }
+      tableFlags = indexedFlags != null ? indexedFlags : plainFlags;
+      String boundFlags = plainFlags != null ? plainFlags : indexedFlags;
+      tableTransient = tableTransientOf(pd.getReadMethod(), pd.getWriteMethod());
+      if (boundFlags != null && levelBound && boundFlags.indexOf('N') >= 0) {
+        pd.setBound(false);
+      }
+      if (tableFlags != null) {
+        expert = tableFlags.indexOf('E') >= 0;
+        hidden = tableFlags.indexOf('H') >= 0;
+        preferred = tableFlags.indexOf('P') >= 0;
+        required = tableFlags.indexOf('R') >= 0;
+        visualUpdate = tableFlags.indexOf('V') >= 0;
+      }
+    }
     if (flagAnnotation != null) {
       expert = flagAnnotation.expert();
       hidden = flagAnnotation.hidden();
@@ -952,7 +995,29 @@ public class Introspector {
     pd.setPreferred(preferred);
     if (transientAnnotation != null) {
       pd.setValue("transient", Boolean.valueOf(transientAnnotation.value()));
+    } else if (tableTransient != null) {
+      pd.setValue("transient", Boolean.valueOf(tableTransient.indexOf('T') >= 0));
     }
+  }
+
+  private String tableFlagsOf(Method first, Method second) {
+    for (Method m : new Method[] {first, second}) {
+      String f = shim.beans.BeanAttributes.flags(m, beanClass);
+      if (f != null && f.matches(".*[NEHPRVB].*")) {
+        return f;
+      }
+    }
+    return null;
+  }
+
+  private String tableTransientOf(Method first, Method second) {
+    for (Method m : new Method[] {first, second}) {
+      String f = shim.beans.BeanAttributes.flags(m, beanClass);
+      if (f != null && f.matches(".*[Tt].*")) {
+        return f;
+      }
+    }
+    return null;
   }
 
   private static BeanProperty annotationOf(Method first, Method second) {

@@ -67,14 +67,40 @@ public class MetalTabbedPaneUI extends BasicTabbedPaneUI {
     }
   }
 
+  private static final int kSlant = 6;
+
   protected void paintTopTabBorder(int tabIndex, Graphics g, int x, int y, int w, int h, int btm, int rght,
       boolean isSelected) {
-    g.setColor(isSelected ? darkShadow : shadow);
-    g.drawLine(x, y + 2, x, btm);
-    g.drawLine(x + 1, y + 1, x + 1, y + 1);
-    g.drawLine(x + 2, y, rght - 2, y);
-    g.drawLine(rght - 1, y + 1, rght - 1, y + 1);
-    g.drawLine(rght, y + 2, rght, btm);
+    int right = tabIndex < tabPane.getTabCount() - 1 ? x + w : rght;
+    Color line = isSelected ? MetalLookAndFeel.getPrimaryControlDarkShadow() : MetalLookAndFeel.getControlDarkShadow();
+    Color fill = isSelected ? selectColor : getUnselectedFill(tabIndex);
+    for (int k = 1; k <= kSlant; k++) {
+      int edge = x + kSlant - k;
+      g.setColor(fill);
+      g.fillRect(edge + 1, y + k, right - edge - 1, 1);
+    }
+    g.setColor(fill);
+    g.fillRect(x + 1, y + kSlant + 1, right - x - 1, btm - y - kSlant);
+    g.setColor(line);
+    g.fillRect(x + kSlant, y, right - x - kSlant + 1, 1);
+    for (int k = 1; k <= kSlant; k++) {
+      g.fillRect(x + kSlant - k, y + k, 1, 1);
+    }
+    g.fillRect(x, y + kSlant, 1, btm - y - kSlant + 1);
+    g.fillRect(right, y, 1, btm - y + 1);
+    if (isSelected) {
+      g.setColor(Color.WHITE);
+      g.fillRect(x + kSlant, y + 1, right - x - kSlant, 1);
+      for (int k = 2; k <= kSlant; k++) {
+        g.fillRect(x + kSlant - k + 1, y + k, 1, 1);
+      }
+      g.fillRect(x + 1, y + kSlant, 1, btm - y - kSlant + 1);
+    }
+  }
+
+  private Color getUnselectedFill(int tabIndex) {
+    Color bg = tabPane.getBackgroundAt(tabIndex);
+    return bg instanceof javax.swing.plaf.UIResource && unselectedBackground != null ? unselectedBackground : bg;
   }
 
   protected boolean shouldFillGap(int currentRun, int tabIndex, int x, int y) {
@@ -143,7 +169,7 @@ public class MetalTabbedPaneUI extends BasicTabbedPaneUI {
         break;
       case TOP:
       default:
-        g.fillRect(x, y + 1, w, h - 1);
+        break;
     }
   }
 
@@ -190,22 +216,40 @@ public class MetalTabbedPaneUI extends BasicTabbedPaneUI {
 
   protected void paintContentBorderTopEdge(Graphics g, int tabPlacement, int selectedIndex, int x, int y, int w,
       int h) {
-    super.paintContentBorderTopEdge(g, tabPlacement, selectedIndex, x, y, w, h);
+    Rectangle selRect = selectedIndex < 0 ? null : getTabBounds(selectedIndex, new Rectangle());
+    boolean gap = tabPlacement == TOP && selRect != null && selRect.y + selRect.height + 1 >= y && selRect.x >= x
+        && selRect.x <= x + w;
+    g.setColor(MetalLookAndFeel.getPrimaryControlDarkShadow());
+    if (!gap) {
+      g.drawLine(x, y, x + w - 2, y);
+      g.setColor(Color.WHITE);
+      g.drawLine(x + 1, y + 1, x + w - 2, y + 1);
+    } else {
+      g.drawLine(x, y, selRect.x + 1, y);
+      int tabRight = selectedIndex < tabPane.getTabCount() - 1 ? selRect.x + selRect.width : selRect.x + selRect.width - 1;
+      g.drawLine(tabRight, y, x + w - 2, y);
+      g.setColor(Color.WHITE);
+      g.drawLine(x + 1, y + 1, selRect.x + 1, y + 1);
+      g.drawLine(tabRight, y + 1, x + w - 2, y + 1);
+    }
   }
 
   protected void paintContentBorderBottomEdge(Graphics g, int tabPlacement, int selectedIndex, int x, int y, int w,
       int h) {
-    super.paintContentBorderBottomEdge(g, tabPlacement, selectedIndex, x, y, w, h);
+    g.setColor(MetalLookAndFeel.getControlDarkShadow());
+    g.drawLine(x, y + h - 1, x + w - 1, y + h - 1);
   }
 
   protected void paintContentBorderLeftEdge(Graphics g, int tabPlacement, int selectedIndex, int x, int y, int w,
       int h) {
-    super.paintContentBorderLeftEdge(g, tabPlacement, selectedIndex, x, y, w, h);
+    g.setColor(MetalLookAndFeel.getPrimaryControlDarkShadow());
+    g.drawLine(x, y, x, y + h - 1);
   }
 
   protected void paintContentBorderRightEdge(Graphics g, int tabPlacement, int selectedIndex, int x, int y, int w,
       int h) {
-    super.paintContentBorderRightEdge(g, tabPlacement, selectedIndex, x, y, w, h);
+    g.setColor(MetalLookAndFeel.getControlDarkShadow());
+    g.drawLine(x + w - 1, y, x + w - 1, y + h - 1);
   }
 
   protected int calculateMaxTabHeight(int tabPlacement) {

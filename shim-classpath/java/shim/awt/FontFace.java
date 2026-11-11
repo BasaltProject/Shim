@@ -79,6 +79,14 @@ public abstract class FontFace {
     return Math.round(advance(cp) * size);
   }
 
+  public long ligature(String s, int index) {
+    return 0;
+  }
+
+  public float glyphAdvance(int glyph) {
+    return 0;
+  }
+
   public boolean styled() {
     return false;
   }

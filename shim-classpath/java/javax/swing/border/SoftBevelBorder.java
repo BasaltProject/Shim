@@ -16,6 +16,7 @@ public class SoftBevelBorder extends BevelBorder {
 
   public SoftBevelBorder(int bevelType, Color highlight, Color shadow) { super(bevelType, highlight, shadow); }
 
+  @java.beans.ConstructorProperties({"bevelType", "highlightOuterColor", "highlightInnerColor", "shadowOuterColor", "shadowInnerColor"})
   public SoftBevelBorder(int bevelType, Color highlightOuterColor, Color highlightInnerColor, Color shadowOuterColor,
       Color shadowInnerColor) {
     super(bevelType, highlightOuterColor, highlightInnerColor, shadowOuterColor, shadowInnerColor);
@@ -31,12 +32,29 @@ public class SoftBevelBorder extends BevelBorder {
   public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
     Color old = g.getColor();
     boolean raised = bevelType == RAISED;
-    g.setColor(raised ? getHighlightOuterColor(c) : getShadowOuterColor(c));
-    g.drawLine(x, y, x + width - 2, y);
-    g.drawLine(x, y, x, y + height - 2);
-    g.setColor(raised ? getShadowOuterColor(c) : getHighlightOuterColor(c));
-    g.drawLine(x + 1, y + height - 1, x + width - 1, y + height - 1);
-    g.drawLine(x + width - 1, y + 1, x + width - 1, y + height - 1);
+    Color tlOuter = raised ? getHighlightOuterColor(c) : getShadowOuterColor(c);
+    Color tlInner = raised ? getHighlightInnerColor(c) : getShadowInnerColor(c);
+    Color brOuter = raised ? getShadowOuterColor(c) : getHighlightOuterColor(c);
+    Color brInner = raised ? getShadowInnerColor(c) : getHighlightInnerColor(c);
+    int w = width;
+    int h = height;
+    g.translate(x, y);
+    g.setColor(tlOuter);
+    g.drawLine(0, 0, w - 2, 0);
+    g.drawLine(0, 1, 1, 1);
+    g.drawLine(0, 2, 0, h - 3);
+    g.setColor(tlInner);
+    g.drawLine(w - 1, 0, w - 1, 0);
+    g.drawLine(2, 1, w - 2, 1);
+    g.drawLine(1, 2, 1, h - 2);
+    g.drawLine(2, 2, 2, 2);
+    g.drawLine(0, h - 2, 0, h - 1);
+    g.setColor(brInner);
+    g.drawLine(w - 2, h - 2, w - 2, h - 2);
+    g.setColor(brOuter);
+    g.drawLine(w - 1, 2, w - 1, h - 1);
+    g.drawLine(2, h - 1, w - 1, h - 1);
+    g.translate(-x, -y);
     g.setColor(old);
   }
 }

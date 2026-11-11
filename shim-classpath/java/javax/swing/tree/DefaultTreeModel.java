@@ -19,6 +19,7 @@ public class DefaultTreeModel implements Serializable, TreeModel {
   protected EventListenerList listenerList = new EventListenerList();
   protected boolean asksAllowsChildren;
 
+  @java.beans.ConstructorProperties({"root"})
   public DefaultTreeModel(TreeNode root) { this(root, false); }
 
   public DefaultTreeModel(TreeNode root, boolean asksAllowsChildren) {

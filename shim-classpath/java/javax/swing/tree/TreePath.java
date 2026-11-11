@@ -20,6 +20,7 @@ public class TreePath implements Serializable {
     this(new Object[] {singleComponent});
   }
 
+  @java.beans.ConstructorProperties({"path"})
   public TreePath(Object[] path) {
     if (path == null || path.length == 0) {
       throw new IllegalArgumentException("path in TreePath must be non null and not empty.");

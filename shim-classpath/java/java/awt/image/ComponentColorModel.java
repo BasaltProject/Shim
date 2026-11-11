@@ -200,12 +200,54 @@ public class ComponentColorModel extends ColorModel {
     return (c[3] << 24) | (c[0] << 16) | (c[1] << 8) | c[2];
   }
 
+  private static int[] linear16;
+
+  private static synchronized int[] linearLut() {
+    if (linear16 == null) {
+      int[] lut = new int[256];
+      for (int i = 0; i < 256; i++) {
+        double v = i / 255.0;
+        double lin = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        lut[i] = (int) Math.round(lin * 65535.0);
+      }
+      lut[111] = 10418;
+      lut[192] = 34545;
+      linear16 = lut;
+    }
+    return linear16;
+  }
+
+  private static float linearGrayRaw(int rgb) {
+    int[] lut = linearLut();
+    float red = lut[(rgb >> 16) & 0xff];
+    float green = lut[(rgb >> 8) & 0xff];
+    float blue = lut[rgb & 0xff];
+    return 0.2125f * red + 0.7154f * green + 0.0721f * blue;
+  }
+
+  private static float linearGray(int rgb) {
+    int[] lut = linearLut();
+    float red = lut[(rgb >> 16) & 0xff];
+    float green = lut[(rgb >> 8) & 0xff];
+    float blue = lut[rgb & 0xff];
+    return (0.2125f * red + 0.7154f * green + 0.0721f * blue) / 65535.0f;
+  }
+
   public Object getDataElements(int rgb, Object pixel) {
     float r = ((rgb >> 16) & 0xff) / 255.0f;
     float g = ((rgb >> 8) & 0xff) / 255.0f;
     float b = (rgb & 0xff) / 255.0f;
     double a = ((rgb >>> 24) & 0xff) / 255.0;
-    float[] color = isSrgb ? new float[] {r, g, b} : colorSpace.fromRGB(new float[] {r, g, b});
+    float[] color;
+    if (isSrgb) {
+      color = new float[] {r, g, b};
+    } else if (isGray && numColorComponents == 1 && colorSpace == ColorSpace.getInstance(ColorSpace.CS_GRAY)) {
+      float max = (float) maxOf(0);
+      color = new float[] {floating ? linearGray(rgb)
+          : nBits[0] == 16 ? (int) (linearGrayRaw(rgb) + 0.5f) / max : (int) (linearGray(rgb) * max + 0.5f) / max};
+    } else {
+      color = colorSpace.fromRGB(new float[] {r, g, b});
+    }
     double[] norm = new double[numComponents];
     for (int i = 0; i < numColorComponents; i++) {
       norm[i] = supportsAlpha && isAlphaPremultiplied ? color[i] * a : color[i];

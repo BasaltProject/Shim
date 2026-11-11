@@ -50,6 +50,7 @@ public class BasicToolBarUI extends javax.swing.plaf.ToolBarUI implements javax.
   protected void uninstallKeyboardActions() {
   }
   protected void installDefaults() {
+    LookAndFeel.installProperty(toolBar, "opaque", Boolean.TRUE);
     LookAndFeel.installBorder(toolBar, "ToolBar.border");
     LookAndFeel.installColorsAndFont(toolBar, "ToolBar.background", "ToolBar.foreground", "ToolBar.font");
     if (rolloverBorder == null) {

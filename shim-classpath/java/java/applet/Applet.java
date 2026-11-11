@@ -8,6 +8,7 @@
 
 package java.applet;
 
+@Deprecated(since = "9", forRemoval = true)
 public class Applet extends java.awt.Panel {
   public Applet() throws java.awt.HeadlessException {
     throw new java.awt.HeadlessException();

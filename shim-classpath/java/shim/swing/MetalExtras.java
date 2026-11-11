@@ -138,8 +138,9 @@ public final class MetalExtras {
       case 3: return new javax.swing.plaf.metal.MetalBorders.MenuItemBorder();
       case 4: return javax.swing.plaf.metal.MetalBorders.getTextFieldBorder();
       case 5: return new javax.swing.plaf.basic.BasicBorders.MarginBorder();
-      case 6: return new BorderUIResource.LineBorderUIResource(color("controlDarkShadow"));
-      case 7: return new BorderUIResource.LineBorderUIResource(color("primaryControlDarkShadow"));
+      case 6: return new BorderUIResource.LineBorderUIResource(javax.swing.plaf.metal.MetalLookAndFeel.getControlDarkShadow());
+      case 7: return new BorderUIResource.LineBorderUIResource(javax.swing.plaf.metal.MetalLookAndFeel.getPrimaryControlDarkShadow());
+      case 22: return new BorderUIResource.LineBorderUIResource(javax.swing.plaf.metal.MetalLookAndFeel.getControlShadow());
       case 8: return new javax.swing.plaf.metal.MetalBorders.MenuBarBorder();
       case 9: return new javax.swing.plaf.metal.MetalBorders.PopupMenuBorder();
       case 10: return new javax.swing.plaf.metal.MetalBorders.ToolBarBorder();
@@ -177,7 +178,7 @@ public final class MetalExtras {
     border(t, "TextPane.border", 5);
     border(t, "EditorPane.border", 5);
     border(t, "ProgressBar.border", 6);
-    border(t, "TitledBorder.border", 6);
+    border(t, "TitledBorder.border", 22);
     border(t, "ToolTip.border", 7);
     border(t, "ToolTip.borderInactive", 6);
     border(t, "MenuBar.border", 8);

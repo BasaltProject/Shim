@@ -30,6 +30,8 @@ public final class TextBuffer implements AbstractDocument.Content, java.io.Seria
     Mark(int offset) { this.offset = offset; }
 
     public int getOffset() { return offset; }
+
+    public String toString() { return Integer.toString(offset); }
   }
 
   public int length() { return text.length(); }

@@ -17,6 +17,7 @@ public class StrokeBorder extends AbstractBorder {
 
   public StrokeBorder(BasicStroke stroke) { this(stroke, null); }
 
+  @java.beans.ConstructorProperties({"stroke", "paint"})
   public StrokeBorder(BasicStroke stroke, Paint paint) {
     if (stroke == null) {
       throw new NullPointerException("border's stroke");

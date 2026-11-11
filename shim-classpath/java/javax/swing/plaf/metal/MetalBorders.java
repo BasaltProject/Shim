@@ -63,6 +63,19 @@ public class MetalBorders {
       }
       javax.swing.AbstractButton button = (javax.swing.AbstractButton) c;
       javax.swing.ButtonModel model = button.getModel();
+      if (model.isEnabled() && c.getParent() instanceof javax.swing.JToolBar && !model.isArmed() && !model.isPressed()
+          && !model.isRollover() && !model.isSelected()) {
+        g.translate(x, y);
+        g.setColor(MetalLookAndFeel.getControlDisabled());
+        g.drawRect(0, 0, w - 2, h - 2);
+        g.setColor(MetalLookAndFeel.getControlHighlight());
+        g.drawRect(1, 1, w - 2, h - 2);
+        g.setColor(MetalLookAndFeel.getControl());
+        g.drawLine(0, h - 1, 1, h - 2);
+        g.drawLine(w - 1, 0, w - 2, 1);
+        g.translate(-x, -y);
+        return;
+      }
       if (model.isEnabled()) {
         boolean pressed = model.isPressed() && model.isArmed();
         boolean isDefault = button instanceof javax.swing.JButton && ((javax.swing.JButton) button).isDefaultButton();
@@ -160,7 +173,20 @@ public class MetalBorders {
     public RolloverButtonBorder() { }
 
     public void paintBorder(Component c, Graphics g, int x, int y, int w, int h) {
-      outline(g, "controlDarkShadow", x, y, w, h);
+      javax.swing.ButtonModel m = c instanceof javax.swing.AbstractButton ? ((javax.swing.AbstractButton) c).getModel() : null;
+      if (m != null && (m.isRollover() || m.isPressed() || m.isSelected())) {
+        super.paintBorder(c, g, x, y, w, h);
+        return;
+      }
+      g.translate(x, y);
+      g.setColor(MetalLookAndFeel.getControlDisabled());
+      g.drawRect(0, 0, w - 2, h - 2);
+      g.setColor(MetalLookAndFeel.getControlHighlight());
+      g.drawRect(1, 1, w - 2, h - 2);
+      g.setColor(MetalLookAndFeel.getControl());
+      g.drawLine(0, h - 1, 1, h - 2);
+      g.drawLine(w - 1, 0, w - 2, 1);
+      g.translate(-x, -y);
     }
 
     public Insets getBorderInsets(Component c, Insets i) {
@@ -200,7 +226,31 @@ public class MetalBorders {
     public ToolBarBorder() { }
 
     public void paintBorder(Component c, Graphics g, int x, int y, int w, int h) {
-      outline(g, "controlDarkShadow", x, y, w, h);
+      g.translate(x, y);
+      if (c instanceof javax.swing.JToolBar && ((javax.swing.JToolBar) c).isFloatable()) {
+        boolean horizontal = ((javax.swing.JToolBar) c).getOrientation() == HORIZONTAL;
+        java.awt.Color dark = javax.swing.plaf.metal.MetalLookAndFeel.getControlDarkShadow();
+        int bx = horizontal ? (c.getComponentOrientation().isLeftToRight() ? 2 : w - 12) : 1;
+        int by = horizontal ? 1 : 2;
+        int bw = horizontal ? 10 : w - 2;
+        int bh = horizontal ? h - 4 : 10;
+        g.setColor(c.getBackground());
+        g.fillRect(bx, by, bw, bh);
+        for (int ry = 0; ry < bh; ry++) {
+          for (int rx = 0; rx < bw; rx++) {
+            if (((rx - ry) & 3) == 0) {
+              g.setColor((ry & 1) == 0 ? java.awt.Color.WHITE : dark);
+              g.fillRect(bx + rx, by + ry, 1, 1);
+            }
+          }
+        }
+      }
+      g.setColor(c.getBackground());
+      g.drawLine(0, h - 2, w - 1, h - 2);
+      java.awt.Color line = javax.swing.UIManager.getColor("MenuBar.borderColor");
+      g.setColor(line != null ? line : javax.swing.plaf.metal.MetalLookAndFeel.getControlShadow());
+      g.drawLine(0, h - 1, w - 1, h - 1);
+      g.translate(-x, -y);
     }
 
     public Insets getBorderInsets(Component c, Insets i) {
@@ -239,7 +289,13 @@ public class MetalBorders {
     public MenuItemBorder() { }
 
     public void paintBorder(Component c, Graphics g, int x, int y, int w, int h) {
-      outline(g, "controlDarkShadow", x, y, w, h);
+      if (!(c instanceof javax.swing.JMenuItem)) {
+        return;
+      }
+      javax.swing.JMenuItem item = (javax.swing.JMenuItem) c;
+      if (item.getModel().isArmed() || item.isSelected()) {
+        outline(g, "controlDarkShadow", x, y, w, h);
+      }
     }
 
     public Insets getBorderInsets(Component c, Insets i) {
@@ -253,7 +309,13 @@ public class MetalBorders {
     public MenuBarBorder() { }
 
     public void paintBorder(Component c, Graphics g, int x, int y, int w, int h) {
-      outline(g, "controlDarkShadow", x, y, w, h);
+      g.translate(x, y);
+      g.setColor(c.getBackground());
+      g.drawLine(0, h - 2, w - 1, h - 2);
+      java.awt.Color line = javax.swing.UIManager.getColor("MenuBar.borderColor");
+      g.setColor(line != null ? line : javax.swing.plaf.metal.MetalLookAndFeel.getControlShadow());
+      g.drawLine(0, h - 1, w - 1, h - 1);
+      g.translate(-x, -y);
     }
 
     public Insets getBorderInsets(Component c, Insets i) {

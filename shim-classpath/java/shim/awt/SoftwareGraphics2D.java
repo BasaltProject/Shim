@@ -415,6 +415,8 @@ public final class SoftwareGraphics2D extends Graphics2D {
     return clipBounds.intersects(r);
   }
 
+  private static final int kTile = 32;
+
   private final class Fill implements Rasterizer.RowSink {
     private final int srcColor;
     private final PaintContext pctx;
@@ -423,6 +425,8 @@ public final class SoftwareGraphics2D extends Graphics2D {
     private final float extra;
     private final byte[] mask;
     private Raster pr;
+    private int trX;
+    private int trY;
 
     Fill(Paint p, byte[] mask, Rectangle devBounds, Rectangle2D userBounds) {
       this.mask = mask;
@@ -449,12 +453,19 @@ public final class SoftwareGraphics2D extends Graphics2D {
     public void row(int y, int xs, int xe, float[] cov, int base) {
       int[] srcRow = null;
       if (pctx != null) {
-        Raster r = pctx.getRaster(xs, y, xe - xs, 1);
         ColorModel cm = pctx.getColorModel();
         srcRow = new int[xe - xs];
         Object px = null;
         for (int i = 0; i < srcRow.length; i++) {
-          px = r.getDataElements(r.getMinX() + i, r.getMinY(), px);
+          int ax = xs + i;
+          int tx = Math.floorDiv(ax, kTile) * kTile;
+          int ty = Math.floorDiv(y, kTile) * kTile;
+          if (pr == null || tx != trX || ty != trY) {
+            pr = pctx.getRaster(tx, ty, kTile, kTile);
+            trX = tx;
+            trY = ty;
+          }
+          px = pr.getDataElements(pr.getMinX() + ax - tx, pr.getMinY() + y - ty, px);
           srcRow[i] = cm.getRGB(px);
         }
       }

@@ -193,6 +193,8 @@ public abstract class JComponent extends java.awt.Container implements java.io.S
     return border;
   }
   protected java.awt.Graphics getComponentGraphics(java.awt.Graphics p0) {
+    p0.setColor(getForeground());
+    p0.setFont(getFont());
     return p0;
   }
   protected void paintComponent(java.awt.Graphics p0) {

@@ -140,11 +140,11 @@ public class MetalComboBoxButton extends JButton {
         iconTop = getHeight() / 2 - iconHeight / 2;
       } else {
         if (leftToRight) {
-          iconLeft = (left + (width - 1)) - iconWidth;
+          iconLeft = (left + (width - 1)) - iconWidth + 2;
         } else {
           iconLeft = left;
         }
-        iconTop = (top + ((bottom - top) / 2)) - (iconHeight / 2);
+        iconTop = (top + ((bottom - top) / 2)) - (iconHeight / 2) + 1;
       }
       comboIcon.paintIcon(this, g, iconLeft, iconTop);
     }

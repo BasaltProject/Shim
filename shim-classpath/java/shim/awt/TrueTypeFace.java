@@ -331,6 +331,119 @@ public final class TrueTypeFace extends FontFace {
 
   private Map<Integer, Integer> reverse;
 
+  private int[] ligatureSubtables;
+
+  private int[] ligatureSubtables() {
+    if (ligatureSubtables != null) {
+      return ligatureSubtables;
+    }
+    java.util.List<Integer> subs = new java.util.ArrayList<>();
+    int[] gsub = tables.get("GSUB");
+    if (gsub != null) {
+      int base = gsub[0];
+      int featureList = base + u16(base + 6);
+      int lookupList = base + u16(base + 8);
+      java.util.TreeSet<Integer> lookups = new java.util.TreeSet<>();
+      int fc = u16(featureList);
+      for (int i = 0; i < fc; i++) {
+        int rec = featureList + 2 + i * 6;
+        if (u32(rec) == 0x6c696761L) {
+          int ft = featureList + u16(rec + 4);
+          int lc = u16(ft + 2);
+          for (int j = 0; j < lc; j++) {
+            lookups.add(u16(ft + 4 + j * 2));
+          }
+        }
+      }
+      for (int li : lookups) {
+        int lt = lookupList + u16(lookupList + 2 + li * 2);
+        int type = u16(lt);
+        int sc = u16(lt + 4);
+        for (int k = 0; k < sc; k++) {
+          int st = lt + u16(lt + 6 + k * 2);
+          int t = type;
+          if (t == 7) {
+            t = u16(st + 2);
+            st = st + (int) u32(st + 4);
+          }
+          if (t == 4) {
+            subs.add(st);
+          }
+        }
+      }
+    }
+    int[] r = new int[subs.size()];
+    for (int i = 0; i < r.length; i++) {
+      r[i] = subs.get(i);
+    }
+    ligatureSubtables = r;
+    return r;
+  }
+
+  private int coverageIndex(int cov, int glyph) {
+    int fmt = u16(cov);
+    int n = u16(cov + 2);
+    if (fmt == 1) {
+      for (int i = 0; i < n; i++) {
+        if (u16(cov + 4 + i * 2) == glyph) {
+          return i;
+        }
+      }
+      return -1;
+    }
+    for (int i = 0; i < n; i++) {
+      int r = cov + 4 + i * 6;
+      if (glyph >= u16(r) && glyph <= u16(r + 2)) {
+        return u16(r + 4) + glyph - u16(r);
+      }
+    }
+    return -1;
+  }
+
+  public synchronized long ligature(String s, int index) {
+    int[] subs = ligatureSubtables();
+    if (subs.length == 0) {
+      return 0;
+    }
+    int[] g = new int[8];
+    int[] pos = new int[9];
+    int n = 0;
+    for (int i = index; i < s.length() && n < 8; ) {
+      int cp = s.codePointAt(i);
+      g[n] = glyphFor(cp);
+      i += Character.charCount(cp);
+      pos[++n] = i - index;
+    }
+    for (int st : subs) {
+      int ci = coverageIndex(st + u16(st + 2), g[0]);
+      if (ci < 0 || ci >= u16(st + 4)) {
+        continue;
+      }
+      int set = st + u16(st + 6 + ci * 2);
+      int lc = u16(set);
+      for (int l = 0; l < lc; l++) {
+        int lig = set + u16(set + 2 + l * 2);
+        int comps = u16(lig + 2);
+        if (comps < 2 || comps > n) {
+          continue;
+        }
+        boolean ok = true;
+        for (int c = 1; c < comps && ok; c++) {
+          ok = u16(lig + 4 + (c - 1) * 2) == g[c];
+        }
+        if (ok) {
+          return ((long) pos[comps] << 32) | u16(lig);
+        }
+      }
+    }
+    return 0;
+  }
+
+  public float glyphAdvance(int glyph) {
+    int hm = tables.get("hmtx")[0];
+    return u16(hm + Math.min(glyph, numHMetrics - 1) * 4) / (float) unitsPerEm;
+  }
+
   public float advance(int cp) {
     int g = glyphFor(cp);
     int hm = tables.get("hmtx")[0];

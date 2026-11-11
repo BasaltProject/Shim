@@ -28,7 +28,7 @@ import javax.swing.plaf.UIResource;
 public class JSlider extends JComponent implements SwingConstants, Accessible {
   protected int majorTickSpacing;
   protected int minorTickSpacing;
-  protected boolean snapToTicks = true;
+  protected boolean snapToTicks = false;
   protected BoundedRangeModel sliderModel;
   protected int orientation;
   protected ChangeEvent changeEvent = null;

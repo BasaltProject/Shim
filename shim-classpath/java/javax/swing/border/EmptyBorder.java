@@ -24,6 +24,7 @@ public class EmptyBorder extends AbstractBorder implements Serializable {
     this.left = left;
   }
 
+  @java.beans.ConstructorProperties({"borderInsets"})
   public EmptyBorder(Insets borderInsets) {
     this(borderInsets.top, borderInsets.left, borderInsets.bottom, borderInsets.right);
   }

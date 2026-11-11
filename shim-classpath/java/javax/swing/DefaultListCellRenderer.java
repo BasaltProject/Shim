@@ -15,6 +15,9 @@ public class DefaultListCellRenderer extends javax.swing.JLabel implements javax
   private boolean bp_Opaque;
   protected static javax.swing.border.Border noFocusBorder;
   public DefaultListCellRenderer() {
+    setOpaque(true);
+    setBorder(noFocus());
+    setName("List.cellRenderer");
   }
   public void validate() {
     

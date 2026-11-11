@@ -262,13 +262,51 @@ public class MetalIconFactory implements java.io.Serializable {
       this.horizontal = horizontal;
     }
 
+    private static final int[] kRows = {0xc8ddf2, 0xd5e5f5, 0xe3eef8, 0xf1f6fb, 0xffffff, 0xffffff, 0xffffff, 0xf1f6fb,
+        0xe3eef8, 0xd5e5f5, 0xc8ddf2, 0xc4d9ee, 0xc0d6eb, 0xbcd2e8};
+
+    private void dot(Graphics g, int dx, int dy) {
+      if (horizontal) {
+        g.fillRect(dx, dy, 1, 1);
+      } else {
+        g.fillRect(dy, dx, 1, 1);
+      }
+    }
+
     public void paintIcon(Component c, Graphics g, int x, int y) {
       boolean enabled = c == null || c.isEnabled();
+      Color outline = enabled ? MetalLookAndFeel.getControlInfo() : MetalLookAndFeel.getControlShadow();
       g.translate(x, y);
-      g.setColor(col(enabled ? "Slider.thumb" : "controlShadow", Color.LIGHT_GRAY));
-      g.fillOval(0, 0, horizontal ? 14 : 15, horizontal ? 15 : 14);
-      g.setColor(col(enabled ? "controlDarkShadow" : "controlShadow", Color.GRAY));
-      g.drawOval(0, 0, horizontal ? 14 : 15, horizontal ? 15 : 14);
+      for (int dy = 0; dy < 16; dy++) {
+        int left;
+        int right;
+        if (dy == 0) {
+          left = 1;
+          right = 13;
+        } else if (dy <= 8) {
+          left = 0;
+          right = 14;
+        } else {
+          left = dy - 8;
+          right = 22 - dy;
+        }
+        if (left > right) {
+          continue;
+        }
+        g.setColor(outline);
+        dot(g, left, dy);
+        dot(g, right, dy);
+        if (dy == 0) {
+          for (int dx = left + 1; dx < right; dx++) {
+            dot(g, dx, dy);
+          }
+        } else if (dy >= 1 && dy <= 14) {
+          g.setColor(new Color(kRows[dy - 1]));
+          for (int dx = left + 1; dx < right; dx++) {
+            dot(g, dx, dy);
+          }
+        }
+      }
       g.translate(-x, -y);
     }
   }

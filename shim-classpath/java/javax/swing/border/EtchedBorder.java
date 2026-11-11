@@ -25,6 +25,7 @@ public class EtchedBorder extends AbstractBorder {
 
   public EtchedBorder(Color highlight, Color shadow) { this(LOWERED, highlight, shadow); }
 
+  @java.beans.ConstructorProperties({"etchType", "highlightColor", "shadowColor"})
   public EtchedBorder(int etchType, Color highlight, Color shadow) {
     this.etchType = etchType;
     this.highlight = highlight;

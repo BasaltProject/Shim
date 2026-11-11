@@ -27,6 +27,7 @@ public class BevelBorder extends AbstractBorder {
     this(bevelType, highlight.brighter(), highlight, shadow, shadow.brighter());
   }
 
+  @java.beans.ConstructorProperties({"bevelType", "highlightOuterColor", "highlightInnerColor", "shadowOuterColor", "shadowInnerColor"})
   public BevelBorder(int bevelType, Color highlightOuterColor, Color highlightInnerColor, Color shadowOuterColor,
       Color shadowInnerColor) {
     this(bevelType);
@@ -87,8 +88,22 @@ public class BevelBorder extends AbstractBorder {
   }
 
   protected void paintLoweredBevel(Component c, Graphics g, int x, int y, int width, int height) {
-    bevel(g, x, y, width, height, getShadowInnerColor(c), getShadowOuterColor(c), getHighlightInnerColor(c),
-        getHighlightOuterColor(c));
+    Color old = g.getColor();
+    g.translate(x, y);
+    g.setColor(getShadowInnerColor(c));
+    g.drawLine(0, 0, 0, height - 1);
+    g.drawLine(1, 0, width - 1, 0);
+    g.setColor(getShadowOuterColor(c));
+    g.drawLine(1, 1, 1, height - 2);
+    g.drawLine(2, 1, width - 2, 1);
+    g.setColor(getHighlightOuterColor(c));
+    g.drawLine(1, height - 1, width - 1, height - 1);
+    g.drawLine(width - 1, 1, width - 1, height - 2);
+    g.setColor(getHighlightInnerColor(c));
+    g.drawLine(2, height - 2, width - 2, height - 2);
+    g.drawLine(width - 2, 2, width - 2, height - 3);
+    g.translate(-x, -y);
+    g.setColor(old);
   }
 
   private void bevel(Graphics g, int x, int y, int w, int h, Color tlOuter, Color tlInner, Color brOuter, Color brInner) {

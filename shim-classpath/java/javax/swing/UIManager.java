@@ -40,7 +40,9 @@ public class UIManager implements Serializable {
 
   private static final String kMetal = "javax.swing.plaf.metal.MetalLookAndFeel";
   private static LookAndFeelInfo[] installed = {new LookAndFeelInfo("Metal", kMetal),
-      new LookAndFeelInfo("Nimbus", "javax.swing.plaf.nimbus.NimbusLookAndFeel")};
+      new LookAndFeelInfo("Nimbus", "javax.swing.plaf.nimbus.NimbusLookAndFeel"),
+      new LookAndFeelInfo("CDE/Motif", "com.sun.java.swing.plaf.motif.MotifLookAndFeel"),
+      new LookAndFeelInfo("GTK+", "com.sun.java.swing.plaf.gtk.GTKLookAndFeel")};
   private static LookAndFeel current;
   private static final UIDefaults userDefaults = new UIDefaults();
   private static final List<LookAndFeel> auxiliary = new ArrayList<>();

@@ -24,6 +24,7 @@ public class DefaultCellEditor extends AbstractCellEditor implements TableCellEd
   protected EditorDelegate delegate;
   protected int clickCountToStart = 1;
 
+  @java.beans.ConstructorProperties({"component"})
   public DefaultCellEditor(final JTextField textField) {
     editorComponent = textField;
     this.clickCountToStart = 2;

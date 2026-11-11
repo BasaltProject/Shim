@@ -124,6 +124,7 @@ public class JTree extends JComponent implements Scrollable, Accessible {
 
   public JTree(TreeNode root, boolean asksAllowsChildren) { this(new DefaultTreeModel(root, asksAllowsChildren)); }
 
+  @java.beans.ConstructorProperties({"model"})
   public JTree(TreeModel newModel) {
     super();
     setLayout(null);

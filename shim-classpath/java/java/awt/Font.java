@@ -624,8 +624,18 @@ public class Font implements java.io.Serializable {
     boolean fm = frc != null && frc.usesFractionalMetrics();
     float width = 0;
     int count = 0;
+    Object lig = extra == null ? null : extra.get(TextAttribute.LIGATURES);
+    boolean ligatures = lig instanceof Integer && (Integer) lig != 0;
     for (int i = 0; i < s.length();) {
       int cp = s.codePointAt(i);
+      long lg = ligatures ? f.ligature(s, i) : 0;
+      if (lg != 0) {
+        float em = f.glyphAdvance((int) (lg & 0xffff));
+        width += fm ? f.advancePixels(em, pointSize) : Math.round(em * pointSize);
+        count++;
+        i += (int) (lg >>> 32);
+        continue;
+      }
       width += f.pixelAdvance(cp, pointSize, fm, frc == null || !frc.isAntiAliased());
       count++;
       if (kerning() && i + Character.charCount(cp) < s.length()) {

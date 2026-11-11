@@ -86,9 +86,20 @@ public class MetalScrollBarUI extends BasicScrollBarUI {
     return increaseButton;
   }
 
+  private static void px(Graphics g, boolean horizontal, int l1, int t1, int l2, int t2) {
+    if (horizontal) {
+      g.fillRect(l1, t1, l2 - l1 + 1, t2 - t1 + 1);
+    } else {
+      g.fillRect(t1, l1, t2 - t1 + 1, l2 - l1 + 1);
+    }
+  }
+
   protected void paintTrack(Graphics g, JComponent c, Rectangle trackBounds) {
     g.translate(trackBounds.x, trackBounds.y);
-    boolean vertical = scrollbar.getOrientation() == JScrollBar.VERTICAL;
+    boolean horizontal = scrollbar.getOrientation() == JScrollBar.HORIZONTAL;
+    int len = horizontal ? trackBounds.width : trackBounds.height;
+    int thick = horizontal ? trackBounds.height : trackBounds.width;
+    int last = thick - 2;
     if (!c.isEnabled()) {
       g.setColor(MetalLookAndFeel.getControlShadow());
       g.fillRect(0, 0, trackBounds.width - 1, trackBounds.height - 1);
@@ -96,16 +107,15 @@ public class MetalScrollBarUI extends BasicScrollBarUI {
       g.setColor(trackColor);
       g.fillRect(0, 0, trackBounds.width, trackBounds.height);
       g.setColor(MetalLookAndFeel.getControlDarkShadow());
-      Color line = MetalPaint.lastColor("ScrollBar.gradient", trackColor);
-      if (vertical) {
-        g.drawLine(0, 0, 0, trackBounds.height - 1);
-        g.setColor(line);
-        g.drawLine(1, 0, 1, trackBounds.height - 1);
-      } else {
-        g.drawLine(0, 0, trackBounds.width - 1, 0);
-        g.setColor(line);
-        g.drawLine(0, 1, trackBounds.width - 1, 1);
-      }
+      px(g, horizontal, 0, 0, len - 1, 0);
+      px(g, horizontal, 0, last, len - 1, last);
+      px(g, horizontal, 0, 2, 0, last - 1);
+      px(g, horizontal, len - 1, 2, len - 1, last - 1);
+      g.setColor(MetalLookAndFeel.getControlShadow());
+      px(g, horizontal, 1, 1, len - 2, 1);
+      px(g, horizontal, 1, 2, 1, last - 1);
+      g.setColor(horizontal ? MetalLookAndFeel.getControlShadow() : Color.WHITE);
+      px(g, horizontal, 0, last + 1, len - 1, last + 1);
       if (trackHighlight == DECREASE_HIGHLIGHT) {
         paintDecreaseHighlight(g);
       } else if (trackHighlight == INCREASE_HIGHLIGHT) {
@@ -119,16 +129,34 @@ public class MetalScrollBarUI extends BasicScrollBarUI {
     if (!c.isEnabled()) {
       return;
     }
-    boolean vertical = scrollbar.getOrientation() == JScrollBar.VERTICAL;
+    boolean horizontal = scrollbar.getOrientation() == JScrollBar.HORIZONTAL;
     g.translate(thumbBounds.x, thumbBounds.y);
-    int w = thumbBounds.width;
-    int h = thumbBounds.height;
-    Color inner = MetalPaint.lastColor("ScrollBar.gradient", thumbColor);
-    g.setColor(inner);
-    g.fillRect(1, 1, w - 2, h - 2);
-    MetalPaint.drawGradient(c, g, "ScrollBar.gradient", 2, 2, w - 4, h - 4, !vertical);
+    int len = (horizontal ? thumbBounds.width : thumbBounds.height) + 1;
+    int thick = horizontal ? thumbBounds.height : thumbBounds.width;
+    int last = thick - 2;
+    if (horizontal) {
+      MetalPaint.drawGradient(c, g, "ScrollBar.gradient", 2, 2, len - 4, thick - 4, true);
+    } else {
+      MetalPaint.drawGradient(c, g, "ScrollBar.gradient", 2, 2, thick - 4, len - 4, false);
+    }
     g.setColor(UIManager.getColor("ScrollBar.thumbShadow"));
-    g.drawRect(0, 0, w - 1, h - 1);
+    px(g, horizontal, 0, 0, len - 2, 0);
+    px(g, horizontal, 0, last, len - 2, last);
+    px(g, horizontal, 0, 1, 0, last - 1);
+    px(g, horizontal, len - 2, 1, len - 2, last - 1);
+    g.setColor(MetalLookAndFeel.getControlShadow());
+    px(g, horizontal, 1, 1, len - 3, 1);
+    px(g, horizontal, 1, 2, 1, last - 1);
+    px(g, horizontal, len - 1, 1, len - 1, last);
+    int mid = len / 2;
+    g.setColor(UIManager.getColor("ScrollBar.thumbShadow"));
+    for (int k = -1; k <= 1; k++) {
+      px(g, horizontal, mid + 2 * k - 1, 4, mid + 2 * k - 1, last - 3);
+    }
+    g.setColor(Color.WHITE);
+    for (int k = -1; k <= 1; k++) {
+      px(g, horizontal, mid + 2 * k, 5, mid + 2 * k, last - 2);
+    }
     g.translate(-thumbBounds.x, -thumbBounds.y);
   }
 

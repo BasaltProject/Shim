@@ -18,6 +18,7 @@ public class ColorUIResource extends java.awt.Color implements javax.swing.plaf.
   public ColorUIResource(int p0) {
     super(p0);
   }
+  @java.beans.ConstructorProperties({"red", "green", "blue"})
   public ColorUIResource(int p0, int p1, int p2) {
     super(p0, p1, p2);
   }

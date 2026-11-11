@@ -8,6 +8,7 @@
 
 package java.applet;
 
+@Deprecated(since = "9", forRemoval = true)
 public interface AppletContext {
   void showStatus(java.lang.String p0);
   java.awt.Image getImage(java.net.URL p0);

@@ -126,10 +126,7 @@ public class AudioSystem {
     if (sourceFormat.matches(targetFormat)) {
       return true;
     }
-    if (!isConversionSupported(targetFormat.getEncoding(), sourceFormat)) {
-      return false;
-    }
-    return targetFormat.getChannels() == sourceFormat.getChannels();
+    return isConversionSupported(targetFormat.getEncoding(), sourceFormat);
   }
 
   public static AudioInputStream getAudioInputStream(Encoding targetEncoding, AudioInputStream sourceStream) {
@@ -162,6 +159,19 @@ public class AudioSystem {
       for (int i = 0; i < n; i++) {
         samples[i] = decode(data, i, src);
       }
+      int targetChannels = targetFormat.getChannels();
+      if (targetChannels != channels) {
+        samples = mixChannels(samples, frames, channels, targetChannels);
+        channels = targetChannels;
+      }
+      float srcRate = src.getSampleRate();
+      float dstRate = targetFormat.getSampleRate();
+      if (dstRate > 0 && srcRate > 0 && dstRate != srcRate) {
+        int outFrames = (int) (frames * (double) dstRate / srcRate) + 1;
+        samples = resample(samples, frames, outFrames, channels, srcRate / (double) dstRate);
+        frames = outFrames;
+      }
+      n = frames * channels;
       byte[] out = new byte[n * (targetFormat.getSampleSizeInBits() / 8)];
       for (int i = 0; i < n; i++) {
         encode(out, i, samples[i], targetFormat);
@@ -170,6 +180,45 @@ public class AudioSystem {
     } catch (IOException e) {
       throw new IllegalArgumentException(e.toString());
     }
+  }
+
+  private static double[] mixChannels(double[] in, int frames, int from, int to) {
+    double[] out = new double[frames * to];
+    for (int f = 0; f < frames; f++) {
+      for (int c = 0; c < to; c++) {
+        double v;
+        if (to == 1) {
+          double sum = 0;
+          for (int k = 0; k < from; k++) {
+            sum += in[f * from + k];
+          }
+          v = sum / from;
+        } else if (from == 1) {
+          v = in[f];
+        } else {
+          v = c < from ? in[f * from + c] : 0;
+        }
+        out[f * to + c] = v;
+      }
+    }
+    return out;
+  }
+
+  private static double[] resample(double[] in, int frames, int outFrames, int channels, double step) {
+    double[] out = new double[outFrames * channels];
+    for (int f = 0; f < outFrames; f++) {
+      double pos = f * step;
+      int i0 = (int) pos;
+      double frac = pos - i0;
+      int i1 = Math.min(i0 + 1, frames - 1);
+      i0 = Math.min(i0, frames - 1);
+      for (int c = 0; c < channels; c++) {
+        double a = in[i0 * channels + c];
+        double b = in[i1 * channels + c];
+        out[f * channels + c] = a + (b - a) * frac;
+      }
+    }
+    return out;
   }
 
   private static double decode(byte[] d, int i, AudioFormat f) {

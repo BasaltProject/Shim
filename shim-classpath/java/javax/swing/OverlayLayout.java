@@ -24,6 +24,7 @@ public class OverlayLayout implements LayoutManager2, Serializable {
   private transient SizeRequirements[] yChildren;
   private transient boolean valid;
 
+  @java.beans.ConstructorProperties({"target"})
   public OverlayLayout(Container target) { this.target = target; }
 
   public final Container getTarget() { return target; }

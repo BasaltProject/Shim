@@ -32,6 +32,7 @@ public class BoxLayout implements LayoutManager2, Serializable {
   private transient SizeRequirements[] yChildren;
   private transient boolean valid;
 
+  @java.beans.ConstructorProperties({"target", "axis"})
   public BoxLayout(Container target, int axis) {
     if (axis != X_AXIS && axis != Y_AXIS && axis != LINE_AXIS && axis != PAGE_AXIS) {
       throw new AWTError("Invalid axis");

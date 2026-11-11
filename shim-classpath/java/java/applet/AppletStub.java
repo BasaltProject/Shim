@@ -8,6 +8,7 @@
 
 package java.applet;
 
+@Deprecated(since = "9", forRemoval = true)
 public interface AppletStub {
   boolean isActive();
   java.lang.String getParameter(java.lang.String p0);

@@ -31,70 +31,65 @@ public class MetalScrollButton extends BasicArrowButton {
     isFreeStanding = freeStanding;
   }
 
+  private void px(Graphics g, boolean horizontal, int l1, int t1, int l2, int t2) {
+    if (horizontal) {
+      g.fillRect(l1, t1, l2 - l1 + 1, t2 - t1 + 1);
+    } else {
+      g.fillRect(t1, l1, t2 - t1 + 1, l2 - l1 + 1);
+    }
+  }
+
   public void paint(Graphics g) {
-    boolean leftToRight = getComponentOrientation().isLeftToRight();
     boolean isEnabled = getParent().isEnabled();
     Color arrowColor = isEnabled ? MetalLookAndFeel.getControlInfo() : MetalLookAndFeel.getControlDisabled();
     boolean isPressed = getModel().isPressed();
-    int width = getWidth();
-    int height = getHeight();
-    int w = width;
-    int h = height;
-    int arrowHeight = (height + 1) / 4;
-    int arrowWidth = (height + 1) / 2;
-    if (isPressed) {
-      g.setColor(MetalLookAndFeel.getControlShadow());
-    } else {
-      g.setColor(getBackground());
-    }
-    g.fillRect(0, 0, width, height);
-    g.setColor(shadowColor);
+    boolean horizontal = direction == WEST || direction == EAST;
     boolean leading = direction == NORTH || direction == WEST;
-    if (direction == NORTH || direction == SOUTH) {
-      g.drawLine(0, leading ? 0 : 0, w - 1, 0);
-      g.drawLine(0, 0, 0, h - 1);
-      g.drawLine(w - 1, 0, w - 1, h - 1);
-      if (!leading) {
-        g.drawLine(0, h - 1, w - 1, h - 1);
-      }
+    int len = horizontal ? getWidth() : getHeight();
+    int thick = horizontal ? getHeight() : getWidth();
+    g.setColor(isPressed ? MetalLookAndFeel.getControlShadow() : getBackground());
+    g.fillRect(0, 0, getWidth(), getHeight());
+    g.setColor(shadowColor);
+    int last = thick - 2;
+    if (leading) {
+      px(g, horizontal, 0, 0, len - 1, 0);
+      px(g, horizontal, 0, 0, 0, last);
+      px(g, horizontal, 2, last, len - 1, last);
     } else {
-      g.drawLine(0, 0, 0, h - 1);
-      g.drawLine(0, 0, w - 1, 0);
-      g.drawLine(0, h - 1, w - 1, h - 1);
-      if (!leading) {
-        g.drawLine(w - 1, 0, w - 1, h - 1);
-      }
+      px(g, horizontal, 0, 0, len - 2, 0);
+      px(g, horizontal, len - 2, 2, len - 2, last);
+      px(g, horizontal, 0, last, len - 2, last);
     }
     if (!isPressed) {
       g.setColor(highlightColor);
-      g.drawLine(1, 1, w - 2, 1);
-      g.drawLine(1, 1, 1, h - 2);
+      if (leading) {
+        px(g, horizontal, 1, 1, len - 1, 1);
+        px(g, horizontal, 1, 1, 1, last - 1);
+        px(g, horizontal, 1, last + 1, len - 1, last + 1);
+      } else {
+        px(g, horizontal, 0, 1, len - 3, 1);
+        px(g, horizontal, 0, 1, 0, last - 1);
+        px(g, horizontal, len - 1, 1, len - 1, last + 1);
+        px(g, horizontal, 0, last + 1, len - 1, last + 1);
+      }
     }
     g.setColor(arrowColor);
-    int cx = w / 2;
-    int cy = h / 2;
-    int half = Math.max(2, w / 4);
-    switch (direction) {
-      case NORTH:
-        for (int i = 0; i <= half; i++) {
-          g.drawLine(cx - i, cy - 1 + i, cx + i, cy - 1 + i);
-        }
-        break;
-      case SOUTH:
-        for (int i = 0; i <= half; i++) {
-          g.drawLine(cx - i, cy + 1 - i, cx + i, cy + 1 - i);
-        }
-        break;
-      case WEST:
-        for (int i = 0; i <= half; i++) {
-          g.drawLine(cx - 1 + i, cy - i, cx - 1 + i, cy + i);
-        }
-        break;
-      case EAST:
-      default:
-        for (int i = 0; i <= half; i++) {
-          g.drawLine(cx + 1 - i, cy - i, cx + 1 - i, cy + i);
-        }
+    int size = (thick + 1) / 4;
+    if (horizontal) {
+      int tip = leading ? (len - size + 1) / 2 : (len - 1 - size) / 2 + size - 1;
+      int top = (thick - 2 * size + 2) / 2;
+      for (int k = 0; k < size; k++) {
+        int l = leading ? tip + k : tip - k;
+        px(g, true, l, top + size - 1 - k, l, top + size + k);
+      }
+    } else {
+      int tip = leading ? (len - size + 1) / 2 : len / 2;
+      int center = thick / 2;
+      for (int k = 0; k < size; k++) {
+        int l = leading ? tip + k : tip - k;
+        int half = leading ? k : k + 1;
+        px(g, false, l, center - half, l, center + half);
+      }
     }
   }
 

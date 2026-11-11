@@ -9,6 +9,7 @@
 package javax.swing.plaf.metal;
 
 import java.awt.Container;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Insets;
@@ -67,6 +68,18 @@ public class MetalComboBoxUI extends javax.swing.plaf.basic.BasicComboBoxUI {
     manager.superLayout(parent);
   }
   public void paint(Graphics g, JComponent c) {
+    if (comboBox.isEditable() || !comboBox.isEnabled() || arrowButton == null) {
+      return;
+    }
+    int w = c.getWidth();
+    int h = c.getHeight();
+    int edge = arrowButton.getX();
+    Color old = g.getColor();
+    g.setColor(MetalLookAndFeel.getControlDarkShadow());
+    g.drawRect(0, 0, w - 1, h - 1);
+    g.setColor(MetalLookAndFeel.getControlShadow());
+    g.drawRect(1, 1, edge - 2, h - 3);
+    g.setColor(old);
   }
   public Dimension getMinimumSize(JComponent c) {
     if (!isMinimumSizeDirty) {

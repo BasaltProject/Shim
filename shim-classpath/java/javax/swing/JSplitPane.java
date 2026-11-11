@@ -50,6 +50,7 @@ public class JSplitPane extends JComponent implements Accessible {
         new JButton(UIManager.getString("SplitPane.rightButtonText")));
   }
 
+  @java.beans.ConstructorProperties({"orientation"})
   public JSplitPane(int newOrientation) { this(newOrientation, false); }
 
   public JSplitPane(int newOrientation, boolean newContinuousLayout) {

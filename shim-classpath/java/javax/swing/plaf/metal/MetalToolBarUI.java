@@ -91,8 +91,10 @@ public class MetalToolBarUI extends BasicToolBarUI {
 
   public void update(Graphics g, JComponent c) {
     if (c.isOpaque()) {
-      g.setColor(c.getBackground());
-      g.fillRect(0, 0, c.getWidth(), c.getHeight());
+      if (!shim.swing.MetalPaint.drawGradient(c, g, "MenuBar.gradient", 0, 0, c.getWidth(), c.getHeight(), true)) {
+        g.setColor(c.getBackground());
+        g.fillRect(0, 0, c.getWidth(), c.getHeight());
+      }
     }
     paint(g, c);
   }

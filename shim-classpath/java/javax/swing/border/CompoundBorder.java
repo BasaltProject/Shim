@@ -17,6 +17,7 @@ public class CompoundBorder extends AbstractBorder {
 
   public CompoundBorder() { }
 
+  @java.beans.ConstructorProperties({"outsideBorder", "insideBorder"})
   public CompoundBorder(Border outsideBorder, Border insideBorder) {
     this.outsideBorder = outsideBorder;
     this.insideBorder = insideBorder;

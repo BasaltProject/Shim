@@ -24,6 +24,7 @@ public class JButton extends javax.swing.AbstractButton implements javax.accessi
     this(null, null);
     setAction(p0);
   }
+  @java.beans.ConstructorProperties({"text"})
   public JButton(java.lang.String p0) {
     this(p0, null);
   }

@@ -34,7 +34,68 @@ public class MetalSliderUI extends javax.swing.plaf.basic.BasicSliderUI {
   public void paintFocus(Graphics g) {
   }
   public void paintTrack(Graphics g) {
-    Color trackColor = !slider.isEnabled() ? UIManager.getColor("Slider.shadow") : slider.getForeground();
+    if (!slider.isEnabled()) {
+      paintDisabledTrack(g);
+      return;
+    }
+    boolean horizontal = slider.getOrientation() == JSlider.HORIZONTAL;
+    boolean leftToRight = slider.getComponentOrientation().isLeftToRight();
+    g.translate(trackRect.x, trackRect.y);
+    int len = horizontal ? trackRect.width : trackRect.height;
+    int cross = horizontal ? trackRect.height : trackRect.width;
+    int first = (cross - (getTrackWidth() - 1)) / 2;
+    int last = first + getTrackWidth() - 2;
+    int fillEnd;
+    if (horizontal) {
+      fillEnd = thumbRect.x + thumbRect.width / 2 - trackRect.x;
+    } else {
+      fillEnd = thumbRect.y + thumbRect.height / 2 - trackRect.y;
+    }
+    Color primary = MetalLookAndFeel.getPrimaryControlDarkShadow();
+    Color dark = MetalLookAndFeel.getControlDarkShadow();
+    Color fg = slider.getForeground();
+    Color[] fillRows = {UIManager.getColor("Slider.highlight"), UIManager.getColor("Slider.altTrackColor"),
+        UIManager.getColor("Slider.shadow"), fg};
+    boolean fillAtStart = horizontal && leftToRight;
+    int fillFrom = fillAtStart ? 0 : fillEnd;
+    int fillTo = fillAtStart ? fillEnd : len - 2;
+    int emptyFrom = fillAtStart ? fillEnd + 1 : 0;
+    int emptyTo = fillAtStart ? len - 2 : fillEnd - 1;
+    for (int k = 0; k < 4; k++) {
+      g.setColor(fillRows[k]);
+      line(g, horizontal, fillFrom + 1, first + 1 + k, fillTo, first + 1 + k);
+    }
+    g.setColor(primary);
+    line(g, horizontal, fillFrom, first, fillTo, first);
+    line(g, horizontal, fillFrom, last, fillTo, last);
+    int fillCap = fillAtStart ? fillFrom : fillTo;
+    line(g, horizontal, fillCap, first, fillCap, last);
+    if (!horizontal) {
+      g.setColor(fg);
+      line(g, horizontal, emptyFrom, first + 1, emptyTo, first + 1);
+    }
+    g.setColor(dark);
+    line(g, horizontal, emptyFrom, first, emptyTo, first);
+    line(g, horizontal, emptyFrom, last, emptyTo, last);
+    int emptyCap = fillAtStart ? emptyTo : emptyFrom;
+    line(g, horizontal, emptyCap, first, emptyCap, last);
+    if (horizontal) {
+      g.setColor(fg);
+      line(g, horizontal, emptyFrom, first + 1, emptyTo, first + 1);
+    }
+    g.translate(-trackRect.x, -trackRect.y);
+  }
+
+  private static void line(Graphics g, boolean horizontal, int l1, int t1, int l2, int t2) {
+    if (horizontal) {
+      g.fillRect(l1, t1, l2 - l1 + 1, t2 - t1 + 1);
+    } else {
+      g.fillRect(t1, l1, t2 - t1 + 1, l2 - l1 + 1);
+    }
+  }
+
+  private void paintDisabledTrack(Graphics g) {
+    Color trackColor = UIManager.getColor("Slider.shadow");
     boolean leftToRight = slider.getComponentOrientation().isLeftToRight();
     g.translate(trackRect.x, trackRect.y);
     int trackLeft = 0;

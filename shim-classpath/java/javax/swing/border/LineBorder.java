@@ -37,6 +37,7 @@ public class LineBorder extends AbstractBorder {
 
   public LineBorder(Color color, int thickness) { this(color, thickness, false); }
 
+  @java.beans.ConstructorProperties({"lineColor", "thickness", "roundedCorners"})
   public LineBorder(Color color, int thickness, boolean roundedCorners) {
     lineColor = color;
     this.thickness = thickness;

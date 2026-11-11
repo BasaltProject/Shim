@@ -1682,14 +1682,79 @@ public class JTable extends JComponent implements TableModelListener, Scrollable
     return accessibleContext;
   }
 
-  protected class AccessibleJTable extends AccessibleJComponent {
+  protected class AccessibleJTable extends AccessibleJComponent implements javax.accessibility.AccessibleTable {
+    private Accessible caption;
+    private Accessible summary;
+    private javax.accessibility.AccessibleTable rowHeader;
+    private javax.accessibility.AccessibleTable columnHeader;
+    private final java.util.HashMap<Integer, Accessible> rowDescriptions = new java.util.HashMap<>();
+    private final java.util.HashMap<Integer, Accessible> columnDescriptions = new java.util.HashMap<>();
+
     protected AccessibleJTable() { }
 
     public AccessibleRole getAccessibleRole() { return AccessibleRole.TABLE; }
 
+    public javax.accessibility.AccessibleTable getAccessibleTable() { return this; }
+
     public int getAccessibleChildrenCount() { return JTable.this.getRowCount() * JTable.this.getColumnCount(); }
 
-    public Accessible getAccessibleChild(int i) { return null; }
+    public Accessible getAccessibleChild(int i) {
+      int cols = JTable.this.getColumnCount();
+      if (i < 0 || cols == 0 || i >= getAccessibleChildrenCount()) {
+        return null;
+      }
+      return getAccessibleAt(i / cols, i % cols);
+    }
+
+    public Accessible getAccessibleCaption() { return caption; }
+
+    public void setAccessibleCaption(Accessible a) { caption = a; }
+
+    public Accessible getAccessibleSummary() { return summary; }
+
+    public void setAccessibleSummary(Accessible a) { summary = a; }
+
+    public int getAccessibleRowCount() { return JTable.this.getRowCount(); }
+
+    public int getAccessibleColumnCount() { return JTable.this.getColumnCount(); }
+
+    public int getAccessibleRowExtentAt(int r, int c) { return 1; }
+
+    public int getAccessibleColumnExtentAt(int r, int c) { return 1; }
+
+    public javax.accessibility.AccessibleTable getAccessibleRowHeader() { return rowHeader; }
+
+    public void setAccessibleRowHeader(javax.accessibility.AccessibleTable t) { rowHeader = t; }
+
+    public javax.accessibility.AccessibleTable getAccessibleColumnHeader() { return columnHeader; }
+
+    public void setAccessibleColumnHeader(javax.accessibility.AccessibleTable t) { columnHeader = t; }
+
+    public Accessible getAccessibleRowDescription(int r) { return rowDescriptions.get(r); }
+
+    public void setAccessibleRowDescription(int r, Accessible a) { rowDescriptions.put(r, a); }
+
+    public Accessible getAccessibleColumnDescription(int c) { return columnDescriptions.get(c); }
+
+    public void setAccessibleColumnDescription(int c, Accessible a) { columnDescriptions.put(c, a); }
+
+    public boolean isAccessibleSelected(int r, int c) { return JTable.this.isCellSelected(r, c); }
+
+    public boolean isAccessibleRowSelected(int r) { return JTable.this.isRowSelected(r); }
+
+    public boolean isAccessibleColumnSelected(int c) { return JTable.this.isColumnSelected(c); }
+
+    public int[] getSelectedAccessibleRows() { return JTable.this.getSelectedRows(); }
+
+    public int[] getSelectedAccessibleColumns() { return JTable.this.getSelectedColumns(); }
+
+    public Accessible getAccessibleAt(int r, int c) {
+      if (r < 0 || c < 0 || r >= JTable.this.getRowCount() || c >= JTable.this.getColumnCount()) {
+        return null;
+      }
+      java.awt.Component comp = JTable.this.prepareRenderer(JTable.this.getCellRenderer(r, c), r, c);
+      return comp instanceof Accessible ? (Accessible) comp : null;
+    }
   }
 
   public static final class DropLocation extends TransferHandler.DropLocation {

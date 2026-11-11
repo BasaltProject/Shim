@@ -30,17 +30,26 @@ public class Statement {
     StringBuilder sb = new StringBuilder();
     String unrecognized = "<unrecognized>";
     Object t = getTarget();
-    String n = t == null ? "null" : t.getClass().getSimpleName();
+    String n = instanceName(t);
     sb.append(n).append(".").append(getMethodName()).append("(");
     Object[] args = getArguments();
     for (int i = 0; i < args.length; i++) {
       if (i > 0) {
         sb.append(", ");
       }
-      sb.append(args[i] == null ? "null" : args[i] instanceof String ? "\"" + args[i] + "\"" : args[i].getClass().getSimpleName());
+      sb.append(instanceName(args[i]));
     }
-    sb.append(")");
+    sb.append(");");
     return sb.toString();
+  }
+  static String instanceName(Object o) {
+    if (o == null) {
+      return "null";
+    }
+    if (o.getClass() == String.class) {
+      return "\"" + o + "\"";
+    }
+    return o.getClass().getSimpleName();
   }
   public void execute() throws java.lang.Exception {
     invoke();

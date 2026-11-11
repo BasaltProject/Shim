@@ -24,7 +24,7 @@ public class Expression extends java.beans.Statement {
     this.valueSet = true;
   }
   public java.lang.String toString() {
-    return (valueSet ? (value == null ? "null" : value.getClass().getSimpleName()) : "<unbound>") + "=" + super.toString();
+    return (valueSet ? instanceName(value) : "<unbound>") + "=" + super.toString();
   }
   public java.lang.Object getValue() throws java.lang.Exception {
     if (!valueSet) {

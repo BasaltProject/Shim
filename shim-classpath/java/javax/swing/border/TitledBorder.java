@@ -50,6 +50,7 @@ public class TitledBorder extends AbstractBorder {
     this(border, title, titleJustification, titlePosition, titleFont, null);
   }
 
+  @java.beans.ConstructorProperties({"border", "title", "titleJustification", "titlePosition", "titleFont", "titleColor"})
   public TitledBorder(Border border, String title, int titleJustification, int titlePosition, Font titleFont,
       Color titleColor) {
     this.title = title;
@@ -73,59 +74,108 @@ public class TitledBorder extends AbstractBorder {
   public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
     Border b = getBorder();
     String t = getTitle();
-    if (t == null || t.isEmpty()) {
+    if (t == null || t.isEmpty() || c == null) {
       if (b != null) {
         b.paintBorder(c, g, x, y, width, height);
       }
       return;
     }
-    int th = textHeight(c);
-    int tw = textWidth(c);
-    int pos = titlePosition == DEFAULT_POSITION ? TOP : titlePosition;
-    int by = y;
-    int bh = height;
-    int ty;
-    if (pos == ABOVE_TOP) {
-      by += th;
-      bh -= th;
-      ty = y;
-    } else if (pos == TOP) {
-      by += th / 2;
-      bh -= th / 2;
-      ty = y;
-    } else if (pos == BELOW_TOP) {
-      ty = y + EDGE_SPACING;
-    } else if (pos == ABOVE_BOTTOM) {
-      ty = y + height - th - EDGE_SPACING;
-    } else if (pos == BOTTOM) {
-      bh -= th / 2;
-      ty = y + height - th;
-    } else {
-      bh -= th;
-      ty = y + height - th;
-    }
+    int edge = b instanceof TitledBorder ? 0 : EDGE_SPACING;
+    Font f = getFont(c);
+    FontMetrics fm = c.getFontMetrics(f);
+    int labelH = fm.getHeight();
+    int labelW = fm.stringWidth(t);
+    Insets own = new Insets(0, 0, 0, 0);
     if (b != null) {
-      b.paintBorder(c, g, x, by, width, bh);
+      if (b instanceof AbstractBorder) {
+        ((AbstractBorder) b).getBorderInsets(c, own);
+      } else {
+        Insets i = b.getBorderInsets(c);
+        own.set(i.top, i.left, i.bottom, i.right);
+      }
+    }
+    int borderX = x + edge;
+    int borderY = y + edge;
+    int borderW = width - edge - edge;
+    int borderH = height - edge - edge;
+    int labelY = y;
+    int pos = titlePosition == DEFAULT_POSITION ? TOP : titlePosition;
+    if (pos == ABOVE_TOP) {
+      own.left = 0;
+      own.right = 0;
+      borderY += labelH - edge;
+      borderH -= labelH - edge;
+    } else if (pos == TOP) {
+      own.top = edge + own.top / 2 - labelH / 2;
+      if (own.top < edge) {
+        borderY -= own.top;
+        borderH += own.top;
+      } else {
+        labelY += own.top;
+      }
+    } else if (pos == BELOW_TOP) {
+      labelY += own.top + edge;
+    } else if (pos == ABOVE_BOTTOM) {
+      labelY += height - labelH - own.bottom - edge;
+    } else if (pos == BOTTOM) {
+      labelY += height - labelH;
+      own.bottom = edge + (own.bottom - labelH) / 2;
+      if (own.bottom < edge) {
+        borderH += own.bottom;
+      } else {
+        labelY -= own.bottom;
+      }
+    } else {
+      own.left = 0;
+      own.right = 0;
+      labelY += height - labelH;
+      borderH -= labelH - edge;
+    }
+    own.left += edge + TEXT_INSET_H;
+    own.right += edge + TEXT_INSET_H;
+    int available = width - own.left - own.right;
+    if (available < labelW) {
+      labelW = available;
     }
     int j = titleJustification;
-    boolean ltr = c == null || c.getComponentOrientation().isLeftToRight();
+    boolean ltr = c.getComponentOrientation().isLeftToRight();
     if (j == LEADING || j == DEFAULT_JUSTIFICATION) {
       j = ltr ? LEFT : RIGHT;
     } else if (j == TRAILING) {
       j = ltr ? RIGHT : LEFT;
     }
-    int tx = j == CENTER ? x + (width - tw) / 2 : j == RIGHT ? x + width - tw - TEXT_INSET_H : x + TEXT_INSET_H;
-    Font f = getFont(c);
+    int labelX = x;
+    if (j == LEFT) {
+      labelX += own.left;
+    } else if (j == RIGHT) {
+      labelX += width - own.right - labelW;
+    } else {
+      labelX += (width - labelW) / 2;
+    }
+    if (b != null) {
+      if (pos != TOP && pos != BOTTOM) {
+        b.paintBorder(c, g, borderX, borderY, borderW, borderH);
+      } else {
+        Graphics g2 = g.create();
+        java.awt.geom.Path2D path = new java.awt.geom.Path2D.Float();
+        path.append(new Rectangle(borderX, borderY, borderW, labelY - borderY), false);
+        path.append(new Rectangle(borderX, labelY, labelX - borderX - TEXT_SPACING, labelH), false);
+        path.append(new Rectangle(labelX + labelW + TEXT_SPACING, labelY,
+            borderX - labelX + borderW - labelW - TEXT_SPACING, labelH), false);
+        path.append(new Rectangle(borderX, labelY + labelH, borderW, borderY - labelY + borderH - labelH), false);
+        ((Graphics2D) g2).clip(path);
+        b.paintBorder(c, g2, borderX, borderY, borderW, borderH);
+        g2.dispose();
+      }
+    }
     Color old = g.getColor();
     Font oldFont = g.getFont();
-    if (c != null) {
-      FontMetrics fm = c.getFontMetrics(f);
-      g.setColor(c.getBackground());
-      g.fillRect(tx - TEXT_SPACING, ty, tw + 2 * TEXT_SPACING, th);
-      g.setColor(getTitleColor());
-      g.setFont(f);
-      g.drawString(t, tx, ty + fm.getAscent());
-    }
+    Shape oldClip = g.getClip();
+    g.clipRect(labelX, labelY, labelW, labelH);
+    g.setColor(getTitleColor());
+    g.setFont(f);
+    g.drawString(t, labelX, labelY + fm.getAscent());
+    g.setClip(oldClip);
     g.setFont(oldFont);
     g.setColor(old);
   }
