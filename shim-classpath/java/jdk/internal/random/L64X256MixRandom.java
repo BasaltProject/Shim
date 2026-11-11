@@ -112,4 +112,21 @@ public final class L64X256MixRandom implements RandomGenerator.SplittableGenerat
     Objects.requireNonNull(source, "source");
     return new L64X256MixRandom(source.nextLong(), source.nextLong(), source.nextLong(), source.nextLong(), source.nextLong(), source.nextLong());
   }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(long streamSize) {
+    return jdk.internal.random.SplitStreams.splits(this, streamSize);
+  }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(
+      java.util.random.RandomGenerator.SplittableGenerator source) {
+    return jdk.internal.random.SplitStreams.splits(this, source);
+  }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(long streamSize,
+      java.util.random.RandomGenerator.SplittableGenerator source) {
+    return jdk.internal.random.SplitStreams.splits(this, streamSize, source);
+  }
 }

@@ -65,6 +65,26 @@ set(_quoted_sources ${_classpath_sources})
 list(TRANSFORM _quoted_sources REPLACE "^(.+)$" "\"\\1\"")
 list(JOIN _quoted_sources "\n" _classpath_args)
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/classpath-sources.args" CONTENT "${_classpath_args}\n")
+
+# Classes that need a newer language level than the bootstrap ones: java-modern patches java.base,
+# java-modern-ext holds the real records. Both compile for Java 25 after the bootstrap classes.
+set(_modern_dir "${CMAKE_SOURCE_DIR}/shim-classpath/java-modern")
+set(_modern_ext_dir "${CMAKE_SOURCE_DIR}/shim-classpath/java-modern-ext")
+file(GLOB_RECURSE _modern_sources CONFIGURE_DEPENDS "${_modern_dir}/*.java")
+file(GLOB_RECURSE _modern_ext_sources CONFIGURE_DEPENDS "${_modern_ext_dir}/*.java")
+set(_modern_commands "")
+if(_modern_sources)
+    list(APPEND _modern_commands
+        COMMAND "${SHIM_JAVAC}" -encoding UTF-8 -source 25 -target 25 -Xlint:-options
+                --patch-module java.base=${_modern_dir}
+                -d "${SHIM_CLASSES_DIR}" ${_modern_sources})
+endif()
+if(_modern_ext_sources)
+    list(APPEND _modern_commands
+        COMMAND "${SHIM_JAVAC}" -encoding UTF-8 -source 25 -target 25 -Xlint:-options
+                --limit-modules java.base,jdk.jdi
+                -cp "${SHIM_CLASSES_DIR}" -d "${SHIM_CLASSES_DIR}" ${_modern_ext_sources})
+endif()
 add_custom_command(
     OUTPUT "${SHIM_CLASSPATH_STAMP}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${SHIM_CLASSES_DIR}"
@@ -72,8 +92,9 @@ add_custom_command(
     COMMAND "${SHIM_JAVAC}" -encoding UTF-8 -source 8 -target 8 -Xlint:-options
             -d "${SHIM_CLASSES_DIR}" -bootclasspath "${SHIM_CLASSES_DIR}"
             "@${CMAKE_BINARY_DIR}/classpath-sources.args"
+    ${_modern_commands}
     COMMAND ${CMAKE_COMMAND} -E touch "${SHIM_CLASSPATH_STAMP}"
-    DEPENDS ${_classpath_sources} "${CMAKE_BINARY_DIR}/classpath-sources.args"
+    DEPENDS ${_classpath_sources} ${_modern_sources} ${_modern_ext_sources} "${CMAKE_BINARY_DIR}/classpath-sources.args"
     COMMENT "Compiling the class library"
     VERBATIM)
 

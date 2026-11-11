@@ -208,4 +208,154 @@ public class DirectByteBuffer extends MappedByteBuffer {
     discardMark();
     return this;
   }
+
+  @Override
+  public char getChar() {
+    return getChar0();
+  }
+
+  @Override
+  public char getChar(int index) {
+    return getChar0(index);
+  }
+
+  @Override
+  public ByteBuffer putChar(char value) {
+    return putChar0(value);
+  }
+
+  @Override
+  public ByteBuffer putChar(int index, char value) {
+    return putChar0(index, value);
+  }
+
+  @Override
+  public short getShort() {
+    return getShort0();
+  }
+
+  @Override
+  public short getShort(int index) {
+    return getShort0(index);
+  }
+
+  @Override
+  public ByteBuffer putShort(short value) {
+    return putShort0(value);
+  }
+
+  @Override
+  public ByteBuffer putShort(int index, short value) {
+    return putShort0(index, value);
+  }
+
+  @Override
+  public int getInt() {
+    return getInt0();
+  }
+
+  @Override
+  public int getInt(int index) {
+    return getInt0(index);
+  }
+
+  @Override
+  public ByteBuffer putInt(int value) {
+    return putInt0(value);
+  }
+
+  @Override
+  public ByteBuffer putInt(int index, int value) {
+    return putInt0(index, value);
+  }
+
+  @Override
+  public long getLong() {
+    return getLong0();
+  }
+
+  @Override
+  public long getLong(int index) {
+    return getLong0(index);
+  }
+
+  @Override
+  public ByteBuffer putLong(long value) {
+    return putLong0(value);
+  }
+
+  @Override
+  public ByteBuffer putLong(int index, long value) {
+    return putLong0(index, value);
+  }
+
+  @Override
+  public float getFloat() {
+    return getFloat0();
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return getFloat0(index);
+  }
+
+  @Override
+  public ByteBuffer putFloat(float value) {
+    return putFloat0(value);
+  }
+
+  @Override
+  public ByteBuffer putFloat(int index, float value) {
+    return putFloat0(index, value);
+  }
+
+  @Override
+  public double getDouble() {
+    return getDouble0();
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return getDouble0(index);
+  }
+
+  @Override
+  public ByteBuffer putDouble(double value) {
+    return putDouble0(value);
+  }
+
+  @Override
+  public ByteBuffer putDouble(int index, double value) {
+    return putDouble0(index, value);
+  }
+
+  @Override
+  public CharBuffer asCharBuffer() {
+    return asCharBuffer0();
+  }
+
+  @Override
+  public ShortBuffer asShortBuffer() {
+    return asShortBuffer0();
+  }
+
+  @Override
+  public IntBuffer asIntBuffer() {
+    return asIntBuffer0();
+  }
+
+  @Override
+  public LongBuffer asLongBuffer() {
+    return asLongBuffer0();
+  }
+
+  @Override
+  public FloatBuffer asFloatBuffer() {
+    return asFloatBuffer0();
+  }
+
+  @Override
+  public DoubleBuffer asDoubleBuffer() {
+    return asDoubleBuffer0();
+  }
 }

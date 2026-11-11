@@ -418,6 +418,11 @@ public abstract class CharBuffer extends Buffer implements Comparable<CharBuffer
   public abstract CharBuffer subSequence(int start, int end);
 
   @Override
+  public java.util.stream.IntStream chars() {
+    return CharSequence.super.chars();
+  }
+
+  @Override
   public CharBuffer append(CharSequence csq) {
     if (csq == null) {
       return put("null");

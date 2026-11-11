@@ -393,6 +393,11 @@ public final class Method extends Executable {
   }
 
   @Override
+  public int getParameterCount() {
+    return getParameterTypes().length;
+  }
+
+  @Override
   public TypeVariable<?>[] getTypeParameters() {
     if (vmMethod.addendum != null && vmMethod.addendum.signature != null) {
       String sig = Classes.toString((byte[]) vmMethod.addendum.signature);

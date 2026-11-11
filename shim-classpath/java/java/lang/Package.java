@@ -26,7 +26,7 @@ package java.lang;
 
 import java.net.URL;
 
-public final class Package implements java.lang.reflect.AnnotatedElement {
+public final class Package extends NamedPackage implements java.lang.reflect.AnnotatedElement {
   private final String name;
   private final String implementationTitle;
   private final String implementationVendor;
@@ -47,6 +47,7 @@ public final class Package implements java.lang.reflect.AnnotatedElement {
           URL sealed,
           ClassLoader loader)
   {
+    super(name);
     this.name                  = name;
     this.implementationTitle   = implementationTitle;
     this.implementationVendor  = implementationVendor;
@@ -112,6 +113,26 @@ public final class Package implements java.lang.reflect.AnnotatedElement {
       }
     }
     return null;
+  }
+
+  @Override
+  public boolean isAnnotationPresent(Class<? extends java.lang.annotation.Annotation> annotationClass) {
+    return java.lang.reflect.AnnotatedElement.super.isAnnotationPresent(annotationClass);
+  }
+
+  @Override
+  public <A extends java.lang.annotation.Annotation> A[] getAnnotationsByType(Class<A> annotationClass) {
+    return java.lang.reflect.AnnotatedElement.super.getAnnotationsByType(annotationClass);
+  }
+
+  @Override
+  public <A extends java.lang.annotation.Annotation> A getDeclaredAnnotation(Class<A> annotationClass) {
+    return java.lang.reflect.AnnotatedElement.super.getDeclaredAnnotation(annotationClass);
+  }
+
+  @Override
+  public <A extends java.lang.annotation.Annotation> A[] getDeclaredAnnotationsByType(Class<A> annotationClass) {
+    return java.lang.reflect.AnnotatedElement.super.getDeclaredAnnotationsByType(annotationClass);
   }
 
   @Override

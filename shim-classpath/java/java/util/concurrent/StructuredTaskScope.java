@@ -45,13 +45,7 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
 
   <U extends T> Subtask<U> fork(Callable<? extends U> task);
 
-  default <U extends T> Subtask<U> fork(Runnable task) {
-    Objects.requireNonNull(task, "task");
-    return fork(() -> {
-      task.run();
-      return null;
-    });
-  }
+  <U extends T> Subtask<U> fork(Runnable task);
 
   R join() throws InterruptedException;
 
@@ -298,6 +292,15 @@ public interface StructuredTaskScope<T, R> extends AutoCloseable {
       if (Thread.currentThread() != owner) {
         throw new IllegalStateException("Current thread is not scope owner");
       }
+    }
+
+    @Override
+    public <U extends T> Subtask<U> fork(Runnable task) {
+      Objects.requireNonNull(task, "task");
+      return fork(() -> {
+        task.run();
+        return null;
+      });
     }
 
     @Override

@@ -11,6 +11,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterator;
@@ -459,5 +460,105 @@ abstract class AbstractMemorySegment implements MemorySegment {
       }
     }
     return srcLen != dstLen ? minLen : -1L;
+  }
+
+  @Override
+  public String getString(long offset) {
+    return getString(offset, StandardCharsets.UTF_8);
+  }
+
+  @Override
+  public void setString(long offset, String str) {
+    setString(offset, str, StandardCharsets.UTF_8);
+  }
+
+  @Override
+  public byte getAtIndex(ValueLayout.OfByte layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public boolean getAtIndex(ValueLayout.OfBoolean layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public char getAtIndex(ValueLayout.OfChar layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfChar layout, long index, char value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public short getAtIndex(ValueLayout.OfShort layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfByte layout, long index, byte value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfBoolean layout, long index, boolean value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfShort layout, long index, short value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public int getAtIndex(ValueLayout.OfInt layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfInt layout, long index, int value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public float getAtIndex(ValueLayout.OfFloat layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfFloat layout, long index, float value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public long getAtIndex(ValueLayout.OfLong layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfLong layout, long index, long value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public double getAtIndex(ValueLayout.OfDouble layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public void setAtIndex(ValueLayout.OfDouble layout, long index, double value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
+  }
+
+  @Override
+  public MemorySegment getAtIndex(AddressLayout layout, long index) {
+    return get(layout, Math.multiplyExact(index, layout.byteSize()));
+  }
+
+  @Override
+  public void setAtIndex(AddressLayout layout, long index, MemorySegment value) {
+    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
   }
 }

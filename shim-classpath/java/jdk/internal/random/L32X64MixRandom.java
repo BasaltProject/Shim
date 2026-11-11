@@ -102,4 +102,21 @@ public final class L32X64MixRandom implements RandomGenerator.SplittableGenerato
     long brine = source.nextLong();
     return new L32X64MixRandom((int) brine << 1, source.nextInt(), source.nextInt(), source.nextInt());
   }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(long streamSize) {
+    return jdk.internal.random.SplitStreams.splits(this, streamSize);
+  }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(
+      java.util.random.RandomGenerator.SplittableGenerator source) {
+    return jdk.internal.random.SplitStreams.splits(this, source);
+  }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(long streamSize,
+      java.util.random.RandomGenerator.SplittableGenerator source) {
+    return jdk.internal.random.SplitStreams.splits(this, streamSize, source);
+  }
 }

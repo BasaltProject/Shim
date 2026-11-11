@@ -125,19 +125,6 @@ public final class PEMEncoder {
   }
 
   static String format(String type, String content) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("-----BEGIN ").append(type).append("-----").append(kLineSeparator);
-    if (content.isEmpty()) {
-      sb.append(kLineSeparator);
-    }
-    for (int i = 0; i < content.length(); i += 64) {
-      String chunk = content.substring(i, Math.min(content.length(), i + 64));
-      sb.append(chunk);
-      if (!chunk.endsWith("\n")) {
-        sb.append(kLineSeparator);
-      }
-    }
-    sb.append("-----END ").append(type).append("-----").append(kLineSeparator);
-    return sb.toString();
+    return sun.security.util.Pem.format(type, content);
   }
 }

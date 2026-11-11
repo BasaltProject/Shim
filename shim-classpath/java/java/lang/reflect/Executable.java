@@ -24,9 +24,7 @@ public abstract class Executable extends AccessibleObject implements Member, Gen
 
   public abstract Class<?>[] getExceptionTypes();
 
-  public int getParameterCount() {
-    return getParameterTypes().length;
-  }
+  public abstract int getParameterCount();
 
   public Parameter[] getParameters() {
     Class<?>[] types = getParameterTypes();
@@ -128,9 +126,7 @@ public abstract class Executable extends AccessibleObject implements Member, Gen
     return AccessFlag.maskToAccessFlags(getModifiers(), AccessFlag.Location.METHOD);
   }
 
-  public TypeVariable<?>[] getTypeParameters() {
-    return new TypeVariable<?>[0];
-  }
+  public abstract TypeVariable<?>[] getTypeParameters();
 
   public Type[] getGenericParameterTypes() {
     return getParameterTypes();
@@ -144,8 +140,27 @@ public abstract class Executable extends AccessibleObject implements Member, Gen
     return null;
   }
 
-  public AnnotatedType getAnnotatedReturnType() {
-    return AnnotatedTypeImpl.create(Void.TYPE);
+  public abstract AnnotatedType getAnnotatedReturnType();
+
+  @Override
+  public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    java.util.Objects.requireNonNull(annotationClass);
+    for (Annotation a : getDeclaredAnnotations()) {
+      if (annotationClass == a.annotationType()) {
+        return annotationClass.cast(a);
+      }
+    }
+    return null;
+  }
+
+  @Override
+  public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+    return super.getAnnotationsByType(annotationClass);
+  }
+
+  @Override
+  public Annotation[] getDeclaredAnnotations() {
+    return super.getDeclaredAnnotations();
   }
 
   public AnnotatedType[] getAnnotatedParameterTypes() {

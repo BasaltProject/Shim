@@ -150,7 +150,7 @@ public final class SplittableRandom implements RandomGenerator, RandomGenerator.
 
   @Override
   public java.util.stream.Stream<RandomGenerator.SplittableGenerator> splits(long streamSize) {
-    return RandomGenerator.SplittableGenerator.super.splits(streamSize);
+    return jdk.internal.random.SplitStreams.splits(this, streamSize);
   }
 
   @Override
@@ -160,11 +160,11 @@ public final class SplittableRandom implements RandomGenerator, RandomGenerator.
 
   @Override
   public java.util.stream.Stream<RandomGenerator.SplittableGenerator> splits(RandomGenerator.SplittableGenerator source) {
-    return RandomGenerator.SplittableGenerator.super.splits(source);
+    return jdk.internal.random.SplitStreams.splits(this, source);
   }
 
   @Override
   public java.util.stream.Stream<RandomGenerator.SplittableGenerator> splits(long streamSize, RandomGenerator.SplittableGenerator source) {
-    return RandomGenerator.SplittableGenerator.super.splits(streamSize, source);
+    return jdk.internal.random.SplitStreams.splits(this, streamSize, source);
   }
 }

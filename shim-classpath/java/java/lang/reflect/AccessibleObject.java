@@ -25,7 +25,7 @@ package java.lang.reflect;
 
 import java.lang.annotation.Annotation;
 
-public abstract class AccessibleObject implements AnnotatedElement {
+public class AccessibleObject implements AnnotatedElement {
   protected static final int Accessible = 1 << 0;
 
   // Access and property flags for Member descendants
@@ -38,9 +38,54 @@ public abstract class AccessibleObject implements AnnotatedElement {
     return getAnnotation(class_) != null;
   }
 
-  public abstract boolean isAccessible();
+  private static java.util.Map<AccessibleObject, Boolean> overrides;
 
-  public abstract void setAccessible(boolean v);
+  protected AccessibleObject() {
+  }
+
+  @Deprecated(since = "9")
+  public boolean isAccessible() {
+    synchronized (AccessibleObject.class) {
+      return overrides != null && overrides.containsKey(this);
+    }
+  }
+
+  public void setAccessible(boolean v) {
+    synchronized (AccessibleObject.class) {
+      if (overrides == null) {
+        overrides = new java.util.WeakHashMap<AccessibleObject, Boolean>();
+      }
+      if (v) {
+        overrides.put(this, Boolean.TRUE);
+      } else {
+        overrides.remove(this);
+      }
+    }
+  }
+
+  public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    throw new AssertionError("All subclasses should override this method");
+  }
+
+  public Annotation[] getAnnotations() {
+    return getDeclaredAnnotations();
+  }
+
+  public Annotation[] getDeclaredAnnotations() {
+    throw new AssertionError("All subclasses should override this method");
+  }
+
+  public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+    return AnnotatedElement.super.getAnnotationsByType(annotationClass);
+  }
+
+  public <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
+    return AnnotatedElement.super.getDeclaredAnnotation(annotationClass);
+  }
+
+  public <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
+    return AnnotatedElement.super.getDeclaredAnnotationsByType(annotationClass);
+  }
 
   public static void setAccessible(AccessibleObject[] array, boolean v) {
     for (AccessibleObject o: array) o.setAccessible(v);

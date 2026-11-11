@@ -433,119 +433,169 @@ public abstract class ByteBuffer extends Buffer implements Comparable<ByteBuffer
     }
   }
 
-  public char getChar() {
+  public abstract char getChar();
+
+  final char getChar0() {
     return (char) rawGetShort(nextGetIndex(2), bigEndian);
   }
 
-  public char getChar(int index) {
+  public abstract char getChar(int index);
+
+  final char getChar0(int index) {
     return (char) rawGetShort(checkIndex(index, 2), bigEndian);
   }
 
-  public ByteBuffer putChar(char value) {
+  public abstract ByteBuffer putChar(char value);
+
+  final ByteBuffer putChar0(char value) {
     checkWritable();
     rawPutShort(nextPutIndex(2), (short) value, bigEndian);
     return this;
   }
 
-  public ByteBuffer putChar(int index, char value) {
+  public abstract ByteBuffer putChar(int index, char value);
+
+  final ByteBuffer putChar0(int index, char value) {
     checkWritable();
     rawPutShort(checkIndex(index, 2), (short) value, bigEndian);
     return this;
   }
 
-  public short getShort() {
+  public abstract short getShort();
+
+  final short getShort0() {
     return rawGetShort(nextGetIndex(2), bigEndian);
   }
 
-  public short getShort(int index) {
+  public abstract short getShort(int index);
+
+  final short getShort0(int index) {
     return rawGetShort(checkIndex(index, 2), bigEndian);
   }
 
-  public ByteBuffer putShort(short value) {
+  public abstract ByteBuffer putShort(short value);
+
+  final ByteBuffer putShort0(short value) {
     checkWritable();
     rawPutShort(nextPutIndex(2), value, bigEndian);
     return this;
   }
 
-  public ByteBuffer putShort(int index, short value) {
+  public abstract ByteBuffer putShort(int index, short value);
+
+  final ByteBuffer putShort0(int index, short value) {
     checkWritable();
     rawPutShort(checkIndex(index, 2), value, bigEndian);
     return this;
   }
 
-  public int getInt() {
+  public abstract int getInt();
+
+  final int getInt0() {
     return rawGetInt(nextGetIndex(4), bigEndian);
   }
 
-  public int getInt(int index) {
+  public abstract int getInt(int index);
+
+  final int getInt0(int index) {
     return rawGetInt(checkIndex(index, 4), bigEndian);
   }
 
-  public ByteBuffer putInt(int value) {
+  public abstract ByteBuffer putInt(int value);
+
+  final ByteBuffer putInt0(int value) {
     checkWritable();
     rawPutInt(nextPutIndex(4), value, bigEndian);
     return this;
   }
 
-  public ByteBuffer putInt(int index, int value) {
+  public abstract ByteBuffer putInt(int index, int value);
+
+  final ByteBuffer putInt0(int index, int value) {
     checkWritable();
     rawPutInt(checkIndex(index, 4), value, bigEndian);
     return this;
   }
 
-  public long getLong() {
+  public abstract long getLong();
+
+  final long getLong0() {
     return rawGetLong(nextGetIndex(8), bigEndian);
   }
 
-  public long getLong(int index) {
+  public abstract long getLong(int index);
+
+  final long getLong0(int index) {
     return rawGetLong(checkIndex(index, 8), bigEndian);
   }
 
-  public ByteBuffer putLong(long value) {
+  public abstract ByteBuffer putLong(long value);
+
+  final ByteBuffer putLong0(long value) {
     checkWritable();
     rawPutLong(nextPutIndex(8), value, bigEndian);
     return this;
   }
 
-  public ByteBuffer putLong(int index, long value) {
+  public abstract ByteBuffer putLong(int index, long value);
+
+  final ByteBuffer putLong0(int index, long value) {
     checkWritable();
     rawPutLong(checkIndex(index, 8), value, bigEndian);
     return this;
   }
 
-  public float getFloat() {
-    return Float.intBitsToFloat(getInt());
+  public abstract float getFloat();
+
+  final float getFloat0() {
+    return Float.intBitsToFloat(getInt0());
   }
 
-  public float getFloat(int index) {
-    return Float.intBitsToFloat(getInt(index));
+  public abstract float getFloat(int index);
+
+  final float getFloat0(int index) {
+    return Float.intBitsToFloat(getInt0(index));
   }
 
-  public ByteBuffer putFloat(float value) {
-    return putInt(Float.floatToRawIntBits(value));
+  public abstract ByteBuffer putFloat(float value);
+
+  final ByteBuffer putFloat0(float value) {
+    return putInt0(Float.floatToRawIntBits(value));
   }
 
-  public ByteBuffer putFloat(int index, float value) {
-    return putInt(index, Float.floatToRawIntBits(value));
+  public abstract ByteBuffer putFloat(int index, float value);
+
+  final ByteBuffer putFloat0(int index, float value) {
+    return putInt0(index, Float.floatToRawIntBits(value));
   }
 
-  public double getDouble() {
-    return Double.longBitsToDouble(getLong());
+  public abstract double getDouble();
+
+  final double getDouble0() {
+    return Double.longBitsToDouble(getLong0());
   }
 
-  public double getDouble(int index) {
-    return Double.longBitsToDouble(getLong(index));
+  public abstract double getDouble(int index);
+
+  final double getDouble0(int index) {
+    return Double.longBitsToDouble(getLong0(index));
   }
 
-  public ByteBuffer putDouble(double value) {
-    return putLong(Double.doubleToRawLongBits(value));
+  public abstract ByteBuffer putDouble(double value);
+
+  final ByteBuffer putDouble0(double value) {
+    return putLong0(Double.doubleToRawLongBits(value));
   }
 
-  public ByteBuffer putDouble(int index, double value) {
-    return putLong(index, Double.doubleToRawLongBits(value));
+  public abstract ByteBuffer putDouble(int index, double value);
+
+  final ByteBuffer putDouble0(int index, double value) {
+    return putLong0(index, Double.doubleToRawLongBits(value));
   }
 
-  public CharBuffer asCharBuffer() {
+  public abstract CharBuffer asCharBuffer();
+
+  final CharBuffer asCharBuffer0() {
     int pos = position();
     int lim = limit();
     int rem = pos <= lim ? lim - pos : 0;
@@ -553,7 +603,9 @@ public abstract class ByteBuffer extends Buffer implements Comparable<ByteBuffer
     return new ByteBufferAsCharBuffer(this, -1, 0, size, size, pos, bigEndian, isReadOnly());
   }
 
-  public ShortBuffer asShortBuffer() {
+  public abstract ShortBuffer asShortBuffer();
+
+  final ShortBuffer asShortBuffer0() {
     int pos = position();
     int lim = limit();
     int rem = pos <= lim ? lim - pos : 0;
@@ -561,7 +613,9 @@ public abstract class ByteBuffer extends Buffer implements Comparable<ByteBuffer
     return new ByteBufferAsShortBuffer(this, -1, 0, size, size, pos, bigEndian, isReadOnly());
   }
 
-  public IntBuffer asIntBuffer() {
+  public abstract IntBuffer asIntBuffer();
+
+  final IntBuffer asIntBuffer0() {
     int pos = position();
     int lim = limit();
     int rem = pos <= lim ? lim - pos : 0;
@@ -569,7 +623,9 @@ public abstract class ByteBuffer extends Buffer implements Comparable<ByteBuffer
     return new ByteBufferAsIntBuffer(this, -1, 0, size, size, pos, bigEndian, isReadOnly());
   }
 
-  public LongBuffer asLongBuffer() {
+  public abstract LongBuffer asLongBuffer();
+
+  final LongBuffer asLongBuffer0() {
     int pos = position();
     int lim = limit();
     int rem = pos <= lim ? lim - pos : 0;
@@ -577,7 +633,9 @@ public abstract class ByteBuffer extends Buffer implements Comparable<ByteBuffer
     return new ByteBufferAsLongBuffer(this, -1, 0, size, size, pos, bigEndian, isReadOnly());
   }
 
-  public FloatBuffer asFloatBuffer() {
+  public abstract FloatBuffer asFloatBuffer();
+
+  final FloatBuffer asFloatBuffer0() {
     int pos = position();
     int lim = limit();
     int rem = pos <= lim ? lim - pos : 0;
@@ -585,7 +643,9 @@ public abstract class ByteBuffer extends Buffer implements Comparable<ByteBuffer
     return new ByteBufferAsFloatBuffer(this, -1, 0, size, size, pos, bigEndian, isReadOnly());
   }
 
-  public DoubleBuffer asDoubleBuffer() {
+  public abstract DoubleBuffer asDoubleBuffer();
+
+  final DoubleBuffer asDoubleBuffer0() {
     int pos = position();
     int lim = limit();
     int rem = pos <= lim ? lim - pos : 0;

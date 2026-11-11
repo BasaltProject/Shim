@@ -105,4 +105,21 @@ public final class L128X256MixRandom implements RandomGenerator.SplittableGenera
     long brine = source.nextLong();
     return new L128X256MixRandom(source.nextLong(), brine << 1, source.nextLong(), source.nextLong(), source.nextLong(), source.nextLong(), source.nextLong(), source.nextLong());
   }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(long streamSize) {
+    return jdk.internal.random.SplitStreams.splits(this, streamSize);
+  }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(
+      java.util.random.RandomGenerator.SplittableGenerator source) {
+    return jdk.internal.random.SplitStreams.splits(this, source);
+  }
+
+  @Override
+  public java.util.stream.Stream<java.util.random.RandomGenerator.SplittableGenerator> splits(long streamSize,
+      java.util.random.RandomGenerator.SplittableGenerator source) {
+    return jdk.internal.random.SplitStreams.splits(this, streamSize, source);
+  }
 }

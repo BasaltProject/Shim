@@ -296,20 +296,11 @@ public interface RandomGenerator {
       return Stream.generate(this::split);
     }
 
-    default Stream<SplittableGenerator> splits(long streamSize) {
-      if (streamSize < 0L) throw new IllegalArgumentException("size must be non-negative");
-      return splits().limit(streamSize);
-    }
+    Stream<SplittableGenerator> splits(long streamSize);
 
-    default Stream<SplittableGenerator> splits(SplittableGenerator source) {
-      Objects.requireNonNull(source, "source");
-      return Stream.generate(() -> split(source));
-    }
+    Stream<SplittableGenerator> splits(SplittableGenerator source);
 
-    default Stream<SplittableGenerator> splits(long streamSize, SplittableGenerator source) {
-      if (streamSize < 0L) throw new IllegalArgumentException("size must be non-negative");
-      return splits(source).limit(streamSize);
-    }
+    Stream<SplittableGenerator> splits(long streamSize, SplittableGenerator source);
 
     @Override
     default Stream<RandomGenerator> rngs() {

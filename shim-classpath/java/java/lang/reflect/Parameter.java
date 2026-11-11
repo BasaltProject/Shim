@@ -130,6 +130,21 @@ public final class Parameter implements AnnotatedElement {
     return getAnnotations();
   }
 
+  @Override
+  public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+    return AnnotatedElement.super.getAnnotationsByType(annotationClass);
+  }
+
+  @Override
+  public <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
+    return AnnotatedElement.super.getDeclaredAnnotation(annotationClass);
+  }
+
+  @Override
+  public <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
+    return AnnotatedElement.super.getDeclaredAnnotationsByType(annotationClass);
+  }
+
   public AnnotatedType getAnnotatedType() {
     return AnnotatedTypeImpl.create(getParameterizedType());
   }

@@ -99,15 +99,11 @@ public interface MemorySegment {
 
   double[] toArray(ValueLayout.OfDouble elementLayout);
 
-  default String getString(long offset) {
-    return getString(offset, StandardCharsets.UTF_8);
-  }
+  String getString(long offset);
 
   String getString(long offset, Charset charset);
 
-  default void setString(long offset, String str) {
-    setString(offset, str, StandardCharsets.UTF_8);
-  }
+  void setString(long offset, String str);
 
   void setString(long offset, String str, Charset charset);
 
@@ -147,77 +143,41 @@ public interface MemorySegment {
 
   void set(AddressLayout layout, long offset, MemorySegment value);
 
-  default byte getAtIndex(ValueLayout.OfByte layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  byte getAtIndex(ValueLayout.OfByte layout, long index);
 
-  default boolean getAtIndex(ValueLayout.OfBoolean layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  boolean getAtIndex(ValueLayout.OfBoolean layout, long index);
 
-  default char getAtIndex(ValueLayout.OfChar layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  char getAtIndex(ValueLayout.OfChar layout, long index);
 
-  default void setAtIndex(ValueLayout.OfChar layout, long index, char value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfChar layout, long index, char value);
 
-  default short getAtIndex(ValueLayout.OfShort layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  short getAtIndex(ValueLayout.OfShort layout, long index);
 
-  default void setAtIndex(ValueLayout.OfByte layout, long index, byte value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfByte layout, long index, byte value);
 
-  default void setAtIndex(ValueLayout.OfBoolean layout, long index, boolean value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfBoolean layout, long index, boolean value);
 
-  default void setAtIndex(ValueLayout.OfShort layout, long index, short value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfShort layout, long index, short value);
 
-  default int getAtIndex(ValueLayout.OfInt layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  int getAtIndex(ValueLayout.OfInt layout, long index);
 
-  default void setAtIndex(ValueLayout.OfInt layout, long index, int value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfInt layout, long index, int value);
 
-  default float getAtIndex(ValueLayout.OfFloat layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  float getAtIndex(ValueLayout.OfFloat layout, long index);
 
-  default void setAtIndex(ValueLayout.OfFloat layout, long index, float value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfFloat layout, long index, float value);
 
-  default long getAtIndex(ValueLayout.OfLong layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  long getAtIndex(ValueLayout.OfLong layout, long index);
 
-  default void setAtIndex(ValueLayout.OfLong layout, long index, long value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfLong layout, long index, long value);
 
-  default double getAtIndex(ValueLayout.OfDouble layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  double getAtIndex(ValueLayout.OfDouble layout, long index);
 
-  default void setAtIndex(ValueLayout.OfDouble layout, long index, double value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(ValueLayout.OfDouble layout, long index, double value);
 
-  default MemorySegment getAtIndex(AddressLayout layout, long index) {
-    return get(layout, Math.multiplyExact(index, layout.byteSize()));
-  }
+  MemorySegment getAtIndex(AddressLayout layout, long index);
 
-  default void setAtIndex(AddressLayout layout, long index, MemorySegment value) {
-    set(layout, Math.multiplyExact(index, layout.byteSize()), value);
-  }
+  void setAtIndex(AddressLayout layout, long index, MemorySegment value);
 
   @Override
   boolean equals(Object obj);

@@ -143,4 +143,14 @@ public final class Constructor<T> extends Executable {
   public TypeVariable<?>[] getTypeParameters() {
     return method.getTypeParameters();
   }
+
+  @Override
+  public int getParameterCount() {
+    return getParameterTypes().length;
+  }
+
+  @Override
+  public AnnotatedType getAnnotatedReturnType() {
+    return AnnotatedTypeImpl.create(getDeclaringClass());
+  }
 }

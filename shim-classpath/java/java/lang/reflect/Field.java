@@ -404,6 +404,11 @@ public final class Field extends AccessibleObject implements Member {
     return getAnnotations();
   }
 
+  @Override
+  public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+    return super.getAnnotationsByType(annotationClass);
+  }
+
   public boolean equals(Object obj) {
     if (obj instanceof Field) {
       Field other = (Field) obj;

@@ -627,7 +627,7 @@ public final class Class <T>
       }
     }
 
-    return vmClass.flags;
+    return vmClass.flags & ~0x20;
   }
 
   public java.util.Set<java.lang.reflect.AccessFlag> accessFlags() {
