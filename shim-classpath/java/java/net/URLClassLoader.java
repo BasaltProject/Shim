@@ -29,14 +29,16 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 
 public class URLClassLoader extends java.security.SecureClassLoader implements Closeable {
 
-  private final List<URL> urls = new ArrayList<URL>();
-  private final List<File> roots = new ArrayList<File>();
+  private final Object lock = new Object();
+  private URL[] urls = new URL[0];
+  private volatile File[] roots = new File[0];
 
   public URLClassLoader(String name, URL[] urls, ClassLoader parent) {
     super(name, parent);
@@ -84,12 +86,25 @@ public class URLClassLoader extends java.security.SecureClassLoader implements C
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException("Invalid class path URL: " + url, e);
     }
-    urls.add(url);
-    roots.add(root);
+    synchronized (lock) {
+      for (URL u : urls) {
+        if (u.equals(url)) {
+          return;
+        }
+      }
+      URL[] nextUrls = Arrays.copyOf(urls, urls.length + 1);
+      nextUrls[urls.length] = url;
+      File[] nextRoots = Arrays.copyOf(roots, roots.length + 1);
+      nextRoots[roots.length] = root;
+      urls = nextUrls;
+      roots = nextRoots;
+    }
   }
 
   public URL[] getURLs() {
-    return urls.toArray(new URL[0]);
+    synchronized (lock) {
+      return urls.clone();
+    }
   }
 
   public void close() throws IOException { }
