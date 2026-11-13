@@ -26,6 +26,8 @@ package java.util;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import shim.VMMethod;
 
 public abstract class ResourceBundle {
   private static final ResourceBundle NONEXISTENT = new ResourceBundle() {
@@ -139,21 +141,21 @@ public abstract class ResourceBundle {
     return keySet;
   }
 
-  private static ClassLoader callerLoader() {
-    ClassLoader loader = Thread.currentThread().getContextClassLoader();
+  private static ClassLoader loaderOf(VMMethod caller) {
+    ClassLoader loader = caller == null ? null : caller.class_.loader;
     return loader != null ? loader : ClassLoader.getSystemClassLoader();
   }
 
   public static final ResourceBundle getBundle(String baseName) {
-    return getBundleImpl(baseName, Locale.getDefault(), callerLoader(), Control.INSTANCE);
+    return getBundleImpl(baseName, Locale.getDefault(), loaderOf(Method.getCaller()), Control.INSTANCE);
   }
 
   public static final ResourceBundle getBundle(String baseName, Control control) {
-    return getBundleImpl(baseName, Locale.getDefault(), callerLoader(), control);
+    return getBundleImpl(baseName, Locale.getDefault(), loaderOf(Method.getCaller()), control);
   }
 
   public static final ResourceBundle getBundle(String baseName, Locale locale) {
-    return getBundleImpl(baseName, locale, callerLoader(), Control.INSTANCE);
+    return getBundleImpl(baseName, locale, loaderOf(Method.getCaller()), Control.INSTANCE);
   }
 
   public static ResourceBundle getBundle(String baseName, Module module) {
@@ -171,7 +173,7 @@ public abstract class ResourceBundle {
   }
 
   public static final ResourceBundle getBundle(String baseName, Locale targetLocale, Control control) {
-    return getBundleImpl(baseName, targetLocale, callerLoader(), control);
+    return getBundleImpl(baseName, targetLocale, loaderOf(Method.getCaller()), control);
   }
 
   public static ResourceBundle getBundle(String baseName, Locale locale, ClassLoader loader) {
@@ -309,7 +311,7 @@ public abstract class ResourceBundle {
   }
 
   public static final void clearCache() {
-    clearCache(callerLoader());
+    clearCache(loaderOf(Method.getCaller()));
   }
 
   public static final void clearCache(ClassLoader loader) {
