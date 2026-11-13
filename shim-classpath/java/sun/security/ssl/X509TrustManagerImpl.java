@@ -165,20 +165,17 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager {
     X509Certificate leaf = ordered[0];
     List<X509Certificate> path = new ArrayList<X509Certificate>();
     X509Certificate anchor = null;
-    for (int i = 0; i < ordered.length && anchor == null; i++) {
-      if (trusted.contains(ordered[i])) {
-        anchor = ordered[i];
+    for (int i = 0; i < ordered.length; i++) {
+      anchor = trustedMatch(ordered[i]);
+      if (anchor != null) {
         break;
       }
       path.add(ordered[i]);
     }
-    if (anchor == null) {
-      X509Certificate last = path.get(path.size() - 1);
-      for (X509Certificate t : trusted) {
-        if (t.getSubjectX500Principal().equals(last.getIssuerX500Principal()) && verifies(last, t)) {
-          anchor = t;
-          break;
-        }
+    for (int i = 0; anchor == null && i < ordered.length; i++) {
+      anchor = trustedIssuer(ordered[i]);
+      if (anchor != null) {
+        path.subList(i + 1, path.size()).clear();
       }
     }
     if (anchor == null) {
@@ -228,6 +225,25 @@ final class X509TrustManagerImpl extends X509ExtendedTrustManager {
     }
     throw new ValidatorException("Extended key usage does not permit use for TLS "
         + (server ? "server" : "client") + " authentication");
+  }
+
+  private X509Certificate trustedMatch(X509Certificate cert) {
+    for (X509Certificate t : trusted) {
+      if (t.equals(cert) || (t.getSubjectX500Principal().equals(cert.getSubjectX500Principal())
+          && Arrays.equals(t.getPublicKey().getEncoded(), cert.getPublicKey().getEncoded()))) {
+        return t;
+      }
+    }
+    return null;
+  }
+
+  private X509Certificate trustedIssuer(X509Certificate cert) {
+    for (X509Certificate t : trusted) {
+      if (t.getSubjectX500Principal().equals(cert.getIssuerX500Principal()) && verifies(cert, t)) {
+        return t;
+      }
+    }
+    return null;
   }
 
   private static boolean verifies(X509Certificate cert, X509Certificate issuer) {
