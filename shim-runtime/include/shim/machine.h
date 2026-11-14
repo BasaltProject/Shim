@@ -164,7 +164,7 @@ const unsigned ThreadBackupHeapSizeInWords = ThreadBackupHeapSizeInBytes
 const unsigned ThreadHeapPoolSize = 2048;
 
 const unsigned MinimumThreadHeapPoolSize = 64;
-const unsigned DefaultMaximumThreadHeapPoolSize = 512;
+const unsigned DefaultMaximumThreadHeapPoolSize = 768;
 
 // number of zombie threads which may accumulate before we force a GC
 // to clean them up:
