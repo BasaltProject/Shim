@@ -164,6 +164,7 @@ const unsigned ThreadBackupHeapSizeInWords = ThreadBackupHeapSizeInBytes
 const unsigned ThreadHeapPoolSize = 2048;
 
 const unsigned MinimumThreadHeapPoolSize = 64;
+const unsigned DefaultMaximumThreadHeapPoolSize = 512;
 
 // number of zombie threads which may accumulate before we force a GC
 // to clean them up:
@@ -1650,10 +1651,24 @@ inline Aborter* getAborter(Thread* t)
   return t->m->system;
 }
 
-inline bool ensure(Thread* t, unsigned sizeInBytes)
+bool acquireNurseryBlock(Thread* t);
+
+inline void reserveNursery(Thread* t, unsigned sizeInBytes)
+{
+  if (t->heapIndex + ceilingDivide(sizeInBytes, BytesPerWord) > ThreadHeapSizeInWords) {
+    acquireNurseryBlock(t);
+  }
+}
+
+inline bool ensure(Thread* t, unsigned sizeInBytes, bool mayLock = false)
 {
   if (t->heapIndex + ceilingDivide(sizeInBytes, BytesPerWord)
       > ThreadHeapSizeInWords) {
+    // only synchronous faults on the thread's own code may take the state lock
+    if (mayLock and sizeInBytes <= ThreadHeapSizeInBytes / 2 and acquireNurseryBlock(t)) {
+      return true;
+    }
+
     if (sizeInBytes <= ThreadBackupHeapSizeInBytes) {
       expect(t, (t->getFlags() & Thread::UseBackupHeapFlag) == 0);
 

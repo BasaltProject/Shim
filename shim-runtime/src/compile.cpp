@@ -2943,7 +2943,7 @@ const unsigned MessageReserve = 1024;
 
 void NO_RETURN throwArithmetic(MyThread* t)
 {
-  if (ensure(t, GcArithmeticException::FixedSize + traceSize(t) + MessageReserve)) {
+  if (ensure(t, GcArithmeticException::FixedSize + traceSize(t) + MessageReserve, true)) {
     t->setFlag(Thread::TracingFlag);
     THREAD_RESOURCE0(t, t->clearFlag(Thread::TracingFlag));
 
@@ -3211,7 +3211,7 @@ void NO_RETURN throwArrayIndexOutOfBounds(MyThread* t, int32_t first, int32_t se
   bool detailed = t->arch->argumentRegisterCount() >= 4;
   int32_t index = swapped ? second : first;
   int32_t length = swapped ? first : second;
-  if (ensure(t, GcArrayIndexOutOfBoundsException::FixedSize + traceSize(t) + MessageReserve)) {
+  if (ensure(t, GcArrayIndexOutOfBoundsException::FixedSize + traceSize(t) + MessageReserve, true)) {
     t->setFlag(Thread::TracingFlag);
     THREAD_RESOURCE0(t, t->clearFlag(Thread::TracingFlag));
 
@@ -9598,7 +9598,7 @@ class SignalHandler : public SignalRegistrar::Handler {
   }
 
   void setException(MyThread* t) {
-    if (ensure(t, pad(fixedSize) + traceSize(t))) {
+    if (ensure(t, pad(fixedSize) + traceSize(t), true)) {
       t->setFlag(Thread::TracingFlag);
       GcThrowable* preallocated = (vm::roots(t)->*exc)();
       t->exception = makeThrowable(t, type, preallocated ? preallocated->message() : 0);
@@ -10581,6 +10581,8 @@ class MyProcessor : public Processor {
         a->body()[i]
             -= reinterpret_cast<uintptr_t>(codeAllocator.memory.begin());
       }
+    reserveNursery(t, ThreadHeapSizeInBytes / 2);
+
     }
   }
 

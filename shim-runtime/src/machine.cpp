@@ -4312,12 +4312,21 @@ Machine::Machine(System* system,
 
   populateJNITables(&javaVMVTable, &jniEnvVTable);
 
-  // the nursery is at most a sixteenth of the heap limit so a collection always has room to copy into
+  // a collection always has room to copy into: the fixed object threshold is a sixteenth of the heap limit
+  // and the nursery is that, capped at a default that keeps the resident set small
   {
     unsigned blocks = heap->limit() / 16 / ThreadHeapSizeInBytes;
+    unsigned fixedBlocks = blocks < MinimumThreadHeapPoolSize ? MinimumThreadHeapPoolSize
+                           : blocks > ThreadHeapPoolSize ? ThreadHeapPoolSize : blocks;
+    if (blocks > DefaultMaximumThreadHeapPoolSize) {
+      blocks = DefaultMaximumThreadHeapPoolSize;
+    }
+    if (const char* megabytes = getenv("SHIM_NURSERY_MB")) {
+      blocks = static_cast<unsigned>(atoi(megabytes)) * 1024 * 1024 / ThreadHeapSizeInBytes;
+    }
     heapPoolLimit = blocks < MinimumThreadHeapPoolSize ? MinimumThreadHeapPoolSize
                     : blocks > ThreadHeapPoolSize ? ThreadHeapPoolSize : blocks;
-    fixedFootprintThreshold = heapPoolLimit * ThreadHeapSizeInBytes;
+    fixedFootprintThreshold = fixedBlocks * ThreadHeapSizeInBytes;
   }
 
   // Copying the properties memory (to avoid memory crashes)
@@ -4945,6 +4954,28 @@ object allocate2(Thread* t, unsigned sizeInBytes, bool objectMask)
           : Machine::MovableAllocation,
       sizeInBytes,
       objectMask);
+}
+
+bool acquireNurseryBlock(Thread* t)
+{
+  Machine* m = t->m;
+  ACQUIRE_RAW(t, m->stateLock);
+
+  if (m->heap->limitExceeded() or m->heapPoolIndex >= m->heapPoolLimit) {
+    return false;
+  }
+
+  uintptr_t* block = static_cast<uintptr_t*>(m->heap->tryAllocate(ThreadHeapSizeInBytes));
+  if (block == 0) {
+    return false;
+  }
+
+  memset(block, 0, ThreadHeapSizeInBytes);
+  m->heapPool[m->heapPoolIndex++] = block;
+  t->heap = block;
+  t->heapOffset += t->heapIndex;
+  t->heapIndex = 0;
+  return true;
 }
 
 object allocate3(Thread* t,
