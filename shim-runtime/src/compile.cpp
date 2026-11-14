@@ -11881,6 +11881,9 @@ uintptr_t virtualThunk(MyThread* t, unsigned index)
   return oldArray->body()[index * 2];
 }
 
+int64_t compilePhase1Ns = 0;
+int64_t compileFinishNs = 0;
+
 int64_t compileNowNs()
 {
   timespec ts;
@@ -11929,7 +11932,7 @@ void compile(MyThread* t,
         int64_t n = __atomic_add_fetch(&count, 1, __ATOMIC_RELAXED);
         int64_t total = __atomic_add_fetch(&totalNs, spent, __ATOMIC_RELAXED);
         if (n % 1000 == 0) {
-          fprintf(stderr, "jit compiled %lld methods, %.1f ms total\n", static_cast<long long>(n), total / 1e6);
+          fprintf(stderr, "jit compiled %lld methods, %.1f ms total, phase1 %.1f ms, finish %.1f ms\n", static_cast<long long>(n), total / 1e6, compilePhase1Ns / 1e6, compileFinishNs / 1e6);
         }
       }
     }
@@ -11951,7 +11954,9 @@ void compile(MyThread* t,
   }
 
   Context context(t, bootContext, clone);
+  int64_t phaseStart = compileStats ? compileNowNs() : 0;
   compile(t, &context);
+  if (compileStats) __atomic_add_fetch(&compilePhase1Ns, compileNowNs() - phaseStart, __ATOMIC_RELAXED);
 
   {
     GcExceptionHandlerTable* ehTable = cast<GcExceptionHandlerTable>(
@@ -11977,7 +11982,9 @@ void compile(MyThread* t,
     return;
   }
 
+  int64_t finishStart = compileStats ? compileNowNs() : 0;
   finish(t, allocator, &context);
+  if (compileStats) __atomic_add_fetch(&compileFinishNs, compileNowNs() - finishStart, __ATOMIC_RELAXED);
 
   if (DebugMethodTree) {
     fprintf(stderr,
