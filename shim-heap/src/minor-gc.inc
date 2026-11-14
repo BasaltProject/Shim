@@ -74,6 +74,9 @@ struct GcWorker {
   uintptr_t* deferred;
   unsigned deferredCount;
   unsigned deferredCapacity;
+  Fixie** done;
+  unsigned doneCount;
+  unsigned doneCapacity;
   pthread_t thread;
 };
 
@@ -96,6 +99,9 @@ struct ParGc {
   int active;
   int helpersIn;
   bool major;
+  unsigned minorThreads;
+  unsigned majorThreads;
+  unsigned participants;
 };
 
 inline uintptr_t loadHeader(void* o)
@@ -355,6 +361,12 @@ class FixieWalker : public Heap::Walker {
   Fixie* f;
 };
 
+void addDoneFixie(Context* c, GcWorker* w, Fixie* f)
+{
+  grow(c, &w->done, &w->doneCapacity, w->doneCount + 1);
+  w->done[w->doneCount++] = f;
+}
+
 class MajorWalker : public Heap::Walker {
  public:
   MajorWalker(Context* c, GcWorker* w, void* object) : c(c), w(w), object(object)
@@ -380,6 +392,14 @@ class MajorWalker : public Heap::Walker {
       return true;
     }
     if (immortalHeapContains(c, o)) {
+      return true;
+    }
+    if (c->client->isFixed(o)) {
+      Fixie* f = fixie(o);
+      if (f->tryMark()) {
+        addDoneFixie(c, w, f);
+        pushItem(c, w, reinterpret_cast<uintptr_t>(o) | 1);
+      }
       return true;
     }
     if (w->deferredCount + 3 > w->deferredCapacity) {
@@ -416,7 +436,7 @@ class PrefetchWalker : public Heap::Walker {
 void scanItem(Context* c, GcWorker* w, uintptr_t item)
 {
   if (w->par->major) {
-    MajorWalker walker(c, w, reinterpret_cast<void*>(item));
+    MajorWalker walker(c, w, reinterpret_cast<void*>(item & ~static_cast<uintptr_t>(1)));
     c->client->walk(walker.object, &walker);
     return;
   }
@@ -638,7 +658,7 @@ void* helperMain(void* arg)
       break;
     }
     seen = g->epoch;
-    if (not g->active) {
+    if (not g->active or w->id >= g->participants) {
       pthread_mutex_unlock(&g->mu);
       continue;
     }
@@ -737,6 +757,9 @@ void disposeParGc(Context* c)
     if (g->workers[i]->deferred) {
       c->system->free(g->workers[i]->deferred);
     }
+    if (g->workers[i]->done) {
+      c->system->free(g->workers[i]->done);
+    }
     c->system->free(g->workers[i]);
   }
   c->system->free(g);
@@ -747,6 +770,7 @@ void beginRegion(ParGc* g)
 {
   startHelpers(g);
   pthread_mutex_lock(&g->mu);
+  g->participants = g->major ? g->majorThreads : g->minorThreads;
   g->active = 1;
   ++g->epoch;
   pthread_cond_broadcast(&g->cv);
@@ -891,6 +915,12 @@ void drainMarkStackParallel(Context* c)
   int64_t tp0 = c->logMajor ? nowNs() : 0;
   g->major = true;
   beginRegion(g);
+  while (c->markedFixies) {
+    Fixie* f = c->markedFixies;
+    f->remove(c);
+    addDoneFixie(c, w0, f);
+    pushItem(c, w0, reinterpret_cast<uintptr_t>(f->body()) | 1);
+  }
   while (c->markStackCount) {
     pushItem(c, w0, reinterpret_cast<uintptr_t>(c->markStack[--c->markStackCount]));
   }
@@ -899,8 +929,15 @@ void drainMarkStackParallel(Context* c)
   g->major = false;
   if (c->logMajor) c->statParallelNs += nowNs() - tp0;
 
+  int64_t td0 = c->logMajor ? nowNs() : 0;
   for (unsigned i = 0; i < g->workerCount; ++i) {
     GcWorker* w = g->workers[i];
+    for (unsigned j = 0; j < w->doneCount; ++j) {
+      Fixie* f = w->done[j];
+      f->dead(false);
+      f->move(c, &(c->visitedFixies));
+    }
+    w->doneCount = 0;
     for (unsigned j = 0; j < w->deferredCount; j += 3) {
       uintptr_t* d = w->deferred + j;
       local::collect(c, reinterpret_cast<void**>(d[0]), reinterpret_cast<void*>(d[1]), static_cast<unsigned>(d[2]));
@@ -908,6 +945,7 @@ void drainMarkStackParallel(Context* c)
     c->statParallelDeferred += w->deferredCount / 3;
     w->deferredCount = 0;
   }
+  if (c->logMajor) c->statDeferredNs += nowNs() - td0;
   ++c->statParallelRounds;
 }
 

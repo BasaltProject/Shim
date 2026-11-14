@@ -517,6 +517,7 @@ void postVisit(Thread* t, Heap::Visitor* v)
   for (GcJreference* p = m->weakReferences; p;) {
     GcJreference* r = m->heap->follow(p);
     p = cast<GcJreference>(t, r->vmNext());
+    __builtin_prefetch(p);
     clearTargetIfFinalizable(t, r);
   }
 
@@ -524,6 +525,7 @@ void postVisit(Thread* t, Heap::Visitor* v)
     for (GcJreference* p = m->tenuredWeakReferences; p;) {
       GcJreference* r = m->heap->follow(p);
       p = cast<GcJreference>(t, r->vmNext());
+      __builtin_prefetch(p);
       clearTargetIfFinalizable(t, r);
     }
   }
@@ -621,6 +623,8 @@ void postVisit(Thread* t, Heap::Visitor* v)
       object unreachable = 0;
       for (GcFinalizer** p = &(m->tenuredFinalizers); *p;) {
         v->visit(p);
+        __builtin_prefetch((*p)->next());
+        __builtin_prefetch((*p)->target());
 
         if (m->heap->status((*p)->target()) == Heap::Unreachable) {
           GcFinalizer* finalizer = *p;
@@ -635,6 +639,7 @@ void postVisit(Thread* t, Heap::Visitor* v)
 
       for (GcFinalizer** p = &(m->tenuredFinalizers); *p;) {
         // target is reachable
+        __builtin_prefetch((*p)->next());
         v->visit(&(*p)->target());
         p = reinterpret_cast<GcFinalizer**>(&(*p)->next());
       }
@@ -646,6 +651,7 @@ void postVisit(Thread* t, Heap::Visitor* v)
     }
 
     for (GcJreference** p = &(m->tenuredWeakReferences); *p;) {
+      __builtin_prefetch((*p)->vmNext());
       if (m->heap->status(*p) == Heap::Unreachable) {
         // reference is unreachable
         referenceUnreachable(t, v, reinterpret_cast<GcJreference**>(p));
@@ -5058,6 +5064,10 @@ object allocate3(Thread* t,
     }
 
     if (t->m->heap->limitExceeded(pendingAllocation)) {
+      if (getenv("SHIM_GC_STATS")) {
+        fprintf(stderr, "gc out of memory: limit %u remaining %d pending %d type %d\n", t->m->heap->limit(),
+                static_cast<int>(t->m->heap->remaining()), pendingAllocation, static_cast<int>(type));
+      }
       throw_(t, roots(t)->outOfMemoryError());
     }
   } while (type == Machine::MovableAllocation
@@ -5119,7 +5129,22 @@ void collect(Thread* t, Heap::CollectionType type, int pendingAllocation)
   }
 #endif
 
-  doCollect(t, type, pendingAllocation);
+  bool collected = false;
+  if (t->m->heap->majorImminent(footprint(t->m->rootThread), pending)) {
+    t->m->heap->deferMajor(true);
+    doCollect(t, Heap::MinorCollection, pendingAllocation);
+    t->m->heap->deferMajor(false);
+    if (t->m->heap->collectionType() == Heap::MajorCollection) {
+      collected = true;
+    } else {
+      type = Heap::MajorCollection;
+    }
+  }
+
+  if (not collected) {
+    doCollect(t, type, pendingAllocation);
+  }
+  type = t->m->heap->collectionType();
 
 #ifndef _WIN32
   if (logPauses) {

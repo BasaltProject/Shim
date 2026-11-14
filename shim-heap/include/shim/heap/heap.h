@@ -74,6 +74,8 @@ class Heap : public shim::util::Allocator {
   virtual void collect(CollectionType type,
                        unsigned footprint,
                        int pendingAllocation) = 0;
+  virtual bool majorImminent(unsigned footprint, int pendingAllocation) = 0;
+  virtual void deferMajor(bool defer) = 0;
   virtual unsigned fixedFootprint(unsigned sizeInWords, bool objectMask) = 0;
   virtual void* allocateFixed(shim::util::Alloc* allocator,
                               unsigned sizeInWords,

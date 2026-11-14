@@ -702,6 +702,11 @@ class Fixie {
     return (flags & Marked) != 0;
   }
 
+  bool tryMark()
+  {
+    return (__atomic_fetch_or(&flags, Marked, __ATOMIC_RELAXED) & Marked) == 0;
+  }
+
   void marked(bool v)
   {
     if (v) {
@@ -836,7 +841,7 @@ class Context {
         gen2Threshold(max(InitialGen2CapacityInBytes, limit / 16) / BytesPerWord),
         logMajor(getenv("SHIM_GC_STATS") != 0),
         tagged(false),
-        parMajor(getenv("SHIM_GC_PARMAJOR") != 0),
+        parMajor(getenv("SHIM_GC_PARMAJOR") == 0 or atoi(getenv("SHIM_GC_PARMAJOR")) != 0),
         verify(getenv("SHIM_GC_VERIFY") != 0),
         poison(getenv("SHIM_GC_POISON") != 0),
         par(0),
@@ -957,6 +962,8 @@ class Context {
   bool logMajor;
   bool tagged;
   bool parMajor;
+  bool parMajorActive = false;
+  bool deferMajor = false;
   bool verify;
   bool poison;
   struct ParGc* par;
@@ -966,6 +973,8 @@ class Context {
   uint64_t statParallelRounds = 0;
   uint64_t statParallelDeferred = 0;
   int64_t statParallelNs = 0;
+  int64_t statDeferredNs = 0;
+  int64_t statRootNs = 0;
   bool deferDrain = false;
   GcWorker* parWorker = 0;
   int64_t statT[4];
@@ -1408,7 +1417,17 @@ void clearFreshCopies(Context* c)
 
 #ifdef SHIM_HEAP_PARALLEL
 const unsigned ParallelMarkMin = 256;
+const unsigned ParallelFixieMinWords = 4096;
 void drainMarkStackParallel(Context* c);
+
+unsigned markedFixieWords(Context* c)
+{
+  unsigned words = 0;
+  for (Fixie* f = c->markedFixies; f and words < ParallelFixieMinWords; f = f->next) {
+    words += f->size;
+  }
+  return words;
+}
 #endif
 
 void markInPlace(Context* c, void* o)
@@ -1441,7 +1460,8 @@ void drainMarkStack(Context* c)
 
   while (c->markStackCount) {
 #ifdef SHIM_HEAP_PARALLEL
-    if (c->par and c->mode == Heap::MajorCollection and c->markStackCount >= ParallelMarkMin and c->parMajor) {
+    if (c->par and c->mode == Heap::MajorCollection and c->parMajorActive
+        and (c->markStackCount >= ParallelMarkMin or markedFixieWords(c) >= ParallelFixieMinWords)) {
       drainMarkStackParallel(c);
       continue;
     }
@@ -2510,6 +2530,13 @@ void visitMarkedFixies(Context* c)
 void drainAll(Context* c)
 {
   do {
+#ifdef SHIM_HEAP_PARALLEL
+    if (c->par and c->inPlace and c->mode == Heap::MajorCollection and c->parMajorActive
+        and (c->markStackCount >= ParallelMarkMin or markedFixieWords(c) >= ParallelFixieMinWords)) {
+      drainMarkStackParallel(c);
+      continue;
+    }
+#endif
     visitMarkedFixies(c);
     if (c->inPlace) {
       drainMarkStack(c);
@@ -2566,14 +2593,28 @@ void collect(Context* c,
 
 ParGc* makeParGcForContext(Context* c)
 {
-  unsigned n = 4;
+  unsigned minorThreads = 4;
   if (const char* e = getenv("SHIM_GC_THREADS")) {
-    n = static_cast<unsigned>(atoi(e));
+    minorThreads = static_cast<unsigned>(atoi(e));
   }
-  if (n == 0) {
+  if (minorThreads == 0) {
     return 0;
   }
-  return makeParGc(c, min(n, MaxHelpers + 1));
+  long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+  unsigned majorThreads = cpus > 0 ? (cpus < 8 ? static_cast<unsigned>(cpus) : 8u) : 4u;
+  if (const char* e = getenv("SHIM_GC_MAJOR_THREADS")) {
+    majorThreads = static_cast<unsigned>(atoi(e));
+  }
+  majorThreads = max(majorThreads, minorThreads);
+  minorThreads = min(minorThreads, MaxHelpers + 1);
+  majorThreads = min(majorThreads, MaxHelpers + 1);
+  ParGc* g = makeParGc(c, majorThreads);
+  if (g) {
+    g->minorThreads = minorThreads;
+    g->majorThreads = majorThreads;
+    g->participants = minorThreads;
+  }
+  return g;
 }
 #endif
 
@@ -2621,7 +2662,7 @@ void collect2(Context* c)
     virtual void visit(void* p)
     {
       local::collect(c, static_cast<void**>(p));
-      if (not c->deferDrain) {
+      if (not c->deferDrain and (c->markStackCount or c->markedFixies or not c->inPlace)) {
         drainAll(c);
       }
     }
@@ -2639,7 +2680,9 @@ void collect2(Context* c)
 #ifdef SHIM_HEAP_PARALLEL
   c->deferDrain = c->par and c->inPlace and c->mode == Heap::MajorCollection;
 #endif
+  int64_t tr0 = c->logMajor ? nowNs() : 0;
   c->client->visitRoots(&v);
+  if (c->logMajor) c->statRootNs += nowNs() - tr0;
   if (c->deferDrain) {
     c->deferDrain = false;
     drainAll(c);
@@ -2837,21 +2880,29 @@ void verifyHeap(Context* c)
   fprintf(stderr, "heap verify: %llu objects ok\n", static_cast<unsigned long long>(count));
 }
 
+bool gen2ThresholdExceeded(Context* c)
+{
+  unsigned tenureNeeded = c->tenureFootprint + c->tenurePadding;
+  return c->gen2.position() - c->freeWords + tenureNeeded > c->gen2Threshold;
+}
+
+bool gen2CapacityExceeded(Context* c)
+{
+  unsigned tenureNeeded = c->tenureFootprint + c->tenurePadding;
+  return c->gen2.position() + tenureNeeded + (TenureThreshold == 0 ? c->incomingFootprint : 0) > c->gen2.capacity();
+}
+
 void collect(Context* c)
 {
   unsigned tenureNeeded = c->tenureFootprint + c->tenurePadding;
   bool gen2Full
       = c->inPlace
-            ? (c->gen2.position() - c->freeWords + tenureNeeded
-                   > c->gen2Threshold
-               or c->gen2.position() + tenureNeeded
-                      + (TenureThreshold == 0 ? c->incomingFootprint : 0)
-                  > c->gen2.capacity())
+            ? ((not c->deferMajor and gen2ThresholdExceeded(c)) or gen2CapacityExceeded(c))
             : (oversizedGen2(c) or tenureNeeded > c->gen2.remaining());
 
   if (limitExceeded(c, c->pendingAllocation) or gen2Full
-      or c->fixieTenureFootprint + c->tenuredFixieFootprint
-         > c->tenuredFixieCeiling) {
+      or (not c->deferMajor
+          and c->fixieTenureFootprint + c->tenuredFixieFootprint > c->tenuredFixieCeiling)) {
     if (Verbose) {
       if (limitExceeded(c, c->pendingAllocation)) {
         fprintf(stderr, "low memory causes ");
@@ -2879,6 +2930,8 @@ void collect(Context* c)
   if (c->inPlace and c->compactNext and c->mode == Heap::MajorCollection) {
     degradeToCopying(c);
   }
+
+  c->parMajorActive = c->parMajor and c->incomingFootprint == 0;
 
   initNextGen1(c);
 
@@ -2921,10 +2974,10 @@ void collect(Context* c)
   int64_t tm3 = c->logMajor ? nowNs() : 0;
 
   if (c->logMajor and c->mode == Heap::MajorCollection) {
-    fprintf(stderr, "gc major phases: mark %.1f ms, sweep %.1f ms, fixies %.1f ms, parallel rounds %llu deferred %llu in-parallel %.1f ms\n",
+    fprintf(stderr, "gc major phases: mark %.1f ms, sweep %.1f ms, fixies %.1f ms, parallel rounds %llu deferred %llu in-parallel %.1f ms, roots %.1f ms, deferred %.1f ms\n",
             (tm1 - tm0) / 1e6, (tm2 - tm1) / 1e6, (tm3 - tm2) / 1e6,
-            static_cast<unsigned long long>(c->statParallelRounds), static_cast<unsigned long long>(c->statParallelDeferred), c->statParallelNs / 1e6);
-    c->statParallelNs = 0;
+            static_cast<unsigned long long>(c->statParallelRounds), static_cast<unsigned long long>(c->statParallelDeferred), c->statParallelNs / 1e6, c->statRootNs / 1e6, c->statDeferredNs / 1e6);
+    c->statParallelNs = c->statRootNs = c->statDeferredNs = 0;
     c->statParallelRounds = c->statParallelDeferred = 0;
   }
   if (c->logMajor and c->mode == Heap::MinorCollection) {
@@ -3114,6 +3167,22 @@ class MyHeap : public Heap {
     local::collect(&c);
   }
 
+  virtual bool majorImminent(unsigned incomingFootprint, int pendingAllocation)
+  {
+    if (not(c.par and c.parMajor and c.inPlace)) {
+      return false;
+    }
+    c.incomingFootprint = incomingFootprint;
+    return not local::gen2CapacityExceeded(&c) and not local::limitExceeded(&c, pendingAllocation)
+           and (local::gen2ThresholdExceeded(&c)
+                or c.fixieTenureFootprint + c.tenuredFixieFootprint > c.tenuredFixieCeiling);
+  }
+
+  virtual void deferMajor(bool defer)
+  {
+    c.deferMajor = defer;
+  }
+
   virtual unsigned fixedFootprint(unsigned sizeInWords, bool objectMask)
   {
     return Fixie::totalSize(sizeInWords, objectMask);
@@ -3248,13 +3317,13 @@ class MyHeap : public Heap {
   virtual void* follow(void* p)
   {
     if (c.tagged) {
-      if (p == 0) {
+      if (p == 0 or c.gen2.contains(p)) {
         return p;
       }
       uintptr_t header = __atomic_load_n(&fieldAtOffset<uintptr_t>(p, 0), __ATOMIC_ACQUIRE);
       return (header & ForwardTag) ? maskAlignedPointer(reinterpret_cast<void*>(header)) : p;
     }
-    if (p == 0 or c.client->isFixed(p)) {
+    if (p == 0 or (c.inPlace and c.gen2.contains(p)) or c.client->isFixed(p)) {
       return p;
     } else if (wasCollected(&c, p)) {
       if (Debug) {
@@ -3292,6 +3361,8 @@ class MyHeap : public Heap {
 
     if (p == 0) {
       return Null;
+    } else if (c.inPlace and c.gen2.contains(p)) {
+      return (c.mode == Heap::MinorCollection or gen2Marked(&c, p)) ? Tenured : Unreachable;
     } else if (c.client->isFixed(p)) {
       Fixie* f = fixie(p);
       return f->dead() ? Unreachable : (static_cast<unsigned>(f->age + 1)
