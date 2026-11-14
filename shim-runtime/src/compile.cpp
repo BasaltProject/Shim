@@ -49,6 +49,8 @@
 #include <shim/util/fixed-allocator.h>
 
 #include "debug-util.h"
+
+#include <time.h>
 #include "shim/npe-message.h"
 
 using namespace vm;
@@ -1372,6 +1374,9 @@ class Context {
   void* executableStart;
   unsigned executableSize;
   unsigned objectPoolCount;
+  PoolElement** poolIndex = 0;
+  unsigned poolIndexSize = 0;
+  uintptr_t poolIndexEpoch = 0;
   unsigned traceLogCount;
   bool dirtyRoots;
   bool leaf;
@@ -1614,6 +1619,61 @@ class Frame {
     }
   }
 
+  static unsigned poolSlot(object o, unsigned mask)
+  {
+    return static_cast<unsigned>((reinterpret_cast<uintptr_t>(o) >> 3) * 0x9E3779B1u) & mask;
+  }
+
+  void insertPoolElement(PoolElement* e)
+  {
+    Context* x = context;
+    if (x->poolIndexSize == 0) {
+      return;
+    }
+    unsigned mask = x->poolIndexSize - 1;
+    unsigned i = poolSlot(e->target, mask);
+    while (x->poolIndex[i]) {
+      i = (i + 1) & mask;
+    }
+    x->poolIndex[i] = e;
+  }
+
+  PoolElement* findPoolElement(object o)
+  {
+    Context* x = context;
+    if (x->objectPoolCount < 32) {
+      for (PoolElement* e = x->objectPool; e; e = e->next) {
+        if (o == e->target) {
+          return e;
+        }
+      }
+      return 0;
+    }
+
+    // objects move when a collection runs inside the compiler, so the index is rebuilt after one
+    if (x->poolIndexEpoch != t->m->gcEpoch or x->poolIndexSize < x->objectPoolCount * 2) {
+      unsigned size = 64;
+      while (size < x->objectPoolCount * 4) {
+        size *= 2;
+      }
+      x->poolIndex = static_cast<PoolElement**>(x->zone.allocate(size * sizeof(PoolElement*)));
+      memset(x->poolIndex, 0, size * sizeof(PoolElement*));
+      x->poolIndexSize = size;
+      x->poolIndexEpoch = t->m->gcEpoch;
+      for (PoolElement* e = x->objectPool; e; e = e->next) {
+        insertPoolElement(e);
+      }
+    }
+
+    unsigned mask = x->poolIndexSize - 1;
+    for (unsigned i = poolSlot(o, mask); x->poolIndex[i]; i = (i + 1) & mask) {
+      if (x->poolIndex[i]->target == o) {
+        return x->poolIndex[i];
+      }
+    }
+    return 0;
+  }
+
   ir::Value* append(object o)
   {
     BootContext* bc = context->bootContext;
@@ -1632,16 +1692,16 @@ class Frame {
               c->threadRegister(), ir::Type::object(), TARGET_THREAD_HEAPIMAGE),
           c->promiseConstant(p, ir::Type::object()));
     } else {
-      for (PoolElement* e = context->objectPool; e; e = e->next) {
-        if (o == e->target) {
-          return c->address(ir::Type::object(), e);
-        }
+      if (PoolElement* e = findPoolElement(o)) {
+        return c->address(ir::Type::object(), e);
       }
 
       context->objectPool = new (&context->zone)
           PoolElement(t, o, context->objectPool);
 
       ++context->objectPoolCount;
+
+      insertPoolElement(context->objectPool);
 
       return c->address(ir::Type::object(), context->objectPool);
     }
@@ -10521,6 +10581,8 @@ class MyProcessor : public Processor {
       object trace;
     } visitor(t, p, target);
 
+    reserveNursery(t, ThreadHeapSizeInBytes / 2);
+
     t->m->system->visit(t->systemThread, target->systemThread, &visitor);
 
     if (UNLIKELY(t->getFlags() & Thread::UseBackupHeapFlag)) {
@@ -10581,8 +10643,6 @@ class MyProcessor : public Processor {
         a->body()[i]
             -= reinterpret_cast<uintptr_t>(codeAllocator.memory.begin());
       }
-    reserveNursery(t, ThreadHeapSizeInBytes / 2);
-
     }
   }
 
@@ -11821,6 +11881,13 @@ uintptr_t virtualThunk(MyThread* t, unsigned index)
   return oldArray->body()[index * 2];
 }
 
+int64_t compileNowNs()
+{
+  timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return static_cast<int64_t>(ts.tv_sec) * 1000000000 + ts.tv_nsec;
+}
+
 void compile(MyThread* t,
              FixedAllocator* allocator UNUSED,
              BootContext* bootContext,
@@ -11848,6 +11915,25 @@ void compile(MyThread* t,
   // deadlock.  To make this safe, we use a private clone of the
   // method so that we won't be confused if another thread updates the
   // original while we're working.
+
+  static const bool compileStats = getenv("SHIM_COMPILE_STATS") != 0;
+  struct CompileTimer {
+    int64_t start;
+    CompileTimer(bool on) : start(on ? compileNowNs() : 0) {}
+    ~CompileTimer()
+    {
+      static int64_t totalNs = 0;
+      static int64_t count = 0;
+      if (start) {
+        int64_t spent = compileNowNs() - start;
+        int64_t n = __atomic_add_fetch(&count, 1, __ATOMIC_RELAXED);
+        int64_t total = __atomic_add_fetch(&totalNs, spent, __ATOMIC_RELAXED);
+        if (n % 1000 == 0) {
+          fprintf(stderr, "jit compiled %lld methods, %.1f ms total\n", static_cast<long long>(n), total / 1e6);
+        }
+      }
+    }
+  } compileTimer(compileStats);
 
   GcMethod* clone = methodClone(t, method);
 
