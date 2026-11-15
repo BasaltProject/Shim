@@ -1109,6 +1109,7 @@ class Machine {
   size_t bootimageSize;
   uintptr_t gcEpoch;
   unsigned heapPoolLimit;
+  unsigned heapPoolLimitFull;
   unsigned fixedFootprintThreshold;
 };
 

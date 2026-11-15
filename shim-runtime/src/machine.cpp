@@ -4326,6 +4326,7 @@ Machine::Machine(System* system,
     }
     heapPoolLimit = blocks < MinimumThreadHeapPoolSize ? MinimumThreadHeapPoolSize
                     : blocks > ThreadHeapPoolSize ? ThreadHeapPoolSize : blocks;
+    heapPoolLimitFull = heapPoolLimit;
     fixedFootprintThreshold = fixedBlocks * ThreadHeapSizeInBytes;
   }
 
@@ -5151,6 +5152,11 @@ void collect(Thread* t, Heap::CollectionType type, int pendingAllocation)
             (cpuEnd.tv_sec - cpuStart.tv_sec) * 1e3 + (cpuEnd.tv_nsec - cpuStart.tv_nsec) / 1e6);
   }
 #endif
+
+  // a pending major runs as its own pause behind a small nursery, not on top of a full one
+  t->m->heapPoolLimit = t->m->heap->majorImminent(footprint(t->m->rootThread), 0)
+                            ? min(t->m->heapPoolLimitFull, MinimumThreadHeapPoolSize)
+                            : t->m->heapPoolLimitFull;
 
   if (t->m->heap->limitExceeded(pending)) {
     // try once more, giving the heap a chance to squeeze everything
