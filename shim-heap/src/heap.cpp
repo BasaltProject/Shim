@@ -3303,6 +3303,11 @@ class MyHeap : public Heap {
                 or c.fixieTenureFootprint + c.tenuredFixieFootprint > c.tenuredFixieCeiling);
   }
 
+  virtual bool majorParallel()
+  {
+    return c.par and c.parMajor and c.inPlace;
+  }
+
   virtual void deferMajor(bool defer)
   {
     c.deferMajor = defer;

@@ -5294,7 +5294,8 @@ void collect(Thread* t, Heap::CollectionType type, int pendingAllocation)
 #endif
 
   bool collected = false;
-  if (t->m->heap->majorImminent(footprint(t->m->rootThread), pending)) {
+  if (t->m->heap->majorImminent(footprint(t->m->rootThread), pending)
+      or (type == Heap::MajorCollection and t->m->heap->majorParallel())) {
     t->m->heap->deferMajor(true);
     doCollect(t, Heap::MinorCollection, pendingAllocation);
     t->m->heap->deferMajor(false);
