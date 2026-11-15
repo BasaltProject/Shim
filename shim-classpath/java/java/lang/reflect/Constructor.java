@@ -27,9 +27,16 @@ import java.lang.annotation.Annotation;
 
 public final class Constructor<T> extends Executable {
   public final Method method;
+  private final Class<?> instanceClass;
 
   public Constructor(Method method) {
     this.method = method;
+    this.instanceClass = null;
+  }
+
+  public Constructor(Method method, Class<?> instanceClass) {
+    this.method = method;
+    this.instanceClass = instanceClass;
   }
 
   public int hashCode() {
@@ -112,7 +119,7 @@ public final class Constructor<T> extends Executable {
     throws InvocationTargetException, InstantiationException,
     IllegalAccessException
   {
-    T v = (T) make(method.getDeclaringClass().vmClass);
+    T v = (T) make((instanceClass != null ? instanceClass : method.getDeclaringClass()).vmClass);
     method.invoke(v, arguments);
     return v;
   }

@@ -19,20 +19,45 @@ public class ReflectionFactory {
   public final java.lang.invoke.MethodHandle defaultWriteObjectForSerialization(java.lang.Class<?> p0) {
     throw new UnsupportedOperationException();
   }
+  private static final ReflectionFactory instance = new ReflectionFactory();
+
   public static sun.reflect.ReflectionFactory getReflectionFactory() {
-    throw new UnsupportedOperationException();
+    return instance;
   }
   public final boolean hasStaticInitializerForSerialization(java.lang.Class<?> p0) {
     throw new UnsupportedOperationException();
   }
   public final java.lang.reflect.Constructor<?> newConstructorForExternalization(java.lang.Class<?> p0) {
-    throw new UnsupportedOperationException();
+    if (!java.io.Externalizable.class.isAssignableFrom(p0)) {
+      return null;
+    }
+    try {
+      return p0.getConstructor();
+    } catch (NoSuchMethodException e) {
+      return null;
+    }
   }
   public java.lang.reflect.Constructor<?> newConstructorForSerialization(java.lang.Class<?> p0, java.lang.reflect.Constructor<?> constructor) {
-    throw new UnsupportedOperationException();
+    return new java.lang.reflect.Constructor<Object>(constructor.method, p0);
   }
   public final java.lang.reflect.Constructor<?> newConstructorForSerialization(java.lang.Class<?> p0) {
-    throw new UnsupportedOperationException();
+    Class<?> c = p0;
+    while (java.io.Serializable.class.isAssignableFrom(c)) {
+      c = c.getSuperclass();
+      if (c == null) {
+        return null;
+      }
+    }
+    try {
+      java.lang.reflect.Constructor<?> k = c.getDeclaredConstructor();
+      int m = k.getModifiers();
+      if (java.lang.reflect.Modifier.isPrivate(m)) {
+        return null;
+      }
+      return newConstructorForSerialization(p0, k);
+    } catch (NoSuchMethodException e) {
+      return null;
+    }
   }
   public final java.io.OptionalDataException newOptionalDataExceptionForSerialization(boolean flag) {
     throw new UnsupportedOperationException();

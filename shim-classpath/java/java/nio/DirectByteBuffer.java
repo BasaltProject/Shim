@@ -17,7 +17,7 @@ package java.nio;
 import java.util.Objects;
 import sun.misc.Unsafe;
 
-public class DirectByteBuffer extends MappedByteBuffer {
+public class DirectByteBuffer extends MappedByteBuffer implements sun.nio.ch.DirectBuffer {
   private static final Unsafe unsafe = Unsafe.getUnsafe();
   private static final int baseOffset = unsafe.arrayBaseOffset(byte[].class);
 
@@ -41,6 +41,14 @@ public class DirectByteBuffer extends MappedByteBuffer {
 
   public long address() {
     return address;
+  }
+
+  public Object attachment() {
+    return null;
+  }
+
+  public jdk.internal.ref.Cleaner cleaner() {
+    return null;
   }
 
   @Override

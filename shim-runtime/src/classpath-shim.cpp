@@ -97,7 +97,7 @@ class MyClasspath : public Classpath {
     GcJmethod* jmethod = makeJmethod(t, vmMethod, false);
 
     return vmMethod->name()->body()[0] == '<'
-               ? (object)makeJconstructor(t, jmethod)
+               ? (object)makeJconstructor(t, jmethod, nullptr)
                : (object)jmethod;
   }
 

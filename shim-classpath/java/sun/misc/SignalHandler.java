@@ -9,8 +9,8 @@
 package sun.misc;
 
 public interface SignalHandler {
-  sun.misc.SignalHandler SIG_DFL = null;
-  sun.misc.SignalHandler SIG_IGN = null;
+  sun.misc.SignalHandler SIG_DFL = signal -> { };
+  sun.misc.SignalHandler SIG_IGN = signal -> { };
 
   void handle(sun.misc.Signal signal);
 }
