@@ -61,6 +61,25 @@ public class PluginCompat {
     ByteBuffer bb = ByteBuffer.allocateDirect(16);
     check(direct.isInstance(bb), "direct buffer interface");
     check((Long) direct.getMethod("address").invoke(bb) != 0L, "direct buffer address");
+    java.nio.channels.Selector sel = java.nio.channels.Selector.open();
+    Thread waiter = new Thread(() -> {
+      try {
+        sel.select(60000);
+      } catch (java.io.IOException e) {
+        throw new AssertionError(e);
+      }
+    });
+    waiter.start();
+    Thread.sleep(150);
+    waiter.interrupt();
+    waiter.join(5000);
+    check(!waiter.isAlive(), "interrupt wakes a selector");
+
+    Thread.currentThread().interrupt();
+    long start = System.nanoTime();
+    sel.select(60000);
+    check(System.nanoTime() - start < 5_000_000_000L, "select returns at once when already interrupted");
+    check(Thread.interrupted(), "select keeps the interrupt status");
     System.out.println("PluginCompat ok");
   }
 }

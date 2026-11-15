@@ -87,6 +87,7 @@ class MyClasspath : public Classpath {
                           0,
                           group,
                           tid,
+                          0,
                           0);
   }
 

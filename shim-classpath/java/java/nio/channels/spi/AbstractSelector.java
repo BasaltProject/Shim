@@ -65,7 +65,20 @@ public abstract class AbstractSelector extends Selector {
     ((AbstractSelectableChannel) key.channel()).removeKey(key);
   }
 
-  protected final void begin() { }
+  private sun.nio.ch.Interruptible interruptor;
 
-  protected final void end() { }
+  protected final void begin() {
+    if (interruptor == null) {
+      interruptor = new sun.nio.ch.Interruptible() {
+        public void interrupt(Thread target) {
+          AbstractSelector.this.wakeup();
+        }
+      };
+    }
+    Thread.shimBlockedOn(interruptor);
+  }
+
+  protected final void end() {
+    Thread.shimBlockedOn(null);
+  }
 }

@@ -54,6 +54,7 @@ public class Thread implements Runnable {
   }
   private final long tid;
   private final boolean isVirtual;
+  private volatile sun.nio.ch.Interruptible blocker;
 
   private static UncaughtExceptionHandler defaultExceptionHandler;
 
@@ -239,6 +240,18 @@ public class Thread implements Runnable {
       interrupt(p);
     } else {
       interrupted = true;
+    }
+    sun.nio.ch.Interruptible b = blocker;
+    if (b != null) {
+      b.interrupt(this);
+    }
+  }
+
+  public static void shimBlockedOn(sun.nio.ch.Interruptible b) {
+    Thread t = currentThread();
+    t.blocker = b;
+    if (b != null && t.interrupted) {
+      b.interrupt(t);
     }
   }
 

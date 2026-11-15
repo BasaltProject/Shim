@@ -180,7 +180,13 @@ final class SelectorImpl extends AbstractSelector {
         count++;
       }
       int timeoutMs = timeout < 0 ? 0 : (timeout == 0 ? -1 : (int) Math.min(Integer.MAX_VALUE, timeout));
-      int ready = NetNative.poll(handles, events, revents, count, timeoutMs);
+      int ready;
+      begin();
+      try {
+        ready = NetNative.poll(handles, events, revents, count, timeoutMs);
+      } finally {
+        end();
+      }
       int updated = 0;
       if (ready > 0) {
         if ((revents[0] & 1) != 0) {
