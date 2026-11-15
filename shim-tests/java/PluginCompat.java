@@ -80,6 +80,24 @@ public class PluginCompat {
     sel.select(60000);
     check(System.nanoTime() - start < 5_000_000_000L, "select returns at once when already interrupted");
     check(Thread.interrupted(), "select keeps the interrupt status");
+    java.nio.channels.ServerSocketChannel server = java.nio.channels.ServerSocketChannel.open();
+    server.bind(new java.net.InetSocketAddress("127.0.0.1", 0));
+    java.nio.channels.SocketChannel client = java.nio.channels.SocketChannel.open(server.getLocalAddress());
+    server.accept();
+    Throwable[] thrown = new Throwable[1];
+    Thread reader = new Thread(() -> {
+      try {
+        client.read(ByteBuffer.allocate(4));
+      } catch (Throwable e) {
+        thrown[0] = e;
+      }
+    });
+    reader.start();
+    Thread.sleep(150);
+    reader.interrupt();
+    reader.join(5000);
+    check(!reader.isAlive(), "interrupt unblocks a channel read");
+    check(thrown[0] instanceof java.nio.channels.ClosedByInterruptException, "closed by interrupt");
     System.out.println("PluginCompat ok");
   }
 }

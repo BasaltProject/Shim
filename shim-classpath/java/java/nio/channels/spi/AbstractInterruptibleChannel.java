@@ -35,9 +35,38 @@ public abstract class AbstractInterruptibleChannel implements Channel, Interrupt
     return !closed;
   }
 
-  protected final void begin() { }
+  private sun.nio.ch.Interruptible interruptor;
+  private volatile Thread interrupted;
+
+  protected final void begin() {
+    if (interruptor == null) {
+      interruptor = new sun.nio.ch.Interruptible() {
+        public void interrupt(Thread target) {
+          synchronized (closeLock) {
+            if (closed) {
+              return;
+            }
+            closed = true;
+            interrupted = target;
+            try {
+              implCloseChannel();
+            } catch (IOException e) {
+              throw new Error(e);
+            }
+          }
+        }
+      };
+    }
+    Thread.shimBlockedOn(interruptor);
+  }
 
   protected final void end(boolean completed) throws AsynchronousCloseException {
+    Thread.shimBlockedOn(null);
+    Thread target = interrupted;
+    if (target != null && target == Thread.currentThread()) {
+      interrupted = null;
+      throw new java.nio.channels.ClosedByInterruptException();
+    }
     if (!completed && closed) {
       throw new AsynchronousCloseException();
     }

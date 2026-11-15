@@ -453,14 +453,26 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
       }
     }
     long h = net.begin();
+    boolean blocking = isBlocking();
+    boolean done = false;
     try {
-      int n = ChannelIo.read(h, dst, isBlocking());
+      if (blocking) {
+        begin();
+      }
+      int n = ChannelIo.read(h, dst, blocking);
       if (n < 0 && !isOpen()) {
         throw new java.nio.channels.AsynchronousCloseException();
       }
+      done = true;
       return n;
     } finally {
-      net.end();
+      try {
+        if (blocking) {
+          end(done);
+        }
+      } finally {
+        net.end();
+      }
     }
   }
 
@@ -500,10 +512,23 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
       }
     }
     long h = net.begin();
+    boolean blocking = isBlocking();
+    boolean done = false;
     try {
-      return ChannelIo.read(h, dsts, offset, length, isBlocking());
+      if (blocking) {
+        begin();
+      }
+      long n = ChannelIo.read(h, dsts, offset, length, blocking);
+      done = true;
+      return n;
     } finally {
-      net.end();
+      try {
+        if (blocking) {
+          end(done);
+        }
+      } finally {
+        net.end();
+      }
     }
   }
 
@@ -519,10 +544,23 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
       }
     }
     long h = net.begin();
+    boolean blocking = isBlocking();
+    boolean done = false;
     try {
-      return ChannelIo.write(h, src, isBlocking());
+      if (blocking) {
+        begin();
+      }
+      int n = ChannelIo.write(h, src, blocking);
+      done = true;
+      return n;
     } finally {
-      net.end();
+      try {
+        if (blocking) {
+          end(done);
+        }
+      } finally {
+        net.end();
+      }
     }
   }
 
@@ -535,10 +573,23 @@ final class SocketChannelImpl extends SocketChannel implements SelectorImpl.HasH
       }
     }
     long h = net.begin();
+    boolean blocking = isBlocking();
+    boolean done = false;
     try {
-      return ChannelIo.write(h, srcs, offset, length, isBlocking());
+      if (blocking) {
+        begin();
+      }
+      long n = ChannelIo.write(h, srcs, offset, length, blocking);
+      done = true;
+      return n;
     } finally {
-      net.end();
+      try {
+        if (blocking) {
+          end(done);
+        }
+      } finally {
+        net.end();
+      }
     }
   }
 

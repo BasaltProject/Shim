@@ -146,11 +146,16 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
       }
     }
     long h = net.begin();
+    boolean blocking = isBlocking();
+    boolean done = false;
     try {
+      if (blocking) {
+        begin();
+      }
       byte[][] peer = new byte[1][];
       int[] peerPort = new int[1];
       long client;
-      if (isBlocking()) {
+      if (blocking) {
         client = NetNative.accept(h, 0, peer, peerPort);
         if (!isOpen()) {
           NetNative.close(client);
@@ -163,12 +168,19 @@ final class ServerSocketChannelImpl extends ServerSocketChannel implements Selec
         }
       }
       NetNative.setBlocking(client, true);
+      done = true;
       if (unix) {
         return new SocketChannelImpl(provider(), client, true);
       }
       return new SocketChannelImpl(provider(), client, peer[0], peerPort[0]);
     } finally {
-      net.end();
+      try {
+        if (blocking) {
+          end(done);
+        }
+      } finally {
+        net.end();
+      }
     }
   }
 

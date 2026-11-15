@@ -97,6 +97,21 @@ public class FileChannelImpl extends FileChannel {
   }
 
   private int readInternal(ByteBuffer dst, long position) throws IOException {
+    boolean done = false;
+    try {
+      begin();
+      if (!isOpen()) {
+        return 0;
+      }
+      int n = readOp(dst, position);
+      done = true;
+      return n;
+    } finally {
+      end(done);
+    }
+  }
+
+  private int readOp(ByteBuffer dst, long position) throws IOException {
     int rem = dst.remaining();
     if (rem == 0) {
       return 0;
@@ -168,6 +183,21 @@ public class FileChannelImpl extends FileChannel {
   }
 
   private int writeInternal(ByteBuffer src, long position) throws IOException {
+    boolean done = false;
+    try {
+      begin();
+      if (!isOpen()) {
+        return 0;
+      }
+      int n = writeOp(src, position);
+      done = true;
+      return n;
+    } finally {
+      end(done);
+    }
+  }
+
+  private int writeOp(ByteBuffer src, long position) throws IOException {
     int rem = src.remaining();
     if (rem == 0) {
       return 0;
