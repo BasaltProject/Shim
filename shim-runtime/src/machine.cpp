@@ -876,11 +876,6 @@ GcByteArray* makeByteArray(Thread* t, Stream& s, unsigned length)
   return value;
 }
 
-void removeByteArray(Thread* t, object o)
-{
-  hashMapRemove(t, roots(t)->byteArrayMap(), o, byteArrayHash, objectEqual);
-}
-
 GcByteArray* internByteArray(Thread* t, GcByteArray* array)
 {
   PROTECT(t, array);
@@ -890,10 +885,9 @@ GcByteArray* internByteArray(Thread* t, GcByteArray* array)
   GcTriple* n = hashMapFindNode(
       t, roots(t)->byteArrayMap(), array, byteArrayHash, byteArrayEqual);
   if (n) {
-    return cast<GcByteArray>(t, cast<GcJreference>(t, n->first())->target());
+    return cast<GcByteArray>(t, n->first());
   } else {
     hashMapInsert(t, roots(t)->byteArrayMap(), array, 0, byteArrayHash);
-    addFinalizer(t, array, removeByteArray);
     return array;
   }
 }
@@ -4522,11 +4516,12 @@ void Thread::init()
       boot(this);
     }
 
-    GcWeakHashMap* map = makeWeakHashMap(this, 0, 0);
+    // Strong on purpose: interned byte arrays of unloaded classes stay (keeps weak references off the major pass).
+    GcHashMap* byteMap = makeHashMap(this, 0, 0);
     // sequence point, for gc (don't recombine statements)
-    roots(this)->setByteArrayMap(this, map->as<GcHashMap>(this));
+    roots(this)->setByteArrayMap(this, byteMap);
 
-    map = makeWeakHashMap(this, 0, 0);
+    GcWeakHashMap* map = makeWeakHashMap(this, 0, 0);
     // sequence point, for gc (don't recombine statements)
     roots(this)->setMonitorMap(this, map->as<GcHashMap>(this));
 
