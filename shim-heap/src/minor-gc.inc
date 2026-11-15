@@ -437,6 +437,9 @@ void scanItem(Context* c, GcWorker* w, uintptr_t item)
 {
   if (w->par->major) {
     MajorWalker walker(c, w, reinterpret_cast<void*>(item & ~static_cast<uintptr_t>(1)));
+    if (not(item & 1)) {
+      setGen2End(c, walker.object, c->client->sizeInWords(walker.object));
+    }
     c->client->walk(walker.object, &walker);
     return;
   }

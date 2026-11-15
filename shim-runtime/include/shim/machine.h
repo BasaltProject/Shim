@@ -1097,6 +1097,7 @@ class Machine {
   GcFinalizer* finalizeQueue;
   GcJreference* weakReferences;
   GcJreference* tenuredWeakReferences;
+  void* listGather;
   bool unsafe;
   bool collecting;
   bool triedBuiltinOnLoad;

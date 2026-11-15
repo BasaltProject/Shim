@@ -95,6 +95,8 @@ class Heap : public shim::util::Allocator {
 
   virtual void postVisit() = 0;
   virtual Status status(void* p) = 0;
+  virtual void prefetchStatus(void* p) = 0;
+  virtual bool inPlaceMajor() = 0;
   virtual CollectionType collectionType() = 0;
   virtual void disposeFixies() = 0;
   virtual void dispose() = 0;

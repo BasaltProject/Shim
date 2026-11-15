@@ -21,6 +21,11 @@
    There is NO WARRANTY for this software.  See license.txt for
    details. */
 
+#include <vector>
+#if defined(__linux__) || defined(__APPLE__)
+#include <pthread.h>
+#define SHIM_LIST_GATHER 1
+#endif
 #include "shim/jnienv.h"
 #include "shim/machine.h"
 #include <time.h>
@@ -505,6 +510,91 @@ void clearTargetIfFinalizable(Thread* t, GcJreference* r)
   }
 }
 
+struct ListGather {
+  std::vector<GcJreference*> weak;
+  std::vector<GcFinalizer*> finalizers;
+  Machine* m;
+#ifdef SHIM_LIST_GATHER
+  pthread_t thread;
+#endif
+  bool running;
+};
+
+#ifdef SHIM_LIST_GATHER
+void* gatherLists(void* arg)
+{
+  ListGather* g = static_cast<ListGather*>(arg);
+  Machine* m = g->m;
+  for (GcJreference* p = m->tenuredWeakReferences; p;) {
+    g->weak.push_back(p);
+    p = cast<GcJreference>(m->rootThread, p->vmNext());
+  }
+  for (GcFinalizer* p = m->tenuredFinalizers; p;) {
+    g->finalizers.push_back(p);
+    p = cast<GcFinalizer>(m->rootThread, p->next());
+  }
+  return 0;
+}
+#endif
+
+void startListGather(Machine* m)
+{
+#ifdef SHIM_LIST_GATHER
+  ListGather* g = static_cast<ListGather*>(m->listGather);
+  if (g == 0) {
+    g = new ListGather();
+    g->running = false;
+    m->listGather = g;
+  }
+  g->weak.clear();
+  g->finalizers.clear();
+  g->m = m;
+  g->running = pthread_create(&g->thread, 0, gatherLists, g) == 0;
+#else
+  (void)m;
+#endif
+}
+
+ListGather* finishListGather(Machine* m)
+{
+  ListGather* g = static_cast<ListGather*>(m->listGather);
+#ifdef SHIM_LIST_GATHER
+  if (g and g->running) {
+    pthread_join(g->thread, 0);
+    g->running = false;
+  }
+#endif
+  return g;
+}
+
+inline void hintWeak(Heap* h, const std::vector<GcJreference*>& v, size_t k)
+{
+  size_t n = v.size();
+  if (k + 24 < n) {
+    __builtin_prefetch(v[k + 24]);
+  }
+  if (k + 12 < n) {
+    GcJreference* a = v[k + 12];
+    h->prefetchStatus(a->target());
+    __builtin_prefetch(a->target());
+    h->prefetchStatus(a->queue());
+  }
+}
+
+inline void hintFinalizer(Heap* h, const std::vector<GcFinalizer*>& v, size_t k)
+{
+  size_t n = v.size();
+  if (k + 24 < n) {
+    __builtin_prefetch(v[k + 24]);
+  }
+  if (k + 12 < n) {
+    GcFinalizer* a = v[k + 12];
+    h->prefetchStatus(a);
+    h->prefetchStatus(a->target());
+    __builtin_prefetch(a->target());
+  }
+}
+
 void postVisit(Thread* t, Heap::Visitor* v)
 {
   Machine* m = t->m;
@@ -514,6 +604,17 @@ void postVisit(Thread* t, Heap::Visitor* v)
 
   m->heap->postVisit();
 
+  static const std::vector<GcJreference*> noWeak;
+  static const std::vector<GcFinalizer*> noFinalizers;
+  const std::vector<GcJreference*>* weakHints = &noWeak;
+  const std::vector<GcFinalizer*>* finalizerHints = &noFinalizers;
+  if (major and m->heap->inPlaceMajor()) {
+    if (ListGather* g = finishListGather(m)) {
+      weakHints = &g->weak;
+      finalizerHints = &g->finalizers;
+    }
+  }
+
   for (GcJreference* p = m->weakReferences; p;) {
     GcJreference* r = m->heap->follow(p);
     p = cast<GcJreference>(t, r->vmNext());
@@ -522,10 +623,11 @@ void postVisit(Thread* t, Heap::Visitor* v)
   }
 
   if (major) {
+    size_t k = 0;
     for (GcJreference* p = m->tenuredWeakReferences; p;) {
       GcJreference* r = m->heap->follow(p);
       p = cast<GcJreference>(t, r->vmNext());
-      __builtin_prefetch(p);
+      hintWeak(m->heap, *weakHints, k++);
       clearTargetIfFinalizable(t, r);
     }
   }
@@ -621,7 +723,9 @@ void postVisit(Thread* t, Heap::Visitor* v)
   if (major) {
     {
       object unreachable = 0;
+      size_t k = 0;
       for (GcFinalizer** p = &(m->tenuredFinalizers); *p;) {
+        hintFinalizer(m->heap, *finalizerHints, k++);
         v->visit(p);
         __builtin_prefetch((*p)->next());
         __builtin_prefetch((*p)->target());
@@ -637,8 +741,10 @@ void postVisit(Thread* t, Heap::Visitor* v)
         }
       }
 
+      size_t k2 = 0;
       for (GcFinalizer** p = &(m->tenuredFinalizers); *p;) {
         // target is reachable
+        hintFinalizer(m->heap, *finalizerHints, k2++);
         __builtin_prefetch((*p)->next());
         v->visit(&(*p)->target());
         p = reinterpret_cast<GcFinalizer**>(&(*p)->next());
@@ -650,7 +756,9 @@ void postVisit(Thread* t, Heap::Visitor* v)
       }
     }
 
+    size_t k3 = 0;
     for (GcJreference** p = &(m->tenuredWeakReferences); *p;) {
+      hintWeak(m->heap, *weakHints, k3++);
       __builtin_prefetch((*p)->vmNext());
       if (m->heap->status(*p) == Heap::Unreachable) {
         // reference is unreachable
@@ -3928,6 +4036,9 @@ class HeapClient : public Heap::Client {
 
   virtual void visitRoots(Heap::Visitor* v)
   {
+    if (m->heap->inPlaceMajor()) {
+      startListGather(m);
+    }
     ::visitRoots(m, v);
 
     postVisit(m->rootThread, v);
@@ -4053,6 +4164,58 @@ class HeapClient : public Heap::Client {
   Machine* m;
 };
 
+// Warms the monitor map a few finalizers ahead: removeMonitor is the bulk of the queue and every removal misses cache.
+class FinalizeQueueAhead {
+ public:
+  FinalizeQueueAhead(Thread* t, GcFinalizer* queue) : t(t), distant(queue), middle(queue), close(queue)
+  {
+    for (unsigned k = 0; k < 16 and distant; ++k) {
+      distant = cast<GcFinalizer>(t, distant->next());
+      if (k < 8) {
+        middle = distant;
+      }
+      if (k < 4) {
+        close = distant;
+      }
+    }
+  }
+
+  void step()
+  {
+    GcHashMap* map = cast<GcHashMap>(t, roots(t)->monitorMap());
+    GcArray* array = map ? map->array() : 0;
+    if (distant) {
+      __builtin_prefetch(distant->target());
+      distant = cast<GcFinalizer>(t, distant->next());
+    }
+    if (middle) {
+      if (object o = middle->target()) {
+        if (array and not objectFixed(t, o)) {
+          __builtin_prefetch(&array->body()[takeHash(t, o) & (array->length() - 1)]);
+        }
+      }
+      middle = cast<GcFinalizer>(t, middle->next());
+    }
+    if (close) {
+      if (object o = close->target()) {
+        if (array and not objectFixed(t, o)) {
+          if (object head = array->body()[takeHash(t, o) & (array->length() - 1)]) {
+            __builtin_prefetch(head);
+            __builtin_prefetch(cast<GcTriple>(t, head)->first());
+          }
+        }
+      }
+      close = cast<GcFinalizer>(t, close->next());
+    }
+  }
+
+ private:
+  Thread* t;
+  GcFinalizer* distant;
+  GcFinalizer* middle;
+  GcFinalizer* close;
+};
+
 void doCollect(Thread* t, Heap::CollectionType type, int pendingAllocation)
 {
   expect(t, not t->m->collecting);
@@ -4118,8 +4281,10 @@ void doCollect(Thread* t, Heap::CollectionType type, int pendingAllocation)
 
   GcFinalizer* finalizeQueue = t->m->finalizeQueue;
   t->m->finalizeQueue = 0;
+  FinalizeQueueAhead ahead(t, finalizeQueue);
   for (; finalizeQueue;
        finalizeQueue = cast<GcFinalizer>(t, finalizeQueue->next())) {
+    ahead.step();
     void (*function)(Thread*, object);
     memcpy(&function, &finalizeQueue->finalize(), BytesPerWord);
     function(t, finalizeQueue->target());
@@ -4300,6 +4465,7 @@ Machine::Machine(System* system,
       finalizeQueue(0),
       weakReferences(0),
       tenuredWeakReferences(0),
+      listGather(0),
       unsafe(false),
       collecting(false),
       triedBuiltinOnLoad(false),
@@ -4379,6 +4545,8 @@ Machine::Machine(System* system,
 
 void Machine::dispose()
 {
+  delete static_cast<ListGather*>(listGather);
+  listGather = 0;
   localThread->dispose();
   stateLock->dispose();
   heapLock->dispose();

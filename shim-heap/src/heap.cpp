@@ -826,6 +826,7 @@ class Context {
         reservationBytes(0),
         markBits(0),
         freshBits(0),
+        endBits(0),
         markBitsBytes(0),
         spans(0),
         spanCount(0),
@@ -946,6 +947,7 @@ class Context {
   size_t reservationBytes;
   uintptr_t* markBits;
   uintptr_t* freshBits;
+  uintptr_t* endBits;
   size_t markBitsBytes;
   Span* spans;
   unsigned spanCount;
@@ -1236,7 +1238,7 @@ bool reserveGen2(Context* c)
     if (memory == 0) {
       continue;
     }
-    void* bits = mapZeroed(markBytes * 2);
+    void* bits = mapZeroed(markBytes * 3);
     if (bits == 0) {
       unmapMemory(memory, total);
       continue;
@@ -1245,14 +1247,15 @@ bool reserveGen2(Context* c)
 #if defined(MADV_NOHUGEPAGE) && !defined(_WIN32)
     if (getenv("SHIM_GC_NOHUGEPAGE")) {
       madvise(memory, total, MADV_NOHUGEPAGE);
-      madvise(bits, markBytes * 2, MADV_NOHUGEPAGE);
+      madvise(bits, markBytes * 3, MADV_NOHUGEPAGE);
     }
 #endif
     c->reservation = memory;
     c->reservationBytes = total;
     c->markBits = static_cast<uintptr_t*>(bits);
     c->freshBits = c->markBits + markBytes / BytesPerWord;
-    c->markBitsBytes = markBytes * 2;
+    c->endBits = c->freshBits + markBytes / BytesPerWord;
+    c->markBitsBytes = markBytes * 3;
 
     c->gen2.data = static_cast<uintptr_t*>(memory);
     c->gen2.capacity_ = capacity;
@@ -1279,6 +1282,7 @@ void releaseGen2(Context* c)
     c->reservation = 0;
     c->markBits = 0;
     c->freshBits = 0;
+    c->endBits = 0;
     c->gen2.data = 0;
     c->gen2.capacity_ = 0;
     c->gen2.position_ = 0;
@@ -1336,6 +1340,12 @@ inline void setGen2Mark(Context* c, void* o)
 {
   unsigned i = gen2Index(c, o);
   c->markBits[wordOf(i)] |= static_cast<uintptr_t>(1) << bitOf(i);
+}
+
+inline void setGen2End(Context* c, void* o, unsigned size)
+{
+  unsigned i = gen2Index(c, o) + size - 1;
+  __atomic_fetch_or(c->endBits + wordOf(i), static_cast<uintptr_t>(1) << bitOf(i), __ATOMIC_RELAXED);
 }
 
 inline bool gen2Fresh(Context* c, void* o)
@@ -1396,6 +1406,7 @@ void* copyToGen2(Context* c, void* o, unsigned size)
 
   if (c->mode == Heap::MajorCollection) {
     setGen2Mark(c, dst);
+    setGen2End(c, dst, c->client->sizeInWords(dst));
   }
   if (fromSpan) {
     unsigned i = gen2Index(c, dst);
@@ -1467,6 +1478,9 @@ void drainMarkStack(Context* c)
     }
 #endif
     void* o = c->markStack[--c->markStackCount];
+    if (c->mode == Heap::MajorCollection and c->gen2.contains(o)) {
+      setGen2End(c, o, c->client->sizeInWords(o));
+    }
     Walker w(c, o);
     c->client->walk(o, &w);
   }
@@ -1489,6 +1503,8 @@ const unsigned SweepChunkWords = 1 << 13;
 
 struct SweepPart {
   bool any;
+  uint64_t startBits;
+  uint64_t endBits;
   unsigned firstStart;
   unsigned lastEnd;
   unsigned freeWords;
@@ -1503,12 +1519,69 @@ struct SweepJob {
   unsigned chunks;
   unsigned next;
   SweepPart* parts;
+  bool verify;
+  bool failed;
 };
 
-void sweepChunk(SweepJob* j, unsigned chunk)
+inline void addSpan(SweepPart* part, unsigned from, unsigned to)
+{
+  if (part->count == part->capacity) {
+    part->capacity = part->capacity ? part->capacity * 2 : 256;
+    part->spans = static_cast<Span*>(::realloc(part->spans, part->capacity * sizeof(Span)));
+  }
+  part->spans[part->count].start = from;
+  part->spans[part->count].length = to - from;
+  ++part->count;
+  part->freeWords += to - from;
+}
+
+inline unsigned popCount(uintptr_t v)
+{
+  return sizeof(uintptr_t) == 8 ? __builtin_popcountll(v) : __builtin_popcount(static_cast<unsigned>(v));
+}
+
+// An object's end bit is set while it is marked, so the sweep reads two bitmaps and never touches the objects.
+bool sweepChunkByEnds(SweepJob* j, unsigned chunk, SweepPart* part)
 {
   Context* c = j->c;
-  SweepPart* part = j->parts + chunk;
+  unsigned lo = chunk * SweepChunkWords;
+  unsigned hi = min(lo + SweepChunkWords, j->markWords);
+  unsigned previousEnd = 0;
+  unsigned ew = 0;
+  uintptr_t ebits = 0;
+  for (unsigned w = lo; w < hi; ++w) {
+    uintptr_t bits = c->markBits[w];
+    part->startBits += popCount(bits);
+    part->endBits += popCount(c->endBits[w]);
+    while (bits) {
+      unsigned bit = countTrailingZeros(bits);
+      bits &= bits - 1;
+      unsigned start = indexOf(w, bit);
+      if (not part->any) {
+        part->any = true;
+        part->firstStart = start;
+        ew = w;
+        ebits = c->endBits[w] & (~static_cast<uintptr_t>(0) << bit);
+      } else if (start > previousEnd and start - previousEnd >= MinimumSpanInWords) {
+        addSpan(part, previousEnd, start);
+      }
+      while (ebits == 0) {
+        if (++ew >= j->markWords) {
+          return false;
+        }
+        ebits = c->endBits[ew];
+      }
+      previousEnd = indexOf(ew, countTrailingZeros(ebits)) + 1;
+      ebits &= ebits - 1;
+    }
+  }
+  part->lastEnd = previousEnd;
+  return true;
+}
+
+void sweepChunkByScan(SweepJob* j, unsigned chunk, SweepPart* part)
+{
+  Context* c = j->c;
   unsigned lo = chunk * SweepChunkWords;
   unsigned hi = min(lo + SweepChunkWords, j->markWords);
   unsigned previousEnd = 0;
@@ -1537,6 +1610,38 @@ void sweepChunk(SweepJob* j, unsigned chunk)
   part->lastEnd = previousEnd;
 }
 
+void sweepChunk(SweepJob* j, unsigned chunk)
+{
+  SweepPart* part = j->parts + chunk;
+  if (not sweepChunkByEnds(j, chunk, part)) {
+    j->failed = true;
+    return;
+  }
+  if (j->verify) {
+    SweepPart ref;
+    memset(&ref, 0, sizeof ref);
+    sweepChunkByScan(j, chunk, &ref);
+    bool same = ref.any == part->any and ref.lastEnd == part->lastEnd and ref.count == part->count
+                and ref.freeWords == part->freeWords and (not ref.any or ref.firstStart == part->firstStart)
+                and (ref.count == 0 or memcmp(ref.spans, part->spans, ref.count * sizeof(Span)) == 0);
+    if (not same) {
+      fprintf(stderr,
+              "sweep verify FAILED in chunk %u: ends %u/%u/%u/%u scan %u/%u/%u/%u\n",
+              chunk,
+              part->any,
+              part->lastEnd,
+              part->count,
+              part->freeWords,
+              ref.any,
+              ref.lastEnd,
+              ref.count,
+              ref.freeWords);
+      abort();
+    }
+    ::free(ref.spans);
+  }
+}
+
 void* sweepMain(void* arg)
 {
   SweepJob* j = static_cast<SweepJob*>(arg);
@@ -1557,6 +1662,8 @@ bool sweepSpansParallel(Context* c, unsigned markWords, unsigned* previousEndOut
   job.markWords = markWords;
   job.chunks = ceilingDivide(markWords, SweepChunkWords);
   job.next = 0;
+  job.verify = getenv("SHIM_GC_VERIFY_SWEEP") != 0;
+  job.failed = false;
   job.parts = static_cast<SweepPart*>(::calloc(job.chunks, sizeof(SweepPart)));
   if (job.parts == 0) {
     return false;
@@ -1572,6 +1679,22 @@ bool sweepSpansParallel(Context* c, unsigned markWords, unsigned* previousEndOut
   sweepMain(&job);
   for (unsigned i = 0; i < started; ++i) {
     pthread_join(threads[i], 0);
+  }
+
+  uint64_t startTotal = 0;
+  uint64_t endTotal = 0;
+  for (unsigned i = 0; i < job.chunks; ++i) {
+    startTotal += job.parts[i].startBits;
+    endTotal += job.parts[i].endBits;
+  }
+  if (job.failed or startTotal != endTotal) {
+    fprintf(stderr, "gc sweep: end bits inconsistent (%llu starts, %llu ends), scanning objects instead\n",
+            static_cast<unsigned long long>(startTotal), static_cast<unsigned long long>(endTotal));
+    for (unsigned i = 0; i < job.chunks; ++i) {
+      ::free(job.parts[i].spans);
+    }
+    ::free(job.parts);
+    return false;
   }
 
   unsigned previousEnd = 0;
@@ -1638,6 +1761,7 @@ void sweepGen2(Context* c)
   }
 
   memset(c->markBits, 0, markWords * BytesPerWord);
+  memset(c->endBits, 0, markWords * BytesPerWord);
 
 #ifdef SHIM_HEAP_RESERVE
   // madvise operates on OS pages, not the logical 4 KiB GC map granule.
@@ -1718,6 +1842,7 @@ void releaseRetired(Context* c)
     c->retiredMemory = 0;
     c->markBits = 0;
     c->freshBits = 0;
+    c->endBits = 0;
   }
 #endif
 }
@@ -3353,6 +3478,20 @@ class MyHeap : public Heap {
         drainAll(&c);
     }
     killFixies(&c);
+  }
+
+  virtual bool inPlaceMajor()
+  {
+    return c.inPlace and c.mode == Heap::MajorCollection;
+  }
+
+  virtual void prefetchStatus(void* p)
+  {
+    p = maskAlignedPointer(p);
+    if (c.inPlace and c.mode == Heap::MajorCollection and c.gen2.contains(p)) {
+      unsigned i = gen2Index(&c, p);
+      __builtin_prefetch(c.markBits + wordOf(i));
+    }
   }
 
   virtual Status status(void* p)
