@@ -163,9 +163,7 @@ public final class Unsafe {
     return objectFieldOffset(field);
   }
 
-  public Object staticFieldBase(Field field) {
-    return field.getDeclaringClass();
-  }
+  public native Object staticFieldBase(Field field);
 
   public native void park(boolean absolute, long time);
 

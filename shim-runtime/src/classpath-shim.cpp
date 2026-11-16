@@ -737,6 +737,18 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
+    Shim_sun_misc_Unsafe_staticFieldBase(Thread* t,
+                                          object,
+                                          uintptr_t* arguments)
+{
+  return reinterpret_cast<int64_t>(
+      cast<GcJfield>(t, reinterpret_cast<object>(arguments[1]))
+          ->vmField()
+          ->class_()
+          ->staticTable());
+}
+
+extern "C" SHIM_EXPORT int64_t JNICALL
     Shim_sun_misc_Unsafe_allocateInstance0(Thread* t, object, uintptr_t* arguments)
 {
   GcClass* c = cast<GcJclass>(t, reinterpret_cast<object>(arguments[1]))->vmClass();
