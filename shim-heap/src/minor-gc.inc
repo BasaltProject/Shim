@@ -369,8 +369,20 @@ void addDoneFixie(Context* c, GcWorker* w, Fixie* f)
 
 class MajorWalker : public Heap::Walker {
  public:
-  MajorWalker(Context* c, GcWorker* w, void* object) : c(c), w(w), object(object)
+  MajorWalker(Context* c, GcWorker* w, void* object, Fixie* owner) : c(c), w(w), object(object), owner(owner)
   {
+  }
+
+  void recordYoungFixie(void** p, unsigned offset)
+  {
+    if (owner) {
+      if (static_cast<unsigned>(owner->age + 1) >= FixieTenureThreshold) {
+        __atomic_fetch_or(&owner->flags, static_cast<uint16_t>(Fixie::Dirty), __ATOMIC_RELAXED);
+        markBit(owner->mask(), offset);
+      }
+    } else if (c->gen2.contains(p)) {
+      markCard(c, p);
+    }
   }
 
   virtual bool visit(unsigned offset)
@@ -396,6 +408,10 @@ class MajorWalker : public Heap::Walker {
     }
     if (c->client->isFixed(o)) {
       Fixie* f = fixie(o);
+      // parity: the serial major mark leaves a card for every tenured slot that points to a young fixie
+      if (f->age < FixieTenureThreshold) {
+        recordYoungFixie(p, offset);
+      }
       if (f->tryMark()) {
         addDoneFixie(c, w, f);
         pushItem(c, w, reinterpret_cast<uintptr_t>(o) | 1);
@@ -416,6 +432,7 @@ class MajorWalker : public Heap::Walker {
   Context* c;
   GcWorker* w;
   void* object;
+  Fixie* owner;
 };
 
 class PrefetchWalker : public Heap::Walker {
@@ -436,7 +453,8 @@ class PrefetchWalker : public Heap::Walker {
 void scanItem(Context* c, GcWorker* w, uintptr_t item)
 {
   if (w->par->major) {
-    MajorWalker walker(c, w, reinterpret_cast<void*>(item & ~static_cast<uintptr_t>(1)));
+    void* body = reinterpret_cast<void*>(item & ~static_cast<uintptr_t>(1));
+    MajorWalker walker(c, w, body, (item & 1) ? fixie(body) : 0);
     if (not(item & 1)) {
       setGen2End(c, walker.object, c->client->sizeInWords(walker.object));
     }

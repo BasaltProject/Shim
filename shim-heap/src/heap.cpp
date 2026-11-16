@@ -2718,7 +2718,8 @@ void collect(Context* c,
 
 ParGc* makeParGcForContext(Context* c)
 {
-  unsigned minorThreads = 4;
+  // Parallel GC is opt-in (SHIM_GC_THREADS): helpers scanning objects corrupt class object masks.
+  unsigned minorThreads = 0;
   if (const char* e = getenv("SHIM_GC_THREADS")) {
     minorThreads = static_cast<unsigned>(atoi(e));
   }
@@ -2976,15 +2977,20 @@ void verifyHeap(Context* c)
 
   class ChildWalker : public Heap::Walker {
    public:
-    ChildWalker(void* object, VerifyState* st) : object(object), st(st) {}
+    ChildWalker(Context* c, void* object, VerifyState* st) : c(c), object(object), st(st) {}
     virtual bool visit(unsigned offset)
     {
       void* o = maskAlignedPointer(get(object, offset));
       if (o) {
+        if (c->inPlace and c->gen2.contains(object) and c->client->isFixed(o) and fixie(o)->age < FixieTenureThreshold
+            and not c->pointerMap.get(getp(object, offset))) {
+          verifyFail(c, object, o, "young fixie without a card");
+        }
         st->push(object, o);
       }
       return true;
     }
+    Context* c;
     void* object;
     VerifyState* st;
   };
@@ -2997,7 +3003,7 @@ void verifyHeap(Context* c)
     }
     verifyOk(c, e.owner, e.o);
     ++count;
-    ChildWalker w(e.o, &st);
+    ChildWalker w(c, e.o, &st);
     c->client->walk(e.o, &w);
   }
   ::free(st.work);
