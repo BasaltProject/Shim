@@ -305,7 +305,16 @@ public abstract class MethodHandle implements java.lang.constant.Constable {
 
     FieldMethodHandle(int kind, Field targetField) {
       super(kind, targetField.getDeclaringClass().getClassLoader(), null);
-      this.targetField = targetField;
+      this.targetField = writableCopy(kind, targetField);
+    }
+
+    private static Field writableCopy(int kind, Field field) {
+      if (kind == REF_putField && (field.getModifiers() & java.lang.reflect.Modifier.FINAL) != 0) {
+        Field copy = new Field(field.vmField);
+        copy.setAccessible(true);
+        return copy;
+      }
+      return field;
     }
 
     @Override

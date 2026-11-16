@@ -699,7 +699,7 @@ public final class Class <T>
   }
 
   public boolean isArray() {
-    return vmClass.arrayDimensions != 0;
+    return vmClass.arrayDimensions != 0 && vmClass.name != null && vmClass.name.length > 0 && vmClass.name[0] == '[';
   }
 
   public boolean isInstance(Object o) {
