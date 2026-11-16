@@ -95,10 +95,10 @@ class MyClasspath : public Classpath {
   {
     PROTECT(t, vmMethod);
 
-    GcJmethod* jmethod = makeJmethod(t, vmMethod, false);
+    GcJmethod* jmethod = makeJmethod(t, false, vmMethod);
 
     return vmMethod->name()->body()[0] == '<'
-               ? (object)makeJconstructor(t, jmethod, nullptr)
+               ? (object)makeJconstructor(t, false, jmethod, nullptr)
                : (object)jmethod;
   }
 
@@ -111,7 +111,7 @@ class MyClasspath : public Classpath {
 
   virtual object makeJField(Thread* t, GcField* vmField)
   {
-    return makeJfield(t, vmField, false, false);
+    return makeJfield(t, false, vmField, false, false);
   }
 
   virtual GcField* getVMField(Thread* t UNUSED, GcJfield* jfield)

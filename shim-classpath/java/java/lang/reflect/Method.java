@@ -32,7 +32,6 @@ import java.lang.annotation.Annotation;
 
 public final class Method extends Executable {
   public final VMMethod vmMethod;
-  private boolean accessible;
 
   public Method(VMMethod vmMethod) {
     this.vmMethod = vmMethod;
@@ -47,14 +46,14 @@ public final class Method extends Executable {
   }
 
   public boolean isAccessible() {
-    return accessible;
+    return override;
   }
 
   public void setAccessible(boolean v) {
     if (v) {
       checkCanSetAccessible(this, getDeclaringClass(), getModifiers());
     }
-    accessible = v;
+    override = v;
   }
 
   public static native VMMethod getCaller();
@@ -101,7 +100,7 @@ public final class Method extends Executable {
                                            + " is not an instance of " + getDeclaringClass().getName());
       }
     }
-    if (!accessible) {
+    if (!override) {
       checkInvoke(this, getDeclaringClass());
     }
     arguments = checkArguments(arguments);
