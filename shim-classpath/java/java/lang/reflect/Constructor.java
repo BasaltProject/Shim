@@ -61,6 +61,11 @@ public final class Constructor<T> extends Executable {
     return (Class<T>) method.getDeclaringClass();
   }
 
+  @Override
+  public Parameter[] getParameters() {
+    return method.parameters(this);
+  }
+
   public Class[] getParameterTypes() {
     return method.getParameterTypes();
   }

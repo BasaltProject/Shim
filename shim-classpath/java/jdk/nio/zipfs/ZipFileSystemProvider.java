@@ -270,7 +270,21 @@ public class ZipFileSystemProvider extends FileSystemProvider {
   @Override
   public FileChannel newFileChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs)
       throws IOException {
-    throw new UnsupportedOperationException();
+    for (OpenOption option : options) {
+      if (option == java.nio.file.StandardOpenOption.WRITE || option == java.nio.file.StandardOpenOption.APPEND
+          || option == java.nio.file.StandardOpenOption.CREATE || option == java.nio.file.StandardOpenOption.CREATE_NEW) {
+        throw new UnsupportedOperationException();
+      }
+    }
+    Path copy = Files.createTempFile("zipentry", ".tmp");
+    try (InputStream in = newInputStream(path)) {
+      Files.copy(in, copy, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+      return FileChannel.open(copy, java.nio.file.StandardOpenOption.READ,
+          java.nio.file.StandardOpenOption.DELETE_ON_CLOSE);
+    } catch (IOException | RuntimeException e) {
+      Files.deleteIfExists(copy);
+      throw e;
+    }
   }
 
   @Override

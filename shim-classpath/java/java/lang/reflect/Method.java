@@ -279,6 +279,36 @@ public final class Method extends Executable {
         Classes.getAnnotationDefaultValue(loader, vmMethod.addendum));
   }
 
+  @Override
+  public Parameter[] getParameters() {
+    return parameters(this);
+  }
+
+  Parameter[] parameters(Executable owner) {
+    Class<?>[] types = getParameterTypes();
+    Parameter[] params = new Parameter[types.length];
+    shim.MethodAddendum addendum = vmMethod.addendum;
+    byte[] raw = addendum != null && addendum.methodParameters instanceof byte[]
+        ? (byte[]) addendum.methodParameters : null;
+    boolean usable = raw != null && raw.length >= 1 && (raw[0] & 0xff) == types.length
+        && raw.length >= 1 + types.length * 4;
+    for (int i = 0; i < types.length; i++) {
+      String name = "arg" + i;
+      int flags = 0;
+      if (usable) {
+        int at = 1 + i * 4;
+        int index = ((raw[at] & 0xff) << 8) | (raw[at + 1] & 0xff);
+        flags = ((raw[at + 2] & 0xff) << 8) | (raw[at + 3] & 0xff);
+        if (index != 0) {
+          byte[] utf = (byte[]) shim.Singleton.getObject(addendum.pool, index - 1);
+          name = Classes.makeString(utf, 0, utf.length - 1);
+        }
+      }
+      params[i] = new Parameter(name, flags, owner, i, usable);
+    }
+    return params;
+  }
+
   public Annotation[][] getParameterAnnotations() {
     int count = getParameterCount();
     Classes.parseParameterAnnotations(vmMethod.class_.loader, vmMethod.addendum);

@@ -66,12 +66,12 @@ public final class StreamSupport {
 
   public static <T> Stream<T> stream(Spliterator<T> spliterator, boolean parallel) {
     Objects.requireNonNull(spliterator);
-    return new ReferencePipeline<>(spliterator, parallel);
+    return new ShimPipeline<>(spliterator, parallel);
   }
 
   public static <T> Stream<T> stream(Supplier<? extends Spliterator<T>> supplier, int characteristics, boolean parallel) {
     Objects.requireNonNull(supplier);
-    return new ReferencePipeline<>(supplier.get(), parallel);
+    return new ShimPipeline<>(supplier.get(), parallel);
   }
 
   public static IntStream intStream(Spliterator.OfInt spliterator, boolean parallel) {
@@ -119,18 +119,18 @@ public final class StreamSupport {
     return new DoublePipeline(Spliterators.spliteratorUnknownSize(iterator, characteristics), parallel);
   }
 
-  static class ReferencePipeline<T> implements Stream<T> {
+  static class ShimPipeline<T> extends ReferencePipeline<T> {
     private final Spliterator<T> spliterator;
     private final boolean parallel;
     private boolean linkedOrConsumed = false;
     private List<Runnable> closeHandlers = null;
 
-    ReferencePipeline(Spliterator<T> spliterator, boolean parallel) {
+    ShimPipeline(Spliterator<T> spliterator, boolean parallel) {
       this.spliterator = spliterator;
       this.parallel = parallel;
     }
 
-    ReferencePipeline(Spliterator<T> spliterator, boolean parallel, List<Runnable> closeHandlers) {
+    ShimPipeline(Spliterator<T> spliterator, boolean parallel, List<Runnable> closeHandlers) {
       this.spliterator = spliterator;
       this.parallel = parallel;
       if (closeHandlers != null) {
@@ -161,12 +161,12 @@ public final class StreamSupport {
 
     @Override
     public Stream<T> sequential() {
-      return parallel ? new ReferencePipeline<>(spliterator, false, closeHandlers) : this;
+      return parallel ? new ShimPipeline<>(spliterator, false, closeHandlers) : this;
     }
 
     @Override
     public Stream<T> parallel() {
-      return parallel ? this : new ReferencePipeline<>(spliterator, true, closeHandlers);
+      return parallel ? this : new ShimPipeline<>(spliterator, true, closeHandlers);
     }
 
     @Override
@@ -242,7 +242,7 @@ public final class StreamSupport {
           return next;
         }
       };
-      return new ReferencePipeline<>(
+      return new ShimPipeline<>(
           Spliterators.spliteratorUnknownSize(it, spliterator.characteristics() & ~Spliterator.SIZED),
           parallel,
           closeHandlers);
@@ -270,7 +270,7 @@ public final class StreamSupport {
       Spliterator<R> sp = size >= 0
           ? Spliterators.spliterator(it, size, flags)
           : Spliterators.spliteratorUnknownSize(it, flags);
-      return new ReferencePipeline<>(sp, parallel, closeHandlers);
+      return new ShimPipeline<>(sp, parallel, closeHandlers);
     }
 
     @Override
@@ -400,7 +400,7 @@ public final class StreamSupport {
           return cur.next();
         }
       };
-      return new ReferencePipeline<>(Spliterators.spliteratorUnknownSize(it, 0), parallel, closeHandlers);
+      return new ShimPipeline<>(Spliterators.spliteratorUnknownSize(it, 0), parallel, closeHandlers);
     }
 
     @Override
@@ -461,7 +461,7 @@ public final class StreamSupport {
           return next;
         }
       };
-      return new ReferencePipeline<>(
+      return new ShimPipeline<>(
           Spliterators.spliteratorUnknownSize(it, Spliterator.DISTINCT),
           parallel,
           closeHandlers);
@@ -482,7 +482,7 @@ public final class StreamSupport {
         list.add(it.next());
       }
       Collections.sort(list, comparator);
-      return new ReferencePipeline<>(
+      return new ShimPipeline<>(
           list.spliterator(),
           parallel,
           closeHandlers);
@@ -507,7 +507,7 @@ public final class StreamSupport {
           return val;
         }
       };
-      return new ReferencePipeline<>(
+      return new ShimPipeline<>(
           Spliterators.spliterator(it, spliterator.estimateSize(), spliterator.characteristics()),
           parallel,
           closeHandlers);
@@ -537,7 +537,7 @@ public final class StreamSupport {
         }
       };
       long est = Math.min(spliterator.estimateSize(), maxSize);
-      return new ReferencePipeline<>(
+      return new ShimPipeline<>(
           Spliterators.spliterator(it, est, spliterator.characteristics()),
           parallel,
           closeHandlers);
@@ -578,7 +578,7 @@ public final class StreamSupport {
         }
       };
       long est = Math.max(0L, spliterator.estimateSize() - n);
-      return new ReferencePipeline<>(
+      return new ShimPipeline<>(
           Spliterators.spliterator(it, est, spliterator.characteristics() & ~Spliterator.SIZED),
           parallel,
           closeHandlers);
@@ -899,7 +899,7 @@ public final class StreamSupport {
 
     @Override
     public Stream<Integer> boxed() {
-      ReferencePipeline<Integer> ref = new ReferencePipeline<>(new Spliterator<Integer>() {
+      ShimPipeline<Integer> ref = new ShimPipeline<>(new Spliterator<Integer>() {
         @Override
         public boolean tryAdvance(Consumer<? super Integer> action) {
           return spliterator.tryAdvance(action);
@@ -1176,7 +1176,7 @@ public final class StreamSupport {
 
     @Override
     public Stream<Long> boxed() {
-      return new ReferencePipeline<>(new Spliterator<Long>() {
+      return new ShimPipeline<>(new Spliterator<Long>() {
         @Override
         public boolean tryAdvance(Consumer<? super Long> action) {
           return spliterator.tryAdvance(action);
@@ -1447,7 +1447,7 @@ public final class StreamSupport {
 
     @Override
     public Stream<Double> boxed() {
-      return new ReferencePipeline<>(new Spliterator<Double>() {
+      return new ShimPipeline<>(new Spliterator<Double>() {
         @Override
         public boolean tryAdvance(Consumer<? super Double> action) {
           return spliterator.tryAdvance(action);

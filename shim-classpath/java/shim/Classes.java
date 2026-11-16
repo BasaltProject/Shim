@@ -412,6 +412,10 @@ public class Classes {
   }
 
   private static void linkDeclaredMethods(VMClass c, boolean constructors, boolean publicOnly) {
+    linkDeclaredMethods(c, constructors, publicOnly, null);
+  }
+
+  private static void linkDeclaredMethods(VMClass c, boolean constructors, boolean publicOnly, String only) {
     link(c);
     if (c.methodTable == null) return;
     int mode = 1 << ((constructors ? 2 : 0) + (publicOnly ? 0 : 1));
@@ -424,9 +428,11 @@ public class Classes {
       String name = toString(method.name);
       boolean constructor = name.equals("<init>");
       if ((constructors ? !constructor : name.startsWith("<"))
-          || (publicOnly && (method.flags & Modifier.PUBLIC) == 0)) continue;
+          || (publicOnly && (method.flags & Modifier.PUBLIC) == 0)
+          || (only != null && !name.equals(only))) continue;
       for (int j = 1; j < method.spec.length;) j = resolveSpec(c.loader, method.spec, j);
     }
+    if (only != null) return;
     // Publish only after successful resolution. A failed optional signature must
     // still fail (or be retried after its dependency becomes available).
     synchronized (linkedDeclaredMethods) {
@@ -677,7 +683,7 @@ public class Classes {
   }
 
   public static Method[] getPublicMethodsNamed(VMClass vmClass, String name) {
-    linkDeclaredMethods(vmClass, false, true);
+    linkDeclaredMethods(vmClass, false, true, name);
     VMMethod[] table = vmClass.methodTable;
     if (table == null) return new Method[0];
     boolean ascii = true;

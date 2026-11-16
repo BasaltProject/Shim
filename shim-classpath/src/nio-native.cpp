@@ -127,7 +127,7 @@ jint statxFill(JNIEnv* e, jlongArray out, int dirfd, const char* path, int flags
 
 }  // namespace
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_statx(JNIEnv* e, jclass, jstring path, jlongArray out,
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_statx0(JNIEnv* e, jclass, jstring path, jlongArray out,
                                                             jboolean follow)
 {
   Utf8 p(e, path);
@@ -195,7 +195,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_fstatx(JNIEnv* e, jclass, 
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_symlink(JNIEnv* e, jclass, jstring target, jstring link)
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_symlink0(JNIEnv* e, jclass, jstring target, jstring link)
 {
 #ifdef PLATFORM_WINDOWS
   return -ENOSYS;
@@ -209,7 +209,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_symlink(JNIEnv* e, jclass,
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_readlink(JNIEnv* e, jclass, jstring path, jobjectArray out)
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_readlink0(JNIEnv* e, jclass, jstring path, jobjectArray out)
 {
 #ifdef PLATFORM_WINDOWS
   return -ENOSYS;
@@ -229,7 +229,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_readlink(JNIEnv* e, jclass
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_link(JNIEnv* e, jclass, jstring existing, jstring newLink)
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_link0(JNIEnv* e, jclass, jstring existing, jstring newLink)
 {
 #ifdef PLATFORM_WINDOWS
   return -ENOSYS;
@@ -243,7 +243,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_link(JNIEnv* e, jclass, js
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_chown(JNIEnv* e, jclass, jstring path, jint uid, jint gid,
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_chown0(JNIEnv* e, jclass, jstring path, jint uid, jint gid,
                                                             jboolean follow)
 {
 #ifdef PLATFORM_WINDOWS
@@ -259,7 +259,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_chown(JNIEnv* e, jclass, j
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_chmod(JNIEnv* e, jclass, jstring path, jint mode)
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_chmod0(JNIEnv* e, jclass, jstring path, jint mode)
 {
   Utf8 p(e, path);
   if (p.chars == 0) {
@@ -276,7 +276,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_chmod(JNIEnv* e, jclass, j
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_utimens(JNIEnv* e, jclass, jstring path, jlong atimeSec,
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_utimens0(JNIEnv* e, jclass, jstring path, jlong atimeSec,
                                                               jlong atimeNsec, jlong mtimeSec, jlong mtimeNsec,
                                                               jboolean follow)
 {
@@ -296,7 +296,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_utimens(JNIEnv* e, jclass,
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_fsinfo(JNIEnv* e, jclass, jstring path, jlongArray out)
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_fsinfo0(JNIEnv* e, jclass, jstring path, jlongArray out)
 {
 #ifdef PLATFORM_WINDOWS
   return -ENOSYS;
@@ -388,7 +388,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_shim_NioNative_groupId(JNIEnv* e, jclass
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_listxattr(JNIEnv* e, jclass, jstring path, jbyteArray buf,
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_listxattr0(JNIEnv* e, jclass, jstring path, jbyteArray buf,
                                                                 jboolean follow)
 {
 #if defined(__linux__)
@@ -413,7 +413,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_listxattr(JNIEnv* e, jclas
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_getxattr(JNIEnv* e, jclass, jstring path, jstring name,
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_getxattr0(JNIEnv* e, jclass, jstring path, jstring name,
                                                                jbyteArray buf, jint off, jint len, jboolean follow)
 {
 #if defined(__linux__)
@@ -439,7 +439,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_getxattr(JNIEnv* e, jclass
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_setxattr(JNIEnv* e, jclass, jstring path, jstring name,
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_setxattr0(JNIEnv* e, jclass, jstring path, jstring name,
                                                                jbyteArray buf, jint off, jint len)
 {
 #if defined(__linux__)
@@ -460,7 +460,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_setxattr(JNIEnv* e, jclass
 #endif
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_removexattr(JNIEnv* e, jclass, jstring path, jstring name)
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_removexattr0(JNIEnv* e, jclass, jstring path, jstring name)
 {
 #if defined(__linux__)
   Utf8 p(e, path);
@@ -590,7 +590,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_errnoValue(JNIEnv*, jclass
   }
 }
 
-extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_realpath(JNIEnv* e, jclass, jstring path, jobjectArray out)
+extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_realpath0(JNIEnv* e, jclass, jstring path, jobjectArray out)
 {
 #ifdef PLATFORM_WINDOWS
   return -ENOSYS;
@@ -608,7 +608,7 @@ extern "C" JNIEXPORT jint JNICALL Java_shim_NioNative_realpath(JNIEnv* e, jclass
 #endif
 }
 
-extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_NioNative_listdir(JNIEnv* e, jclass, jstring path, jintArray errOut)
+extern "C" JNIEXPORT jobjectArray JNICALL Java_shim_NioNative_listdir0(JNIEnv* e, jclass, jstring path, jintArray errOut)
 {
 #ifdef PLATFORM_WINDOWS
   jint code = -ENOSYS;

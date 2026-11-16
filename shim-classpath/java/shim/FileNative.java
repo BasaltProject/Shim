@@ -110,6 +110,10 @@ public final class FileNative {
     mapper = function;
   }
 
+  public static String mapPath(String path, int operation) {
+    return map(path, operation);
+  }
+
   private static String map(String path, int operation) {
     java.util.function.BiFunction<String, Integer, String> function = mapper;
     if (function == null || path == null || MAPPING.get() != null) {

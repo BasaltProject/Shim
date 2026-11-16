@@ -18,7 +18,14 @@ public final class Parameter implements AnnotatedElement {
   private final Executable executable;
   private final int index;
 
+  private final boolean namePresent;
+
   public Parameter(String name, int modifiers, Executable executable, int index) {
+    this(name, modifiers, executable, index, false);
+  }
+
+  Parameter(String name, int modifiers, Executable executable, int index, boolean namePresent) {
+    this.namePresent = namePresent;
     this.name = Objects.requireNonNull(name);
     this.modifiers = modifiers;
     this.executable = Objects.requireNonNull(executable);
@@ -66,7 +73,7 @@ public final class Parameter implements AnnotatedElement {
   }
 
   public boolean isNamePresent() {
-    return false;
+    return namePresent;
   }
 
   @Override

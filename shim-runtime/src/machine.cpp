@@ -2876,7 +2876,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
         } else if (vm::strcmp(reinterpret_cast<const int8_t*>("Exceptions"),
                               attributeName->body().begin()) == 0) {
           if (addendum == 0) {
-            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0);
+            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0, 0);
           }
           unsigned exceptionCount = s.read2();
           GcShortArray* body = makeShortArray(t, exceptionCount);
@@ -2888,7 +2888,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
                        reinterpret_cast<const int8_t*>("AnnotationDefault"),
                        attributeName->body().begin()) == 0) {
           if (addendum == 0) {
-            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0);
+            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0, 0);
           }
 
           GcByteArray* body = makeByteArray(t, length);
@@ -2898,7 +2898,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
         } else if (vm::strcmp(reinterpret_cast<const int8_t*>("Signature"),
                               attributeName->body().begin()) == 0) {
           if (addendum == 0) {
-            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0);
+            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0, 0);
           }
 
           addendum->setSignature(t, singletonObject(t, pool, s.read2() - 1));
@@ -2906,7 +2906,7 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
                                   "RuntimeVisibleAnnotations"),
                               attributeName->body().begin()) == 0) {
           if (addendum == 0) {
-            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0);
+            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0, 0);
           }
 
           GcByteArray* body = makeByteArray(t, length);
@@ -2917,13 +2917,23 @@ void parseMethodTable(Thread* t, Stream& s, GcClass* class_, GcSingleton* pool, 
                                   "RuntimeVisibleParameterAnnotations"),
                               attributeName->body().begin()) == 0) {
           if (addendum == 0) {
-            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0);
+            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0, 0);
           }
 
           GcByteArray* body = makeByteArray(t, length);
           s.read(reinterpret_cast<uint8_t*>(body->body().begin()), length);
 
           addendum->setParameterAnnotationTable(t, body);
+        } else if (vm::strcmp(reinterpret_cast<const int8_t*>("MethodParameters"),
+                              attributeName->body().begin()) == 0) {
+          if (addendum == 0) {
+            addendum = makeMethodAddendum(t, pool, 0, 0, 0, 0, 0, 0);
+          }
+
+          GcByteArray* body = makeByteArray(t, length);
+          s.read(reinterpret_cast<uint8_t*>(body->body().begin()), length);
+
+          addendum->setMethodParameters(t, body);
         } else {
           s.skip(length);
         }

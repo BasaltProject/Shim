@@ -36,6 +36,11 @@ public class ThreadImpl implements com.sun.management.ThreadMXBean {
   }
 
   @Override
+  public long getTotalThreadAllocatedBytes() {
+    return 0;
+  }
+
+  @Override
   public boolean isThreadAllocatedMemorySupported() {
     return true;
   }

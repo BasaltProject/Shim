@@ -595,7 +595,7 @@ public final class Class <T>
             if (reference.outer != null) {
               try {
                 return vmClass.loader.loadClass
-                  (new String(reference.outer, 0, reference.outer.length - 1));
+                  (new String(reference.outer, 0, reference.outer.length - 1).replace('/', '.'));
               } catch (ClassNotFoundException e) {
                 throw new Error(e);
               }

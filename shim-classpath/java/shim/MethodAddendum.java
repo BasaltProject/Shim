@@ -27,4 +27,5 @@ public class MethodAddendum extends Addendum {
   public Object exceptionTable;
   public Object annotationDefault;
   public Object parameterAnnotationTable;
+  public Object methodParameters;
 }
