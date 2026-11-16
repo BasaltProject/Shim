@@ -393,7 +393,8 @@ object findInInterfaces(
   object result = 0;
   if (GcArray* itable = cast<GcArray>(t, class_->interfaceTable())) {
     PROTECT(t, itable);
-    for (unsigned i = 0; i < itable->length() and result == 0; i += 2) {
+    unsigned stride = (class_->flags() & ACC_INTERFACE) ? 1 : 2;
+    for (unsigned i = 0; i < itable->length() and result == 0; i += stride) {
       result = find(t, cast<GcClass>(t, itable->body()[i]), name, spec);
     }
   }
