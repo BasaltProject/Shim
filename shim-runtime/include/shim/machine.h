@@ -2828,7 +2828,11 @@ inline GcMethod* findInterfaceMethod(Thread* t,
       return cast<GcMethod>(t, row->body()[method->offset()]);
     }
   }
-  abort(t);
+  throwNew(t,
+           GcIncompatibleClassChangeError::Type,
+           "Class %s does not implement the requested interface %s",
+           class_->name()->body().begin(),
+           interface->name()->body().begin());
 }
 
 inline unsigned objectArrayLength(Thread* t UNUSED, object array)

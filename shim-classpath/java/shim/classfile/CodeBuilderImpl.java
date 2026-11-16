@@ -112,7 +112,14 @@ public class CodeBuilderImpl implements CodeBuilder, LabelContext {
     /** The parsed body this one is transformed from, or null. */
     public CodeModel original() { return original; }
 
-    void setOriginal(CodeModel original) { this.original = original; }
+    void setOriginal(CodeModel original) {
+        this.original = original;
+        if (original instanceof java.lang.classfile.attribute.CodeAttribute) {
+            int locals = ((java.lang.classfile.attribute.CodeAttribute) original).maxLocals();
+            topLocal = Math.max(topLocal, locals);
+            maxLocal = Math.max(maxLocal, locals);
+        }
+    }
 
     /** The highest local slot count reached by the parameters and {@link #allocateLocal}. */
     public int allocatedLocals() { return maxLocal; }
