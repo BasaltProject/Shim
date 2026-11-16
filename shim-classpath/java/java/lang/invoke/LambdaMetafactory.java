@@ -716,6 +716,16 @@ public final class LambdaMetafactory {
     return out.toByteArray();
   }
 
+  private static ClassLoader defineLoader(MethodType invokedType, MethodHandle implementation) {
+    ClassLoader own = implementation.method.class_.loader;
+    ClassLoader system = ClassLoader.getSystemClassLoader();
+    if (own != null && own != invokedType.loader && own != system && own != shim.SystemClassLoader.bootLoader()
+        && own.getClass().getName().endsWith("PluginClassLoader")) {
+      return own;
+    }
+    return invokedType.loader;
+  }
+
   private static CallSite makeCallSite(MethodType invokedType, byte[] classData, MethodHandle implementation)
       throws AssertionError {
     try {
@@ -724,7 +734,7 @@ public final class LambdaMetafactory {
                       (MethodHandle.REF_invokeStatic, invokedType.loader, Classes.toVMMethod
                               (shim.SystemClassLoader.getClass
                                       (shim.Classes.defineLambdaVMClass
-                                              (invokedType.loader, classData, implementation.method.class_))
+                                              (defineLoader(invokedType, implementation), classData, implementation.method.class_))
                                       .getMethod("make", invokedType.parameterArray()))));
     } catch (NoSuchMethodException e) {
       AssertionError error = new AssertionError();
