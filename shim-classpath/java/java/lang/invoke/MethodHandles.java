@@ -814,6 +814,9 @@ public final class MethodHandles {
     public static final int UNCONDITIONAL = 0x0020;
     public static final int ORIGINAL = 0x0040;
 
+    private static final int TRUSTED = -1;
+    static final Lookup IMPL_LOOKUP = new Lookup(shim.Classes.toVMClass(Object.class), TRUSTED);
+
     final shim.VMClass class_;
     private final int modes;
     private Class<?> previous;
@@ -875,7 +878,7 @@ public final class MethodHandles {
 
     private boolean classAccessible(Class<?> c) {
       while (c.isArray()) c = c.getComponentType();
-      if (c.isPrimitive() || Modifier.isPublic(c.getModifiers())) return true;
+      if (modes == TRUSTED || c.isPrimitive() || Modifier.isPublic(c.getModifiers())) return true;
       Class<?> from = lookupClass();
       return c == from || ((modes & PACKAGE) != 0 && samePackage(from, c));
     }
@@ -883,6 +886,7 @@ public final class MethodHandles {
     private void checkAccess(Class<?> refc, Class<?> declaring, int flags, String what) throws IllegalAccessException {
       Class<?> from = lookupClass();
       boolean allowed = classAccessible(refc);
+      if (modes == TRUSTED) return;
       if (allowed && !Modifier.isPublic(flags)) {
         if (Modifier.isPrivate(flags)) {
           allowed = (modes & PRIVATE) != 0 && from.isNestmateOf(declaring);
