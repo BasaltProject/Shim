@@ -38,29 +38,18 @@ public class AccessibleObject implements AnnotatedElement {
     return getAnnotation(class_) != null;
   }
 
-  private static java.util.Map<AccessibleObject, Boolean> overrides;
+  boolean override;
 
   protected AccessibleObject() {
   }
 
   @Deprecated(since = "9")
   public boolean isAccessible() {
-    synchronized (AccessibleObject.class) {
-      return overrides != null && overrides.containsKey(this);
-    }
+    return override;
   }
 
   public void setAccessible(boolean v) {
-    synchronized (AccessibleObject.class) {
-      if (overrides == null) {
-        overrides = new java.util.WeakHashMap<AccessibleObject, Boolean>();
-      }
-      if (v) {
-        overrides.put(this, Boolean.TRUE);
-      } else {
-        overrides.remove(this);
-      }
-    }
+    override = v;
   }
 
   public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
