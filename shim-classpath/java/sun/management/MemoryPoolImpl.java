@@ -109,7 +109,7 @@ public class MemoryPoolImpl implements MemoryPoolMXBean {
 
   @Override
   public MemoryUsage getCollectionUsage() {
-    return null;
+    return type == MemoryType.HEAP ? getUsage() : null;
   }
 
   @Override

@@ -255,6 +255,9 @@ public final class System {
   private static native String doMapLibraryName(String name);
 
   public static void load(String path) {
+    if (path != null && path.contains("libasyncProfiler")) {
+      throw new UnsatisfiedLinkError("The async profiler needs the HotSpot tool interface, which this VM lacks");
+    }
     ClassLoader.load(path, ClassLoader.getCaller(), false);
   }
 

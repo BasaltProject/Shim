@@ -352,6 +352,9 @@ public final class Runtime {
   }
 
   public void load(String path) {
+    if (path != null && path.contains("libasyncProfiler")) {
+      throw new UnsatisfiedLinkError("The async profiler needs the HotSpot tool interface, which this VM lacks");
+    }
     if (path != null) {
       ClassLoader.load(path, ClassLoader.getCaller(), false);
     } else {
