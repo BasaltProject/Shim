@@ -737,7 +737,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_sun_misc_Unsafe_staticFieldBase(Thread* t,
+    Shim_sun_misc_Unsafe_staticFieldBase0(Thread* t,
                                           object,
                                           uintptr_t* arguments)
 {
