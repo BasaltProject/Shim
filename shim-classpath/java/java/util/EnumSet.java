@@ -74,6 +74,9 @@ public abstract class EnumSet<T extends Enum<T>> extends AbstractSet<T> implemen
   
   @Override
   public boolean remove(Object toRemove) {
+    if (!(toRemove instanceof Enum)) {
+      return false;
+    }
     T element =  tryToCast(toRemove);
     
     int index = element.ordinal();
@@ -87,6 +90,9 @@ public abstract class EnumSet<T extends Enum<T>> extends AbstractSet<T> implemen
   
   @Override
   public boolean contains(Object toCheck) {
+    if (!(toCheck instanceof Enum)) {
+      return false;
+    }
     T element =  tryToCast(toCheck);
     int index = element.ordinal();
     return bitset.get(index);
