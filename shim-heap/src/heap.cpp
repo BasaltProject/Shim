@@ -2718,8 +2718,7 @@ void collect(Context* c,
 
 ParGc* makeParGcForContext(Context* c)
 {
-  // Parallel GC is opt-in (SHIM_GC_THREADS): helpers scanning objects corrupt class object masks.
-  unsigned minorThreads = 0;
+  unsigned minorThreads = 4;
   if (const char* e = getenv("SHIM_GC_THREADS")) {
     minorThreads = static_cast<unsigned>(atoi(e));
   }

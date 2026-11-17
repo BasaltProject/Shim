@@ -1022,12 +1022,26 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   return reinterpret_cast<intptr_t>(array);
 }
 
+// Plugins written for HotSpot use the Class mirror as the base of static field offsets.
+static object unsafeBase(Thread* t, object o, int64_t offset)
+{
+  if (o and offset >= static_cast<int64_t>(GcJclass::FixedSize)
+      and objectClass(t, o) == type(t, GcJclass::Type)) {
+    object table = cast<GcJclass>(t, o)->vmClass()->staticTable();
+    if (table) {
+      return table;
+    }
+  }
+  return o;
+}
+
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_sun_misc_Unsafe_getObject(Thread*, object, uintptr_t* arguments)
+    Shim_sun_misc_Unsafe_getObject(Thread* t, object, uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
 
   return fieldAtOffset<uintptr_t>(o, offset);
 }
@@ -1038,6 +1052,7 @@ extern "C" SHIM_EXPORT void JNICALL
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
   uintptr_t value = arguments[4];
 
   setField(t, o, offset, reinterpret_cast<object>(value));
@@ -1051,6 +1066,7 @@ extern "C" SHIM_EXPORT void JNICALL
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
   object value = reinterpret_cast<object>(arguments[4]);
 
   storeStoreMemoryBarrier();
@@ -1067,13 +1083,14 @@ extern "C" SHIM_EXPORT void JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_sun_misc_Unsafe_getObjectVolatile(Thread*,
+    Shim_sun_misc_Unsafe_getObjectVolatile(Thread* t,
                                             object,
                                             uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
 
   uintptr_t value = fieldAtOffset<uintptr_t>(o, offset);
   loadMemoryBarrier();
@@ -1088,6 +1105,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   object target = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  target = unsafeBase(t, target, offset);
   uintptr_t expect = arguments[4];
   uintptr_t update = arguments[5];
 
@@ -1102,13 +1120,14 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_sun_misc_Unsafe_compareAndSwapInt(Thread*,
+    Shim_sun_misc_Unsafe_compareAndSwapInt(Thread* t,
                                             object,
                                             uintptr_t* arguments)
 {
   object target = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  target = unsafeBase(t, target, offset);
   uint32_t expect = arguments[4];
   uint32_t update = arguments[5];
 
@@ -1124,6 +1143,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   object target = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  target = unsafeBase(t, target, offset);
   uint64_t expect;
   memcpy(&expect, arguments + 4, 8);
   uint64_t update;
@@ -1152,6 +1172,7 @@ extern "C" SHIM_EXPORT int64_t JNICALL
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
 
   object lock;
   if (BytesPerWord < 8) {
@@ -1185,6 +1206,7 @@ extern "C" SHIM_EXPORT void JNICALL
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
   int64_t value;
   memcpy(&value, arguments + 4, 8);
 
@@ -1279,11 +1301,12 @@ extern "C" SHIM_EXPORT void JNICALL
 }
 
 extern "C" SHIM_EXPORT void JNICALL
-    Shim_sun_misc_Unsafe_putIntVolatile(Thread*, object, uintptr_t* arguments)
+    Shim_sun_misc_Unsafe_putIntVolatile(Thread* t, object, uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
   int32_t value = arguments[4];
 
   storeStoreMemoryBarrier();
@@ -1300,11 +1323,12 @@ extern "C" SHIM_EXPORT void JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_sun_misc_Unsafe_getIntVolatile(Thread*, object, uintptr_t* arguments)
+    Shim_sun_misc_Unsafe_getIntVolatile(Thread* t, object, uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
 
   int32_t result = fieldAtOffset<int32_t>(o, offset);
   loadMemoryBarrier();
@@ -1312,11 +1336,12 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT void JNICALL
-    Shim_sun_misc_Unsafe_putByteVolatile(Thread*, object, uintptr_t* arguments)
+    Shim_sun_misc_Unsafe_putByteVolatile(Thread* t, object, uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
   int8_t value = arguments[4];
 
   storeStoreMemoryBarrier();
@@ -1325,11 +1350,12 @@ extern "C" SHIM_EXPORT void JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_sun_misc_Unsafe_getByteVolatile(Thread*, object, uintptr_t* arguments)
+    Shim_sun_misc_Unsafe_getByteVolatile(Thread* t, object, uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
 
   int8_t result = fieldAtOffset<int8_t>(o, offset);
   loadMemoryBarrier();
@@ -1353,13 +1379,14 @@ extern "C" SHIM_EXPORT int64_t JNICALL
 }
 
 extern "C" SHIM_EXPORT void JNICALL
-    Shim_sun_misc_Unsafe_putShortVolatile(Thread*,
+    Shim_sun_misc_Unsafe_putShortVolatile(Thread* t,
                                            object,
                                            uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
   int16_t value = arguments[4];
 
   storeStoreMemoryBarrier();
@@ -1368,13 +1395,14 @@ extern "C" SHIM_EXPORT void JNICALL
 }
 
 extern "C" SHIM_EXPORT int64_t JNICALL
-    Shim_sun_misc_Unsafe_getShortVolatile(Thread*,
+    Shim_sun_misc_Unsafe_getShortVolatile(Thread* t,
                                            object,
                                            uintptr_t* arguments)
 {
   object o = reinterpret_cast<object>(arguments[1]);
   int64_t offset;
   memcpy(&offset, arguments + 2, 8);
+  o = unsafeBase(t, o, offset);
 
   int16_t result = fieldAtOffset<int16_t>(o, offset);
   loadMemoryBarrier();
