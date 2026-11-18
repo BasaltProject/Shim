@@ -26,56 +26,26 @@ SPDX-License-Identifier: MIT
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
 </p>
 
-## Overview
+## About
 
-Basalt Shim is a fork of [Avian](https://github.com/ReadyTalk/avian) focused on
-modernizing its lightweight Java virtual machine for modern Java LTS releases.
-The initial target is **Java 25 LTS**. Avian's original technical documentation
-is preserved in [the upstream reference](docs/upstream/avian.md).
+Basalt Shim is a fork of [Avian](https://github.com/ReadyTalk/avian) that modernizes its lightweight Java virtual
+machine for modern Java LTS releases, starting with **Java 25**. Java 25 conformance is still in progress.
 
-Shim is an independent runtime project within the Basalt ecosystem. Its scope
-is the VM and the Java class library support needed to execute Java bytecode:
-class loading, verification, execution, memory management and native interfaces.
+Shim is an independent project: it was born for Basalt, but it is a general purpose VM you can embed in any
+application that needs to run Java bytecode, with no JDK or JRE installed on the host. Its scope is the VM and the
+class library support needed to run that bytecode.
 
-The organization's motivation is to run Bukkit, Spigot and Paper `.jar` plugins
-without requiring an external JVM installation or process. Basalt Server does
-this today: it embeds Shim in its binary and starts it only when a jar is present
-in `plugins-bukkit/`. The Bukkit API and plugin lifecycle live in a Server module,
-not in Shim, which only provides Java bytecode execution. BungeeCord and Velocity
-adapters are planned as modules of Proxy.
-
-Java 25 conformance is still in progress.
+Within Basalt it is one of the layers that make Java plugins possible. Server embeds it in its binary and starts it
+only when a plugin jar is present, and [Stratum](https://github.com/BasaltProject/Stratum) provides the Bukkit,
+BungeeCord and Velocity APIs on top of it. Avian's original documentation is kept in
+[docs/upstream](docs/upstream/avian.md).
 
 ## Releases
 
-Every push to `main` publishes a release named `<year>.<n>` (for example `26.5`), where `n` counts
-the releases of that year and starts over in January. Each one carries a
-`shim-<version>-<platform>.tar.gz` for Linux (glibc and musl), Windows, macOS, FreeBSD and Android, each on x64 and arm64, holding the `shim` executable, `libjvm`, `classpath.jar` and the licenses, plus a
-`SHA256SUMS` file.
+Every push to `main` publishes a release named `<year>.<n>` with a `shim-<version>-<platform>.tar.gz` for Linux (glibc
+and musl), Windows, macOS, FreeBSD and Android, on x64 and arm64, plus `SHA256SUMS`.
 
-## Project layout
-
-| Directory | Responsibility |
-|---|---|
-| `shim-runtime/` | VM execution, class loading, JNI entry points and embedding |
-| `shim-codegen/` | Compiler, intermediate representation and architecture backends |
-| `shim-classpath/` | Java class library, native library methods and OpenJDK adapters |
-| `shim-system/` | Operating system services, memory and signal handling |
-| `shim-heap/` | Heap and garbage collection support |
-| `shim-util/` | Shared native utilities |
-| `shim-tools/` | Type generation, object writing and binary embedding tools |
-| `shim-tests/` | Native unit tests and Java compatibility tests |
-| `cmake/` | Build configuration |
-| `tools/` | Test runner and debugging support |
-| `docs/` | Documentation, upstream reference and license notices |
-
-Native modules keep headers in `include/shim/` and implementations in `src/`.
-The class library lives in `shim-classpath/java/`; its native methods live in
-`shim-classpath/src/`.
-
-CMake builds everything: the VM (`libjvm`, `libshim.a`, the `shim` executables),
-`classpath.jar`, the tools and the tests. It needs CMake 3.28 or newer, Clang and a
-JDK 25 or newer (set `JAVA_HOME`, or `-DSHIM_JAVA_HOME=<jdk>`) for `javac` and the JNI headers.
+## Building
 
 ```bash
 cmake -S . -B build -G Ninja
@@ -83,23 +53,12 @@ cmake --build build
 ctest --test-dir build
 ```
 
-| Option | Default | Effect |
-|---|---|---|
-| `SHIM_PROCESS` | `compile` (`interpret` on Apple Silicon) | JIT compiler or interpreter |
-| `SHIM_MODE` | `fast` | `debug`, `debug-fast`, `fast`, `stress`, `stress-major` or `small` |
-| `SHIM_FRAME_POINTER` | `OFF` | Keep frame pointers so native stacks can be walked |
-| `SHIM_TAILS`, `SHIM_CONTINUATIONS` | `OFF` | Tail calls and continuations (x86 only) |
-| `SHIM_LTO` | `OFF` | Link time optimization |
-| `SHIM_WERROR` | `OFF` | Warnings as errors |
-
-Linux (glibc and musl), Android, macOS, Windows (MinGW-w64 toolchain, not MSVC) and FreeBSD are supported on x64 and arm64; CI builds and tests all twelve targets.
+Needs CMake 3.28+, Clang and a JDK 25+ (`JAVA_HOME`, or `-DSHIM_JAVA_HOME=<jdk>`) for `javac` and the JNI headers.
+Windows builds use the MinGW-w64 toolchain, not MSVC.
 
 ## License
 
-The original material in this repository is distributed under the [MIT License](LICENSE).
-Avian's original code retains its [ISC License](LICENSE.txt). Basalt Shim
-modifications use MIT. Third-party components retain their respective licenses;
-see [third-party notices](docs/licenses/third-party.md).
+The original material is under the [MIT License](LICENSE). Avian's code keeps its [ISC License](LICENSE.txt), and
+third-party components keep theirs; see the [notices](docs/licenses/third-party.md).
 
-Basalt is not affiliated with Mojang Studios or Microsoft. Minecraft is a
-trademark of Mojang Studios.
+Basalt is not affiliated with Mojang Studios or Microsoft. Minecraft is a trademark of Mojang Studios.
