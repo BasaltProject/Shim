@@ -1534,7 +1534,40 @@ extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_disconnect(JNIEnv* e, jcla
 extern "C" JNIEXPORT void JNICALL Java_shim_NetNative_socketPair(JNIEnv* e, jclass, jlongArray out)
 {
 #ifdef PLATFORM_WINDOWS
-  throwNew(e, "java/io/IOException", "Pipes are not supported on this platform");
+  ensureStarted();
+  NetHandle listener = ::socket(AF_INET, SOCK_STREAM, 0);
+  NetHandle client = ::socket(AF_INET, SOCK_STREAM, 0);
+  NetHandle server = NET_INVALID;
+  struct sockaddr_in address;
+  memset(&address, 0, sizeof(address));
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  NetLen length = sizeof(address);
+  bool paired = listener != NET_INVALID && client != NET_INVALID &&
+                ::bind(listener, reinterpret_cast<struct sockaddr*>(&address), sizeof(address)) == 0 &&
+                ::listen(listener, 1) == 0 &&
+                ::getsockname(listener, reinterpret_cast<struct sockaddr*>(&address), &length) == 0 &&
+                ::connect(client, reinterpret_cast<struct sockaddr*>(&address), sizeof(address)) == 0;
+  if (paired) {
+    server = ::accept(listener, nullptr, nullptr);
+    paired = server != NET_INVALID;
+  }
+  int err = paired ? 0 : NET_ERRNO();
+  if (listener != NET_INVALID) {
+    NET_CLOSE(listener);
+  }
+  if (!paired) {
+    if (client != NET_INVALID) {
+      NET_CLOSE(client);
+    }
+    throwForError(e, err, "socketpair");
+    return;
+  }
+  NetOptVal on = 1;
+  setsockopt(client, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&on), sizeof(on));
+  setsockopt(server, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&on), sizeof(on));
+  jlong pair[2] = {static_cast<jlong>(client), static_cast<jlong>(server)};
+  e->SetLongArrayRegion(out, 0, 2, pair);
 #else
   int fds[2];
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
